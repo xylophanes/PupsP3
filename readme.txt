@@ -3,6 +3,7 @@ functions have been replaced by their snprintf(), strlcpy() and
 strlcat() replacments which are not susceptable to buffer overuns.
 In addition, checkpoiting functionality (via Criu) has been added
 and a number of minor bugs found and squashed.
+
 --------------------------------------------------------------------------
 
 The 4.0.3 release rationalises varibale passing to the core PUPS/P3
