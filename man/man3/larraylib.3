@@ -1,0 +1,459 @@
+.\" WARNING! THIS FILE WAS GENERATED AUTOMATICALLY BY c2man!
+.\" DO NOT EDIT! CHANGES MADE TO THIS FILE WILL BE LOST!
+.TH "larray" 3 "24 January 2018" "c2man larray.h"
+.SH "NAME"
+lvector_destroy,
+lmatrix_destroy,
+lmatrix_create,
+lvector_create,
+lmatrix_copy,
+lvector_copy,
+lvector_deflate,
+lmatrix_deflate,
+lvector_inflate,
+lmatrix_inflate,
+fastResetPatternVector,
+lvector_get_list_value,
+lvector_get_component_value,
+lmatrix_get_list_value,
+lmatrix_get_element_value,
+lmatrix_normalise,
+lvector_normalise,
+lvector_print,
+lvector_scan,
+lmatrix_print,
+lmatrix_scan,
+lvector_set_name,
+lmatrix_set_name,
+lvector_get_state,
+lvector_get_size,
+lmatrix_get_size,
+lvector_get_allocated,
+lvector_get_used,
+lvector_get_compression_factor,
+lmatrix_get_compression_factor,
+lvector_load_from_file,
+lvector_save_to_file,
+lmatrix_load_from_file,
+lmatrix_save_to_file,
+lvector_save_to_binary_file,
+lvector_load_from_binary_file,
+lmatrix_save_to_binary_file,
+lmatrix_load_from_binary_file,
+lvector_save_to_binary_fildes,
+lvector_load_from_binary_fildes,
+lmatrix_save_to_binary_fildes,
+lmatrix_load_from_binary_fildes \- Purpose: Header file for larraylib.
+.SH "SYNOPSIS"
+.ft B
+#include <larray.h>
+.sp
+extern vlist_type *lvector_destroy(vlist_type *);
+.sp
+extern mlist_type *lmatrix_destroy(mlist_type *);
+.sp
+extern mlist_type *lmatrix_create
+.br
+(
+.br
+	FILE *,
+.br
+	int,
+.br
+	int,
+.br
+	double *
+.br
+);
+.sp
+extern vlist_type *lvector_create
+.br
+(
+.br
+	FILE *,
+.br
+	int,
+.br
+	double *
+.br
+);
+.sp
+extern mlist_type *lmatrix_copy(mlist_type *);
+.sp
+extern vlist_type *lvector_copy(vlist_type *);
+.sp
+extern vlist_type *lvector_deflate
+.br
+(
+.br
+	FILE *,
+.br
+	int,
+.br
+	double *,
+.br
+	vlist_type *
+.br
+);
+.sp
+extern mlist_type *lmatrix_deflate
+.br
+(
+.br
+	FILE *,
+.br
+	int,
+.br
+	double *,
+.br
+	mlist_type *
+.br
+);
+.sp
+extern vlist_type *lvector_inflate
+.br
+(
+.br
+	int,
+.br
+	vlist_type *
+.br
+);
+.sp
+extern mlist_type *lmatrix_inflate
+.br
+(
+.br
+	int,
+.br
+	mlist_type *
+.br
+);
+.sp
+extern int fastResetPatternVector
+.br
+(
+.br
+	int,
+.br
+	double *,
+.br
+	vlist_type *
+.br
+);
+.sp
+extern double lvector_get_list_value
+.br
+(
+.br
+	int,
+.br
+	int *,
+.br
+	vlist_type *
+.br
+);
+.sp
+extern double lvector_get_component_value
+.br
+(
+.br
+	int,
+.br
+	vlist_type *
+.br
+);
+.sp
+extern double lmatrix_get_list_value
+.br
+(
+.br
+	int,
+.br
+	int,
+.br
+	int *,
+.br
+	mlist_type *
+.br
+);
+.sp
+extern double lmatrix_get_element_value
+.br
+(
+.br
+	int row,
+.br
+	int col,
+.br
+	mlist_type *
+.br
+);
+.sp
+extern int lmatrix_normalise(mlist_type *);
+.sp
+extern int lvector_normalise(vlist_type *);
+.sp
+extern int lvector_print
+.br
+(
+.br
+	FILE *,
+.br
+	int,
+.br
+	vlist_type *
+.br
+);
+.sp
+vlist_type *lvector_scan(FILE *);
+.sp
+extern int lmatrix_print
+.br
+(
+.br
+	FILE *,
+.br
+	int,
+.br
+	mlist_type *
+.br
+);
+.sp
+mlist_type *lmatrix_scan(FILE *);
+.sp
+extern int lvector_set_name
+.br
+(
+.br
+	char *,
+.br
+	vlist_type *
+.br
+);
+.sp
+extern int lmatrix_set_name
+.br
+(
+.br
+	char *,
+.br
+	mlist_type *
+.br
+);
+.sp
+extern int lvector_get_state(vlist_type *);
+.sp
+extern int lvector_get_size(vlist_type *);
+.sp
+extern int lmatrix_get_size
+.br
+(
+.br
+	mlist_type *,
+.br
+	int *,
+.br
+	int *
+.br
+);
+.sp
+extern int lvector_get_allocated(vlist_type *);
+.sp
+extern int lvector_get_used(vlist_type *);
+.sp
+extern double lvector_get_compression_factor(vlist_type *);
+.sp
+extern double lmatrix_get_compression_factor(mlist_type *);
+.sp
+extern vlist_type *lvector_load_from_file(char *);
+.sp
+extern int lvector_save_to_file
+.br
+(
+.br
+	char *,
+.br
+	vlist_type *
+.br
+);
+.sp
+extern mlist_type *lmatrix_load_from_file(char *filename);
+.sp
+extern int lmatrix_save_to_file
+.br
+(
+.br
+	char *,
+.br
+	mlist_type *
+.br
+);
+.sp
+extern int lvector_save_to_binary_file
+.br
+(
+.br
+	char *,
+.br
+	vlist_type *
+.br
+);
+.sp
+extern vlist_type *lvector_load_from_binary_file(char *);
+.sp
+extern int lmatrix_save_to_binary_file
+.br
+(
+.br
+	char *,
+.br
+	mlist_type *
+.br
+);
+.sp
+extern mlist_type *lmatrix_load_from_binary_file(char *);
+.sp
+extern int lvector_save_to_binary_fildes
+.br
+(
+.br
+	int,
+.br
+	vlist_type *
+.br
+);
+.sp
+extern vlist_type *lvector_load_from_binary_fildes(int);
+.sp
+extern int lmatrix_save_to_binary_fildes
+.br
+(
+.br
+	int,
+.br
+	mlist_type *
+.br
+);
+.sp
+extern mlist_type *lmatrix_load_from_binary_fildes(int);
+.ft R
+.SH "PARAMETERS"
+.TP
+.B "vlist_type *"
+Not Documented.
+.TP
+.B "mlist_type *"
+Not Documented.
+.TP
+.B "FILE *"
+Not Documented.
+.TP
+.B "int"
+Not Documented.
+.TP
+.B "int"
+Not Documented.
+.TP
+.B "double *"
+Not Documented.
+.TP
+.B "int *"
+Not Documented.
+.TP
+.B "int row"
+Not Documented.
+.TP
+.B "int col"
+Not Documented.
+.TP
+.B "char *"
+Not Documented.
+.TP
+.B "char *filename"
+Not Documented.
+.SH "DESCRIPTION"
+.SS "lvector_destroy"
+Destroy list vector.
+.SS "lmatrix_destroy"
+Destroy list matrix.
+.SS "lmatrix_create"
+Create list matrix.
+.SS "lvector_create"
+Creat list vector.
+.SS "lmatrix_copy"
+Copy list matrix/.
+.SS "lvector_copy"
+Copy list vector.
+.SS "lvector_deflate"
+Deflate list vector.
+.SS "lmatrix_deflate"
+Deflate list matrix.
+.SS "lvector_inflate"
+Inflate list vector.
+.SS "lmatrix_inflate"
+Inflate list matrix.
+.SS "fastResetPatternVector"
+Do fast re-initialisation of pattern vector.
+.SS "lvector_get_list_value"
+Get list value from list vector list.
+.SS "lvector_get_component_value"
+Get component value from list vector.
+.SS "lmatrix_get_list_value"
+Get list value from list matrix.
+.SS "lmatrix_get_element_value"
+Get component value from list matrix.
+.SS "lmatrix_normalise"
+Normalise list matrix.
+.SS "lvector_normalise"
+Normalize list vector.
+.SS "lvector_print"
+Print list vector.
+.SS "lvector_scan"
+Scan list vector.
+.SS "lmatrix_print"
+Print list matrix.
+.SS "lmatrix_scan"
+Scan list matrix.
+.SS "lvector_set_name"
+Set list vector name.
+.SS "lmatrix_set_name"
+Set list matrix name.
+.SS "lvector_get_state"
+Get list vector inflation state.
+.SS "lvector_get_size"
+Get list vector size.
+.SS "lmatrix_get_size"
+Get list matrix size.
+.SS "lvector_get_allocated"
+Get list vector (allocated) size.
+.SS "lvector_get_used"
+Get size of list vector (non zero components in corresponding vector).
+.SS "lvector_get_compression_factor"
+Get list vector compression factor.
+.SS "lmatrix_get_compression_factor"
+Get list matrix compression factor.
+.SS "lvector_load_from_file"
+Load list vector from (ASCII) file.
+.SS "lvector_save_to_file"
+Save list vector to (ASCII) file.
+.SS "lmatrix_load_from_file"
+Load list matrix from (ASCII) file.
+.SS "lmatrix_save_to_file"
+Save list matrix to (ASCII) file .
+.SS "lvector_save_to_binary_file"
+Save list vector in binary format to file.
+.SS "lvector_load_from_binary_file"
+Load list vector saved in binary format from file.
+.SS "lmatrix_save_to_binary_file"
+Save list matrix in binary format to file.
+.SS "lmatrix_load_from_binary_file"
+Load list matrix saved in binary format from file.
+.SS "lvector_save_to_binary_fildes"
+Save list vector in binary format to open file descriptor.
+.SS "lvector_load_from_binary_fildes"
+Load list vector saved in binary format from open file descriptor.
+.SS "lmatrix_save_to_binary_fildes"
+Save list matrix in binary format to open file descriptor.
+.SS "lmatrix_load_from_binary_fildes"
+Load list matrix saved in binary format from open file descriptor.

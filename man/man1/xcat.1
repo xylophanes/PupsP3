@@ -1,0 +1,162 @@
+.TH XCAT 1 "16th April 2015" "PUPSP3 commands" "PUPSP3 commands"
+.SH NAME
+.br
+
+xcat \ the dynamic pipeline insertion point marker 
+.SH SYNOPSIS
+.B xcat 
+[
+.B -nice
+.I cardinal
+][
+.B -argf
+.I argument_file
+][
+.B -growth_protection
+][
+.B -help
+][
+.B -usage
+][
+.B -version
+][
+.B -slots
+][
+.B -slotinfo
+]
+< <stdin>
+> <stdout>
+>& <log file>
+.br
+
+.SH DESCRIPTION
+.I xcat 
+provides a mechanism for inserting processes (and sub-pipelines) into a running
+process pipeline dynamically. Typically, a process wishing to insert itself
+into a running pipeline would open a PSRP channel to
+.I xcat(1)
+and then replac
+.I xcat(1)
+in the pipeline via the PSRP
+.B overlay
+(builtin) command. This facility allows the user to dynamically insert monitoring
+filters (which may require transient facilities like an X display) into a running
+pipeline.
+.br
+ 
+.SH OPTIONS
+ 
+.B -help
+invokes the on-line context help system for the file system watcher. This
+"man" page is displayed. The process then exits.
+.br
+
+.B -usage
+displays shortform usage string.
+.br
+
+.B -growth_protection
+.I <retrys>
+causes the system to retry an
+.I sbrk(3)
+call up to
+.I retrys
+times. This option permits the program to wait until the core that it requires
+is available rather than simply exiting if
+.I sbrk(3)
+fails.
+.br
+
+.B -version
+displays program version number.
+.br
+
+.B -slots
+displays short form
+.I pups(3)
+library dependencies.
+.br
+
+.B -slotinfo
+displays long form
+.I pups(3)
+library dependencies.
+.br
+
+.B -argf
+.I argument_file
+tells the filter to take its command line arguments from the specified
+.I argument_file.
+The data format of the argument file is:
+.br
+
+#  ... optional comment line ...
+.br
+.B -argflag           [1]
+.br
+.I argument_parameter [1,1]
+.br
+.I argument_parameter [1,2]
+.br
+
+.I argument_parameter [1,n]
+.br
+
+# ... optional comment line ...
+.br
+.B -argflag           [2]
+.br
+.I argument_parameter [1,1]
+.br
+.I argument_parameter [1,2]
+.br
+
+.I argument_parameter [1,n]
+.br
+ 
+.B -nice
+.I cardinal
+determimes the
+.I niceness
+at which the filter is scheduled. In keeping with all UNIX user processes, nice
+must be a cardinal between 0 and 20. The default niceness for
+.I xcat(1)
+is 4.
+.br
+
+.B -usage
+displays program shortform usage.
+.br
+
+.B -version
+displays program version number.
+.br
+
+.SH PSRP OPTIONS
+
+.B dataflow
+.I off | stdout | psrp | ptap
+switches the output of
+.I xcat(1)
+to the specified stream. If
+.B ptap
+is specified output is sent to both
+.B standard output
+and
+.B psrp
+streams.
+.b r
+
+.SH LIBRARIES
+.I xcat(1)
+uses the PUPS libraries, see
+.I pups(3)
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd, Gosforth.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br

@@ -1,0 +1,48 @@
+.TH SOMAKE "16th April 2015" "PUPSP3 Scripts" "PUPSP3 Scripts"
+
+.SH NAME
+SOMAKE \- generate a PUPS shared object (.so) from object (.o) file or archive (.a) file.
+
+.br
+
+.SH SYNOPSIS
+.B somake 
+.I [usage | --usage] 
+.I !shared library name!
+.I !<list of .o files>!
+>& <log file>
+.br
+
+.SH DESCRIPTION
+.I somake(1)
+is a
+.I csh(1)
+shellscript which calls
+.I gcc(1)
+to generate a shared library (.so) from the list input object (.o) files,
+.I object file name.
+The shared object object which is generated can be manipulated by the
+POSIX dynamic link loader
+.I ld.so.
+.br
+
+
+.SH OPTIONS
+
+.B -usage
+.B --usage 
+prints out help information about
+.I share(1)
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br
+
+.SH SEE ALSO
+gcc(1),ld(1),csh(1)
+.br

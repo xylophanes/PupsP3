@@ -1,0 +1,265 @@
+.\" WARNING! THIS FILE WAS GENERATED AUTOMATICALLY BY c2man!
+.\" DO NOT EDIT! CHANGES MADE TO THIS FILE WILL BE LOST!
+.TH "casino" 3 "24 January 2018" "c2man casino.h"
+.SH "NAME"
+factrl,
+bico,
+ran1,
+ran2,
+ran3,
+ran4,
+ran5,
+gasdev,
+gasdev2,
+gamdev,
+poidev,
+bnldev,
+numdev,
+n_from_m,
+pearsn,
+spear,
+enigma8read,
+enigma8read \- Header for the random number generator library.
+.SH "SYNOPSIS"
+.ft B
+#include <casino.h>
+.sp
+double factrl(int);
+.sp
+double bico
+.br
+(
+.br
+	int,
+.br
+	int
+.br
+);
+.sp
+double ran1(void);
+.sp
+double ran2(void);
+.sp
+double ran3(void);
+.sp
+double ran4(long *);
+.sp
+double ran5(long *);
+.sp
+double gasdev
+.br
+(
+.br
+	double (*)(void),
+.br
+	double
+.br
+);
+.sp
+double gasdev2
+.br
+(
+.br
+	double (*)(void),
+.br
+	double
+.br
+);
+.sp
+double gamdev
+.br
+(
+.br
+	int,
+.br
+	double (*)(void)
+.br
+);
+.sp
+double poidev
+.br
+(
+.br
+	double,
+.br
+	double (*)(void)
+.br
+);
+.sp
+double bnldev
+.br
+(
+.br
+	double,
+.br
+	int,
+.br
+	double (*)(void)
+.br
+);
+.sp
+double numdev
+.br
+(
+.br
+	double (*)(void),
+.br
+	gate_type *
+.br
+);
+.sp
+int n_from_m
+.br
+(
+.br
+	int,
+.br
+	int
+.br
+);
+.sp
+void pearsn
+.br
+(
+.br
+	double [],
+.br
+	double [],
+.br
+	int,
+.br
+	double *,
+.br
+	double *,
+.br
+	double *
+.br
+);
+.sp
+void spear
+.br
+(
+.br
+	double [],
+.br
+	double [],
+.br
+	int,
+.br
+	double *,
+.br
+	double *,
+.br
+	double *,
+.br
+	double *,
+.br
+	double *
+.br
+);
+.sp
+int enigma8read
+.br
+(
+.br
+	unsigned long,
+.br
+	int,
+.br
+	unsigned char *,
+.br
+	unsigned long
+.br
+);
+.sp
+int enigma8read
+.br
+(
+.br
+	unsigned long,
+.br
+	int,
+.br
+	unsigned char *,
+.br
+	unsigned long
+.br
+);
+.ft R
+.SH "PARAMETERS"
+.TP
+.B "int"
+Not Documented.
+.TP
+.B "long *"
+Not Documented.
+.TP
+.B "double (*)(void)"
+Not Documented.
+.TP
+.B "double"
+Not Documented.
+.TP
+.B "gate_type *"
+Not Documented.
+.TP
+.B "double []"
+Not Documented.
+.TP
+.B "double []"
+Not Documented.
+.TP
+.B "double *"
+Not Documented.
+.TP
+.B "double *"
+Not Documented.
+.TP
+.B "double *"
+Not Documented.
+.TP
+.B "unsigned long"
+Not Documented.
+.TP
+.B "unsigned char *"
+Not Documented.
+.TP
+.B "unsigned long"
+Not Documented.
+.SH "DESCRIPTION"
+.SS "factrl"
+Return N! as floating point number.
+.SS "bico"
+Return binomial coefficient as floating point number.
+.SS "ran1"
+High precision linear congruential random deviates.
+.SS "ran2"
+Reduced precision linear congruential generator .
+.SS "ran3"
+Random deviates using Knuths' method .
+.SS "ran4"
+Random deviate long period random number generator.
+.SS "ran5"
+Park-Miller random number generator (with Bays-Durham shuffle).
+.SS "gasdev"
+Gaussian deviates via the Box-Muller Transfor .
+.SS "gasdev2"
+Gaussian Deviates via Central Limit Theorem.
+.SS "gamdev"
+Gamma deviates via substitution method.
+.SS "poidev"
+Poisson distribution via substitution method.
+.SS "bnldev"
+Binomial deviates via substitution method.
+.SS "numdev"
+User defined deviates via substitution method.
+.SS "n_from_m"
+Number of unique combinations of n objects taken from m.
+.SS "pearsn"
+Linear correlation coefficient [Pearson's r].
+.SS "spear"
+Spearman's rank correlation coefficient.
+.SS "enigma8read"
+Write to (enigma) encrypted data stream.
+.SS "enigma8read"
+Read from (enigma) encrypted data stream.

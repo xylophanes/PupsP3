@@ -1,0 +1,269 @@
+.TH PROTECT 1 "16th April 2015" "PUPSP3 commands" "PUPSP3 commands"
+.SH NAME
+.br
+
+protect \ PSRP file/directory protection application 
+.SH SYNOPSIS
+.B protect 
+[
+.B -nice
+.I cardinal
+][
+.B -argf
+.I argument_file
+][
+.B -growth_protection
+][
+.B -help
+][
+.B -usage
+][
+.B -version
+][
+.B -slots
+][
+.B -slotinfo
+][
+.B -principal
+.I name of file to be protected
+][
+.B -defer
+][
+.B -lifetime
+.I seconds
+][
+.B -key
+.I file protection key
+]
+>& <log file>
+.br
+
+.SH DESCRIPTION
+.I protect(1)
+sets up
+.I default_fd_homeostats
+(see
+.I utilib(3)
+) in order to protect a file or  directory specified by the user. In the case of a directory
+.I all
+files in the directory which match the user supplied
+.B key
+are protected.
+.br
+
+
+.SH OPTIONS
+ 
+.B -help
+invokes the on-line context help system. This
+"man" page is displayed. The process then exits.
+.br
+
+.B -growth_protection
+.I <retrys>
+causes the system to retry an
+.I sbrk(3)
+call up to
+.I retrys
+times. This option permits the program to wait until the core that it requires
+is available rather than simply exiting if
+.I sbrk(3)
+fails.
+.br
+
+.B -usage
+displays shortform usage string.
+.br
+
+.B -version
+displays program version number.
+.br
+
+.B -slots
+displays short form
+.I pups(3)
+library dependencies.
+.br
+
+.B -slotinfo
+displays long form
+.I pups(3)
+library dependencies.
+.br
+
+.B -argf
+.I argument_file
+tells the filter to take its command line arguments from the specified
+.I argument_file.
+The data format of the argument file is:
+.br
+
+#  ... optional comment line ...
+.br
+.B -argflag           [1]
+.br
+.I argument_parameter [1,1]
+.br
+.I argument_parameter [1,2]
+.br
+
+.I argument_parameter [1,n]
+.br
+
+# ... optional comment line ...
+.br
+.B -argflag           [2]
+.br
+.I argument_parameter [1,1]
+.br
+.I argument_parameter [1,2]
+.br
+
+.I argument_parameter [1,n]
+.br
+ 
+.B -nice
+.I cardinal
+determimes the
+.I niceness
+at which the filter is scheduled. In keeping with all UNIX user processes, nice
+must be a cardinal between 0 and 20. The default niceness for
+.I protect(1)
+is 4.
+.br
+
+.B -principal
+.I object 
+specifies the (file system) object  which is to be protected. If the object is a directory, all files matching
+the user supplied
+.B key
+are protected.
+.br
+
+.B -defer
+tells
+.I protect(1)]
+to wait for principal to be created. This option is only valid if the principal is
+a
+.B regular file.
+.br
+
+.B -lifetime
+.I seconds
+tells
+.I protect(1)
+how long it is to protect its principal for.
+.br
+
+.B -key
+.I file protection key
+specifies a key. If filesnames within a directory contain
+.I file protection key
+the corresponding file(s) are homeostatically protected. This option is ignored if
+.I name of file
+is not a directory.
+.br
+
+.SH COMPILATION OPTIONS
+If
+.B -DHYDRA_OF_LERNA
+is specified when compiling this application the thread of execution of the
+algorithm is protected using the
+.I hydra of lerna
+algorithm. The application parent process on startup forks a child. This child is monitored by the
+parent (which reforks it if it is terminated). The child also monitors the parent process. If the
+parent process is terminated the child forks it own child and takes over the job of protecting its
+principal from its parent (note this is inspired by the Hydra of Lerna, a creature of Greek Legend
+which had the capacity to re-grow heads which had been crushed by the hero Heracles as one of his
+labours -- who says a classical education is wasted!).
+.br
+
+If
+.B -DUSE_PROTECT
+is specified an alternative form of homeostatic file protection algorithm (which does not
+use up file descriptors) is used. This option is useful if
+.I protect(1)
+is being used to protect directories containing many files (and the OS limit on file descriptors
+would be exhausted)
+.br
+
+.SH SIGNALS
+SIGUSR2 is used to support PSRP event handling
+.br      
+
+.SH PSRP INTERACTIVITY
+Supports interactive querying while running using Process Status Request Protocol [PSRP], see
+.I psrp(1).
+.br         
+
+.B protect
+.I object
+tells
+.I protect(1)
+to protect (file system) object
+.I object.
+.br
+
+.B unprotect
+.I object
+tells
+.I protect(1)
+to unprotect (file system) object
+.I object.
+.br
+
+.B protstat
+tells
+.I protect(1)
+to show all files currently protected.
+.br
+
+.B key
+.I key
+sets the file key to
+.I key.
+This option is only valid if
+.I the principal
+is a directory.
+.br
+
+.B principal
+.I object
+tells
+.I protect(1)
+the name of the object (which is to be homeostatically protected).
+.br
+
+.B status
+display (PSRP) process status.
+.br
+
+.SH LIBRARIES
+.I protect(1)
+uses the PUPS libraries, see
+.I pups(3)
+.br
+
+.SH BUGS
+.I setsid(2)
+is used to make it easy for the
+.B PUPS
+exit routine to clobber the child. This means
+.I any
+process can send a
+.I killpg(2) 
+to the parents process group (and clobber the child as well as the parent). This is a safety
+feature which could be removed (should the need arise).
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br
+
+.SH SEE ALSO
+psrp(1), utilib(3)
+

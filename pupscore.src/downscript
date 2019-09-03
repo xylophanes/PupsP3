@@ -1,0 +1,9 @@
+#---------------------------------------------------------------------------
+# Actions which are performed by connected when Internet gateway goes down.
+# This script lives in /etc/downscript (by default)
+#---------------------------------------------------------------------------
+
+cp /etc/resolv.down /etc/resolv.conf
+echo "downscript (" $$@`hostname` "): offline version of resolv.conf"
+exit 0
+

@@ -1,0 +1,104 @@
+#!/bin/tcsh
+#
+#-----------------------------------------------------------
+# Build test version of PUPS/P3 libraries and application
+# which can be debugged.
+#
+# (C) M.A. O'Neill, Tubling Dice, 2013
+#
+# $1 is the name of the Makefile template
+#-----------------------------------------------------------
+#
+
+if($MACHTYPE == unknown) then
+	set arch = `uname -a | awk '{print $12}'`
+else
+	set arch      = $MACHTYPE
+endif
+set arch      = `upcase $arch`
+
+echo ""
+echo "PUPS/P3 testConfigure version 1,00 (P3 debug build tool)"
+echo "(C) M.A. O'Neill, Tumbling Dice, 2013"
+echo ""
+
+
+if($1 == usage) then
+	echo ""
+	echo "Usage: testconfigure [Makefile template]"
+	echo ""
+
+	exit 1
+else if($1 == "") then
+	echo ""
+	echo "ERROR: expecting Makefile template"
+	echo ""
+
+	exit -1
+else if (! -e $1) then
+	echo ""
+	echo "ERROR: Makefile template ($1) not found"
+	echo ""
+
+	exit -1
+endif
+
+
+#----------------------------------------------------
+# Are we in the correct directory to use this tool?
+#----------------------------------------------------
+set cwd = `pwd`
+if(! -e "../pupscore.src") then
+	echo ""
+        echo "ERROR: this tool can only be used in the PUPS/P3 core source directory"
+	echo "       you are in directory $cwd"
+        echo ""
+
+        exit -1
+endif
+
+#---------------------------------------------
+# Do we have debuggable libraries built? ...
+#---------------------------------------------
+
+set debug_libs = FALSE
+if(! -e ../lib.$arch.linux.cluster/debug) then
+	echo ""
+	echo "WARNING: you have not built debuggable libraries"
+	echo "         type './build_pups_services.csh cluster tty force default debug' (in this directory)"
+	echo "         to build them"
+	echo ""
+
+else
+	set debug_libs = TRUE
+endif
+
+if(-e BUILDLOCK) then
+        set ret = `ask "buildlock exists  -- delete?"`
+
+        if($ret == "y" || $ret == "yes") then
+                echo "buildlock removed"
+                \rmdir BUILDLOCK
+        else if($ret == "quit" || $ret == "bye") then
+                exit -1
+        else
+                tas BUILDLOCK
+        endif
+endif
+tas BUILDLOCK
+
+
+#------------------------------------------
+# Build Makefile for specified application
+#------------------------------------------
+
+if($debug_libs == TRUE) then
+	pupsconf -cdir ../config.debug $arch.linux.cluster $1 Makefile
+else
+	pupsconf -cdir ../config $arch.linux.cluster $1 Makefile
+endif
+
+
+\rmdir BUILDLOCK                        							>& /dev/null
+exit 0
+

@@ -1,0 +1,81 @@
+.TH LOL 1 "20 Decemeber 2007" "PUPSP3 commands" "PUPSP3 commands"
+
+.SH NAME
+LOL \- test to see if the owner of a (simple link) lock, PSRP communication channel or P3
+linkpost file is live 
+.br
+
+.SH SYNOPSIS
+.B lol 
+.B [-usage | -help]
+.I lock identifer file name | PSRP communication channel name | P3 lockpost file name
+>& <log file>
+.br
+
+.SH DESCRIPTION
+.I lol(1)
+tests to see if a process associated with a (simple link) file lock, PSRP communication channel or
+P3 lockpost file is live.  If it is
+.I lol(1)
+returns
+.B LIVE
+otherwise it returns
+.B DEAD.
+If the channel/lock does not exit
+.B NOT_FOUND
+is returned.
+.br
+
+
+.SH OPTIONS
+
+.B -usage | -help
+display help and copyright information for the
+.I lol(1)
+filter.
+.br
+
+.B lock identifier file name | PSRP communication channel name | P3 lockpost file name
+is the name of the lock identifier
+.I lid
+file which gives the PID of the process currently owning the lock, or the name of the PUPS
+lockpost file, or PSRP communication channel associated with a given process.
+.br
+
+.SH RETURNS
+
+.B LIVE
+The lockfile/PSRP channel/PUPS lockpost exists and the process associated with the lock file, PUPS lockpost or
+PSRP communication channel is live (running on the host running
+.I lol(1)
+).
+.br
+
+.B DEAD
+The lockfile/PSRP channel/PUPS lockpost exists and the process associated with the lock file, PUPS lockpost or
+PSRP communication channel is dead (not running on the host running
+.I lol(1)
+).
+.br
+
+.B NOT_FOUND
+The lockfile/PSRP channel/PUPS lockpost exists and the process associated with the lock file, PUPS lockpost or
+PSRP communication channel specified could not be found on the host running
+.I lol(1)
+).
+.br
+
+.SH ENVIRONMENT VARIABLES
+None.
+.br
+
+.SH BUGS
+Only works for lids originated by local processes at present.
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br

@@ -1,0 +1,25 @@
+PML Macro file syntax
+=====================
+
+Each macro file (.mdf - macro definition file) is of the form:
+
+The tags are the synonomous names for the macro. Each
+macro must have at least one tag. The body of the
+macro is enclosed by braces "{" and ""}.
+
+# Optional comment 
+tag_1
+tag_2
+tag_3
+{   <macro command definition 1>
+    <macro command definition 2>
+
+    ...
+
+    # Optional comment
+    <macro command definition i>
+
+    ...
+
+    <macro command definition N>
+}

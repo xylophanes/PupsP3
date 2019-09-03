@@ -1,0 +1,173 @@
+.\" WARNING! THIS FILE WAS GENERATED AUTOMATICALLY BY c2man!
+.\" DO NOT EDIT! CHANGES MADE TO THIS FILE WILL BE LOST!
+.TH "eigen" 3 "24 January 2018" "c2man eigen.h"
+.SH "NAME"
+tqli,
+tred2,
+jacobi,
+eigsrt,
+get_covariance_matrix,
+get_eigenvectors,
+get_eigenpatterns,
+generate_weight_vector \- Purpose: Numerical recipes matrix routines to support PCA classifiers
+.SH "SYNOPSIS"
+.ft B
+#include <eigen.h>
+.sp
+extern int tqli
+.br
+(
+.br
+	double *,
+.br
+	double *,
+.br
+	int,
+.br
+	double **
+.br
+);
+.sp
+extern void tred2
+.br
+(
+.br
+	int,
+.br
+	double **,
+.br
+	int,
+.br
+	double *,
+.br
+	double *e
+.br
+);
+.sp
+int jacobi
+.br
+(
+.br
+	double **,
+.br
+	int,
+.br
+	double *,
+.br
+	double **,
+.br
+	int *
+.br
+);
+.sp
+void eigsrt
+.br
+(
+.br
+	double *,
+.br
+	double **,
+.br
+	int
+.br
+);
+.sp
+void get_covariance_matrix
+.br
+(
+.br
+	int,
+.br
+	int,
+.br
+	double **,
+.br
+	double **
+.br
+);
+.sp
+int get_eigenvectors
+.br
+(
+.br
+	double,
+.br
+	int,
+.br
+	double **,
+.br
+	double *,
+.br
+	double *
+.br
+);
+.sp
+double **get_eigenpatterns
+.br
+(
+.br
+	int,
+.br
+	int,
+.br
+	int,
+.br
+	double **,
+.br
+	double **
+.br
+);
+.sp
+double *generate_weight_vector
+.br
+(
+.br
+	int,
+.br
+	int,
+.br
+	double *,
+.br
+	double **
+.br
+);
+.ft R
+.SH "PARAMETERS"
+.TP
+.B "double *"
+Not Documented.
+.TP
+.B "double *"
+Not Documented.
+.TP
+.B "int"
+Not Documented.
+.TP
+.B "double **"
+Not Documented.
+.TP
+.B "double *e"
+Not Documented.
+.TP
+.B "int *"
+Not Documented.
+.TP
+.B "double"
+Not Documented.
+.SH "DESCRIPTION"
+.SS "tqli"
+Reduce matrix to tridiagonal form.
+.SS "tred2"
+Get eigenvalues and eigenvectors of matrix by Householder reduction.
+.SS "jacobi"
+Get eigenvalues and eigenvectors of a real symmetric matrix by Jacobi rotation.
+.SS "eigsrt"
+Sort eigenvectors into ascending order.
+.SS "get_covariance_matrix"
+Get pattern vector covariance matrix.
+.SS "get_eigenvectors"
+Get eigenvectors (of covariance matrix).
+.SS "get_eigenpatterns"
+Transform pattern vectors to basis defined by eignvectors of covariance matrix.
+.SS "generate_weight_vector"
+Map pattern into covariance basis (returning projection weights in that basis).

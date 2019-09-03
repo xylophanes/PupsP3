@@ -1,0 +1,66 @@
+.TH CONFIGURE 1 "5th August 2013" "PUPSP3 Scripts" "PUPSP3 Scripts"
+
+.SH NAME
+CONFIGURE \- generate makefile from PUPSP3 makefile template (.in) file.
+
+.br
+
+.SH SYNOPSIS
+.B configure 
+.I [usage | --usage] 
+.I !PUPSP3 architecture type!
+.I !PUPSP3 Makefile template!
+.I [debug]
+>& <log file>
+.br
+
+.SH DESCRIPTION
+.I configure(1)
+is a
+.I csh(1)
+shellscript which calls
+.I pupsconf(1)
+to generate a makefile from a PUPSP3 makefile template. The script has two
+mandatory arguments, the
+.I PUPSP3 architecture type
+(for example linux.cluster, solaris.shm etc) and the name of the PUPSP3
+makefile template. The
+.I configure(1)
+script is intended to be a lightweight replacement for the GNU configure
+utility.
+.br
+
+.SH OPTIONS
+
+.B -usage
+.B --usage 
+prints out help information about
+.I configure(1)
+.B PUPSP3 architecture type
+specifies the PUPSP3 and OS architectures. For example this would be
+.I linux.cluster
+for a network-enabled version of PUPSP3 running under the LINUX operating system.
+.B PUPSP3 Makefile template
+specifies the name of the
+.I makefile template (.in file)
+which is to be transformed.
+,br
+Specifying
+.B debug
+as the last argument to
+.I configure(1)
+generates a makefile which will produce executables which can be debugged using
+.I gdb(1)
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br
+
+.SH SEE ALSO
+pupsconf(1),csh(1).gdb(1)
+.br

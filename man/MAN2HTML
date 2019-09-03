@@ -1,0 +1,17 @@
+#!/bin/tcsh
+
+if (! -e ../html) then
+	mkdir ../html
+endif
+
+foreach i (`ls *.$1`)
+	man2html <$i >../html/$i.html
+	echo $i done
+end
+
+echo ""
+echo "Finished"
+echo ""
+
+exit 0
+

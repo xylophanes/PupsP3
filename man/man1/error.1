@@ -1,0 +1,44 @@
+.TH ERROR 1 "16 April 2002" "PUPSP3 commands" "PUPSP3 commands"
+
+.SH NAME
+ERROR \- PUPS error number to error string translator.
+.br
+
+.SH SYNOPSIS
+.B error 
+.I errno
+>& <log file>
+.br
+
+.SH DESCRIPTION
+.I error(1)
+is a utility which translates POSIX error numbers to the
+corresponding error string, using the
+.I perror(3)
+call. The resulting error string is printed on
+.I standard
+.I output.
+.br
+
+
+.SH OPTIONS
+
+None.
+.br
+
+.SH ENVIRONMENT VARIABLES
+None.
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br
+
+.SH SEE ALSO
+perror(3)
+.br
+

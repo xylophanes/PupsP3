@@ -1,0 +1,57 @@
+.TH VTAGUP 1 "16th April 2015" "PUPSP3 build commands" "PUPSP3 build commands"
+
+.SH NAME
+VTAGUP \- Dynamic version I.D. control for PUPS 
+.br
+
+.SH SYNOPSIS
+.B vtagug 
+[
+.B -help
+][
+.B -set
+.I tag value
+]
+!
+.I Template tag 
+!!
+.I Source file name 
+!!
+>& <log file>
+.br
+
+
+.SH DESCRIPTION
+.I vtagup(1) 
+is a utility for automatically maintaining a software version flag,
+.I appl_vtag
+which is used by PUPS applications to automatically detect and reject
+stale dynamic objects (for example an out of date CKPT checkpoint file).
+.br
+
+.SH OPTIONS
+
+.B -help
+displays help information for
+.I vtagup(1)
+.br
+
+.B -set
+.I tag value
+sets the value of the build tag to user defined value.
+.br
+
+.SH FILES
+C/C++ sourcefile
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+ 
+.SH SEE ALSO
+configure(1)
+.br

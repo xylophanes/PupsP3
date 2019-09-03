@@ -1,0 +1,52 @@
+#!/bin/tcsh
+
+#------------------------------------------------------------------------
+# Make a shared libary module - details from Johnson and Troan
+# LINUX Application Development.
+#
+# $1: name of the shared object 
+# $2: name(s) of the objects to be shared 
+#
+# (C) M.A. O'Neill, Tumbling Dice, 1999-2018
+#------------------------------------------------------------------------
+
+
+set path=($path .. .)
+echo ""
+echo "    PUPSP3 (SUPUPS) shared object generator"
+echo "    (C) M.A. O'Neill, Tumbling Dice 1999-2018"
+echo ""
+
+if($1 == "" || $1 == "usage" || $1 == "help" || $1 == "-usage" || $1 == "-help") then
+        echo ""
+	echo "    Usage: somake [usage | help]                                                                  |"
+        echo "                  !<shared object [.so] file>! [<archive (.a) file> | <<list of object [.o] files>]"
+	echo ""
+
+	exit 1
+else
+	set sharename = $1
+endif
+
+if("$2" == "") then
+	echo "    somake ERROR: expecting name of (.o, .a) objects to be shared"
+	exit -1
+endif
+
+
+#--------------------------------------
+# Actually generate the shared library
+#--------------------------------------
+
+
+#-------------------------------------------------------------
+# -Wl used to be -W1 in gcc-4.6.x changed to -Wl in gcc-4.7.x
+#-------------------------------------------------------------
+
+gcc -shared -fPIC -Wl,-soname,$sharename -o $sharename $2 -lc
+if ($? == 0) then
+	echo "    somake: shared library '$sharename' generated"
+endif
+
+exit 0
+

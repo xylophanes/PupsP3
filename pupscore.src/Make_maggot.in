@@ -1,0 +1,40 @@
+#-----------------------------------------------------------------------
+# Makefile for PSRP maggot process on Linux system
+# M.A. O'Neill Tumblingng Dice 23/01/2018
+#-----------------------------------------------------------------------
+
+CFLAGS		=	TARGET_CFLAGS TARGET_ARCHDEPCFLAGS -finline-functions -fopenmp -ffast-math
+LDFLAGS 	=	TARGET_LDFLAGS TARGET_ARCHDEPLDFLAGS -lgomp
+CC		=	gcc
+LIBS		=
+
+maggot	:	maggot.o $(LIBS)
+		$(CC) $(CFLAGS) maggot.o $(LIBS) -o maggot $(LDFLAGS)
+
+maggot.o:	embryo.c $(LIBS)
+		@vtagup VTAG maggot.c
+		@vstamp 
+		$(CC) $(CFLAGS) -DMAX_SLOTS=32 -DSLOT=seg_slot_18		\
+		$(H_OPTS) -DMAX_USE_SLOTS=4 -DUSE=usage_slot_2 -c maggot.c
+
+maggot.c:	../include.libs/utils.h    ../include.libs/slotman.h		\
+		../include.libs/netlib.h   ../include.libs/psrp.h		\
+		../include.libs/dll.h
+
+
+.PHONY:		clean
+clean:
+		@rm *.o maggot
+
+.PHONY:		install
+install:
+		@strip maggot
+		@cp -f maggot TARGET_INSTALL_DIR
+
+.PHONY:		unstripped
+unstripped:
+		@cp -f  maggot TARGET_INSTALL_DIR
+
+.PHONY:		uninstall
+uninstall:      
+		@rm TARGET_INSTALL_DIR/maggot

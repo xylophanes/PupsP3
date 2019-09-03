@@ -1,0 +1,5 @@
+
+
+    buildP3 ERROR: expecting buildtypes 'vanilla' or 'cluster' or 'clean' directive
+    Usage: buildP3 [logfile:/dev/null] [vanilla | cluster:cluster] [force | noforce] [default] [debug]
+

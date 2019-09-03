@@ -1,0 +1,186 @@
+.\" WARNING! THIS FILE WAS GENERATED AUTOMATICALLY BY c2man!
+.\" DO NOT EDIT! CHANGES MADE TO THIS FILE WILL BE LOST!
+.TH "tad" 3 "24 January 2018" "c2man tad.h"
+.SH "NAME"
+pupsthread_is_root_thread,
+pupsthread_set_errno,
+pupsthread_get_errno,
+pupsthread_mutex_lock,
+pupsthread_mutex_unlock,
+pupsthread_tfuncname2tid,
+pupsthread_tid2tfuncname,
+pupsthread_tfuncname2nid,
+pupsthread_nid2tfuncname,
+pupsthread_tid2nid,
+pupsthread_tpid2nid,
+pupsthread_nid2tpid,
+pupsthread_nid2tid,
+pupsthread_show_threadinfo,
+pupsthread_show_ttab,
+pupsthread_init,
+pupsthread_create,
+pupsthread_cancel,
+pupsthread_stop,
+pupsthread_stop,
+pupsthread_cancel_all_other_threads,
+pupsthread_exit,
+pupsthread_unlock_mutexes \- Purpose: header for multithread DLL support library.
+.SH "SYNOPSIS"
+.ft B
+#include <tad.h>
+.sp
+extern int pupsthread_is_root_thread(void);
+.sp
+extern void pupsthread_set_errno(int);
+.sp
+extern int pupsthread_get_errno(void);
+.sp
+extern int pupsthread_mutex_lock(pthread_mutex_t *);
+.sp
+extern int pupsthread_mutex_unlock(pthread_mutex_t *);
+.sp
+extern pthread_t pupsthread_tfuncname2tid(char *);
+.sp
+extern int pupsthread_tid2tfuncname
+.br
+(
+.br
+	pthread_t tid,
+.br
+	char *
+.br
+);
+.sp
+extern int pupsthread_tfuncname2nid(char *);
+.sp
+extern int pupsthread_nid2tfuncname
+.br
+(
+.br
+	int nid,
+.br
+	char *
+.br
+);
+.sp
+extern int pupsthread_tid2nid(pthread_t);
+.sp
+extern int pupsthread_tpid2nid(int);
+.sp
+extern int pupsthread_nid2tpid(int);
+.sp
+extern pthread_t pupsthread_nid2tid(int);
+.sp
+extern int pupsthread_show_threadinfo
+.br
+(
+.br
+	FILE *,
+.br
+	int
+.br
+);
+.sp
+extern void pupsthread_show_ttab(FILE *);
+.sp
+extern void pupsthread_init(void);
+.sp
+extern pthread_t pupsthread_create
+.br
+(
+.br
+	char *,
+.br
+	void *,
+.br
+	void *
+.br
+);
+.sp
+extern int pupsthread_cancel(pthread_t);
+.sp
+extern int pupsthread_stop(pthread_t);
+.sp
+extern int pupsthread_stop(pthread_t);
+.sp
+extern int pupsthread_cancel_all_other_threads(void);
+.sp
+extern void pupsthread_exit(void *);
+.sp
+extern void pupsthread_unlock_mutexes(void);
+.ft R
+.SH "PARAMETERS"
+.TP
+.B "int"
+Not Documented.
+.TP
+.B "pthread_mutex_t *"
+Not Documented.
+.TP
+.B "char *"
+Not Documented.
+.TP
+.B "pthread_t tid"
+Not Documented.
+.TP
+.B "int nid"
+Not Documented.
+.TP
+.B "pthread_t"
+Not Documented.
+.TP
+.B "FILE *"
+Not Documented.
+.TP
+.B "void *"
+Not Documented.
+.TP
+.B "void *"
+Not Documented.
+.SH "DESCRIPTION"
+.SS "pupsthread_is_root_thread"
+Is caller the root thread?.
+.SS "pupsthread_set_errno"
+Set thread specific errno.
+.SS "pupsthread_get_errno"
+Get thread specific errno.
+.SS "pupsthread_mutex_lock"
+Lock mutex.
+.SS "pupsthread_mutex_unlock"
+Unlock mutex.
+.SS "pupsthread_tfuncname2tid"
+Get tid (thread identifier) associated with given function name */.
+.SS "pupsthread_tid2tfuncname"
+Get name of function associated with tid.
+.SS "pupsthread_tfuncname2nid"
+Get nid (thread number) associated with given function name.
+.SS "pupsthread_nid2tfuncname"
+Get function name associated with given thread number (nid).
+.SS "pupsthread_tid2nid"
+Get thread number (nid) associated with given thread handle.
+.SS "pupsthread_tpid2nid"
+Translate (LWP) tpid to ttab index (nid).
+.SS "pupsthread_nid2tpid"
+Translate ttab index (nid) to (LWP) tpid.
+.SS "pupsthread_nid2tid"
+Get thread handle associated with given thread number (nid).
+.SS "pupsthread_show_threadinfo"
+Show single entry in thread table.
+.SS "pupsthread_show_ttab"
+Show contents of thread table.
+.SS "pupsthread_init"
+Initialised PUPS threads.
+.SS "pupsthread_create"
+Create a PUPS thread.
+.SS "pupsthread_cancel"
+Cancel PUPS thread.
+.SS "pupsthread_stop"
+Stop PUPS thread.
+.SS "pupsthread_stop"
+Restart PUPS thread.
+.SS "pupsthread_cancel_all_other_threads"
+Cancel all PUPS threads (except for calling root thread).
+.SS "pupsthread_exit"
+Exit PUPS thread (terminating it).
+.SS "pupsthread_unlock_mutexes"
+Release mutexes.

@@ -1,0 +1,7 @@
+Path: Mail
+mhstore-store-image/gif:   %m%P.gif
+mhstore-store-image/jpeg:  %m%P.jpg
+mhstore-store-image/x-pbm: %m%P.pbm
+mhstore-store-image/x-pgm: %m%P.pgm
+mhstore-store-image/x-ppm: %m%P.ppm
+mhstore-store-image/x-xwd: %m%P.xwd

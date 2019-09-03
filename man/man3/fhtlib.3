@@ -1,0 +1,284 @@
+.\" WARNING! THIS FILE WAS GENERATED AUTOMATICALLY BY c2man!
+.\" DO NOT EDIT! CHANGES MADE TO THIS FILE WILL BE LOST!
+.TH "fht" 3 "24 January 2018" "c2man fht.h"
+.SH "NAME"
+get_fft_R,
+get_fft_IM,
+get_pwr_S,
+fht,
+band_pass,
+get_FFT_pwr_S,
+resample,
+Fourier,
+memcof,
+evlmem,
+pwtset,
+pwt,
+wt1,
+daub4,
+wtn \- Purpose: Header for the Fast Hartley Transform library.
+.SH "SYNOPSIS"
+.ft B
+#include <fht.h>
+.sp
+void get_fft_R
+.br
+(
+.br
+	int,
+.br
+	double [],
+.br
+	double []
+.br
+);
+.sp
+void get_fft_IM
+.br
+(
+.br
+	int,
+.br
+	double [],
+.br
+	double []
+.br
+);
+.sp
+void get_pwr_S
+.br
+(
+.br
+	int,
+.br
+	double [],
+.br
+	double []
+.br
+);
+.sp
+void fht
+.br
+(
+.br
+	int,
+.br
+	int,
+.br
+	double []
+.br
+);
+.sp
+void band_pass
+.br
+(
+.br
+	int,
+.br
+	double,
+.br
+	double,
+.br
+	double,
+.br
+	double *
+.br
+);
+.sp
+void get_FFT_pwr_S
+.br
+(
+.br
+	int,
+.br
+	double [],
+.br
+	double [],
+.br
+	double []
+.br
+);
+.sp
+void resample
+.br
+(
+.br
+	int,
+.br
+	int,
+.br
+	double [],
+.br
+	double []
+.br
+);
+.sp
+void Fourier
+.br
+(
+.br
+	int,
+.br
+	int,
+.br
+	int,
+.br
+	double [],
+.br
+	double []
+.br
+);
+.sp
+void memcof
+.br
+(
+.br
+	double [],
+.br
+	int,
+.br
+	int,
+.br
+	double *,
+.br
+	double [],
+.br
+	int
+.br
+);
+.sp
+double evlmem
+.br
+(
+.br
+	double,
+.br
+	double [],
+.br
+	int,
+.br
+	double
+.br
+);
+.sp
+int pwtset(int);
+.sp
+int pwt
+.br
+(
+.br
+	double [],
+.br
+	unsigned long int,
+.br
+	int
+.br
+);
+.sp
+void wt1
+.br
+(
+.br
+	double [],
+.br
+	unsigned long int,
+.br
+	int,
+.br
+	void (*)(float [],unsigned long int,int)
+.br
+);
+.sp
+void daub4
+.br
+(
+.br
+	double [],
+.br
+	unsigned long,
+.br
+	int
+.br
+);
+.sp
+void wtn
+.br
+(
+.br
+	double [],
+.br
+	unsigned long int [],
+.br
+	int,
+.br
+	int,
+.br
+	void (*)(float [],unsigned long int,int)
+.br
+);
+.ft R
+.SH "PARAMETERS"
+.TP
+.B "int"
+Not Documented.
+.TP
+.B "double []"
+Not Documented.
+.TP
+.B "double []"
+Not Documented.
+.TP
+.B "double"
+Not Documented.
+.TP
+.B "double"
+Not Documented.
+.TP
+.B "double"
+Not Documented.
+.TP
+.B "double *"
+Not Documented.
+.TP
+.B "unsigned long int"
+Not Documented.
+.TP
+.B "void (*)(float [],unsigned long int,int)"
+Not Documented.
+.TP
+.B "unsigned long"
+Not Documented.
+.TP
+.B "unsigned long int []"
+Not Documented.
+.SH "DESCRIPTION"
+.SS "get_fft_R"
+Get real part of Fourier transform.
+.SS "get_fft_IM"
+Get imaginary part of Fourier transform.
+.SS "get_pwr_S"
+Get power spectral density function.
+.SS "fht"
+Perform Fast Hartley Transform.
+.SS "band_pass"
+Set up band pass filter.
+.SS "get_FFT_pwr_S"
+Get Power Spectral Density Function from FFT.
+.SS "resample"
+Resample data [so that the number of data points is a power of two].
+.SS "Fourier"
+Perform Fast Fourier Transform on complex array of data.
+.SS "memcof"
+Compute linear predictive coefficients.
+.SS "evlmem"
+Compute power spectrum using maximum entropy [all poles] algorithm.
+.SS "pwtset"
+Set up Daub wavelet coeffiecients for n=4, n=1 or n = 20.
+.SS "pwt"
+Partial wavelet transform.
+.SS "wt1"
+Compute discrete wavelet transform of input vector.
+.SS "daub4"
+Transform filter for daub4 [Daubechies 4 coeffiecient wavelets].
+.SS "wtn"
+Compute N dimensional wavelet transform of N dimensional dataset.

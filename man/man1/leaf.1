@@ -1,0 +1,71 @@
+.TH LEAF 1 "10th January 2010" "PUPSP3 tools" "PUPSP3 tools"
+
+.SH NAME
+LEAF \- extract leaf or twig from branch directory path 
+.br
+
+.SH SYNOPSIS
+.B leaf 
+[
+.B -usage
+| 
+.B -help
+][
+.B -verbose
+][
+.B -tlength
+.I twig length
+]!
+.I pathname
+![>& <log file>]
+.br
+
+.SH DESCRIPTION
+.I leaf(1)
+extracts a leaf (or sub twig) from a pathname (branch). By defaulti,
+.I leaf(1)
+extracts the
+.B leaf
+(file name) from the end of the pathname branch. Larger twigs are specified
+using the tlength parameter.
+.br
+
+
+.SH OPTIONS
+
+.B -usage
+|
+.B -help
+display help and copyright information for the
+.I leaf(1)
+filter. The application then exits
+.br
+
+.B -verbose
+tells
+.I leaf(1)
+log error/status information to
+.I standard error.
+Defaults to
+.B FALSE
+(no logging).
+.br
+
+.B -tlength
+.I twig length
+specifies the size of the
+.B twig
+to be extracted from the pathname branch. Defaults to 1 (the filename leaf is
+extracted from the pathname).
+
+.SH ENVIRONMENT VARIABLES
+None.
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br

@@ -1,0 +1,675 @@
+.TH PSRP 1 "16th April 2015" "PUPSP3 commands" "PUPSP3 commands"
+.SH NAME
+.br
+
+psrp \ PSRP process interrogation client
+.SH SYNOPSIS
+.B psrp 
+[
+.B -nice
+.I cardinal
+][
+.B -growth_protection
+][
+.B -argf
+.I argument_file
+][
+.B -help
+][
+.B -usage
+][
+.B -version
+][
+.B -slots
+][
+.B -slotinfo
+][
+.B -startmsg
+][
+.B -sname
+.I PSRP server process name
+]i[
+.B -spid
+.I PSRP server process pid
+[
+.B -max_trys
+.I trys
+]][
+.B -on
+.I host name
+][
+.B -wait
+][
+.B -nowait
+][
+.B -channel
+.I channel name
+][
+.B -c
+.I PSRP command string
+][
+.B -log
+][
+.B -remote
+.I hostname 
+.I client
+.I client-pid
+][
+.B -password
+][
+.I authentication token
+][
+.B -username
+.I user-name
+][
+.B -slaved
+][
+.B -noprompt
+][
+.B -clist
+.I clist file name
+]
+< <stdin>
+> <stdout>
+>& <log file>
+.br
+
+.SH DESCRIPTION
+.I psrp
+is a client which permits the user to connect to an active process and to interrogate it. In addition, if
+the target server process permits, the psrp client can also be used to interactively load dynamic library
+modules, databags and start new threads of execution within the server process.
+.br
+ 
+.SH OPTIONS
+ 
+.B -help
+invokes the on-line context help system. This
+"man" page is displayed. The process then exits.
+.br
+
+.B -growth_protection
+.I <retrys>
+causes the system to retry an
+.I sbrk(3)
+call up to
+.I retrys
+times. This option permits the program to wait until the core that it requires
+is available rather than simply exiting if
+.I sbrk(3)
+fails.
+.br
+
+.B -usage
+displays shortform usage string.
+.br
+
+.B -version
+displays program version number.
+.br
+
+.B -slots
+displays short form
+.I pups(7)
+library dependencies.
+.br
+
+.B -slotinfo
+displays long form
+.I pups(7)
+library dependencies.
+.br
+
+.B -argf
+.I argument_file
+tells the filter to take its command line arguments from the specified
+.I argument_file.
+The data format of the argument file is:
+.br
+
+#  ... optional comment line ...
+.br
+.B -argflag           [1]
+.br
+.I argument_parameter [1,1]
+.br
+.I argument_parameter [1,2]
+.br
+
+.I argument_parameter [1,n]
+.br
+
+# ... optional comment line ...
+.br
+.B -argflag           [2]
+.br
+.I argument_parameter [1,1]
+.br
+.I argument_parameter [1,2]
+.br
+
+.I argument_parameter [1,n]
+.br
+ 
+.B -nice
+.I cardinal
+determimes the
+.I niceness
+at which the filter is scheduled. In keeping with all UNIX user processes, nice
+must be a cardinal between 0 and 20. The default niceness for
+.I psrp(1)
+is 4.
+.br
+
+.B -startmsg
+prints out version information on startup
+.br
+
+.B -spid
+.I pid
+specifies the pid of the target PSRP server process.
+.br
+
+.B -sname
+.I name
+specifies the name of the target PSRP server process. The corresponding pid is resolved
+automatically by
+.I psrp(1).
+.br
+
+.B -max_trys
+.I trys
+tells the PSRP how many times to try to connect to the server process. Defaults to
+3 tries with 1 second delay between each.
+.br
+
+.B -on
+.I host name
+tells
+.I psrp(1)
+the name of the host it is to execute on
+.br
+
+.B -wait
+tells
+psrp(1)
+to wait for specified PSRP server to start running and then conenct to it.
+.br
+
+.B -nowait
+tells
+.I psrp(1)
+to abort connection attempt if specified server is not running.
+.br
+
+.B -channel
+.I channel name
+tells
+.I psrp(1)
+to attempt to conenct the nominated server process via the named channel. By default
+.I psrp(1)
+will try to conenct to the nominated servers primary channel.
+.br
+
+.B -c
+.I PSRP command string
+send the requested PSRP comamnd string to the PSRP dispatch handler on the server process
+which takes appropriate action.
+.br
+
+.B -log
+tells
+.I psrp(1)
+to log transactions with server process.
+.br
+
+.B -remote
+tells this invocation of
+.I psrp(1)
+that it is a remote client (started by either the
+.I psrp(1)
+.B -on
+option, or interactively from a running local
+.I psrp(1)
+process using an appropriate inbuilt command such as
+.B connect
+.br
+.B hostname
+is the name of the basal host from which the remote PSRP client is being run.
+.br
+
+.B client 
+is the name of the client on that host. 
+.br
+
+.B client-pid
+is the PID of the client on the remote host.
+.br
+
+.B -on
+.I hostname
+.I [tty | notty]
+tells
+.I psrp(1)
+to invoke a remote instance of
+.I psrp(1)
+on the remote host
+.I hostname.
+By default the remote
+.I psrp(1)
+client is invoked by
+.I rttyd(1)
+which ensures that it has a full terminal connection to the client machine. This course
+of action may also be specified via the
+.B tty
+option modifier. If a simple socket connection is required, the
+.B notty
+option modifier must be used, in which case a simple socket conection is set up using
+.I xrshd(1).
+.br
+
+.B -password
+.I authentication-token
+is used to set the token which
+.I psrp(1)
+uses to authenticate connections to remote hosts.
+.br
+
+.B -user
+enables
+.I psrp(1)
+to changed to another user 
+.I user-name. The user is prompted for the associated password using the
+.I getpass(3)
+function. While the semantics of the operation differ, the effects of doing this
+are broadly similar to
+.I su(1).
+.br
+
+The owner of the current session is prompted for a new username/password. If authentication succeeds
+subsequent
+.I psrp(1)
+will be performed under the uid of the new user. This option is used to enable a user to connect to
+PSRP server processes which they don't own. Typically, access to processes which a user do not own
+are effected by pseudo-identifiers. For example user
+.B mao
+would typically have a
+.I psuedo identifier
+.B psrpmao.
+which allows limited access to mao's account (e.g. to connect to PSRP server applications owned by
+mao). Typically, a pseudo identifier would not allow other uses direct access to files, or the
+capability to run a shell.
+.br
+
+.B slaved
+tells
+.I psrp(1)
+that it being used by a PSRP server process which wishes to make peer-to-peer PSRP connections with other
+PSRP servers. In this mode PSRP protocol status is sent to stdout. This is used by the PSRP server which
+is slaving
+.I psrp(1)
+to determine the status of its peer-to-peer connection.
+.br
+
+.B -noprompt
+tells
+.I psrp(1)
+to turn prompt off (used mainly when operating in slaved, remote or non-interactive modes of operation).
+.br
+
+.B -clist
+tells
+.I psrp
+to read the specified
+.I clist file.
+This contains a list of commands which may be executed by
+.B shells
+.I slaved
+by this instace of the
+.I psrp(1)
+client. This feature permits
+.I psrp(1)
+clients to be called from
+.B web service
+and similar interfaces where security is paramount.
+.br
+
+.SH BUILTIN INTERACTIVE COMMANDS
+
+.B if
+<cond> <cmd> : execute command <cmd> if condition <cond> is TRUE.
+.br
+
+ %<label>: target label for resume command.
+.br
+
+.B resume
+%<label>: resume macro execution at label %<label>.
+.br
+
+.B errorabort
+on|off: PML script aborted if "on" and error code for last command != "ok"
+.br
+
+.B exit:
+exit macro that is currently executing.
+.br
+
+.B abort:
+abort current PML script.
+.br
+
+.B atomic
+<cmd>: do not attempt to expand <cmd> as macro.
+.br
+
+.B body
+<cmd>: show body (if <cmd> is a macro).
+.br
+
+.B repeat
+<cnt> <command>: repeat command (which can be a macro) <cnt> times.
+.br
+
+.B rperiod
+<seconds>: set repeat command repeat interval (in seconds).
+.br
+
+.B repeat
+<command>: repeat command infinitely.
+.br
+
+.B raise
+<cond>: raise condition <cond> (pups_mainly used for testing PML scripts)
+.br
+
+.B clean
+.I channel directory
+clean dead PSRP channels from
+.I channel directory.
+.br
+
+.B cinit:
+enter curses mode. This is mainly used prior to executing commands or
+macros which require curses(3) style screen access.
+.br
+
+.B cend:
+exit curses mode (returns to normal "glass tty" screen).
+.br
+
+.B segaction
+[<action>]: specify/display request the action which is to be taken
+when a server segments (e.g. saves its state and then executes a child which
+inherits that state). In modern PUPS/PSRP applications segmentation has been
+rendered obsolete as PUPS now has its own memory efficient memory allocation
+package based on the memory allocator shipped with The Tennessee Checkpointing
+Libraries.
+.br
+
+.B thandler
+[<handler>]: Specify/display thread handler.
+.br
+
+.B cls:
+clear screen (this is usually called just after a cinit command to prepare
+the screen for
+.I curses(3)
+I/O.
+.br
+
+.B sleep
+<secs>: Delay PML script execution for <secs> seconds.
+.br
+
+.B retry
+<on | off>: enable "on" or disable "off" automatic request repetition (if server busy).
+.br
+
+.B wait
+Make PSRP client wait for server to start (and then connect to it).
+.br
+
+.B nowait
+Make PSRP client abort connection attempt (if target server is not running).
+.br
+
+.B exit 
+Terminate (if attached PSRP server terminates).
+.br
+
+.B linktype:
+show type of PSRP channel linkage.
+.br
+
+.B linktype
+<hard | soft>: set type of PSRP channel link to "hard or "soft". If the PSRP
+client is soft linked to the PSRP server it will abort its connection if the server
+is stopped. A PSRP client which is hard linked to a PSRP will stay connected to the
+server even if the server stops. This option has two uses (a) in the debugging of
+PUP/PSRP based virtual dataflow machines and (b) in peer-to-peer PSRP connections
+between servers (mediated by slaved interaction clients SIC's).
+.br
+
+.B version:
+display version of this PSRP interaction client
+.br
+
+.B id:
+print owner, uid, gid and controlling tty for this [psrp] process.
+.br
+
+.B chanstat
+<directory>: show active PSRP channels in <directory>. If directory
+is ommitted, the default PSRP channel directory, /tmp is assumed.
+.br
+
+.B killall
+<directory> <spec>: Kill all PSRP servers in <directory> matching <spec>
+.br
+
+.B dllstat
+<DLL pathname>: show orifices (pointers to exportable objects) associated
+with DLL <DLL name>.
+.br
+
+poolstat: show pool of hosts (on which application can be started). This pool of
+hosts is used by the native PUPS process migration facility, rtunneld(1) not by
+MOSIX.
+.br
+
+.B hostpool
+<hostpool>: set hostpool database to <hostpool>.
+.br
+
+.B hostpool:
+display name of current hostpool.
+.br
+
+quit | exit | bye: terminates]  psrp client
+.br
+
+.B trys
+<N trys>: set number of attempts to open PSRP server to <N trys>.
+.br
+
+.B ssh
+<ruser> [[un]compress]: use [[un]compressed] secure shell protocols to connect
+to remote psrp server running on remote hosts (as <ruser>).
+.br
+
+.B psrp:
+use PSRP networking protocols to connect remote psrp server running on remote
+hosts. Until encryption is included atomically in the read(1) and write(1) system
+calls, this option is inherently insecure.
+.br
+
+.B connect
+[<user>@]<host>: connect to remote PSRP client on <host> as UID <user>.
+.br
+
+.B lcwd
+<path>: set current (local) working directory for PSRP client.
+.br
+
+.B open
+<PSRP server>[@<host>]: open connection to PSRP server process <PSRP server>
+[on <host>]. If host is not specified, it is assumed that the required server is
+running on the local host. The PSRP server may be specified by name or PID.
+.br
+
+.B close:
+close connection to PSRP server process.
+.br
+
+.B chelp:
+display help on builtin commands for client.
+.br
+
+.B quiet:
+do not display output from builtin PSRP client commands
+.br
+
+.B squiet:
+do not display output from PSRP server dispatch functions.
+.br
+
+.B noisy:
+display output from builtin PSRP client commands
+.br
+
+.B snoisy:
+display output from builtin PSRP server dispatch functions.
+.br
+
+.B perror:
+print error handler status.
+.br
+
+.B segcnt:
+display number of segments (for segmented server).
+.br
+
+.B medit:
+update PML (PSRP macro) definition file, <file>.
+.br
+
+.B mload
+<file>: load macro file (overwriting currently loaded list of macros).
+.br
+
+.B mappend
+<file>: append macro file to currently loaded list of macros.
+.br
+
+.B mpurge
+all|<file>: delete all PML macros or those in <file>.
+.br
+
+.B macros:
+show tags for all loaded PML macros.
+.br
+
+.B user
+<username>: change session owner to <username>.
+.br
+
+.B password:
+set remote PSRP services authentication token. If this token is set it
+will be used for authentication when connecting to PSRP servers running on remote
+hosts.
+
+.B
+diapause: generate restartable PSRP server ckpt file and exit (via extended
+Tennessee Checkpointing Library or UCLiK Kernel checkpointing).
+.br
+
+.B secure:
+set server side PSRP services authentication token. This permits
+.B individual
+PSRP server processes to be password protected. This fetaure is useful when the
+server is operating in a
+.I public encironment
+(e.g. within the conetext of web services for example).
+.br
+
+.B clist
+<clist file>: read list of commands which can be executed by slaved shells. This
+option permits commands which may be executed from
+.I psrp(1)
+to be restricted (e.g. within the context of web services).
+.br
+
+.B diapause:
+generate restartable PSRP server ckpt file and exit
+.br
+
+.B checkpoint:
+generate restartable PSRP server checkpoint file (via extended
+Tennessee Checkpointing Library or UCLiK Kernel checkpointing).
+.br
+
+.B !<command>:
+send command to users default shell.
+.br
+
+.B relay
+<slave process>: relay data to/from slave process via psuedotty.
+.br
+
+.B <srv>: <req>:
+send request (server builtin or dispatch function) <req> to PSRP
+server <srv>.
+.br
+
+.B <srv>@<host>: <req>:
+send request (server builtin or dispatch function)<req> to
+PSRP server <srv> running on node <host>. If <host>=? search local cluster for
+host running PSRP server <srv> and then send command if it is uniquely located.
+.br
+
+.B c1; c2; c3:
+process multiple requests
+.br
+
+.B c "a1 a2":
+glob argument "a1 a2" to a1a2
+.br
+
+.SH FILES
+.I psrp(1)
+will read commands from the
+.B .psrprc
+file in the home directory of the user executing
+.I psrp(1)
+(if it exists), prior to accepting commands from the terminal. In slaved mode, thia file
+is read prior to accepting comamnd input from the enslaving PSRP server process.
+.br
+
+/etc/passwd is used for the purposes of authentication.
+.br
+
+.SH LIBRARIES
+.I psrp(1)
+uses the PUPS libraries, see
+.I pups(7)
+.br
+
+.SH BUGS
+Using shells interactively from
+.I psrp(1)
+under certain flavours of UNIX (notably those which are SVR4 based) can cause the
+client to crash.
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br
+
+.SH SEE ALSO
+getpass(3), pups(7), mtdlib(3), curses(3), rttyd(1), xrshd(1)
+

@@ -1,0 +1,52 @@
+.TH MANTOHTML 1 "26 April 2002" "PUPSP3 Scripts" "PUPSP3 Scripts"
+
+.SH NAME
+MANTOHTML \- generate HTML from man pages.
+
+
+.br
+
+.SH SYNOPSIS
+.B mantohtml 
+.I [usage | --usage] 
+.I man root directory
+.I HTML directory
+>& <log file>
+.br
+
+.SH DESCRIPTION
+.I mantohtml(1)
+is a
+.I csh(1)
+shellscript which calls
+.I man2html(1)
+to transform man pages to HTML format. Essentially, this script is a wrapper for
+the
+.I man2html(1)#
+command.
+.br
+
+.SH OPTIONS
+
+.B -usage
+.B --usage 
+prints out help information about
+.I mantohtml(1)
+.I man page root directory
+specifies the root directory for the man pages (containing man1, man2, ... man8 sections)
+.br
+.I HTML directory
+specifies the name of the directory to which HTML is written
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br
+
+.SH SEE ALSO
+man2html(1),csh(1)
+.br

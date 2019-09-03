@@ -1,0 +1,67 @@
+.TH KRM 1 "10th January 2010" "Kepher support scripts" "PUPSP3 tools"
+
+.SH NAME
+KRM \- Kepher aware file deletion script 
+.br
+
+.SH SYNOPSIS
+.B krm 
+[
+.B usage
+| 
+.B help
+][
+.B rm(1) arguments
+]!
+.B file
+.I [>& <log file>]
+.br
+
+.SH DESCRIPTION
+.I krm(1)
+is a
+.I kepher(1)
+aware wrapper script for the
+.I rm(1)
+command which permits
+.I kepher(1)
+protected files to be deleted.
+.br
+
+
+.SH OPTIONS
+
+.B usage
+|
+.B help
+display help and copyright information for the
+.I krm(1)
+script. The script then exits
+.br
+
+.B rm args
+command arguments to
+.I rm(1)
+command called by
+.I krm(1)
+.br
+
+.B file
+the file to be deleted
+.br
+
+.SH ENVIRONMENT VARIABLES
+None.
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br
+
+.SH SEE ALSO
+rm(1)
+.br

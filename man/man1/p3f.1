@@ -1,0 +1,81 @@
+.TH P3F 1 "16th April 2015" "PUPSP3 commands" "PUPSP3 commands"
+
+.SH NAME
+P3F \- test to see if process is PUPS/P3 aware. 
+.br
+
+.SH SYNOPSIS
+.B p3f
+[ 
+.B -usage
+|
+.B -help
+][
+.B -verbose
+][
+.B -pchan
+.I PSRP channel directory name
+]
+!
+.B <PID>
+|
+.B <PID name>
+!
+>& <log file>
+.br
+
+.SH DESCRIPTION
+.I p3f(1)
+tests to see is a process is
+.B PUPS/P3
+aware.
+.br
+
+
+.SH OPTIONS
+
+.B -usage | -help
+display help and copyright information for the
+.I p3f(1)
+filter.
+.br
+
+.B -verbose
+logs error/status information to standard output/
+.br
+
+.B -pchan
+.I PSRP channel directory name
+tells
+.I p3f(1)
+the name of the
+.B PUPS/P3
+channel directory to be used.
+.br
+
+.SH EXIT CODES
+.I 255
+means process tested
+.I is not PUPS/P3 aware.
+.br
+.I 0
+means process tested
+.I is PUPS/P3 aware.
+.br
+.I -1
+means error condition. If
+.B -verbose
+flag is set the error condition will be reported to
+.I standard error.
+.br
+.SH ENVIRONMENT VARIABLES
+None.
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br

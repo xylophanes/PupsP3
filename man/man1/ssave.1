@@ -1,0 +1,91 @@
+.TH SSAVE 1 "15th December 2017" "PUPSP3 commands" "PUPSP3 commands"
+
+.SH NAME
+SSAVE \- save state of command via
+.I criu(1)
+.br
+
+.SH SYNOPSIS
+.B ssave 
+.B [-usage | -help]
+.B [-t <poll time] [-cd <crui directory>] !-p <payload command/shell-script!
+>& <log file>
+.br
+
+.SH DESCRIPTION
+.I ssave(1)
+autimatically saves the state of a command or shell-script using
+.I criu(1)
+checkpointing. The state of the process is saved every
+.I poll time
+seconds. If the payload command completes successfully the checkpoint
+(stored in /tmp) is discarded, otherwise the command can be restarted
+via
+.I restart(1)
+using the last checkpoint saved.
+.br
+
+
+.SH OPTIONS
+
+.B -usage | -help
+display help and copyright information for the
+.I lol(1)
+filter.
+.br
+
+.B -t
+.I poll_time
+specify time between
+.I criu(1)
+checkpoints in seconds. This value of this argument must be > 0
+.br
+
+.B -p
+.I payload command/shell-script
+tells
+.I ssave(1)
+the name of the
+.I payload command
+or
+.I shell-script
+whose state is to be saved. This argument is mandatory.
+.br
+
+.B -cd
+.I criu directory
+tells
+.I ssave(1)
+the name of the directory in which (Criu) checkpoints will be saved. This defaults
+to
+.I /tmp.
+Typically, a non-default criu directory can be used to hold other items, for example
+the bodies of files which need to be
+.B wrapped
+and migrated with a checkpoint moving to a new host.
+.br
+
+.SH ENVIRONMENT VARIABLES
+None.
+.br
+
+.SH FILES
+the
+.I criu(1)
+checkpoint is stored in
+.I /tmp/criu.<payload pid>.ssave.
+
+.SH BUGS
+.I None
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br
+
+.SH SEE ALSO
+criu(1), restart(1)
+.br

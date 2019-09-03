@@ -1,0 +1,36 @@
+.TH HTYPE 1 "8th February 2009" "PUPSP3 build tools" "PUPSP3 build tools"
+
+.SH NAME
+HTYPE \- test to see if linux instance is running in a container 
+.br
+
+.SH SYNOPSIS
+.B hytype 
+>& <log file>
+.br
+
+.SH DESCRIPTION
+.I htype(1)
+tests to see if linux is running on a regular host or in a Docker or LXC container.
+The result of the test (HOST or CONTAINER) is sent to
+.I standard ouput.
+.br
+
+.SH ENVIRONMENT VARIABLES
+None.
+.br
+
+.SH BUGS
+Not really a bug but
+.I htype(1)
+should ideally report if the current Linux isntance is running on a virtual
+machine.
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br

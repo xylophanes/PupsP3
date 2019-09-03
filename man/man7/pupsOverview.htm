@@ -1,0 +1,1473 @@
+<head>
+</head>
+
+<body>
+<html>
+
+<center><table width="700">
+<tr>
+<td>
+
+<body bgcolor="#FFFFFF" text="#003300" link="#990000" vlink="#006633" alink="#663300"><!--mstheme--><font face="Trebuchet MS, Arial, Helvetica">
+<div align="center">
+  <center>
+  <!--mstheme--></font><table border="0" width="600">
+    <tr>
+      <td><!--mstheme--><font face="Trebuchet MS, Arial, Helvetica"><!--webbot bot="Navigation" S-Type="banner" S-Rendering S-Orientation
+        B-Include-Home B-Include-Up U-Page S-Target startspan --><img src="_derived/libraries.htm_cmp_pups2100_bnr.gif" width="600" height="100" border="0" alt="Service Commands"><!--webbot bot="Navigation" endspan i-checksum="10564" -->
+        <hr>
+
+</center>
+
+<center>
+<table border=0 width=100%>
+<tr>
+<td width=25%>
+<font size="2">
+<a href="../index.html"><b>Home<b></a>
+</font>
+</td>
+
+<td width=25%>
+<font size="2">
+<a href="./introduction.htm"><b>Introduction<b></a>
+</font>
+</td>
+
+<td width=25%>
+<font size="2">
+<a href="../success_stories.htm"><b>Successes<b></a>
+</font>
+</td>
+
+<td width=25%>
+<font size="2">
+<a href="../easy_examples.htm"><b>Examples<b></a>
+</font>
+</td>
+
+<td width=25%>
+<font size="2">
+<a href="../download.htm"><b>Download<b></a>
+</font>
+</td>
+
+<td width=25%>
+<font size="2">
+<a href="../installpups.html"><b>Install<b></a>
+</font>
+</td>
+
+<td width=25%>
+<font size="2">
+<a href="../documentation.htm"><b>Documentation<b></a>
+</font>
+</td>
+
+<td width=25%>
+<font size="2">
+<a href="../disc_pups_frm.htm"><b>Discussion<b></a>
+</font>
+</td>
+
+<td width=25%>
+<font size="2">
+<a href="../acknowledgments.htm"><b>Acknowledgments<b></a>
+</font>
+</td>
+
+</tr>
+</table>
+</center>
+<hr>
+
+<h2><!--mstheme--><font face="Comic Sans MS, Arial, Helvetica">
+PUPS/P3 - homeostatic cluster computing for Linux and other POSIX compliant operating systems
+<!--mstheme--></font></h3>
+
+<h3><!--mstheme--><font face="Comic Sans MS, Arial, Helvetica">
+Introduction<!--mstheme--></font></h3>
+<p align="justify">
+     <b>PUPS/P3</b> is a set of enhancements for
+     <a href="http://www.linux.org"><b>Linux</b></a> which support persistent and
+     complex computations via hoemostasis, persistent object stores and in
+     conjuction with the 
+     <a href="htpp://www.mosix.org"><b>MOSIX</b></a> system dynamic distributed compute-context
+     load balancing. The <b>PUPS/P3</b> system will work on both standalone computers
+     and within clusters of networked commodity <a href="http://en.wikipedia.org/wiki/Personal_computer"><b>PC</b>s</a>. Although inter-operation
+     with <b>MOSIX</b> requires a
+     <a href="http://en.wikipedia.org/wiki/Intel_x86"><b>Intel-x86</b></a> 
+     family <a href="http://en.wikipedia.org/wiki/CPU"><b>CPU</b></a> hardware running <b>Linux</b>, versions
+     of the <b>PUPS/P3</b> system which do not support pre-emptive compute-context
+     process migration may be built for any operating system offering full
+     <a href="http://en.wikipedia.org/wiki/POSIX"><b>POSIX</b></a> compliance.
+</p>
+<p align="justify">
+     Via <b>PSRP</b> (<b>P</b>rocess <b>S</b>tatus <b>R</b>equest <b>P</b>rotocol), the
+     <b>PUPS/P3</b> system offers comprehensive mechanisms for communicating with running processes
+     (<i><b>PSRP</b> servers</i>) which are carrying <i>persistent computational payloads</i>.
+     This communication interface is inherently multi access (multiple
+     clients can talk to the same <b>PSRP</b> server process at the same time), and multi-user
+     (clients owned by different users can talk to the same <b>PSRP</b> server process at the same time
+     provided that they can authenticate themselves to it). In order
+     to support multi-user access, the <b>PUPS/P3</b> system provides full token
+     based authentication services.  A user must supply an authentication
+     token in order to get client access to a <b>PSRP</b> server which is owned by
+     another user. <b>PSRP</b> server processes are contacted using the <i><b>PSRP</b> client
+     application</i> <b>psrp</b>. Both the <b>PSRP</b> client and <b>server</b> have a number of
+     <i>built in commands</i> which are available to <i>any</i> client or server respectively. In addition application
+     writers can add further commands to the <b>PSRP</b> server process via the
+     <i>dispatch function interface.</i>
+     Two sorts of <i>dispatch function</i> are currently supported by <b>PUPS/P3</b>:
+     <i>static</i> and <i>dynamic</i>. The first type of dispatch function is pre-compiled
+     into a given <b>PSRP</b> server by its implementor. The second type of dispatch function is
+     dynamically associated with the <b>PSRP</b> server using the
+     <a href="http://en.wikipedia.org/wiki/Shared_library#Dynamic_linking"><b>dynamic link-loader</b></a> interface
+     supported by <a href="http://en.wikipedia.org/wiki/POSIX"><b>POSIX</b></a>. In addition to functions,
+     <b>PUPS/P3</b> also supports the static and dynamic attachment of other
+     objects to running <b>PUPS/P3</b> enabled applications. These include:
+     <ol>
+     <font size="2">
+     <li>System V <a href="http://en.wikipedia.org/wiki/Shared_memory"><b>shared memory</b></a> segments.
+     <br>
+     <li><b>Databags</b> (simple contiguous data objects organised as a stream of bytes).
+     <br>
+     <li><b>PUPS/P3</b> <i>shared heaps</i>.
+     <br>
+     </font>
+     </ol>
+     </p>
+     <p align="justify">
+     The <b>PUPS/P3</b> <i>shared heap</i> is a functional implentation of a persistent
+     object store.  It supports multi-process and multi-user access. In networked
+     environments, given an appropriate synchronous file system, for
+     example, <b>MFS</b>, (<b>M</b>osix <b>F</b>ile <b>S</b>ystem) the shared heap may be
+     physically located on <i>a different
+     machine to that running the <b>PUPS/P3</b> enabled process or processes mapping
+     it</i>. <b>PUPS/P3</b> shared heaps are based on the <a href="http://en.wikipedia.org/wiki/POSIX"><b>POSIX</b></a> 
+     <a href="http://en.wikipedia.org/wiki/Mmap"><b>mmap</b></a> interface, and
+     are created, managed and destroyed using an API which resembles the
+     familiar 
+     <a href="http://en.wikipedia.org/wiki/Malloc"><b>malloc</b></a> memory allocation package.
+     </p>
+     <hr>
+     <br>
+     <h3><!--mstheme--><font face="Comic Sans MS, Arial, Helvetica">
+     Requirements<!--mstheme--></font></h3>
+     <font size="2">
+     <ol>
+     <li>All the nodes in the cluster must be connected by 
+     <a href="http://www.wikipedia.org/wiki/LAN"><b>LAN</b>s</a> that support
+     <a href="http://en.wikipedia.org/wiki/TCP/IP"><b>TCP/IP</b></a> under
+     <a href="http://en.wikipedia.org/wiki/Linux"><b>Linux</b></a>.
+     <br>
+     <li>All nodes must have a mathematical (floating-point) unit (FPU).
+     <br>
+     </ol>
+     </font>
+     </p>
+     <hr>
+     <br>
+     <h3><!--mstheme--><font face="Comic Sans MS, Arial, Helvetica">
+     Binary Installation<!--mstheme--></font></h3>
+     <p align="justify">
+     The <b>PUPS/P3</b> system may be installed either from a binary or
+     source distribution. The binary distribution, (currently only
+     available for Intel 
+     <a href="http://en.wikipedia.org/wiki/X86"><b<x86</b></a> compatable processors) is in <b>RedHat <a href="http://en.wikipedia.org/wiki/RPM_Package_Manager">RPM</a> format</b>.
+     In this case the basic <b>PUPS/P3</b> package is installed by
+     downloading the <b>RPM</b> and then typing.
+     <br><br>
+     <font size="2" face="courier">
+     rpm -iv pups.rpm
+     </font>
+     <br><br>
+     The RedHat package manager then takes care of making sure that all the
+     components of the <b>PUPS/P3</b> system are installed in the correct locations.
+     </p>
+     <hr>
+     <br>
+     <h3><!--mstheme--><font face="Comic Sans MS, Arial, Helvetica">
+     Source Installation<!--mstheme--></font></h3>
+     <p align="justify">
+     Installing the package from source is a little more complex, but it
+     allows much more control over the precise capabilities of the system
+     installed. In addition, if the system can be  built from source for any
+     system which fully supports <a href="http://en.wikipedia.org/wiki/POSIX"><b>POSIX</b></a>. To date <b>PUPS/P3</b> has been built for
+     <a href="http://en.wikipedia.org/wiki/SunOS"><b>SunOS</b></a>,
+     <a href="htpp://en.wikipedia.org/wiki/Solaris(operatin_system)><b>Solaris</b></a>,
+     <a href="http://en.wikipedia.org/wiki/BSD_Unix"><b>BSD4.4</b></a>,
+     <a href="http://en.wikipedia.org/wiki/Irix"><b>IRix</b></a>
+     and
+     <a href="http://en.wikipedia.org/wiki/OSF1"><b>OSF1</b></a>,
+     in addition to
+     <a href="http://en.wikipedia.org/wiki/Linux"><b>Linux</b></a>.
+     </p>
+     <p align="justify">
+     Installation of <b>PUPS/P3</b> from source is relatively straightforward. Firstly,
+     the installation scripts assume that the default
+     <a href="http://en.wikipedia.org/wiki/Unix_shell"><b>shell</b></a> for the user when
+     building the system is either <a href="http://en.wikipedia.org/wiki/C_shell"><b>csh</b></a> or 
+     <a href="http://en.wikipedia.org/wiki/Tcsh"><b>tcsh</b></a> If neither of these
+     shells is currently the default, the default shell must be changed appropriately using the 
+     <a href="http://en.wikipedia.org/wiki/Chsh"><b>chsh</b></a> utility. After the 
+     <a href="http://en.wikipedia.org/wiki/Tarball"><b>tarball</b></a> has been unpacked, the first stage
+     of the installation process is to cd to the root directory of the <b>PUPS/P3</b>
+     source distribution: <i>dist.p3.src/pupscore.src</i>. The script 
+     <b>build_pups_services</b> is then run (type
+     <font size="2" face="courier"> 
+     ./install_pups_services
+     </font>)
+     in order to build the <b>PUPS/P3</b> libraries
+     and service functions and install them in the default locations. If the build is successful (see build log)
+     and the user is not 
+     <a href="http://en.wikipedia.org/wiki/Root_user"><b>root</b></a>, by default, the binaries for the <b>PUPS/P3</b>
+     <i>service functions</i>, libraries, header files and man pages are located in:
+     <br>
+     <ul>
+     <font size="2">
+     <li>~/bin
+     <br>
+     <li> ~/lib
+     <br>
+     <li>~/include/p3
+     <br>
+     <li>~/man
+     <br>
+     </font>
+     </ul>
+     If the user is <b>root</b> the corresponding default locations are:
+     <br>
+     <ul>
+     <font size="2">
+     <li>/usr/bin
+     <br>
+     <li>/usr/lib
+     <br>
+     <li>/usr/include/p3
+     <br>
+     <li>/usr/share/man
+     </font>
+     </ul>
+     </p>
+     <hr>
+     <br>
+     <h3><!--mstheme--><font face="Comic Sans MS, Arial, Helvetica">
+     Options<!--mstheme--></font></h3>
+     <p align="justify">
+     There are number of options which may be specified when building <b>PUPS/P3</b>
+     from source. For most installations the <i>cluster</i> option (supporting check-
+     pointing, networking, shared heaps and dynamic objects) is the most
+     appropriate choice.
+     </p>
+     <ul>
+     <li><p align="justify">no option specified or <b>vanilla</b>: causes a <i>vanilla version</i>
+          of <b>PUPS/P3</b> to be built
+          for a standalone machine which is assumed to be non-networked. This version of <b>PUPS/P3</b> is very basic and
+          only allows static dispatch functions and databags. <b>PSRP</b> interaction
+          is limited to builtin commands supported by the <b>PSRP server</b> and the
+          static dispatch functions provided by the application. There is no
+          support for dynamic function or data objects, networking or check pointing.
+     </p>
+     <li><p align="justify">
+          <b>cluster</b>: Build a fully functional network aware <b>PUPS/P3</b> distribution which supports
+          full networking dynamic dispatch functions, shared heaps and 
+	  <a href="http://en.wikipedia.org/wiki/Application_checkpointing"><b>checkpointing</b></a>.
+     </ul>
+     </p>
+
+     <hr>
+     <br>
+     <h3><!--mstheme--><font face="Comic Sans MS, Arial, Helvetica">
+     Setting custom installation directories for PUPS/P3</font></h3>
+     <p align="justify">
+     The following shellscript variables in the <b>build_pups_services</b> shellscript
+     may be edited to change the default installation locations for <b>PUPS/P3</b>
+     software components:
+     <br>
+     <ul>
+     <font size="2">
+     <li>set <b>BINDIR</b> = <i>"location of <b>PUPS/P3</b> service function binaries"</i>
+     <br> 
+     <li>set <b>LIBDIR</b> = <i>"location of <b>PUPS/P3</b> libraries"</i>
+     <br>
+     <li>set <b>HDRDIR</b> = <i>"location of <b>PUPS/P3</b> header files"</i>
+     <br>
+     <li>set <b>MANDIR</b> = <i>"location of <b>PUPS/P3</b> man files"</i>
+     <br>
+     </font>
+     </ul>
+     </p>
+     <p align="justify">
+     The user can also elect to build a standalone process migration facility (based on
+     <b>cryopid</b> and an extended version of <b>S</b>ecure <b>SH</b>ell
+     (<a href="http://en.wikipedia.org/wiki/Ssh"><b>ssh</b></a>) by
+     setting the <b>build_cryopid</b> and <b>build_ssh</b> variables in <b>build_pups_services</b>
+     to <b>"yes"</b> respectively.
+     </p>
+     <hr>
+     <br>
+     <h3><!--mstheme--><font face="Comic Sans MS, Arial, Helvetica">
+     PUPS/P3 Environment<!--mstheme--></font></h3>
+     <p align="justify">
+     The <b>PUPS/P3</b> environment consists of a number libraries, service functions
+     build tools and daemons.
+     </p>
+
+     <h3><!--mstheme--><font face="Comic Sans MS, Arial, Helvetica">
+     Libraries<!--mstheme--></font></h3>
+     <p align="justify">
+     Currently there are six <b>PUPS/P3</b> libraries:
+     <br>
+     <ol>
+     <li><p align="justify">
+          <a href="./pupsManPages/utilib.3grp.html"><b>utilib</b></a>: which contains general purpose utilities including command
+          tail decoding, extended I/O functionality, application process name
+          overloading, extended asynchronous event handling and a number of
+          standard homeostats for protecting files and interprocess communica-
+          tion channels.
+     </p>
+     <li><p align="justify">
+          <a href="./pupsManPages/casino.3grp.html"><b>casino</b></a>: Provides a number of psuedo-random number generators (after
+          Knuth, 1984) and generators for 
+<a href="http://en.wikipedia.org/wiki/Poisson_Distribution"<b>Poisson</b></a>, 
+<a href="http://en.wikipedia.org/wiki/Normal_distribution"<b>Normal</b></a>, 
+<a href="http://en.wikipedia.org/wiki/Binomial_distribution"<b>Binomial</b></a> and other
+          well known distribution function in order to support applications
+          which use stochastic optimisation (e.g. <b>seriate</b>, <b>sm<a href="http://en.wikipedia.org/wiki/Boltzmann">boltzmann</a></b>).
+     </p>
+     <li><p align="justify">
+          <a href="./pupsManPages/netlib.3grp.html"><b>netlib</b></a>: Provides support for network computing including 
+          asynchronous signalling of processes running on remote hosts, remote
+          execution of processes, gathering of loading (and other status
+          information) from remote hosts.
+     </p>
+     <li><p align="justify">
+          <a href="./pupsManPages/psrplib.3grp.html"><b>psrplib</b></a>: Implements <b>PSRP</b> 
+          (<b>P</b>rocess <b>S</b>tatus <b>R</b>equest <b>P</b>rotocol). <b>PSRP</b> is
+          a novel interprocess communications Protocol which enables both users and also peer
+          processes (<b>PSRP clients</b>) to interact asynchronously with a running
+          application (<b>the PSRP server</b>) on an Internet wide basis. <b>PSRP</b> is a
+          secure protocol. With the provision of appropriate authentication
+          tokens (e.g. password, <a href="http://en.wikipedia.org/wiki/Pretty_Good_Privacy"><b>PGP</b></a> signatures etc.) it is possible for a
+          <b>PSRP client</b> to access and make use of resources which it does not
+          own. In addition, the <b>PSRP protocol</b> is <i>multithreaded</i>, which means it
+          is possible for a running <b>PSRP server application</b> to be simultaneously
+          accessed by <i>multiple <b>PSRP clients</b></i>. The <b>PSRP library</b> also provides
+          vides a large number of builtin functions which support standard
+          <i><b>PSRP</b> client-server interactions</i> including:
+          <br>
+          <br>
+          <ul>
+          <font size="2">
+          <li><p align="justify">Status information about the <b>PSRP</b> server including number and
+              identity of any connected client, memory utilisation, attached
+              dynamic objects (e.g. persistent object stores and/or dynamic
+              functions), number of open files etc.
+          <p>
+          <li><p align="justify">A mechanism for dynamically importing dynamic functions into a
+              running application (the <b>PSRP</b> interface supports the
+              <a href="http://en.wikipedia.org/wiki/Dynamic_Library#Dynamic_linking"><b>dynamic
+              linking</b></a> of code modules with strong type checking and possible
+              <i>type broking</i> for example promotion of 
+              <font size="2" face="courier">
+              int
+              </font>
+              to
+              <font size="2" face="courier">
+              long
+              </font>
+              or the depracation
+              of
+              <font size="2" face="courier">
+              double
+              </font>
+              to
+              <font size="2" face="courier">
+              float.
+              </font>
+          </p>
+          <li><p align="justify">A mechanism for attaching and modifying persistent object
+              stores: these are managed using the <a href="http://en.wikipedia.org/wiki/POSIX"><b>POSIX</b></a> memory mapping API
+              which permits a process to directly map the contents of a file
+              (containing the persistent object store) into its address space.
+              The <a href="http://en.wikipedia.org/wiki/POSIX"><b>POSIX</b></a> memory mapping functionality has been extended to
+              enable memory mapping over network files systems such as
+              <a href="http://en.wikipedia.org/wiki/Network_File_System"><b>NFS</b></a> or <b>MFS</b>.
+          </p>
+          <li><p align="justify">Mechanisms for modifying the hoemostatic responses of an active
+              PSRP server (e.g. Server 
+              <a href="http://en.wikipedia.org/wiki/Application_checkpointing"><b>checkpointing</b></a>, migration and homeostatic
+	      protection can be switched on or off by appropriately
+              authenticated <b>PSRP</b> clients).
+          </p>
+          </font>
+          </ul>
+          
+          <li><p align="justify">
+              <a href="./pupsManPages/mvmlib.3grp.html"><b>mvmlib</b></a>: provides support for <b>PUPS/P3</b> processes
+              to (optimally)
+              manage their own memory. For example, this mechanism is used by
+              the <b>smboltzmann</b> application and permits it to deal efficiently
+              with huge rule matrices and lists of degenerate objects.
+          </p>
+          <li><p align="justify">
+              <a href="./pupsManPages/tadlib.3grp.html"><b>tadlib</b></a>: provides support for PSRP servers and other
+              <b>PUPS/P3</b> applications which are multithreaded using the
+              <a href="http://en.wikipedia.org/wiki/Pthreads"><b>POSIX thread</b></a>
+              libraries.
+          </p>
+          </ul>
+          </p>
+     </ol>
+     <hr>
+     <br>
+     <h3><!--mstheme--><font face="Comic Sans MS, Arial, Helvetica">
+     PUPS/P3 Build Tools<!--mstheme--></font></h3>
+     <p align="justify">
+     There are a number of <b>build tools</b> which can be used to automate the generation
+     of <b>PUPS/P3</b> applications. These include:
+     <font size="2">
+     <br>
+     <ol>
+     <li><p align="justify">
+          <a href="./pupsManPages/pupsconf.1.html"><b>pupsconf</b></a>: which is used to generate makefiles from
+          <b>PUPS/P3</b> <i>makefile templates</i>.
+     </p>
+     <li><p align="justify">
+          <a href="./pupsManPages/vtagup.1.html"><b>vtagup</b></a>: which sets the <i>build count</i> of a given target source file.
+     </p>
+     <li><p align="justify">
+          <a href="./pupsManPages/vstamp.1.html"><b>vstamp</b></a>: which timestamps a given target source file. The timestamp
+          generated by this utility is used by various <b>PUPS/P3</b> subsystems to
+          detect <i>stale dynamic objects</i>.
+     </p>
+     <li><p align="justify">
+          <a href="./pupsManPages/downcase,1.html"><b>downcase</b></a>: changes its argument string to lower case. Used in
+          <b>PUPS/P3</b> build and install scripts.
+     </p>
+     <li><p align="justify">
+          <a href="./pupsManPages/upcase.1.html"><b>upcase</b></a>: changes its argument string to upper case.
+     </p>
+     <li><p align="justify">
+          <a href="./pupsManPages/prefix.1.html"><b>prefix</b></a>: given a string <b>prefix.suffix</b> writes
+          <b>prefix</b> to <i>standard output</i>. Used in <b>PUPS/P3</b> build scripts.
+     </p>
+     <li><p align="justify">
+          <a href="./pupsManPages/suffix.1.html"><b>suffix</b></a>: given a string <b>prefix.suffix</b> writes
+          <b>suffix</b> to <i>standard output</i>. Used in <b>PUPS/P3</b> build scripts.
+     </p>
+     <li><p align="justify">
+          <a href="./pupsManPages/ask.1.html"><b>ask</b></a>: prompt for a (user supplied) text string.
+     </p>
+     <li><p align="justify">
+          <a href="./pupsManPages/tas.1.html"><b>tas</b></a>: test and set (lock directory). Used by the build scripts to
+          ensure exclusive access to source directories in a multithreaded
+          mulituser environment.
+     </p>
+     <li><p align="justify">
+          <a href="./pupsManPages/ask.1.html"><b>dynagen</b></a>: generates a block of dynamic hostnames for
+<a href="en.wikipedia.org/wiki/DHCP><b>DHCP</b></a> leasing.
+     </p>
+     <li><p align="justify">
+          <a href="./pupsManPages/gob.1.html"><b>gob</b></a>: creates a mouth (gob hole) into which data for payload
+application is <b>cat</b>ed. 
+     </p>
+     <li><p align="justify">
+          <a href="./pupsManPages/hdid.1.html"><b>hdid</b></a>: get the serial number for
+<a href="en.wikipedia.org/wiki/EIDE><b>EIDE</b></a> or
+<a href="en.wikipedia.org/wiki/SATA><b>SATA</b></a> hard disk drive.
+     </p>
+     <li><p align="justify">
+          <a href="./pupsManPages/tcell.1.html"><b>tcell</b></a>: licencing module (for arbitrary non <b>PUPS/P3</b> applications
+which uses <b>PUPS/P3 <i>security libraries</i></b>.
+     </p>
+     <li><p align="justify">
+          <a href="./pupsManPages/servertool.1.html"><b>servertool</b></a>: starts instance of given <b>PSRP</b> server in an
+<b?xterm</b> window.
+     </p>
+     <li><p align="justify">
+          <a href="./pupsManPages/p3f.1.html"><b>p3f</b></a>: tests to see if a process is <b>PUPS/P3</b> aware. 
+     </p>
+     <li><p align="justify">
+          <a href="./pupsManPages/vector.1.html"><b>vector</b></a>: vector <b>PSRP</b> request to server running on remote host. 
+     </p>
+     <li><p align="justify">
+          <a href="./pupsManPages/thread.1.html"><b>thread</b></a>: execute a <i>homogenous (process) farm</i>.
+     </p>
+     <li><p align="justify">
+          <a href="./pupsManPages/error.1.html"><b>error</b></a>: prints error string associated with error numbers on standard
+          output. Essentially, this is a wrapper around <b>perror</b>.
+     </p>
+     <li><p align="justify">
+          <a href="./pupsManPages/application.1.html"><b>application</b></a>: generates application template from skeleton template
+          files.
+     </p>
+     <li><p align="justify">
+          <a href="./pupsManPages/mktty.1.html"><b>mktty</b></a>: is a homeostat which replaces
+<i><b>/dev/tty</b></i> if it is accidentally (or maliciously) removed. 
+     </p>
+     <li><p align="justify">
+          <a href="./pupsManPages/catfiles.1.html"><b>catfiles <i>f1 f2</i></b></a>: catentate
+files <i><b>f1</b></i> and <i><b>f2</b></i> preserving the 
+<a href="http://en.wikipedia.org/wiki/Inode"><b>inode</b></a> of file <i><b>f1</b></i>.
+     </p>
+     </ol>
+     </font>
+     </p>
+     <hr>
+     <br>
+     <h3><!--mstheme--><font face="Comic Sans MS, Arial, Helvetica">
+     PUPS/P3 Scripts<!--mstheme--></font></h3>
+     <p align="justify">
+     The PUPS/P3 distribution includes a number of
+     <a href="http://en.wikipedia.org/wiki/Shell_scripts"><b>shell</b></a> scripts which facilitate
+     building the <b>PUPS/P3</b> environment. These include:
+     <br>
+     <font size="2">
+     <ol>
+     <li><p align="justify">
+          <a href="./pupsManPages/share.1.html"><b>share</b></a>: generates <i>shared object</i> (<i><b>.so</b></i> from an <i>object</i>
+          (<i><b>.o</b></i>) file (which is the argument to <b>share</b>).
+     </p>
+     <li><p align="justify">
+          <a href="./pupsManPages/sharchive.1.html"><b>sharchive</b></a>: generates <i>shared object</i> (<i><b>.so</b></i>) from an]
+          <i><b>ar</b> archive</i> (<i><b>.a</b></i>) file (which is argument to sharchive).
+     </p>
+     <li><p align="justify">
+          <a href="./pupsManPages/configure.1.html"><b>configure</b></a>: generates a Makefile from a <b>PUPS/P3</b> <i>Makefile template</i>.
+          Essentially this is a wrapper script for
+          <a href="./pupsManPages/pupsconf.1.html"><b>pupsconf</b></a>.
+     </p>
+     <li><p align="justify">
+          <a href="./pupsManPages/clean.1.html"><b>clean</b></a>: cleans the <b>PUPS/P3</b> source tree (prior to a new build of the
+          <b>PUPS/P3</b> environment).
+     </p>
+     <li><p align="justify">
+          <a href="./pupsManPages/pupsuname.1.html"><b>pupsuname</b></a>: echo 
+          <a href="http://en.wikipedia.org/wiki/CPU"><b>CPU</b></a> and OS architecture to standard output (format
+          is <CPU arch>.<OS arch>). This is used by other tools, notably the
+          build scripts to put binaries and libraries in appropriate places.
+     </p>
+     <li><p align="justify">
+          <a href="./pupsManPages/build_pups_libs.1.html"><b>build_pups_libs</b></a>: builds <b>PUPS/P3</b> libraries and installs in
+          place specified by <b>LIBDIR</b> variable in <b>build_pups_libs</b>.
+     </p>
+     <li><p align="justify">
+          <a href="./pupsManPages/build_pups_services.1.html"><b>build_pups_services</b></a>: builds <b>PUPS/P3</b> libraries, service functions and
+          daemons and installs them places specified by relevant variables in <b>build_pups_services</b>
+          script (see above).
+     </p>
+     <li><p align="justify">
+          <a href="./pupsManPages/project.1.html"><b>project</b></a>: installs a <b>PUPS/P3</b> project directory rooted in the calling
+          users home directory.
+     </p>
+     <li><p align="justify">
+     <a href="./pupsManPages/manc.1.html"><b>manc</b></a> <b><i>C source file</i></b>: generates
+documentation for <b><i>C source file</i></b> using the <b>c2man</b> utility.
+     </p> 
+     <li><p align="justify">
+     <a href="./pupsManPages/PSRPTOOL.1.html"><b>PSRPTOOL</b></a>: opens an instance of <b>psrp</b>
+in <b>xterm</b> window,
+     </p>
+     <li><p align="justify">
+     <a href="./pupsManPages/WIPE.1.html"><b>WIPE</b></a>: removes all stale <b>PSRP</b> resources
+in specfied <i><b>directory</b></i>. Defaults to current directory. 
+     </p>
+     </ol>
+     </font>
+     </p>
+     <hr>
+     <br>
+     <h3><!--mstheme--><font face="Comic Sans MS, Arial, Helvetica">
+     PUPS/P3 daemons<!--mstheme--></font></h3>
+     <p align="justify">
+     There is one <b>PUPS/P3</b> daemon:
+     <a href="./pupsManPages/connected.1.html"><b>connected</b></a> which periodically checks whether it is possible
+     to connect to The Internet (via a local networks nominated
+     gateway). When Internet connectivity changes, connected runs an
+     appropriate set of scripts.  Although connected is not part of
+     <b>PUPS/P3</b> proper, it is included in the distribution as it works
+     around
+     <a href="http://en.wikipedia.org/wiki/Domain_name_server"><b>DNS</b></a> problems encountered in some operating
+     systems.
+     </p>
+     <hr>
+     <br>
+     <h3><!--mstheme--><font face="Comic Sans MS, Arial, Helvetica">
+     Service Functions<!--mstheme--></font></h3>
+     <p align="justify">
+     The <b>PUPS/P3</b> service functions are a set of tools which facilitate building
+     of user applications in the <b>PUPS/P3</b> environment.  Many of the functions
+     (for example <b>fsw</b>, <b>xcat</b> and <b>xtee</b>) are effectively used as glue modules
+     in virtual dataflow machines (which consist co-operating pipelines
+     of application processes). Other functions (for example <b>nkill</b>) extend the
+     functionality of existing <a href="http://en.wikipedia.org/wiki/UNIX"><b>UNIX</b></a> tools (e.g.
+     <a href="http://en.wikipedia.org/wiki/Kill_%28Unix%29"><b>Kill</b></a>) in potentially useful
+     ways. The <b>PUPS/P3</b> environment currently provides eight service functions:
+     <br>
+     <font size="2">
+     <ol>
+     <li><p align="justify">
+          <a href="./pupsManPages/nkill.1.html"><b>nkill</b></a>: Permits processes (which may be on remote hosts) to be signalled using
+          a unique name rather than their Process IDentifier (<a href="http://en.wikipedia.org/wiki/Process_ID"><b>PID</b></a>).
+     </p>
+     <li><p align="justify">
+          <a href="./pupsManPages/fsw.1.html"><b>fsw</b></a>,
+          <a href="./pupsManPages/xcat.1.html"><b>xcat</b></a>,
+          <a href="./pupsManPages/xtee.1.html"><b>xtee</b></a>: permit the efficent implementation of <i><b>V</b>irtual
+          <b>D</b>ataflow <b>M</b>achines</i> (<b>VDM</b>s). <b>Fsw</b> is a <i>file system watcher</i> which is able to
+          halt the execution of any <b>VDM</b> of which it is a member in the event
+          of the <b>VDM</b>'s output filesystem becoming full. <b>Xcat</b> is primarily
+          intended to act a place marker within <b>VDM</b>s which can be <i>over<a href="http://en.wikipedia.org/wiki/Fork_%28computing%29"><b>forked</b></a></i>
+          by <i>ephemeral processes</i> (e.g.
+          <a href="http://en.wikipediai.org/wiki/X_windows"><b>X11</b></a> and other interactive applications).
+          Typically, <b>xcat</b> processes provide targets within <b>VDM</b>s which
+          can be overlaid (via
+	  <a href="http://en,wikipedia.org/wiki/Exec_%28operating_system%29"><b>execv</b></a> system call) by interactive monitoring and/or visulisation applications.
+     </p>
+     <li><p align="justify">
+          <a href="./pupsManPages/embryo.1.html"><b>embryo</b><a>: is an uncommited <i><b>PSRP</b> server application</i>.
+          Typically <b>embryo</b> is used to test new <b>PUPS/P3</b> installations, but it may also be used
+          to build applications whose computational payloads are constructed of <i>dynamic functions</i>.
+     </p>
+     <li><p align="justify">
+          <a href="./pupsManPages/pass.1.html"><b>pass</b></a>: an <i>application carrier</i> which enables non
+          <b>PUPS/P3</b> processes to gain access to <b>PUPS/P3</b> and therefore <b>PSRP</b>
+          services. <b>Pass</b> provides <i>homeostatic protection</i> for application payload pipeline,
+          and acts as an I/O manager which is capable of reading/writing data to and from regular 
+          <a href="http://en.wikipedia.org/wiki/Computer_file"><b>files</b></a>, 
+          <a href="http://en.wikipedia.org/wiki/FIFO"><b>FIFOS</b></a> and
+          <a href="http://en.wikipedia.org/wiki/Berkeley_socket"><b>sockets</b></a>. In addition, it provides <i>hoemeostatic protection</i>
+          for the file system objects it is performing I/O on, and
+          can provide its <i>payload process pipeline</i> with thread-of-execution protection.
+     </p>
+     <li><p align="justify">
+          <a href="./pupsManPages/protect.1.html"><b>protect</b></a>: is a file system object protection homeostat.
+          This application will provide homeostatic protection for the file system objects
+          <i><b>files</b></i>, <i><b>FIFO</b></i>s and <i><b>sockets</b></i> presented on its command line.
+     </p>
+     <li><p align="justify">
+          <a href="./pupsManPages/lyosome.1.html"><b>lyosome</b></a>: is a lightweight non <b>PUPS/P3</b> aware utility which is similar in function to
+          <b>protect</b> which protects a <i>file system object</i> that is a <i><b>file</b></i>, <i><b>FIFO</b></i> or <i><b>socket</b></i> for a specified period of time. When
+          this lifetime  has expired, 
+           <a href="http://en.wikipedia.org/wiki/Lyosome"><b>lyosome</b></a> deletes the <i>file system object</i> and exits.
+     </p>
+     <li><p align="justify">
+          <a href="./pupsManPages/lol.1.html"><b>lol</b></a>: tests to see if the owner (<b>PSRP</b>
+server process) of a (simple link) lock, PSRP communication channel, or <b>PUPS/P3</b> linkpost file is
+still alive.
+     </p>
+     <li><p align="justify">
+          <a href="./pupsManPages/hasmosix.1.html"><b>lol</b></a>: tests to see <b>Linux</b> kernel
+has <b>MOSIX</b> extensions. 
+     </p>
+     <li><p align="justify">
+          <a href="./pupsManPages/maggot.1.html"><b>maggot</b><a>: is a <i>service function</i> which cleans the <b>PUPS/P3</b>
+          environment.  It does this by removing stale 
+          <a href="http://en.wikipedia.org/wiki/Application_checkpointing"><b>checkpoint</b></a> files, <b>PSRP</b> 
+          <a href="http://en.wikipedia.org/wiki/FIFO"><b>FIFOS</b></a>,
+          <a href="http://en.wikipedia.org/wiki/Berkeley_socket"><b>sockets</b></a> and
+          other derelict file system objects. <b>Maggot</b> thus acts in a manner
+          which is in keeping with its 
+          <a href="http://en.wikipedia.org/Maggot"><b>biological namesake</b></a>. Without the services
+          of <b>maggot</b>, the <b>PUPS/P3</b> environment could become cluttered
+          with <i>garbage objects</i> generated by <b>PUPS/P3</b> applications and services, and
+          the corpses of processes which have ended abnormally (causing a 
+          <a href="http://en.wikipedia.org/wiki/Core_dump"><b>core dump</b></a>).
+          The <b>maggot</b> detects and removes these objects returning the space
+          that they occupied to the file system: <i>without the cleanup crew,
+          <a href="http://en.wikipedia.org/wiki/Ecosystem"><b>ecosystems</b></a>, both digital and real-world will cease to function as
+          they drown in their own waste!</i>
+      </p>
+      <li><p align="justify">
+          <a href="./pupsManPages/psrp.1.html"><b>psrp</b></a>: is a text based client which allows the user sitting at an
+          interactive terminal to interact with a <i><b>PSRP</b> server processes</i>. From
+          the standpoint of the user <b>psrp</b> appears to be a <i>pseudo-shell</i> which
+          supports many of the features associated with true UNIX
+          <a href="http://en.wikipedia.org/wiki/Unix_shell"><b>shells</b></a> (e.g.
+          Command history, command line editing, 
+          <a href="http://en.wikipedia.org/wiki/Macro_%28computer_science%29"><b<macro</b></a> language [<b>P</b>SRP <b>M</b>acro <b>L</b>anguage - <b>PML</b>], initialisation
+          scripts etc.). With <b>psrp</b>, the user can open an <i>asynchronous
+          connection to any <b>PSRP</b> server, they can authenticate themselves
+          to</i>. Once the server  is open (e.g. a communication channel
+          exists between <b>psrp</b> the <b>PSRP client</b> and the (<b>PSRP</b>) server, the <i><b>PSRP</b>
+          protocol</i> is used to transfer requests to the server and its responses back to
+          <b>psrp</b> (and hence to the users terminal).
+      </p>
+      </ol>
+      </font>
+      </p>
+      <p align="justify">
+     In addition to the service function described above, the <b>PUPS/P3</b> environment
+     also makes use of a modified version of the <b>S</b>ecure <b>SH</b>ell (<a href="http://en.wikipedia.org/wiki/Ssh"><b>ssh</b></a>)
+     communication client. The version of <b>ssh</b> used by <b>PUPS/P3</b> contains a
+     set of extensions which permit the <b>ssh client</b> to work non interactively using password authentication.
+     This allows <b>PSRP</b> server processes to use <b>ssh</b> functionality to build
+     <i>encrypted tunnels</i> for data traffic between <b>PSRP</b> servers on networked hosts thereby
+     enhancing system security.
+     </p>
+     <hr>
+     <br>
+     <h3><!--mstheme--><font face="Comic Sans MS, Arial, Helvetica">
+     PUPS/P3 MOSIX<!--mstheme--></font></h3>
+     <p align="justify">
+     <a href="http://en.wikipedia.org/wiki/MOSIX"><b>Mosix</b></a> is an environment which is designed to turn a set of networked
+     commodity 
+     <a href="http://en.wikipedia.org/wiki/Personal_computer"><b>PCs</b></a> running 
+     <a href="http://en.wikipedia.org/wiki/Linux"><b>Linux</b></a> into a <i>parallel virtual machine</i>. The <b>MOSIX</b>
+     <b>PVM</b> is a <i>psuedo symetric multiprocessor</i> (<b>PSMP</b>) machine which
+     features pre-emptive adaptive dynamic load balancing. From the standpoint of the <b>PUPS/P3</b>
+     system inter-operation with <b>MOSIX</b> currently confers two advantages:
+     </p>
+     <font size="2">
+     <ol>
+     <li><p align="justify">It provides <b>PUPS/P3</b> with transparent optimal load balancing across a
+          computer cluster (and in the case of <b>MOSIX-2</b> across <i> co-operating 
+          <a href="http://en.wikipedia.org/wiki/Grid_computing"><b>grids</b></a> of
+          clusters</i>). Because <b>MOSIX</b> provides pre-emptive load balancing
+          <b>PUPS/P3</b> doesnt have to.
+     </p>
+     <li><p align="justify"><b>MOSIX</b> automatically compares the computational capabilities of hosts
+          and the speed of the networked connections between them when cluster
+          load balancing is started.
+     </p>
+     </ol>
+     </font>
+     <hr>
+     <br>
+     <h3><!--mstheme--><font face="Comic Sans MS, Arial, Helvetica">
+     PUPSP3/MOSIX Virtual Parallel Machines<!--mstheme--></font></h3>
+     <p align="justify">
+     The <b>PUPS/P3-MOSIX</b> cluster is a <i>parallel virtual machine</i> (<b>PVM</b>) which consists
+     of a number of hosts based on networked commodity <a href="http://en.wikipedia.org/wiki/Personal_computer"><b>PC</b></a> hardware running
+     <b>MOSIX</b> enhanced <b>Linux</b> kernels and <b>PUPS/P3</b> enabled application processes. Typically
+     such a cluster has the following structure:
+     <font size="2">
+     </p>
+     <ol>
+     <li><p align="justify">A <b>fileserver</b> which exports all cluster-wide network filesystems.
+          Typically this server also exports a <i>/pups</i> filesystem containing the
+          binaries for <b>PUPS/P3</b> service functions and daemons, and the <b>PUPS/P3</b>
+          libraries and header files.
+     </p>
+     <li><p align="justify">A 
+          <a href="http://en.wikipedia.org/wiki/Network_Information_Service"><b>NIS</b></a> server which provides central network information services
+          [<a href="http://en.wikipedia.org/wiki/Network_Information_Service"><b>NIS</b></a>] for the cluster. This permits users of the cluster
+          and processes running within it to "see"
+          the same environment irrespective of which hardware node they are on.
+     </p>
+     <li><p align="justify">A <b>gateserver</b> which controls access to the rest of the cluster from
+          The 
+          <a href="http://en.wikipedia.org/wiki/Internet"><b>Internet</b></a>. The gateway machine will typically support a firewall
+          (based on packet filtering and/or <b>squid</b>, and will have multiple
+          network connections (e.g. to a 192.168.1 local network and to the
+          Internet via either a second network interface card, point-to-point protocol
+          [<a href="http://en.wikipedia.org/wiki/Point-to-Point_Protocol"><b>PPP</b></a>] or whatever). Typically the <b>gateserver</b> is a relatively low
+          powered machine: processes started on the gateserver rapidly migrate
+          onto compute nodes within the cluster. This <b>gateserver</b> functionality is of course
+          deprecated if <b>PUPS/P3</b> is inter-operating with <b>MOSIX-2</b> which supports <i>grids of
+          co-operating clusters</i>.
+     </p>
+     </ol>
+     </font>
+     <p align="justify">
+     As inferred above <b>PUPS/P3-MOSIX</b> clusters need not work in isolation. Processes can
+     be 
+     <a href="http://en.wikipedia.org/wiki/Application_checkpointing"><b>checkpointed</b></a> and migrated between cluster should the need arise. 
+     In <b>MOSIX-1</b> the load balancing alorotihms need to be augmented so
+     processes migrate to another cluster when the mean loading on the outbound cluster exceeds
+     some defined maximum value. Under <b>MOSIX-2</b> this functionality is deprecated. Processes
+     are automatically migrated between co-operating <b>MOSIX grids</b> in order to maintain an even process-load across all co-operating clusters.
+     the aegis of <b>MOSIX-2</b>
+     </p>
+     <hr>
+     <br>
+     <h3><!--mstheme--><font face="Comic Sans MS, Arial, Helvetica">
+     The PUPS/P3 Project Directory<!--mstheme--></font></h3>
+     <p align="justify">
+     The <b>PUPS/P3</b> project is the source tree within which an implementor devel-
+     ops <b>PUPS/P3</b> applications. In order to create a <b>PUPS/P3</b> project, the <b>PUPS/P3</b>
+     tree must have been installed in <i><b>/home/pups</b></i>.  A project is created by
+     typing:
+     <br>
+
+     <font face="courier">
+     project <i>root directory architecture</i> 
+     </font>
+
+     <p alingn="justify">
+     This will make local copies (in the specified root directory) of all the components required
+     to develop <b>PUPS/P3</b> applications. The architecture is a combination of 
+     <a href="http://en.wikipedia.org/wiki/CPU"><b>CPU</b></a>
+     architecture,
+     <a href="http://en.wikipedia.org/wiki/Operating_systems"><b>OS</b></a> architecture and <b>PUPS/P3</b> architecture.  For example, a
+     <b>PUPS/P3</b> cluster installation, running under Linux on an i686 would be
+     specified as <i><b>IX86.linux.cluster</b></i>.  A <b>PUPS/P3</b> cluster installation, running
+     under Solaris on a SPARC would be <i><b>SPARC.solaris.cluster</b></i>. The project
+     command creates a directory called <i><b>src</b></i> in <i><b>root tree</b></i>, and installs an
+     example Makefile, skeleton application and <b>DLL</b> development library file in it.
+     <hr>
+     <br>
+     <h3><!--mstheme--><font face="Comic Sans MS, Arial, Helvetica">
+     PUPS/P3 Project Application Template</font></h3>
+     <p align="justify">
+     Once the <b>PUPS/P3</b> project directory is installed and assuming that the implentor
+     is in the directory <i><b>src</b></i>, the <b>PUPS/P3 application builder</b> may be used
+     to generate an application template using 
+     <a href="./sourceCode/skelpapp.c.html"><i><b>skelpapp.c</b></i></a>
+     and <i><b>Make_skelpapp.in</b></i> by default.
+     The application template is built by invoking the <b>application</b>
+     command (if no arguments are given the default skeleton templates in the
+     current directory are used). The application builder will prompt (interactively)
+     for the following:
+     </p>
+     <ul>
+     <font size="2">
+     <i>
+     <li>Application name.
+     <br>
+     <li>Author of application.
+     <br>
+     <li>Authors E-mail.
+     <br>
+     <li>Authors institution
+     <br>
+     <li>A string describing the purpose of the application
+     <br>
+     <li>The date (year).
+     <br>
+     </font>
+     </ul>
+     </i>
+     <p align="justify">
+     The resulting application template and associated makefile may then be
+     used as a basis for the application which is being implemented.
+     </p>
+     <hr>
+     <br>
+     <h3><!--mstheme--><font face="Comic Sans MS, Arial, Helvetica">
+     PSRP client command summary<!--mstheme--></font></h3>
+     <p align="justify">
+     The PSRP client, <b>psrp</b> has its own 
+      <a href="http://en.wikipedia.org/wiki/Macro_%28computer_science%29"><b<macro</b></a> language, <b>PML<b> (</b>P</b>SRP <b>M</b>acro
+     <b>L</b>anguage) and a large number of builtin commands. <b>PML</b> and its associated
+     builtin commands are documented below:
+     </p>
+     <font size="2">
+     <ol>
+     <li><p align="justify"><b>if <i>cond cmd</i></b>: execute <b><i>cmd</i></b> if condition
+           <b><i>cond</i></b> is <b>TRUE</b>.
+     </p>
+     <li><p align="justify"><b><i>%label</i></b>: target label for <b>resume</b> command.
+     </p>
+     <li><p align="justify"><b>resume <i>%label</i></b>: resume macro execution at label <b><i>%label</i></b>.
+     </p>
+     <li><p align="justify"><b>errorabort <i>on|off</i></b>: <b>PML</b> script aborted if <b><i>on</i></b> and error code for
+          last command != "ok"
+     </p>
+     <li><p align="justify"><b>exit</b>: exit macro that is currently executing.
+     </p>
+     <li><p align="justify"><b>abort</b>: abort current <b>PML</b> script.
+     </p>
+     <li><p align="justify"><b>atomic <i>cmd</i></b>: do not attempt to expand <b><i>cmd</i></b> as macro.
+     </p>
+     <li><p align="justify"><b>body <i>cmd</i></b>: show body (if <b><i>cmd</i></b> is a macro).
+     </p>
+     <li><p align="justify"><b>repeat <i>cnt</i> <command></b>: repeat command (which can be a macro) <b><i>cnt</i></b>
+          times.
+     </p>
+     <li><p align="justify"><b>rperiod <i>seconds</i></b>: set repeat command repeat interval (in seconds).
+     </p>
+     <li><p align="justify"><b>repeat <i>command></i></b>: repeat <b><i>command</i></b> infinitely.
+     </p>
+     <li><p align="justify"><b>raise <cond></b>: raise condition <cond> (pups_mainly used for testing
+          <b>PML</b> scripts)
+     </p>
+     <li><p align="justify"><b>cinit</b>: enter curses mode. This is mainly used prior to executing
+          commands or macros which require <b>curses</b> style screen access.
+     </p>
+     <li><p align="justify"><b>cend</b>: exit curses mode (returns to normal "glass tty" screen).
+     </p>
+     <li><p align="justify"><b>segaction</b> [<i>action</i>]</b>: specify/display request the <b><i>action</i></b> which is to
+          be taken when a server <i>segments</i> (e.g. saves its state and then executes
+          a child which inherits that state). In modern <b>PUPS/P3</b> applications
+          segmentation has been rendered obsolete. It was developed as an ad hoc way of working around <b>malloc</b> bugs 
+          which caused memory leaks but <b>PUPS/P3</b> now has its
+          own memory efficient (<i>bubble</i>) memory allocation package based on the memory
+          allocator shipped with <b>The Tennessee Checkpointing Libraries</b>.
+     </p>
+     <li><p align="justify"><b>thandler [<i>handler</i>]</b>: Specify/display thread handler.
+     </p>
+     <li><p align="justify"><b>cls</b>: clear screen (this is usually called just after a <b>cinit</b> command
+          to prepare the screen for <b>curses</b> I/O.
+     </p>
+     <li><p align="justify"><b>sleep <i>secs</i></b>: Delay <b>PML</b> script execution for <i>secs</i> seconds.
+     </p>
+     <li><p align="justify"><b>retry <i>on</i> | <i>off</i></b>: enable <i><b>on</b></i> or disable <i><b>off</b></i> automatic request
+          repetition (if <b>PSRP</b> server busy).
+     </p>
+     <li><p align="justify"><b>wait</b>: Make <b>PSRP client</b> wait for <b> PSRP server</b> to start (and then connect to
+          it).
+     </p>
+     <li><p align="justify"><b>nowait</b>: Make <b>PSRP client</b> abort connection attempt (if target <b>PSRP server</b>
+          is not running).
+     </p>
+     <li><p align="justify"><b>linktype</b>: show type of <i><b>PSRP</b> channel linkage</i>.
+     </p>
+     <li><p align="justify"><b>linktype <i>hard</i> | <i>soft</i></b>: set type of <i><b>PSRP</b> channel link</i> to <i><b>hard</b></i> or
+          <i><b>soft</b></i>. If the <b>PSRP client</b> is <i><b>soft</b> linked</i> to the <b>PSRP server</b> it will
+          abort its connection if the server is stopped. A <b>PSRP client</b> which
+          is <i><b>hard</b> linked</i> to a <b>PSRP server</b> will stay connected to the server even if
+          the server stops. This option has two uses:
+	  <br>
+	  <br>
+          <ul>
+          <font size="2">
+          <li>in the debugging of
+          <b>PUP/PSRP</b> based <b>VDM's</b>.
+          <br>
+          <li>in peer-to-peer
+          <b>PSRP</b> connections between <b>PSRP servers</b> mediated by <i><b>S</b>laved <b>I</b>nteraction
+          <b>C</b>lients <b>SIC</b>s)</i>.
+          </font>
+          </ul>
+     </p>
+     <li><p align="justify"><b>version</b>: display version of this <b>PSRP</b> interaction client
+     </p>
+     <li><p align="justify"><b>id</b>: print owner, uid, gid and controlling tty for this [<b>psrp</b>] process.
+     </p>
+     <li><p align="justify"><b>chanstat <i>directory</i></b>: show active <b>PSRP</b> channels in <i><b>directory</b></i>. If
+          <i><b>directory</b></i> is ommitted, the default <b>PSRP</b> channel directory, <i>/tmp</i> is
+          assumed.
+     </p>
+     <li><p align="justify"><b>dllstat <i>DLL pathname</i></b>: show <i>orifices</i> (pointers to exportable
+          objects) associated with <b>D</b>ynamic <b>L</b>ink <b>L</b>ibrary <i><b>DLL name</b></i>.
+     </p>
+     <li><p align="justify"><b>quit</b> | <b>exit</b> | <b>bye</b>: terminates <b>psrp client</b>.
+     </p>
+     <li><p align="justify"><b>trys <i>number</i></b>: set number of attempts to open connection to <b>PSRP</b> server to
+          <i><b>number</b></i> trys.
+     <p>
+     <li><p align="justify">(<a href="http://en.wikipedia.org/wiki/Ssh"><b>ssh</a> <i>ruser</i> [[<i>un</i>]<i>compress</i>]</b>: use [[<i><b>un</b></i>]<i><b>compressed</b></i>]
+          secure shell protocols in specified modality to connect to <i>remote <b>psrp servers</b></i> running on remote hosts (as remote user
+          <i><b>ruser</b></i>).
+     </p>
+     <li><p align="justify"><b>connect <i>host</i></b>: connect to remote <b>PSRP client</b> on <i><b>host</b></i>.
+     </p>
+     <li><p align="justify"><b>lcwd <i>path</i></b>: set current (local) working directory for <b>PSRP client</b> to <i><b>path</b></i>.
+     </p>
+     <li><p align="justify"><b>open <i>PSRP server</i>[<i>@host</i>]</b>: open connection to <b>PSRP</b> server process
+          <i><b>PSRP server</b></i> [on <i><b>host</b></i>]. If host is not specified, it is assumed
+          that the required server is running on the local host. The <b>PSRP</b>
+          server may be specified by either name or
+          <a href="http://en.wikipedia.org/wiki/Process_ID"><b>PID</b></a>.
+     </p>
+     <li><p align="justify"><b>close</b>: <b>close</b> connection to <b>PSRP</b> server process.
+     </p>
+     <li><p align="justify"><b>chelp</b>: display help on builtin commands for <b>PSRP</b> client.
+     </p>
+     <li><p align="justify"><b>pager</b>: toggles paging mode (via 
+     <a href="http://en.wikipedia.org/wiki/Less_%28Unix%29"><b>less</b></a> filter) on and off.
+     </p>
+     <li><p align="justify"><b>quiet</b>: do not display output from builtin <b>PSRP</b> client commands
+     </p>
+     <li><p align="justify"><b>squiet</b>: do not display output from <b>PSRP</b> server dispatch functions.
+     </p>
+     <li><p align="justify"><b>noisy</b>: display output from builtin <b>PSRP</b> client commands
+     </p>
+     <li><p align="justify"><b>snoisy</b>: display output from builtin <b>PSRP</b> server dispatch functions.
+     </p>
+     <li><p align="justify"><b>perror</b>: print error handler status.
+     </p>
+     <li><p align="justify"><b>segcnt</b>: display number of segmentations (for segmented server).
+     </p>
+     <li><p align="justify"><b>medit <i>file</i></b>: update/edit <b>PML</b> (<b>P</b>SRP <b>M</b>acro <b>L</b>anguage) definition file, <i><b>file</b></i>.
+     </p>
+     <li><p align="justify"><b>mload <i>file</i></b>: load 
+          (<a href="http://en.wikipedia.org/wiki/Macro_%28computer_science%29"><b>macro</b></a> <i><b>file</b></i> (overwriting currently loaded list of
+          macros).
+     </p>
+     <li><p align="justify"><b>mappend <file></b>: append macro file to currently loaded list of
+          macros.
+     </p>
+     <li><p align="justify"><b>mpurge <i>all</i> | <i>file</i></b>: delete <i><b>all</b></i> <b>PML</b> macros or those in <i><b>file</b></i> respectively.
+     </p>
+     <li><p align="justify"><b>macros</b>: show tags for all loaded <b>PML</b> macros.
+     </p>
+     <li><p align="justify"><b>user <i>username</i></b>: change session owner for <b>PSRP</b> client to <i><b>username</b></i>.
+     </p>
+     <li><p align="justify"><b>password</b>: set remote <i><b>PSRP</b> services authentication token</i>. If this
+          token is set it will be used for authentication when connecting to
+          <b>PSRP</b> servers running on remote hosts.
+     </p>
+     <li><p align="justify"><b>diapause</b>: generate
+          restartable <i><b>PSRP</b> server 
+          <a href="http://en.wikipedia.org/wiki/Application_checkpointing"><b>checkpoint</b></a> file</i> and exit (via 
+          <a href="http://cryopid.berlios.de"><b>Cryopid Checkpointing Library</b></a>).
+     </p>
+     <li><p align="justify"><b>checkpoint</b>: generate restartable <i><b>PSRP</b> server checkpoint file</i> (via
+          <b>Cryopid Checkpointing Library</b>).
+     </p>
+     <li><p align="justify"><b>!<i>command</i></b>: send <i><b>command</b></i> to users default
+          <a href="http://en.wikipedia.org/wiki/Unix_shell"><b>shell</b></a>.
+     </p>
+     <li><p align="justify"><b>relay <i>slave process</i></b>: relay data to/from <i><b>slave process</b></i> via psuedotty
+     </p>
+     <li><p align="justify"><b><i>server</i>: <i>request</i></b>: send <i><b>request</b></i> (server builtin or dispatch function)
+          <i><b>request</b></i> to <b>PSRP</b> server <i><b>server</b></i>.
+     </p>
+     <li><p align="justify"><b><i>server</i>@<>host</i>></b>: <i>request</i></b>: send (server builtin or dispatch function) <i><b>request</b></i>  to <b>PSRP</b> server <i><b>server</b></i> running on node <i><b>host</b></i>.
+     </p>
+     <li><p align="justify"><b>c1; c2; c3</b>: process multiple <b>PSRP</b> requests
+     </p>
+     <li><p align="justify"><b>"<i>a1 a2</i>"</b>: glob argument "<i><b>a1 a2</b></i>" to <i><b>a1a2</b></i>
+     </p>
+     </ol>
+     </font>
+     <hr>
+     <br>
+     <h3><!--mstheme--><font face="Comic Sans MS, Arial, Helvetica">
+     PSRP Server Builtin Commands<!--mstheme--></font></h3>
+     <p align="justify">
+     In addition to the set of static and dynamic dispatch functions which are
+     built into a <b>PSRP server</b> application by the implementor, any <b>PSRP server</b>
+     (that is any program linked to the static library <i>psrplib.o</i> or the dynamic
+     library <i><b>psrplib.so</b></i>) inherits a number of builtin functions which can
+     be accessed via the <b>PSRP</b> client. A list of these builtin functions is
+     given below:
+     </p>
+     <font size="2">
+     <ol>
+     <li><p align="justify"><b>log <i>on</i> | <i>off</i></b>: switch server transaction logging <i><b>on</b></i> or <i><b>off</b></i.>
+     </p>
+     <li><p align="justify"><b>appl_verbose <i>on</i> | <i>off</i></b>: switch server error logging <i><b>on</b></i> or <i><b>off</b></i>
+     </p>
+     <li><p align="justify"><b>show</b>: display <b>PSRP</b> handler status showing all dispatch functions,
+          databags an other objects attached to the server and server status
+          information.
+     </p>
+     <li><p align="justify"><b>clients</b>: display clients connected to this server. Currently up to
+          256 clients may be concurrently bound to a given <b>PSRP</b> server. In the
+          present implementation, only one client at a time may actually
+          transact with the server (the channels to the other attached clients
+          are temporarily blocked). In the future, if concurent <b>PSRP</b> server
+          applications are implemented via the 
+          <a href="http://en.wikipedia.org/wiki/Posix_threads"><b>pthreads</b></a> interface, it will be
+          possible to provide non-blocking concurrent access to such a <b>PSRP</b>
+          server.
+     </p>
+     <li><p align="justify"><b>bindtype</b>: display the binding type for the current <b>PSRP</b> server.
+          Object binding may be either <b><i>static</i></b> or <b><i>(static and) dynamic</i></b>.
+     </p>
+     <li><p align="justify"><b>help</b>: display on-line help information for builtin (<b>PSRP</b> server)
+          commands.
+     </p>
+     <li><p align="justify"><b>atentrance</b>: display list of (<b>PUPS/P3</b>) <i>application entry functions</i>
+          (these functions are executed once at startup by the <b>PSRP</b> server).
+     </p>
+     <li><p align="justify"><b>atexit</b>: display list of (<b>PUPS/P3</b>) <i>application exit functions</i> (these
+          functions are executed once at exit by the <b>PSRP</b> server).
+     </p>
+     <li><p align="justify"><b>retrys <i>retrys</i></b>: set number of times <b>PSRP</b> server retrys operation (before
+          aborting).
+     </p>
+     <li><p align="justify"><b>atrestart</b>: display list of (<b>PUPS/P3</b>) application 
+     (<a href="http://en.wikipedia.org/wiki/Application_checkpointing"><b>checkpoint</b></a>)
+          restart functions. These functions are executed after a checkpointed
+          process has restored its state. Typically this functionality is used
+          to re-attach dynamic objects which where detached by the process
+          prior to the checkpoint being taked.
+     </p>
+     <li><p align="justify"><b>atckpt</b>: display list of (<b>PUPS/P3</b>) application (checkpoint) check-
+          point functions. These functions are executed just before a checkpoint
+          is taken, typically to detach objects such as shared heaps,
+          which are not owned by any one <b>PSRP</b> server process.
+     </p>
+     <li><p align="justify"><b>auto_ckpt [ <i>on</i> | <i>off</i>]</b>: toggle automatic checkpointing on or off (or
+          get automatic checkpointing status if no argument supplied).
+     </p>
+     <li><p align="justify"><b>ckstat</b>: show current checkpointing parameters.
+     </p>
+     <li><p align="justify"><b>ckset <i> ... ctail ... </i></b>: set 
+          <a href="http://en.wikipedia.org/wiki/Application_checkpointing"><b>checkpoint</b></a> parameters. Currently the
+          following checkpointing parameters can be set:
+          <br>
+          <ul>
+          <font size="2">
+          <li><p align="justify"><b>[-ckpt_dir <i>directory name</i> | <i>default</i>]</b>: sets name of the directory
+              used to store checkpoints for this <b>PSRP</b> server. Defaults to
+              "." (the current directory).
+          <p>
+          <li><p align="justify"><b>[-ckpt_bname <i>ckpt basebame</i> | default]</b>: sets the basename for
+              individual checkpoint files for this <b>PSRP</b> server. Defaults to
+              <b><i>appl_name.appl_pid.appl_hostname.ckpt</i></b>.
+          </p>
+          <li><p align="justify"><b>[-ckpt_mode <i>mode</i> |  <i>default</i>]</b>: sets the default file protection
+              bits for individual checkpoint files owned by this <b>PSRP</b> server.
+              Defaults to "<b>-rw-r--r--</b>" (e.g. <b>0644</b> octal).
+          </p>
+          <li><p align="justify"><b>[-ckpt_fork | -ckpt_nofork]</b>: tells the <b>PSRP</b> server to 
+              <a href="http://en.wikipedia.org/wiki/Fork_%28computing%29"><b>fork</b></a> off a
+              child which actually saves the checkpoint. This means that the parent process
+              continues to execute its payload without having to wait for slow
+              resources like disks and network connections.
+          </p>
+          <li><p align="justify"><b>[-ckpt | -no_ckpt]</b>: enable of disable checkpointing. If checkpointing
+              is NOT enabled, none of the above checkpointing commands are available (to the <b>PSRP</b> client).
+          </p>
+          </font>
+          </ul>
+     </p>
+     <li><p align="justify"><b>mstat</b>: show memory allocation statistics. The <b>PUPS/P3</b> libraries
+          have their own memory allocation scheme. <i>Memory bubbles</i> are mapped
+          into the address space of a requesting process using 
+           <a href="http://en.wikipedia.org/wiki/Mmap"<b>mmap</b></a>.
+          Unlike a typical <b>malloc</b> based allocation scheme, this memory can
+          also be unmapped from the process address space using <b>munmap</b> when
+          it is no longer required and returned to the <i>OS free pool</i>. This model of
+          memory allocation is much more efficient in a global sense than the <b>malloc</b> scheme,
+          especially when the memory requirements of a given process are very variable,
+          and the process is long lived. <i>In biological terms this memory paradigm is
+          a tropical forest as opposed to a temperate woodland!</i>
+     </p>
+     <li><p align="justify"><b>mset <threshold></b>: set memory bubble utilisation threshold percent.
+          If the utilisation falls below the specified thresholds, the process
+          mapping the bubble call <b>munmap</b> to unmap it from its address
+          space.
+     </p>
+     <li><p align="justify"><b>migratory</b>: enable
+          <a href="http://www.mosix.org"><b>MOSIX</b></a> (compute context) process migration.
+     </p>
+     <li><p align="justify"><b>sedentary</b>: disable <b>MOSIX</b> (compute context) process migration.
+     </p>
+     <li><p align="justify"><b>pstat</b>: display <i>/proc</i> filesystem status entry (for <b>PSRP</b> server).
+     </p>
+     <li><p align="justify"><b>tunnel <i>remote host</i></b>:  force <b>PSRP</b> server process <i>to tunnel to named
+          remote host</i>. If checkpointing is enabled, then an attempt is made to migrate the process context
+          to the remote host.
+     </p>
+     <li><p align="justify"><b>shy [<i>default</i> | <i>cmd list]</i></b>: set commands to be avoided by this process
+          (default is <b>top</b>). If any of the commands specified are detected by
+          the <b>PSRP</b> server, it will go into hiding (e.g. it will enter a <i>wait
+          state</i>). While in the wait state, the <b>PSRP</b> server will continue to
+          scan for the command or commands to be avoided but will not run its payload compuation.
+          It leaves the wait state once this command or commands are no longer detectable. <i>This
+          directive is used to steal time on systems where the <b>PSRP</b> server is
+          not supposed to be running in a manner which prevents easy detection of
+          the incursion by the rightful owner of the system (in any biological system there is a good living to be
+          made as a parasite)!</i>
+     </p>
+     <li><p align="justify"><b>cwd <i>path</i></b>: set <b>PSRP</b> server current working directory to <i><b>path</b></i>.
+     </p>
+     <li><p align="justify"><b>vitstat</b>: display status of <b>PUPS/P3</b> virtual interval timers. <b>PUPS/P3</b>
+          has up to 32 virtual interval timers. <i>Typically, these are used to
+          launch <a href="http://en.wikipedia.org/wiki/Homeostasis"><b>homeostatic</b></a> functions at regular intervals</i>. For example the
+          <i><b>PUPS/P3</b> file homeostat</i> is a function run by the <b>PUPS/P3</b> virtual
+          timer subsystem every 0.01 seconds in a vanilla <b>PUPS/P3</b> installation which undeletes files
+          owned by the <b>PSRP</b> server which have been deleted either by a user or another process without
+          the acquiesence of the <b>PSRP</b> server providing (homeostatic) protection for it.
+     </p>
+     <li><p align="justify"><b>lstat</b>: show concurrently held <i>(link) file locks</i>. Each <b>PSRP</b> server can
+          hold up 16 concurrent locks by default.
+     </p>
+     <li><p align="justify"><b>sigstat</b>: display non default 
+     <a href="http://en.wikipedia.org/wiki/Signal_%28computing%29"><b>signal</b></a> handlers.
+     </p>
+     <li><p align="justify"><b>sigstat <i>signal list></i></b>: display detailed data for the signal handlers
+          which correspond to signals in <i><b>signal list</b></i>. For each of these signals
+          the name of the signal handler, whether the signal handler
+          automatically stays installed, and the signals (other than the signal
+          itself) which are blocked while the signal handler is running
+          are displayed.
+     </p>
+     <li><p align="justify"><b>maskstat</b>: display signal mask and pending signals for this <b>PSRP</b>
+          server.
+     </p>
+     <li><p align="justify"><b>dstat</b>: display open file descriptors (name of file, whether the file
+          is homeostatically protected <b><i>live</i></b> or not <b><i>dead</i></b>, file type, underlying
+          file descriptor and the handle of the file are displayed).
+     </p>
+     <li><p align="justify"><b>schedule <i>start</i> <i>finish</i> [<i>function</i>]</b>:
+          schedule <b><i>function</i></b> to run between times <b><i>start</i></b> and <b><i>finish</i></b>
+          This is effectively a per process version of the <a href="http://en.wikipedia.org/wiki/POSIX"><b>POSIX</b></a>
+          <a href="http://en.wikipedia.org/wiki/Cron"><b>cron</b></a> facility. if <b><i>function</i></b> is omitted the <b>PSRP</B> server itself sleeps between times
+          <b><i>start</i></b> and <b><i>finish</i></b>.
+     </p>
+     <li><p align="justify"><b>unschedule <index></b>: unschedule (e.g. remove) previously scheduled
+          <i>crontab function</i>.
+     </p>
+     <li><p align="justify"><b>crontstat</b>: display the contents of the <b>PSRP</b> server crontab table.
+     </p>
+     <li><p align="justify"><b>rusage</b>: show current resource usage status. This is a wrapper function
+          to the <b>getrusage</b> system call.
+     </p>
+     <li><p align="justify"><b>rset <i>arg1</i>, <i>arg2</i>, ...</b>: set resource usage limits. This is a wrapper function to
+          the <b>setrusage</b> system call. The following arguments are supported:
+		<br>
+		<br>
+		<center><table width="600">
+		<tr>
+		<td>
+		<ul>
+		<font size="2">
+		<li><p align="justify">
+		<b>cpu <i>minutes</i></b>: set maximum CPU time for <b>PSRP</b> server process to <i><b>minutes</b></i>.
+		</p>
+		<li><p align="justify">
+		<b>core <i>megabytes</i></b>: set maximum size for coredump file to <i><b>megabytes</b></i>. A size of 0
+		means no core dumps are produced by this <b>PSRP</b> server.
+		</p>	
+		<li><p align="justify">
+                <b>data <i>megabytes</i></b>: set maximum data segment size (for heap and stack) to <i><b>megabytes</b></i>. This is
+		<i>virtual memory</i> which may not be mapped into the <b>PSRP</b> server process address space in its entirety.
+		</p>
+		<li><p align="justify">
+		<b>rss <i>megabyes</i></b>: set maximum <i>resident set size</i> to <i><b>megabytes</b></i>. This is the maximum amount of
+		<i>real memory</i> the <b>PSRP</b> server is allowed to have.
+		</p>
+		<li><p align="justify">
+                <b>vmsize <i>megabytes</i></b>: sets maximum <i>virtual memory size</i> to <i><b>megabytes</b></i>. This is the maximum amount of
+		<i>virtual memory</i> the <b>PSRP</b> server is allowed to have.
+		</p>
+		<li><p align="justify">
+                <b>fsize <i>megabytes</i></b>: sets maximum file size for for files created by the <b>PSRP</b> server process to 
+		<i><b>megabytes</b></i>.
+		</p>
+		<li><p align="justify">
+		<b>nfiles <i>files</i></b>: set maximum number of open files for this <b<PSRP</b> server process to <i><b>files</b></i>.
+		</p>
+		<li><p align="justify">
+		<b>nproc <i>children</i></b>: sets the maximum number of <i><b>children</b></i> this <b>PSRP</b> server is allowed to
+		create.
+		</p>
+		</ul>
+		<td>
+		</tr>
+		</table>
+		</center>
+	
+     </p>
+     <li><p align="justify"><b>cstat</b>: display active children of this <b>PSRP</b> server.
+     </p>
+     <li><p align="justify"><b>sicstat</b>: display open <i>slaved interaction client channels</i> for this
+          <b>PSRP</b> server.
+     </p>
+     <li><p align="justify"><b>showaliases <i>object</i></b>: show aliases of <b>PSRP</b> <i><b>object</b></i> (dispatch function or
+          databag).
+     </p>
+     <li><p align="justify"><b>alias <i>oldname</i> <i>newname</i></b>: alias (<b>PSRP</b> dispatch object or databag)
+            <i><b>oldname</b></i> to <i><b>newname</b></i>.
+     </p>
+     <li><p align="justify"><b>unalias <i>newname</i></b>: remove alias <i><b>newname</b></i>. Note the <i>root tag of the object</i>
+             (the initial name of the object is determined by the objects implementor cannot be removed).
+     </b>
+     <li><p align="justify"><b>rooted</b>: set process to <i>rooted mode</i> (system context cannot migrate).
+     </p>
+     <li><p align="justify"><b>unrooted</b>: set process to <i>unrooted mode</i> (system context can migrate).
+     </p>
+     <li><p align="justify"><b>parent <i>name</i> | <a href="http://en.wikipedia.org/wiki/Process_ID"><i>PID</i></a></b>: set <i><b>name</b></i>/<o><b>PID</b></i> of effective parent process for
+          this <b>PSRP</b> server.
+     </p>
+     <li><p align="justify"><b>pexit</b>: This <b>PSRP</b> server exits if its effective parent is
+          terminated.
+     </p>
+     <li><p align="justify"><b>unpexit</b>: This <b>PSRP</b> server does not exit if effective parent
+          is terminated.
+     </p>
+     <li><p align="justify"><b>proclive</b>: protects <b>PSRP</b> server process thread
+          (using <a href="http://en.wikipedia.org/wiki/Herpes"><b>herpes</b></a> algorithm which changes process
+          <a href="http://en.wikipedia.org/wiki/Process_ID"><b>PID</b></a> many times a second, thus
+          commands like <i><b>kill</b></i> will be targetting a process which no longer exists).
+     </p>
+     <li><p align="justify"><b>procdead</b>: unprotects <b>PSRP</b> process thread of execution.
+     </p>
+     <li><p align="justify"><b>live <i>f1</i> <i>f2</i> ...</b>: protects list of (open) file system objects (e.g.
+          files,
+          <a href="http://en.wikipedia.org/wiki/FIFO"><b>FIFO</b></a>s
+          and
+          <a href="http://en.wikipedia.org/wiki/Berkeley_socket"><b>sockets</b></a>) against damage
+          or deletion via <b>PUPS/P3</b> homeostatic protection mechanisms.
+     </p>
+     <li><p align="justify"><b>dead <i>f1</i> <i>f2</i> ...</b>: unprotects list of (open) file system objects (homeostatic
+          protection for these objects is revoked).
+     </p>
+     <li><p align="justify"><b>vitab [<i>size</i> | <i>shrink</i>]</b>: display [or set to <i><b>size</b></i> or Procrustes
+          <i><b>shrink</b></i>] number of virtal timer table slots.
+     </p>
+     <li><p align="justify"><b>chtab [<i>size</i> | <i>shrink</i>]</b>: display [or set to <i><b>size</b></i> or Procrustes
+          <i><b>shrink</b></i>] number of child table slots.
+     </p>
+     <li><p align="justify"><b>ftab [<i>size</i> | <i>shrink</i>]</b>: display [or set to <i>size</i> or Procrustes
+          <i><b>shrink</b></i>] number of file table slots.
+     </p>
+     <li><p align="justify"><b>new <i>newname</i> <i>host</i> <i>terminate</i></b>: create instance
+          (<i>newname</i>) of <b>PSRP</b> server on <i><b>host</b></i>. If
+          <i><b>terminate</b></i> is specified, the intial instance of the server is terminated. An <i>ant
+          pheromone trail</i> algorithm ensures that any <b>PSRP</b> clients connected to the
+          original instance of the <b>PSRP</b> server can find the new instance (if
+          the original instance has been marked for termination).
+     </p>
+     <li><p align="justify"><b>overlay <i>command</i></b>: Overlay <b>PSRP</b> server process with <i><b>command</b></i>. This is
+          essentially a wrapper for a simple 
+          <a href="http://en.wikipedia.org/wiki/Fork_%28computing%29"><b>fork</b></a> followed by 
+          <a href="http://en.wikipedia.org/wiki/Exec_%28operating_system%29"><b>execv</b></a> of the specified <i><b>command</b></i>.
+     </p>
+     <li><p align="justify"><b>overfork <i>command</i></b>: <i>Overfork</i> server process with
+          <i><b>command</b></i>. In this case the <b>PSRP</b> server lends its thread of execution to <i><b>command</b></i> (and
+          remains suspended while <i></b>command</b></i> is running. This is (typically)
+          used to permit <i>place markers</i> such as <b>xtee</b> to be temporarly
+          replaced by processes which require specific facilities (e.g. a <a href="http://en.wikipedia.org/wiki/X_windows"><b>X</b></a>
+          based graphical application which needs interactive facilties (e..g. a display) in order to run).
+     </p>
+     <li><p align="justify"><b>autosave <i>on</i> | <i>off</i></b>: switch automatic saving of dipatch table (at
+          exit) <i><b>on</b></i> or <i><b>off</b></i>. If autosave is <i><b>on</b></i>, a file containing locations of
+          any dynamic objects (and the alias status of all dispatch table
+          objects), will be saved to <b>.<i>appl_name</i>.<i>psrp</i></b> (in home directory of user who owns the <b>PSRP</b> server)
+          when server exists. With no arguments simply report <b>autosave</b> status.
+     </p>
+     <li><p align="justify"><b>save <i>file</i></b>: save dispatch table (to <b>PSRP</b> resource <i></b>file</b></i>) immediately.
+     </p>
+     <li><p align="justify"><b>load <i>file</i></b>: load <b>PSRP</b> resource <i><b>file</b></i> (possibly modifying current dispatch
+          table).
+     </p>
+     <li><p align="justify"><b>reset</b>: reset dispatch table (returning it to its default state)
+     </p>
+     <li><p align="justify"><b>terminate</b>: terminate (this) <b>PSRP</b> server process
+     </p>
+     <li><p align="justify"><b>detach <i>name</i></b>: detaches specified <i>dynamic object</i> (dynamic function,
+          dynamic databag or shared heap) from <b>PSRP</b> server.
+     </p>
+     <li><p align="justify"><b>dll <i>fname</i> <i>object DLL</i></b>: bind dynamic function <i><b>fname</b></i> in 
+          <i><b>object DLL</b></i> to <b>PSRP</b> servers handler loop  with dispatch name <i><b>fname</b></i>.
+          An example of the source code for a <b>PUPS/P3 DLL</b> is given <a href="./sourceCode/testdll.c.html"><b>here</b></a>
+     </p>
+     <li><p align="justify"><b>bag <i>bagname</i> <i>bagfile</i> [<i>live</i> | <i>dead</i>]</b>: bind dynamic databag in file
+          <i><b>bagfile</b></i> to <b>PSRP</b> servers handler loop with dispatch name <i><b>bagname</b></i>. The specifiers
+          <i><b>live</b></i> and <i><b>dead</b></i> indicate whether or not the <b>PSRP</b> server should extend homeostatic protection
+          to the newly attached dynamic databag.
+     </p>
+     <li><p align="justify"><b>heap <i>heapname</i> <i>heapfile</i> [<i>live</i> | <i>dead</i>]</b>: map shared heap in file
+          <i><b>heapfile</b></i> to <b>PSRP</b> server handler loop with dispatch name <i><b>heapname</b></i>. The specifiers
+          <i><b>live</b></i> and <i><b>dead</b></i> indicate whether the or not the <b>PSRP</b> server should extend homeostatic protection
+          to the newly attached shared heap.
+     </p>
+     <li><p align="justify"><b>hstat [<i>heap</i>]</b>:  show shared heaps mapped into <b>PSRP</b> server process
+          address space or display objects and clients associated with specified <i><b>heap</b></i>.
+     </p>
+     <li><p align="justify"><b>htab [<i>size</i> | <i>shrink</i>]</b>: display [or set to <i><b>size</b></i> or Procrustes shrink]
+          number of shared heap table slots.
+     </p>
+     <li><p align="justify"><b>hostat [<i>o1</i> <i>o2</i> ...] </b>: Show statistics for tracked heap objects
+          <i><b>o1</b></i>, <i><b>o2</b></i> ... Without arguments shows statistics for all tracked heap objects.
+     </p>
+     </ol>
+     </font>
+     <hr>
+     <br>
+     <h3><!--mstheme--><font face="Comic Sans MS, Arial, Helvetica">
+     Special Files<!--mstheme--></font></h3>
+     <p align="justify">
+     The <b>PUPS/P3</b> system includes a number standard file formats. These
+     include:
+     </p>
+     <font size="2">
+     <ol>
+     <li><p align="justify"><i><b>The skeleton application source file format</b></i>
+         (<a href="./sourceCode/skelpapp.c.html"><b>skelpapp.c</b></a>).
+         This is <i>a prototypical <b>main</b> function</i> for a typical <b>PUPS/P3</b> server application.
+     </p>
+     <li><p align="justify"><i><b>Orifice file format</b></i>
+         (<a href="./sourceCode/testdll.c.html"><b>testdll.c</b></a>). This file is an example of
+         the source for a <b>PUPS/P3</b> dynamic link libary. To build a dynamic link
+         library, the functions which are dynamically exported by the library are coded in
+         the manner documented in <b>testdll.c</b>. The shared object is then built by
+         compiling the DLL source code normally (using gcc) producing a linkable <i><b>object name</b></i>.
+         The shared object is then built by typing <b>share  <i>object name shared object name</i></b>.
+     </p>
+     </ol>
+     </font>
+     <p align="justify">
+     The files in the examples directory of the <b>PUPS/P3</b> source tree are self
+     documenting examples of these file types: implementors can make copies of
+     these examples and use them as a basis for their own applications.
+     </p>
+     <hr>
+     <br>
+     <h3><!--mstheme--><font face="Comic Sans MS, Arial, Helvetica">
+     Security<!--mstheme--></font></h3>
+     <p align="justify">
+     When secure shell protocols are used to carry interhost <b>PSRP</b> communications
+     via encrypted tunnels, <b>PUPS/P3</b> may be considered to be moderately
+     secure. In addition, optional encryption layer has been added the Linux buffered file I/O
+     (as a <b>PUPS/P3</b> enhancement to Linux). If this layer is used by applications all communications
+     including those between processes on the same host will be secure. <b>Ssh</b> only offers encrypted tunnel <i>between</i> hosts).
+     </p>
+     <p align="justify"> 
+     By default if <b>PUPS/P3</b> is built as root the binaries are located in <i>/usr/bin</i>
+     the libraries in <i>/usr/lib the header</i> files in <i>/usr/include/p3</i> and the man
+     pages in <i>/usr/share/man</i>
+     </p>
+     <hr>
+     <br>
+     <h3><!--mstheme--><font face="Comic Sans MS, Arial, Helvetica">
+     Bugs<!--mstheme--></font></h3>
+     <p align="justify">
+     Please send bug reports to <b>pupsp3bugs@tumblingdice.co.uk</b>
+     </p>
+     <p align="justify">
+     There are no bugs (yet) reported, but this will probably change when the
+     <b>PUPS</b> sourceforge site goes live! Much of the <b>PUPS/P3</b> system is
+     well tried and tested, but a significant proportion of it it not!
+     Hopefully, the SourceForge project will lead to bugs being squashed as
+     well as reported, which will lead to an (almost) bug free <b>PUPS/P3</b>
+     distribution.
+     </p>
+     <hr>
+     <br>
+     <h3><!--mstheme--><font face="Comic Sans MS, Arial, Helvetica">
+     History<!--mstheme--></font></h3>
+     <p align="justify">
+     <b>PUPS/P3</b> began life as the 
+     <a href="./MSPS.pdef"><i><b>MSPS</b> operating environment</i></a> on the legendary
+     <a href="http://en.wikipedia.org/wiki/Bbc_computer"><b>BBC Microcomputer</b></a> in 1983. It migrated to 
+     <a href="http://en.wikipedia.org/wiki/C_%28programming_language%29"><b>C</b></a> (and 
+     <a href="http://en.wikipedia.org/wiki/UNIX"><b>UNIX</b></a>) in 1987, the first
+     UNIX implementations being for
+     <a href="http://en.wikipedia.org/wiki/SunOS"><b>SunOS</b></a> and 
+     <a href="http://en.wikipedia.org/wiki/Berkeley_Software_Distribution#4.3BSD"><b>4.3 BSD</b></a>. The Linux <b>PUPS/P3</b> implementation
+     was begun in 1992, but most of the biologically inspired functionality was added between
+     1995 and the present date: the result of an
+     ongoing and inspired collaboration between neuroscientists, biologists
+     and computer scientists. Although <B>PUPS/P3</B> is an
+     <a href="http://en.wikipedia.org/wiki/Organic_computing"><b>organic computing environment</b></a> its underlying
+     philosophy draws on the goals of the influential <b>M</b>ultiplexed <b>I</b>nformation and <b>C</b>omputing
+     <b>S</b>ervice, <a href="http://en.wikipedia.org/wiki/MULTICS"><b>Multics</b></a>
+     <br>
+     <br>
+     <hr>
+     <br>
+     <h3><!--mstheme--><font face="Comic Sans MS, Arial, Helvetica">
+     References<!--mstheme--></font></h3>
+     <p align="justify"><font size="2">
+     O'Neill M.A and Hilgetag C-C, 2001: The Portable UNIX Programming System (PUPS) and Cantor: A computational environment
+     for the dynamical representation and analysis of complex neurobiological data. <i>Proc Phil. Roy. Soc. Lond B</i>
+     <b>356</b>(1412):1259-1276
+     </p>
+     <p align="justify"><font size="2">
+     O'Neill M.A, Burns A.P.C. and Hilgetag C-C, 2003: The PUPS-MOSIX Environment: A Homeostatic Environment for Neuro- and
+     Bio-Informatic Applications. In <i>Neuroscience Databases: A practical guide</i> Kotter R. (Ed.),
+     Blackwell ISBN 140207 1655
+     </font>
+     </p>
+     <br>
+     <hr>
+     <font size="2"><b>PUPS/P3</b> (c) Mark A. O'Neill 2007</font>
+</td>
+</tr>
+</table>
+</center>
+
+</html>
+</body>
+
