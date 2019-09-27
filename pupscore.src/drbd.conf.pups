@@ -1,0 +1,23 @@
+# DRBD configuration file for two host nodes
+# You will need to specify host names, IP addresses
+# and devices
+
+resource drbd0 {
+   protocol=C
+   fsckcmd=fsck.ext2 -p -y
+
+    on $HOST1 {
+       device=/dev/nb1
+       disk=/dev/$DEVICE_1
+       address=$IP_ADDR_1
+       port=7789
+    }
+
+    on $HOST2 {
+       device=/dev/nb1
+       disk=/dev/$DEVICE_2
+       address=$IPADDR_2
+       port=7789
+    }
+}
+

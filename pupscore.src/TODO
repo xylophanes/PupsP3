@@ -1,0 +1,4 @@
+[done] Need to check that bubble allocator is thread safe.
+
+Need to add port specificity to ssh functions so they will work in containers
+

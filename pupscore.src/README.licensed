@@ -1,0 +1,23 @@
+Generating licensed P3M applications.
+=====================================
+
+It is possible to generate P3M applications which will only run a given disk
+or when a given "soft dongle" file is present. In order to become a stove
+pipe hatted capatilist and build non-free code which cannot be distributed
+you need to uncomment the security features in config/linux.cluster before
+building P3M.
+
+The build script will then:
+
+1. Ask you what sort of licensing methodology you want (based on matching a
+   (given disk serial number) [dserial] or a soft dongle (located on a random
+   inode) [sdongle].
+
+2. You will then be asked a number of other questions (the answers to these are
+   obvious, and it is safe to use the system determined defaults).
+
+The applications built under licensed P3M will only run if the disk serial number
+matches that expected by the application [dserial] or if the soft dongle file is
+present (and located on the correct inode) [sdongle]. In order to make the system
+secure, the authentication token (serial number or inode respectively) are crypted
+using an 8 rotor enigma code encryption mechanism which is implemented in software.

@@ -1,0 +1,49 @@
+.TH SERVERTOOL 1 "16th April 2015" "PUPSP3 commands" "PUPSP3 commands"
+
+.SH NAME
+SERVERTOOL \- Starts PSRP server in a new window.
+
+.br
+
+.SH SYNOPSIS
+.B servertool 
+.I [-usage | -help] 
+.I !PSRP server name!
+.I [PSRP server command tail] 
+>& <log file>
+.br
+
+.SH DESCRIPTION
+.I servertool(1)
+is a wrapper function which starts a PSRP
+server in a new
+.I xterm(1)
+window. Any arguments to
+.I servertool(1)
+other than
+.B -help
+or
+.B -usage
+are passed to the PSRP server. 
+.br
+
+
+.SH OPTIONS
+
+.B -help
+.B -usage 
+prints out help information about
+.I servertool(1)
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br
+
+.SH SEE ALSO
+xterm(1)
+.br

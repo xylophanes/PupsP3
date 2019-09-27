@@ -1,0 +1,122 @@
+.\" WARNING! THIS FILE WAS GENERATED AUTOMATICALLY BY c2man!
+.\" DO NOT EDIT! CHANGES MADE TO THIS FILE WILL BE LOST!
+.TH "dll" 3 "24 January 2018" "c2man dll.h"
+.SH "NAME"
+ortab_init,
+pups_is_orifice,
+pups_bind_orifice_handle,
+pups_free_orifice_handle,
+pups_show_orifices,
+dll_decode_ffp,
+find_ortab_slot_by_handle,
+find_ortab_slot_by_name,
+pups_show_dll_orifices,
+clear_ortab_slot \- Purpose: header for DLL support library.
+.SH "SYNOPSIS"
+.ft B
+#include <dll.h>
+.sp
+extern void ortab_init(int);
+.sp
+extern int pups_is_orifice
+.br
+(
+.br
+	char *,
+.br
+	char *,
+.br
+	char *
+.br
+);
+.sp
+extern void *pups_bind_orifice_handle
+.br
+(
+.br
+	char *,
+.br
+	char *,
+.br
+	char *
+.br
+);
+.sp
+extern void *pups_free_orifice_handle(void *);
+.sp
+extern void pups_show_orifices(FILE *);
+.sp
+extern int dll_decode_ffp
+.br
+(
+.br
+	char *,
+.br
+	char *
+.br
+);
+.sp
+extern int find_ortab_slot_by_handle(void *);
+.sp
+extern int find_ortab_slot_by_name(char *);
+.sp
+extern int pups_show_dll_orifices
+.br
+(
+.br
+	FILE *,
+.br
+	char *
+.br
+);
+.sp
+extern int clear_ortab_slot
+.br
+(
+.br
+	int,
+.br
+	int
+.br
+);
+.ft R
+.SH "PARAMETERS"
+.TP
+.B "int"
+Not Documented.
+.TP
+.B "char *"
+Not Documented.
+.TP
+.B "char *"
+Not Documented.
+.TP
+.B "char *"
+Not Documented.
+.TP
+.B "void *"
+Not Documented.
+.TP
+.B "FILE *"
+Not Documented.
+.SH "DESCRIPTION"
+.SS "ortab_init"
+Initialise orifice table.
+.SS "pups_is_orifice"
+Check for existence of orifice and return its prototype.
+.SS "pups_bind_orifice_handle"
+Bind DLL orifice function to handle.
+.SS "pups_free_orifice_handle"
+Free DLL orifice function.
+.SS "pups_show_orifices"
+Show currently bound DLL/orifice functions.
+.SS "dll_decode_ffp"
+Decode a format-function prototype.
+.SS "find_ortab_slot_by_handle"
+Find orifice table slot with specified handle.
+.SS "find_ortab_slot_by_name"
+Find orifice table slot with specified name.
+.SS "pups_show_dll_orifices"
+Scan a DLL and show its orifices.
+.SS "clear_ortab_slot"
+Clear orifice table slot.

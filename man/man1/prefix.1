@@ -1,0 +1,41 @@
+.TH PREFIX 1 "12 April 2000" "PUPSP3 build tools" "PUPSP3 build tools"
+
+.SH NAME
+PREFIX \- extract input string prefix.
+.br
+
+.SH SYNOPSIS
+.B prefix
+.I string
+> prefix string
+>& <log file>
+.br
+
+.SH DESCRIPTION
+.I prefix(1)
+is a filter which takes a string of the form <prefix>.<suffix> and
+returns <prefix>. If the string does not contain at least one period
+the string itself is returned. If the string contains more than one period
+the characters up to the first period are returned.
+.br
+
+
+.SH OPTIONS
+
+.B -help
+display help and copyright information of the
+.I prefix(1)
+filter.
+.br
+
+.SH ENVIRONMENT VARIABLES
+None.
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br

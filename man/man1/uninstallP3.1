@@ -1,0 +1,53 @@
+.TH UNINSTALLP31 "16th April 2015" "PUPSP3 Scripts" "PUPSP3 Scripts"
+
+.SH NAME
+UNINSTALLP3 \- top level driver script to uninstall PUPS/P3 system. 
+.br
+
+.SH SYNOPSIS
+.B uninstallP3 
+.I logfile
+[>2 <log file>]
+.br
+
+.SH DESCRIPTION
+.I uninstallP3(1)
+is a top level driver script which calls
+.I uninstall_pupsP3(1)
+to unistall PUPS/P3 system.
+.br
+
+The
+.I logfile
+argument can be either
+.B tty
+in which case output is sent to the users termninal,
+.B null
+in which case output is sent to the data sink (no output) or
+.B logfile
+in which case it is logged to a file in the current directory.  Default if not specified
+is
+.B null
+(e.g. no output).
+.br
+
+.SH OPTIONS
+None.
+.br
+
+.SH ENVIRONMENT VARIABLES
+None.
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br
+
+.SH SEE ALSO
+uninstall_pupsP3(1)
+.br
+

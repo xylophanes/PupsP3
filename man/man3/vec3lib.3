@@ -1,0 +1,643 @@
+.\" WARNING! THIS FILE WAS GENERATED AUTOMATICALLY BY c2man!
+.\" DO NOT EDIT! CHANGES MADE TO THIS FILE WILL BE LOST!
+.TH "vector3" 3 "24 January 2018" "c2man vector3.h"
+.SH "NAME"
+v3ass,
+v3print,
+v3write,
+m3GE_solve,
+v3read,
+v3par,
+v3eq,
+v3hecs,
+v3mag,
+v3dot,
+v3ang,
+v3dpoints,
+v3lvsi,
+v3tomatc,
+v3inv,
+v3zero,
+v3add,
+v3sub,
+v3shift,
+v3cross,
+v3unit,
+v3axtran,
+v3sign,
+v3scalm,
+v3scald,
+v3planp,
+v3urnd,
+v3rnd,
+v3rotx,
+v3roty,
+v3rotz,
+v3mult,
+v3dpointv,
+v3dlinesv,
+v3mlinesv,
+v3distort,
+m3zero,
+m3ass,
+m3ident,
+m3print,
+m3sym,
+m3eq,
+m3add,
+m3sub,
+m3mult,
+mscalm,
+m3euler,
+m3seuler,
+m3inv \- Header for vector3/matrix3 linear programming library ...
+.SH "SYNOPSIS"
+.ft B
+#include <vector3.h>
+.sp
+void v3ass
+.br
+(
+.br
+	vector3 *,
+.br
+	double,
+.br
+	double,
+.br
+	double
+.br
+);
+.sp
+void v3print
+.br
+(
+.br
+	FILE *,
+.br
+	char *,
+.br
+	vector3 *
+.br
+);
+.sp
+void v3write
+.br
+(
+.br
+	char *,
+.br
+	vector3 *,
+.br
+	FILE *
+.br
+);
+.sp
+int m3GE_solve
+.br
+(
+.br
+	int *,
+.br
+	matrix3 *,
+.br
+	vector3 *,
+.br
+	vector3 *
+.br
+);
+.sp
+int v3read
+.br
+(
+.br
+	char *,
+.br
+	vector3 *,
+.br
+	FILE *
+.br
+);
+.sp
+int v3par
+.br
+(
+.br
+	vector3 *,
+.br
+	vector3 *
+.br
+);
+.sp
+int v3eq
+.br
+(
+.br
+	vector3 *,
+.br
+	vector3 *
+.br
+);
+.sp
+int v3hecs(vector3 *);
+.sp
+double v3mag(vector3 *);
+.sp
+double v3dot
+.br
+(
+.br
+	vector3 *,
+.br
+	vector3 *
+.br
+);
+.sp
+double v3ang
+.br
+(
+.br
+	vector3 *,
+.br
+	vector3 *
+.br
+);
+.sp
+double v3dpoints
+.br
+(
+.br
+	vector3 *,
+.br
+	vector3 *,
+.br
+	vector3 *
+.br
+);
+.sp
+double v3lvsi
+.br
+(
+.br
+	int,
+.br
+	vector3 *
+.br
+);
+.sp
+void v3tomatc
+.br
+(
+.br
+	int,
+.br
+	matrix3 *,
+.br
+	vector3 *
+.br
+);
+.sp
+vector3 v3inv(vector3 *);
+.sp
+void v3zero(vector3 *);
+.sp
+vector3 v3add
+.br
+(
+.br
+	vector3 *,
+.br
+	vector3 *
+.br
+);
+.sp
+vector3 v3sub
+.br
+(
+.br
+	vector3 *,
+.br
+	vector3 *
+.br
+);
+.sp
+vector3 v3shift
+.br
+(
+.br
+	vector3 *,
+.br
+	vector3 *
+.br
+);
+.sp
+vector3 v3cross
+.br
+(
+.br
+	vector3 *,
+.br
+	vector3 *
+.br
+);
+.sp
+vector3 v3unit(vector3 *);
+.sp
+vector3 v3axtran
+.br
+(
+.br
+	vector3 *,
+.br
+	vector3 *,
+.br
+	vector3 *,
+.br
+	vector3 *
+.br
+);
+.sp
+vector3 v3sign(vector3 *);
+.sp
+vector3 v3scalm
+.br
+(
+.br
+	double,
+.br
+	vector3 *
+.br
+);
+.sp
+vector3 v3scald
+.br
+(
+.br
+	double,
+.br
+	vector3 *
+.br
+);
+.sp
+vector3 v3planp
+.br
+(
+.br
+	vector3 *,
+.br
+	vector3 *
+.br
+);
+.sp
+vector3 v3urnd(void);
+.sp
+vector3 v3rnd(double);
+.sp
+vector3 v3rotx
+.br
+(
+.br
+	vector3 *,
+.br
+	double
+.br
+);
+.sp
+vector3 v3roty
+.br
+(
+.br
+	vector3 *,
+.br
+	double
+.br
+);
+.sp
+vector3 v3rotz
+.br
+(
+.br
+	vector3 *,
+.br
+	double
+.br
+);
+.sp
+vector3 v3mult
+.br
+(
+.br
+	matrix3 *,
+.br
+	vector3 *
+.br
+);
+.sp
+vector3 v3dpointv
+.br
+(
+.br
+	vector3 *,
+.br
+	vector3 *,
+.br
+	vector3 *
+.br
+);
+.sp
+vector3 v3dlinesv
+.br
+(
+.br
+	int *,
+.br
+	vector3 *,
+.br
+	vector3 *,
+.br
+	vector3 *,
+.br
+	vector3 *,
+.br
+	vector3 *,
+.br
+	vector3 *,
+.br
+	vector3 *
+.br
+);
+.sp
+vector3 v3mlinesv
+.br
+(
+.br
+	int *,
+.br
+	int,
+.br
+	vector3 *,
+.br
+	vector3 *,
+.br
+	double *
+.br
+);
+.sp
+vector3 v3distort
+.br
+(
+.br
+	vector3 *,
+.br
+	double,
+.br
+	double
+.br
+);
+.sp
+void m3zero(matrix3 *);
+.sp
+void m3ass
+.br
+(
+.br
+	matrix3 *,
+.br
+	double,
+.br
+	double,
+.br
+	double,
+.br
+	double,
+.br
+	double,
+.br
+	double,
+.br
+	double,
+.br
+	double,
+.br
+	double
+.br
+);
+.sp
+void m3ident(matrix3 *);
+.sp
+void m3print
+.br
+(
+.br
+	FILE *,
+.br
+	char *,
+.br
+	matrix3 *
+.br
+);
+.sp
+int m3sym(matrix3 *);
+.sp
+int m3eq
+.br
+(
+.br
+	matrix3 *,
+.br
+	matrix3 *
+.br
+);
+.sp
+matrix3 m3add
+.br
+(
+.br
+	matrix3 *,
+.br
+	matrix3 *
+.br
+);
+.sp
+matrix3 m3sub
+.br
+(
+.br
+	matrix3 *,
+.br
+	matrix3 *
+.br
+);
+.sp
+matrix3 m3mult
+.br
+(
+.br
+	matrix3 *,
+.br
+	matrix3 *
+.br
+);
+.sp
+matrix3 mscalm
+.br
+(
+.br
+	double,
+.br
+	matrix3 *
+.br
+);
+.sp
+matrix3 m3euler
+.br
+(
+.br
+	double,
+.br
+	vector3 *
+.br
+);
+.sp
+matrix3 m3seuler
+.br
+(
+.br
+	double,
+.br
+	vector3 *
+.br
+);
+.sp
+matrix3 m3inv(matrix3 *);
+.ft R
+.SH "PARAMETERS"
+.TP
+.B "vector3 *"
+Not Documented.
+.TP
+.B "double"
+Not Documented.
+.TP
+.B "double"
+Not Documented.
+.TP
+.B "double"
+Not Documented.
+.TP
+.B "FILE *"
+Not Documented.
+.TP
+.B "char *"
+Not Documented.
+.TP
+.B "int *"
+Not Documented.
+.TP
+.B "matrix3 *"
+Not Documented.
+.TP
+.B "int"
+Not Documented.
+.TP
+.B "double *"
+Not Documented.
+.SH "DESCRIPTION"
+.SS "v3ass"
+Assign a vector3.
+.SS "v3print"
+Print contents of a vector3.
+.SS "v3write"
+Write vector3 to stream.
+.SS "m3GE_solve"
+Solve linear equations using Gaussian Elimination.
+.SS "v3read"
+Read vector3 from stream.
+.SS "v3par"
+Test whether vector3s parallel.
+.SS "v3eq"
+Test whether vector3s equal.
+.SS "v3hecs"
+Test vector3 sign hetrogeneity.
+.SS "v3mag"
+Get vector3 magnitude.
+.SS "v3dot"
+Get dot product.
+.SS "v3ang"
+Get angle between two vector3s.
+.SS "v3dpoints"
+Get scalar distance between a point in 3 space and line.
+.SS "v3lvsi"
+Compute the spatial entropy of a set of vector3s.
+.SS "v3tomatc"
+Convert vector3 to matrix3 column.
+.SS "v3inv"
+Calculate the additive inverse of a vector3.
+.SS "v3zero"
+Zero a vector3.
+.SS "v3add"
+Add vector3s.
+.SS "v3sub"
+Subtract vectors.
+.SS "v3shift"
+Shift vector3.
+.SS "v3cross"
+Find cross product for pair of 3-vector3s.
+.SS "v3unit"
+Find unit vector3 in direction of argument vector3.
+.SS "v3axtran"
+Express vector3 in given axis system.
+.SS "v3sign"
+Compute vector3 sign.
+.SS "v3scalm"
+Multiply vector3 by scalar.
+.SS "v3scald"
+Divide vector3 by scalar.
+.SS "v3planp"
+Find vector3 perpendicular to plane defined by #1 and #2.
+.SS "v3urnd"
+Generate unit vector3 pointing in random direction.
+.SS "v3rnd"
+Generate unit vector3 pointing in random direction of random size.
+.SS "v3rotx"
+Rotate vector3 about X axis of reference axis system.
+.SS "v3roty"
+Rotate vector3 about y axis of reference axis system.
+.SS "v3rotz"
+Rotate vector3 about z axis of reference axis system.
+.SS "v3mult"
+Multiply vector3 by matrix3.
+.SS "v3dpointv"
+Calculate smallest vector3 between line and point.
+.SS "v3dlinesv"
+Calculate smallest vector3 between two skew lines.
+.SS "v3mlinesv"
+Compute the nearest approach of m vector3s.
+.SS "v3distort"
+Compute planar distortion to vector3 caused by rotation projection.
+.SS "m3zero"
+Assign zero matrix3 .
+.SS "m3ass"
+Assign 3x3 matrix3.
+.SS "m3ident"
+Assign identity matrix3.
+.SS "m3print"
+Print matrix3.
+.SS "m3sym"
+Test if matrix3 is symmetric.
+.SS "m3eq"
+Test if matrices are equal.
+.SS "m3add"
+Add matrices.
+.SS "m3sub"
+Subtract matrices.
+.SS "m3mult"
+Multiply matrices.
+.SS "mscalm"
+Multiply matrix3 by scalar.
+.SS "m3euler"
+Form Euler matrix3.
+.SS "m3seuler"
+Form small angle Euler matrix3.
+.SS "m3inv"
+Find inverse of matrix3.

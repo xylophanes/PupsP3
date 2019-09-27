@@ -1,0 +1,287 @@
+#!/bin/tcsh
+#
+#-------------------------------------------------------------------------------
+# Makefile generator script. M.A. O'Neill, Tumbling Dice, 2002-2017 
+#
+# $1 is a configuration string of the form <OS>.<PUPS type>
+#
+# $2 is the name of the input Makefile from which the actual Makefile
+#    is generated
+#
+# if $3 is set to 'default', default all answer to security questions
+#
+# if $4 is set to debug build Makefile which will generate code which
+# can be debugged using gdb
+#-------------------------------------------------------------------------------
+#
+
+if($# < 2 || $# > 4 || ($1 == "usage" || $1 == "help") || ($3 != "" &&  ($3 != default && $3 != nodefault) && $4 != "debug")) then
+        echo ""
+        echo "    PUPSP3 (SUPUPS) Make template configuration tool (C) M.A. O'Neill, Tumbling Dice, 2002-2017"
+        echo ""
+	echo "    Usage: configure <PUPS architecture type> <PUPS Makefile (.in)> [default | nodefault] [debug]"
+	echo ""
+	exit 0
+endif
+
+echo ""
+echo "    PUPSP3 (SUPUPS) Make template configuration tool (C) M.A. O'Neill, Tumbling Dice 2002-2017"
+echo ""
+
+if(! -e $2) then
+	echo "configure: cannot find Makefile [$2]"
+	echo ""
+	exit -1
+endif
+
+if(`file $2 | grep make` == "") then
+	echo "    configure ERROR: [$2] is not a makefile"
+	echo ""
+	exit -1
+endif
+
+onintr abort_build
+
+
+#-------------------------------------------------------
+# Check that configuration files exist for architecture
+#-------------------------------------------------------
+
+if(`whoami` == root) then
+	set projectDir = /p3
+	set includeDir = /usr/include/p3
+else
+	set projectDir = ~/p3
+	set includeDir = ~/include/p3
+endif
+
+setenv PUPS_CONFDIR $projectDir 
+set path=($path .. `pwd`)
+set arch     = `echo $MACHTYPE`
+set arch     = `upcase $arch`
+set target   = `echo $OSTYPE` 
+set target   = `downcase $target` 
+set targarch = $target.$1
+
+if(! -e $projectDir/$targarch) then
+	echo "    configure ERROR: Cannot find configuration file ($targarch)"
+	exit -1
+endif
+
+
+#--------------------------
+# Check buildlock is clear
+#--------------------------
+
+sed s/\$ARCH/$arch/g < $projectDir/$targarch > $projectDir/$arch.$targarch
+if(-e BUILDLOCK) then
+        set ret = `ask "buildlock exists  -- delete?"`
+
+        if($ret == "y" || $ret == "yes") then
+                echo "buildlock removed"
+                \rmdir BUILDLOCK
+        else if($ret == "quit" || $ret == "bye") then
+                exit -1
+        else
+                tas BUILDLOCK
+        endif
+endif
+tas BUILDLOCK
+
+
+
+#--------------------------------------
+# Are we in secure installation mode?
+#--------------------------------------
+
+if($4 == skip || `grep "\#-DSECURE" < $projectDir/$targarch` != "") then
+        set install_mode = insecure
+else
+        set install_mode = secure
+endif
+
+set method = default
+if($install_mode == secure) then
+
+	if($3 == default) then
+		set method = sdongle
+	else
+        	if($OSTYPE == linux) then
+	                echo ""
+			echo "    ------------------------------------------------------------------------------------------"
+			echo "    You have specified secure binaries in your configuration file -- so you will need to"
+			echo "    specify a licencing method (sdongle or dserial) under $OSTYPE."
+			echo "    ------------------------------------------------------------------------------------------"
+			echo ""
+			set method = `ask "    Licensing method (sdongle or dserial) [default: sdongle]"`
+			if($method == "q" || $method == "quit" || $method == "bye") then
+				exit -1
+			endif
+		else
+			echo ""
+			echo "    ------------------------------------------------------------------------------------------"
+			echo "    You have specified secure binaries in your configuration file -- sdongle is"
+			echo "    the only licencing method supported under $OSTYPE."
+			echo "    ------------------------------------------------------------------------------------------"
+			echo ""
+
+			set method = sdongle
+		endif
+	endif
+
+        if($method == dserial) then
+                echo ""
+                echo "Licence method is disk serial"
+
+                set default_hd_device = `df | grep boot | awk '{print $1}' | striplc | sed s/"\/dev\/"//g`
+
+		if($3 == default) then
+			set hd_device = $default_hd_device
+                        echo "Hard disk device is" $hd_device "(default)"
+		else
+                	set hd_device = `ask "hd_device [default $default_hd_device]"`
+                	if($hd_device == "" || $hd_device == "default") then
+                        	set hd_device = $default_hd_device
+                        	echo "Hard disk device is" $hd_device "(default)"
+                	else if($hd_device == "quit" || $hd_device == "bye")
+				exit -1
+                	endif
+		endif
+
+		if($3 == default) then
+			setenv USE_DISK_SERIAL $dserial
+		else
+                	set dserial = `ask "disk serial [default use build disk serial]"`
+                	if($dserial == "q" || $dserial == "quit" || $dserial == "bye") then
+                        	exit -1
+                	endif
+
+                	if($dserial != "" || $dserial == "default") then
+                        	setenv USE_DISK_SERIAL $dserial
+			endif
+		endif
+
+		if($3 == default) then
+			set seed = 9999
+			echo "Encryption seed is" $seed "(default)"
+		else
+                	set seed = `ask "encryption seed [default 9999]"`
+                	if($seed == "" || $seed == "default") then
+                        	set seed = 9999
+                        	echo "Encryption seed is" $seed "(default)"
+                	else if($seed == "quit" || $seed == "bye") then
+                        	exit -1
+                	endif
+		endif
+
+                sed s/WHICH_DEVICE/$hd_device/g < $includeDir/securicor.h  | sed s/SVAL/$seed/g > $includeDir/sed_securicor.h
+        else if($method == "" || $method == sdongle || $method == default) then
+                echo ""
+                echo "    Licence method is soft dongle (default)"
+
+                set dongle_dir = ~`whoami`/.sdongles
+                if(! -e $dongle_dir) then
+			echo "(Soft) dongle directory $dongle_dir does not exist"
+			exit -1
+                endif
+
+		if($3 == default) then
+			set dongle_file_name = pups.dongle
+			echo "    Dongle file name is" $dongle_file_name "(default)"
+		else
+			set dongle_file_name = `ask "    dongle file name (default pups.dongle)"`
+			if($dongle_file_name == "") then
+				set dongle_file_name = pups.dongle
+                        	echo "    Dongle file name is" $dongle_file_name "(default)"
+			endif
+		endif
+
+		if(! -e $dongle_dir/$dongle_file_name) then
+			echo "(Soft) dongle file $dongle_dir/$dongle_file_name does not exist"
+			exit -1
+		endif
+
+		if($3 == default) then
+			set seed = 9999
+			echo "    Encryption seed is" $seed "(default)"
+		else
+                	set seed = `ask "    encryption seed [default 9999]"`
+                	if($seed == "q" || $seed == "quit" || $seed == "bye") then
+                        	exit -1
+                	else if($seed == "") then
+                        	set seed = 9999
+                        	echo "    Encryption seed is" $seed "(default)"
+                	endif
+		endif
+
+                sed s/WHICH_DEVICE/dummy/g < $includeDir/securicor.h | sed s/SVAL/$seed/g > $includeDir/sed_securicor.h
+        endif
+endif
+
+
+#--------------------------------------------------
+# Tell user what is needed in profile/rc file for
+# binary to run
+#--------------------------------------------------
+
+echo ""
+echo "    ------------------------------------------------------------------------------------------"
+echo "    Make sure your .tcshrc script has the following lines in it:"
+echo ""
+
+if(`whoami` == root) then
+	echo "    setenv P3_CONFDIR /usr/include/p3"
+	echo "    setenv LD_LIBRARY_PATH /usr/lib (should be set by default)"
+else
+	echo "    setenv P3_CONFDIR ~/p3"
+	echo "    setenv LD_LIBRARY_PATH ~/lib"
+endif
+
+echo "    ------------------------------------------------------------------------------------------"
+echo ""
+
+
+#----------------
+# Build Makefile
+#----------------
+
+pupsconf $arch.$targarch $2 Makefile	>& /dev/null
+\rm $projectDir/$arch.$targarch		>& /dev/null
+
+#-------------------------------
+# Generate debuggable binaries
+#-------------------------------
+
+if($4 == debug) then
+        sed s/OPTIMISE/"-g"/g <Makefile >$$
+
+echo ""
+echo "    ----------------------------------------------------------------------------------------------"
+echo "    You have specified debug. This means that your code (but not the underlying PUPS/P3 library"
+echo "    code can be interactively debugged (using gdb). If you want to build debuggable PUPS/P3"
+echo "    libraries you need to specify debuggable PUPS/P3 libraries when they are built (this is an"
+echo "    option to the build_pups_services.csh script) and set debug_install to TRUE before it is run"
+echo "    ----------------------------------------------------------------------------------------------"
+echo ""
+
+else
+        sed s/OPTIMISE/"-O3"/g <Makefile >$$
+endif
+\mv $$ Makefile				>& /dev/null
+
+\rmdir BUILDLOCK			>& /dev/null
+exit 0
+
+
+#--------------
+# Abort build
+#--------------
+
+abort_build:
+
+echo ""
+echo "*** Interrupted"
+echo ""
+
+\rmdir BUILDLOCK
+exit -1 

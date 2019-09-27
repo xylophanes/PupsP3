@@ -1,0 +1,63 @@
+.TH TAS 1 "25th January 2008" "PUPSP3 build tools" "PUPSP3 build tools"
+
+.SH NAME
+TAS \- test and set lock directory 
+.br
+
+.SH SYNOPSIS
+.B tas
+[
+.B -usage
+| 
+.B -help
+]
+.I lock directory name
+.I lock pid
+[>& <log file>]
+.br
+
+.SH DESCRIPTION
+.I tas(1)
+tests for the existence of a lock directory. If the directory already
+exists
+.I tas(1)
+waits for the directory to be deleted and then recreates and returns.
+At this point the shell script calling
+.I tas(1)
+will hold the lock.
+.br
+
+
+.SH OPTIONS
+
+.B -usage | -help
+display help and copyright information for the
+.I tas(1)
+filter.
+.br
+
+.B lock directory name
+is the name of the lock directory.
+.br
+
+.B lock pid
+is the PID of the process which asked
+.I tas(1)
+to hold the lock on its behalf. If specified
+.I tas(1)
+will remove the lock if it still exists, and the process which
+requested it does not (a situation which may otherwise result in
+deadlock).
+.br
+
+.SH ENVIRONMENT VARIABLES
+None.
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br

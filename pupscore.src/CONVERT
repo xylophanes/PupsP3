@@ -1,0 +1,19 @@
+#!/bin/bash
+#
+
+
+outname=$1.sed
+cp $1 $outname
+
+sed -i '/strcpy/ s/);/,SSIZE);/; s/strcpy/strlcpy/'  $outname
+sed -i '/strcat/ s/);/,SSIZE);/; s/strcat/strlcat/'  $outname
+sed -i '/sprintf/ s/,/,SSIZE,/; s/sprintf/snprintf/' $outname
+sed -i '/char/ s/\[256\]/\[SSIZE\]/'                 $outname 
+sed -i '/getcwd/ s/256/SSIZE/'                       $outname 
+sed -i '/fgets/  s/256/SSIZE/'                       $outname 
+sed -i 's/1024/SSIZE/'                               $outname 
+sed -i 's/2048/SSIZE/'                               $outname 
+sed -i 's/STRING_LENGTH/SSIZE/'                      $outname 
+
+exit 0
+

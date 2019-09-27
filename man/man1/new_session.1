@@ -1,0 +1,55 @@
+.TH NEW_SESSION 1 "8 February 2003" "PUPSP3 Script" "PUPSP3 Scripts"
+
+.SH NAME
+NEW_SESSION \- create a new session for subsequent commands 
+.br
+
+.SH SYNOPSIS
+.B new_session 
+.B [-usage | -help]
+>& <log file>
+.br
+
+.SH DESCRIPTION
+.I new_session(1)
+creates a new session using
+.I setsid(2).
+It then sleeps forever acting as both session and process group leader for
+commands which join its process group.
+.I new_session(1)
+relays
+.B SIGTERM
+and
+.B SIGTSTP
+to its process group.
+.I session(1)
+is intended as a
+.I well known process
+within scripts which other processes can (asynchronously and non-hierachically) nominate
+as their process group leader.
+.br
+
+
+.SH OPTIONS
+
+.B -usage | -help
+display help and copyright information for the
+.I new_session(1)
+filter.
+.br
+
+.SH ENVIRONMENT VARIABLES
+None.
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br
+
+.SH SEE ALSO
+.I setsid(2)
+.br

@@ -1,0 +1,102 @@
+#!/bin/bash
+#
+#--------------------------------------------
+# Build test version of PUPS/P3 application
+# which can be debugged.
+#
+# (C) M.A. O'Neill, Tubling Dice, 2013-2019
+#
+# $1 is the name of the Makefile template
+#-------------------------------------------
+#
+
+if [ "$MACHTYPE" = unknown ] ;  then
+	arch=$(uname -a | awk '{print $12}')
+else
+	arch=$MACHTYPE
+fi
+arch=$(upcase $arch)
+
+echo ""
+echo "    PUPS/P3 testConfigure version 3.00 (P3 debug build tool)"
+echo "    (C) M.A. O'Neill, Tumbling Dice, 2019"
+echo ""
+
+
+if [ "$1" = usage ] ; then
+	echo ""
+	echo "Usage: testconfigure [Makefile template]"
+	echo ""
+
+	exit 1
+elif [ "$1" = "" ] ; then
+	echo ""
+	echo "ERROR: expecting Makefile template"
+	echo ""
+
+	exit 255 
+elif [ ! -e $1 ] ; then
+	echo ""
+	echo "ERROR: Makefile template ($1) not found"
+	echo ""
+
+	exit 255 
+fi
+
+
+#----------------------------------------------------
+# Are we in the correct directory to use this tool?
+#----------------------------------------------------
+
+cwd=$(pwd)
+if [ ! -e "../pupscore.src" ] ; then
+	echo ""
+        echo "ERROR: this tool can only be used in the PUPS/P3 core source directory"
+	echo "       you are in directory $cwd"
+        echo ""
+
+        exit 255 
+fi
+
+
+#---------------------------------------------
+# Do we have debuggable libraries built? ...
+#---------------------------------------------
+
+debug_libs=FALSE
+if [ ! -e ../lib.$arch.linux.cluster/debug ] ; then
+	echo ""
+	echo "ERROR: you have not built debuggable libraries"
+	echo "       type './build_pups_services.csh cluster tty force default debug' (in this directory)"
+	echo "       to build them"
+	echo ""
+
+	\rmdir BUILDLOCK 2> /dev/null
+	exit 255
+fi
+
+if [ -e BUILDLOCK ] ; then
+        ret=$(ask "buildlock exists  -- delete?")
+
+        if [ "$ret" = "y" ] ||  [ "$ret" = "yes" ] ; then
+                echo "buildlock removed"
+                \rmdir BUILDLOCK 2> /dev/null
+        elif [ "$ret" == "quit" ] || [ "$ret" == "bye" ] ; then
+                exit 255 
+        else
+                tas BUILDLOCK
+        fi
+fi
+tas BUILDLOCK
+
+
+#------------------------------------------
+# Build Makefile for specified application
+#------------------------------------------
+
+pupsconf -cdir ../config.debug $arch.linux.cluster $1 Makefile 2> /dev/null
+
+
+\rmdir BUILDLOCK 2> /dev/null
+exit 0
+

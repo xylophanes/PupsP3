@@ -1,0 +1,22 @@
+Cache setup
+===========
+
+./cache -cache_blocks 10000 -cache_file test.dat -rvalues
+./cache -cache_blocks 10000 -cache_file test.dat -rvalues -rgb
+
+
+Cache display
+=============
+
+./cache -cache_blocks 10000 -cache_file test.dat -cache_index <n> -show_raw (raw O/P)
+./cache -cache_blocks 10000 -cache_file test.dat -cache_index <n> -show_2d (image array mapping)
+
+
+Correlation tests
+=================
+
+time ./cache -cache_blocks 50000 -cache_index 28560 -cache_file test.dat -cache_index <n> -ctest
+time ./cache -cache_blocks 50000 -cache_index 28560 -cache_file test.dat -cache_index <n> -ctest -show_correlations
+
+
+

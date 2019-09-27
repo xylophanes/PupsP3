@@ -1,0 +1,221 @@
+.\" WARNING! THIS FILE WAS GENERATED AUTOMATICALLY BY c2man!
+.\" DO NOT EDIT! CHANGES MADE TO THIS FILE WILL BE LOST!
+.TH "netlib" 3 "24 January 2018" "c2man netlib.h"
+.SH "NAME"
+xsystem,
+copen,
+cclose,
+fcopen,
+fcclose,
+xsystem2,
+copen2,
+fcopen2,
+detach_from_pipeline,
+xkill,
+fsopen,
+fsclose,
+pipestream_kill_disable,
+pipestream_kill_enable \- Purpose: distributed programming library. Note almost all functions in
+.SH "SYNOPSIS"
+.ft B
+#include <netlib.h>
+.sp
+int xsystem
+.br
+(
+.br
+	char *,
+.br
+	char *,
+.br
+	int,
+.br
+	int *
+.br
+);
+.sp
+int copen
+.br
+(
+.br
+	char *,
+.br
+	char *,
+.br
+	int
+.br
+);
+.sp
+int cclose(int);
+.sp
+FILE *fcopen
+.br
+(
+.br
+	char *,
+.br
+	char *,
+.br
+	char *
+.br
+);
+.sp
+FILE *fcclose(FILE *);
+.sp
+int xsystem2
+.br
+(
+.br
+	char *,
+.br
+	char *,
+.br
+	int,
+.br
+	int *,
+.br
+	int *,
+.br
+	int *,
+.br
+	int *
+.br
+);
+.sp
+int copen2
+.br
+(
+.br
+	char *,
+.br
+	char *,
+.br
+	int *,
+.br
+	int *,
+.br
+	int *,
+.br
+	int *
+.br
+);
+.sp
+int fcopen2
+.br
+(
+.br
+	char *,
+.br
+	char *,
+.br
+	int *,
+.br
+	FILE *,
+.br
+	FILE *,
+.br
+	FILE *
+.br
+);
+.sp
+void detach_from_pipeline(int);
+.sp
+int xkill
+.br
+(
+.br
+	char *,
+.br
+	char *,
+.br
+	char *,
+.br
+	char *,
+.br
+	int
+.br
+);
+.sp
+FILE *fsopen
+.br
+(
+.br
+	FILE *,
+.br
+	char *,
+.br
+	char *,
+.br
+	char *,
+.br
+	char *,
+.br
+	int,
+.br
+	int,
+.br
+	int *
+.br
+);
+.sp
+FILE *fsclose
+.br
+(
+.br
+	FILE *,
+.br
+	FILE *
+.br
+);
+.sp
+int pipestream_kill_disable(int);
+.sp
+int pipestream_kill_enable(int);
+.ft R
+.SH "PARAMETERS"
+.TP
+.B "char *"
+Not Documented.
+.TP
+.B "char *"
+Not Documented.
+.TP
+.B "int"
+Not Documented.
+.TP
+.B "int *"
+MAO.
+.TP
+.B "FILE *"
+MAO.
+.SH "DESCRIPTION"
+.SS "xsystem"
+Extended command processor routine.
+.SS "copen"
+Open a command descriptor.
+.SS "cclose"
+Close command descriptor.
+.SS "fcopen"
+Open a command stream.
+.SS "fcclose"
+Close command stream.
+.SS "xsystem2"
+Extended command processor routine [version 2].
+.SS "copen2"
+Open a set command descriptors bound to pipeline [version 2].
+.SS "fcopen2"
+Open a set of streams bound to pipeline [version 2].
+.SS "detach_from_pipeline"
+Close stdio descriptors.
+.SS "xkill"
+Relay signal to process running on remote host.
+.SS "fsopen"
+Open a stream to remote command.
+.SS "fsclose"
+Close socket stream to remote command.
+.SS "pipestream_kill_disable"
+Disable automatic killing of pipestream on the closure of
+associated descriptor.
+.SS "pipestream_kill_enable"
+Enable automatic killing of pipestream on the closure of
+associated descriptor.

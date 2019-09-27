@@ -1,0 +1,9 @@
+#---------------------------------------------------------------------------
+# Actions which are performed by connected when Internet gateway goes up.
+# This script lives in /etc/upscript (by default)
+#---------------------------------------------------------------------------
+
+cp /etc/resolv.up /etc/resolv.conf
+echo "upscript (" $$@`hostname` "): online version of resolv.conf"
+exit 0
+

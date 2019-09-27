@@ -1,0 +1,43 @@
+#-----------------------------------------------------------------------
+# Makefile for cache - utility to perform intelligent write to tee file 
+# M.A. O'Neill, Tumbling Dice 23/01/2018 
+#-----------------------------------------------------------------------
+
+CFLAGS		=	-fopenmp -ffast-math TARGET_CFLAGS -DDAISY_TEST
+ARCHDEPCFLAGS	=	TARGET_ARCHDEPCFLAGS -ffast-math -fopenmp
+
+LDFLAGS		=	TARGET_LIBS -lgomp
+ARCHDEPLDFLAGS	=	TARGET_ARCHDEPLDFLAGS
+
+CC		=	gcc
+LIBS		=	../lib.TARGET_LIBEXT/libpups.a ../lib.TARGET_LIBEXT/shgmalloc.o
+
+cache:		cache.o cache.c $(LIBS)
+		$(CC) $(CFLAGS) $(ARCHDEPCFLAGS) cache.o $(LIBS) -o cache $(LDFLAGS) $(ARCHDEPLDFLAGS)
+
+cache.o:		cache.c
+		@vtagup VTAG cache.c
+		@vstamp
+		$(CC) $(CFLAGS) -DMAX_SLOTS=32 -DSLOT=seg_slot_18	\
+		-DMAX_USE_SLOTS=3 -DUSE=usage_slot_2 -c cache.c
+
+cache.c:	../include.libs/utils.h    ../include.libs/slotman.h	\
+                ../include.libs/netlib.h   ../include.libs/psrp.h	\
+                ../include.libs/psrp.h     ../include.libs/dll.h
+
+.PHONY:		clean
+clean:
+		@rm -f *.o cache
+
+.PHONY:		install
+install:
+		@strip cache
+		@cp -f cache TARGET_INSTALL_DIR
+
+.PHONY:		unstripped
+unstripped:
+		@cp -f cache TARGET_INSTALL_DIR
+
+.PHONY:		uninstall
+uninstall:
+		@rm TARGET_INSTALL_DIR/cache

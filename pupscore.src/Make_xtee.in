@@ -1,0 +1,39 @@
+#--------------------------------------------------------------------------------------
+# Makefile for xtee - utility to perform intelligent write to tee file on Linux system
+# M.A. O'Neill, Tumbling Dice 23/01/2018
+#--------------------------------------------------------------------------------------
+
+CFLAGS		=	TARGET_CFLAGS TARGET_ARCHDEPCFLAGS -finline-functions -fopenmp -ffast-math
+LDFLAGS		=	TARGET_LDFLAGS TARGET_ARCHDEPLDFLAGS -lgomp
+CC		=	gcc
+LIBS		=
+
+xtee:		xtee.o xtee.c $(LIBS)
+		$(CC) $(CFLAGS) xtee.o $(LIBS) -o xtee $(LDFLAGS)
+
+xtee.o:		xtee.c
+		@vtagup VTAG xtee.c
+		@vstamp
+		$(CC) $(CFLAGS) -DMAX_SLOTS=32 -DSLOT=seg_slot_18	\
+		-DMAX_USE_SLOTS=3 -DUSE=usage_slot_2 -c xtee.c
+
+xtee.c:		../include.libs/utils.h    ../include.libs/slotman.h	\
+                ../include.libs/netlib.h   ../include.libs/psrp.h	\
+                ../include.libs/psrp.h     ../include.libs/dll.h
+
+.PHONY:		clean
+clean:
+		@rm *.o xtee
+
+.PHONY:		install
+install:
+		@strip xtee
+		@cp -f xtee TARGET_INSTALL_DIR
+
+.PHONY:		unstripped
+unstripped:
+		@cp -f xtee TARGET_INSTALL_DIR
+
+.PHONY:		uninstall
+uninstall:      
+		@rm TARGET_INSTALL_DIR/xtee

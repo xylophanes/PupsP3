@@ -1,0 +1,52 @@
+#----------------------------------------------------------------
+# Configuration file for installed cluster enabled Linux system
+# M.A. O'Neill, Tumbling Dice, 02/09/2019 
+#----------------------------------------------------------------
+
+TARGET_OS
+linux
+
+#--------------------------------------
+# Architecture dependent compile flags
+#--------------------------------------
+TARGET_ARCHDEPCFLAGS
+-DBSD_FUNCTION_SUPPORT -DHAVE_CURSES -DSSH_SUPPORT -DHAVE_READLINE -DGLIBC -DTIFF_SUPPORT -DIMG_SUPPORT -DZLIB_SUPPORT
+
+#------------------------------------------------------------------------------------------------------------
+# Comment -DESCURE line if you DON'T want a secure installation (which is disk specific)
+# Vendor mail address is set appropriately for the vendor of the end application
+# Comment out pthread support if you don't want it (process migration for example cannot handle threads yet)
+#------------------------------------------------------------------------------------------------------------
+TARGET_CFLAGS
+-w -Wfatal-errors OPTIMIZE -rdynamic -I. -IINCPATH -DARCH -D_GNU_SOURCE -D_XOPEN_SOURCE -DFTYPE -DPSRP_ENABLED
+-DCHAN_IS_POLL -DSHADOW_SUPPORT -DPERSISTENT_HEAP_SUPPORT -DSOCKET_SUPPORT -DDLL_SUPPORT -DPSRP_AUTHENTICATE
+-DPTHREAD_SUPPORT -DIPV6_SUPPORT -DCRIU_SUPPORT -DBUBBLE_MEMORY_SUPPORT -DMAIL_SUPPORT -DZLIB_SUPPORT -DTIFF_SUPPORT
+-D__NO_PROTO__ -DHAVE_PROC_FS -DIMMUNE
+#-DSECURE -DSEQUENCE_SEED=9999 -DDISK_SERIAL='\"DSN\"' -DVENDOR_MAIL_ADDRESS='\"mao@tumblingdice.co.uk\"'
+
+#-------------------
+# Target load flags
+#-------------------
+TARGET_LDFLAGS
+-LLIBPATH -lpups -lphmalloc -lbubble -lbsd -lreadline -lncurses -ltinfo -lm -ltiff -lcrypt -ldl -lz -lpthread
+
+#--------------------------------------
+# Architecture dependent load flags
+#--------------------------------------
+TARGET_ARCHDEPLDFLAGS
+none
+
+TARGET_LIBEXT
+linux.cluster
+
+#------------------
+# Location of libc 
+#------------------
+TARGET_LIBC_LOCATION
+LIBPATH
+
+TARGET_INSTALL_DIR
+BASEPATH/bin
+
+end
+

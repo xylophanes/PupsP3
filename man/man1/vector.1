@@ -1,0 +1,163 @@
+.TH VECTOR 1 "14th January 2004" "PUPSP3 commands" "PUPSP3 commands"
+
+.SH NAME
+VECTOR \- vector PSRP request to remote server 
+.br
+
+.SH SYNOPSIS
+.B vector 
+[
+.B -nice
+.I cardinal
+][
+.B -argf
+.I argument_file
+][
+.B -help
+][
+.B -usage
+][
+.B -growth_protection
+.I retries
+][
+.B -slots
+][
+.B -slotinfo
+][
+.B -verbose
+]!
+.B -on
+.I hostname
+!!
+.B -server
+.I server 
+!
+>& <log file>
+.br
+
+.SH DESCRIPTION
+.I vector(1)
+vectors commands to remote PSRP
+.I server.
+Typically it is started by a PSRP server when it migrates in order to
+maintain conenctivity with local clients.
+.br
+
+
+.SH OPTIONS
+
+.B -help
+invokes the on-line context help system. This
+"man" page is displayed. The process then exits.
+.br
+
+.B -growth_protection
+.I retrys
+causes the system to retry an
+.I sbrk(2)
+call up to
+.I retrys
+times. This option permits the program to wait until the core that it requires
+is available rather than simply exiting if
+.I sbrk(2)
+fails.
+.br
+
+.B -argf
+.I argument_file
+tells the filter to take its command line arguments from the specified
+.I argument_file.
+The data format of the argument file is:
+.br
+
+#  ... optional comment line ...
+.B -argflag           [1]
+.br
+.I argument_parameter [1,1]
+.br
+.I argument_parameter [1,2]
+.br
+
+.I argument_parameter [1,n]
+.br
+
+# ... optional comment line ...
+.br
+.B -argflag           [2]
+.br
+.I argument_parameter [1,1]
+.br
+.I argument_parameter [1,2]
+.br
+
+.I argument_parameter [1,n]
+.br
+
+.B -nice
+.I cardinal
+determimes the
+.I niceness
+at which the filter is scheduled. In keeping with all UNIX user processes, nice
+must be a cardinal between 0 and 20. The default niceness for
+.I xtee(1)
+is 4.
+.br
+
+.B -usage
+displays program shortform usage.
+.br
+
+B -version
+displays program version number.
+.br
+
+.B -slots
+displays the
+.I pups(3)
+libraries used in application in short form.
+.br
+
+.B -slotinfo
+displays the
+.I pups(3)
+libraries used in application in long form giving version, source language,
+programmer and copyright.
+
+
+.B -verbose
+turns on logging (output to standard error).
+.br
+
+.B -on
+.I hostname
+tells
+.I vector(1)
+the host running the target PSRP server.
+.br
+
+.B -cmd
+.I command
+command name of target PSRP server (on remote host).
+.br
+
+.SH LIBRARIES
+.I vector(1)
+makes use of PUPS libraries [Portable UNIX Programming System], see
+.I pups(3)
+.br
+
+.SH ENVIRONMENT VARIABLES
+None.
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br
+
+
+.SH SEE ALSO
+pips(3)

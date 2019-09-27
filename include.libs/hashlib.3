@@ -1,0 +1,107 @@
+.\" WARNING! THIS FILE WAS GENERATED AUTOMATICALLY BY c2man!
+.\" DO NOT EDIT! CHANGES MADE TO THIS FILE WILL BE LOST!
+.TH "hash" 3 "25 January 2018" "c2man hash.h"
+.SH "NAME"
+hash_table_create,
+hash_table_destroy,
+hash_get_object,
+hash_put_object,
+hash_delete_object,
+hash_show_stats \- Purpose: Portable hash access library.
+.SH "SYNOPSIS"
+.ft B
+#include <hash.h>
+.sp
+hash_table_type *hash_table_create
+.br
+(
+.br
+	int,
+.br
+	char *
+.br
+);
+.sp
+hash_table_type *hash_table_destroy(hash_table_type *);
+.sp
+int hash_get_object
+.br
+(
+.br
+	int,
+.br
+	void *,
+.br
+	char *,
+.br
+	hash_table_type *
+.br
+);
+.sp
+int hash_put_object
+.br
+(
+.br
+	int,
+.br
+	void *,
+.br
+	char *,
+.br
+	int,
+.br
+	hash_table_type *
+.br
+);
+.sp
+int hash_delete_object
+.br
+(
+.br
+	int,
+.br
+	hash_table_type *
+.br
+);
+.sp
+int hash_show_stats
+.br
+(
+.br
+	FILE *,
+.br
+	int,
+.br
+	hash_table_type *
+.br
+);
+.ft R
+.SH "PARAMETERS"
+.TP
+.B "int"
+Not Documented.
+.TP
+.B "char *"
+Not Documented.
+.TP
+.B "hash_table_type *"
+Not Documented.
+.TP
+.B "void *"
+Not Documented.
+.TP
+.B "FILE *"
+Not Documented.
+.SH "DESCRIPTION"
+.SS "hash_table_create"
+Create hash table object.
+.SS "hash_table_destroy"
+Destroy hash table object.
+.SS "hash_get_object"
+Return object at a given location.
+.SS "hash_put_object"
+Add object to hashed object list.
+.SS "hash_delete_object"
+Routine to delete object from hash table.
+.SS "hash_show_stats"
+Report on hash table accesses.

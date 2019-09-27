@@ -1,0 +1,51 @@
+.TH UNINSTALL_PUPSP3 1 "16th April 2015" "PUPSP3 build scripts" "PUPSP3 build scripts
+
+.SH NAME
+UNINSTALL_PUPSP3 \- uninstall PUPS/P3 system
+.br
+
+.SH SYNOPSIS
+.B uninstall_pupsP3 
+.I logfile
+[>2 <log file>]
+.br
+
+.SH DESCRIPTION
+.I uninstall__pupsP3(1)
+uninstall a PUPS/P3 systm removing all binaries, scripts, man pages and project directories.
+.br
+
+If a
+.I logfile
+is specified this script writes error/status information to it. If the reserbed words
+.B tty
+or
+.B null
+are specified, this script writes error/status information to the user terminal
+.B /dev/tty
+or the data sink
+.B /dev/null
+respectively.
+.br
+
+
+.SH OPTIONS
+none
+.br
+
+.SH ENVIRONMENT VARIABLES
+None.
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br
+
+.SH SEE ALSO
+build_pupsP3(1), buildP3(1), uninstallP3(1)
+.br
+

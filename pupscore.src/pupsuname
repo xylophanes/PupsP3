@@ -1,0 +1,36 @@
+#!/bin/bash
+
+#---------------------------------------------------------------------
+# Edit echo to return machine architecture:
+#      e.g. echo ix86.linux    - linux system. Intel 80x86 Proc.
+#           echo sparc.linux   - linux system. SPARC Proc.
+#           echo sparc.sunos   - SunOS system. SPARC Proc
+#           echo sparc.solaris - Solaris system. SPARC proc.
+#           echo axp.osf1      - Digital UNIX system. AXP Proc.
+#
+#---------------------------------------------------------------------
+#
+
+if [ $# -ge 1 ]  ||  [ "$1" = "usage" ] || [ "$1" = "help" ] ; then
+	echo ""
+	echo "    PUPS-2019 (SUPUPS) system architecture identifier script (c) M.A. O'Neill, Tumbling Dice 2002-2019"
+	echo ""
+
+        echo "    Usage: pupsuname [usage] | [help]"
+        echo ""
+        exit 1
+fi
+
+BTYPE=unknown 
+if [ -e ~/p3 ] ; then
+	if [ $(ls ~/p3 | grep cluster) != "" ] ; then
+		BTYPE=cluster
+	elif [ $(ls ~/p3 | grep vanilla) != "" ] ; then
+                BTYPE=vanilla
+	else
+		BTYPE=unknown
+	fi
+fi
+
+echo $MACHTYPE.$OSTYPE.$BTYPE 
+exit 0

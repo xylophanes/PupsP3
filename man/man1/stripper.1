@@ -1,0 +1,55 @@
+.TH STRIPPER 1 "25th January 2008" "PUPSP3 tools" "PUPSP3 tools"
+
+.SH NAME
+STRIPPER \- strip comments (prepended by '#') from a text file 
+.br
+
+.SH SYNOPSIS
+.B stripper
+[ 
+.B -usage
+| 
+.B -help
+][
+.B -verbose
+]
+!< <commented text file>!
+[> <stripped text file>]
+[>& <log file>]
+.br
+
+.SH DESCRIPTION
+.I stripper(1)
+strips comments from data flowing down a pipeline (in a VDM) and writes uncommented
+data downstream. ASCII data is read on
+.I standard input
+and written to
+.I standard output.
+.br
+
+
+.SH OPTIONS
+
+.B -usage | -help
+display help and copyright information for the
+.I stripper(1)
+filter.
+.br
+.B -verbose
+tells
+.I stripper(1)
+to log error/status information to
+.I standard error.
+.br
+
+.SH ENVIRONMENT VARIABLES
+None.
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br

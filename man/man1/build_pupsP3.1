@@ -1,0 +1,63 @@
+.TH BUILD_PUPSP3 1 "16th April 2015" "PUPSP3 build scripts" "PUPSP3 build scripts"
+
+.SH NAME
+BUILD_PUPSP3 \- build and install PUPSP3 environment from PUPSP3 source tree.
+.br
+
+.SH SYNOPSIS
+.B build_pupsP3 
+.I [usage | --usage] 
+.I [vanilla | cluster]
+.I [logfile]
+>& <log file>
+.br
+
+.SH DESCRIPTION
+.I build_pupsP3s(1)
+is a
+.I csh(1)
+script which builds a PUPSP3 binary distribution in the current PUPSP3 source tree. Specifically
+the scripts builds all the necessary libraries, daemons, service functions, build tools and
+header files.
+.br
+
+.SH OPTIONS
+
+.B pupsuname
+specifies the PUPSP3 architecture for the target. Currently this may be:
+.br
+.I vanilla
+which specifies that a vanilla distribution (no networking, shared memory, dynamic
+functions etc.) be built for a standalone system. Typically, this option is used to
+build some sort of basic PUPSP3 functionality for primitive POSIX base operating systems,
+for example, MINIX.
+.br
+.I cluster
+which specifies that a fully capable distribution (including shared memory, dynamic
+linking, networking and checkpointing) is built.
+.br
+By default (no arguments to script)
+.B cluster
+is assumed
+
+.B logfile
+specifies the file to which comipliation logs are to be written. Bt default the is
+.I /dev/tty
+(e.g. log files are written to datasink). If
+.B tty
+is specified, the log infromation is written to the termninal. If
+.B filename
+is specified, it is written to that file.
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br
+
+.SH SEE ALSO
+csh(1), buildP3(1), uninstall_pupsP3, uninstallP3(1)
+.br

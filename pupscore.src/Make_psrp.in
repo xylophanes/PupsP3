@@ -1,0 +1,40 @@
+#-----------------------------------------------------------------------
+# Makefile for PSRP client on Linux system
+# M.A. O'Neill, Tumbling Dice 23/01/2018
+#-----------------------------------------------------------------------
+
+CFLAGS		=	TARGET_CFLAGS TARGET_ARCHDEPCFLAGS -DSLAVED_COMMANDS -finline-functions -fopenmp -ffast-math
+LDFLAGS		=	TARGET_LDFLAGS TARGET_ARCHDEPLDFLAGS -lgomp
+CC		=	gcc
+
+psrp:		psrp.o $(LIBS)
+		@vtagup VTAG psrp.c
+		@vstamp
+		$(CC) $(CFLAGS) psrp.o							\
+		$(LIBS) -o psrp $(LDFLAGS)
+
+psrp.o:		psrp.c
+		$(CC) $(CFLAGS) $(ARCHDEPCFLAGS) -DMAX_SLOTS=32 -DSLOT=seg_slot_18	\
+		$(H_OPTS) -DMAX_USE_SLOTS=4 -DUSE=usage_slot_2 -c psrp.c
+
+psrp.c:		../include.libs/utils.h    ../include.libs/slotman.h			\
+		../include.libs/netlib.h   ../include.libs/psrp.h			\
+		../include.libs/casino.h   ../include.libs/dll.h
+
+
+.PHONY:		clean
+clean:
+		@rm *.o psrp
+
+.PHONY:		install
+install:
+		@strip psrp
+		@cp -f psrp TARGET_INSTALL_DIR/psrp
+
+.PHONY:		unstripped
+unstripped:
+		@cp -f psrp TARGET_INSTALL_DIR/psrp
+
+.PHONY:		uninstall
+uninstall:      
+		@rm TARGET_INSTALL_DIR/psrp

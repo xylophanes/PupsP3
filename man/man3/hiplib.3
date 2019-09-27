@@ -1,0 +1,321 @@
+.\" WARNING! THIS FILE WAS GENERATED AUTOMATICALLY BY c2man!
+.\" DO NOT EDIT! CHANGES MADE TO THIS FILE WILL BE LOST!
+.TH "hipl_hdr" 3 "24 January 2018" "c2man hipl_hdr.h"
+.SH "NAME"
+hips_rd_hdr_info,
+hips_display_hdr_info,
+hips_f_rd_hdr_info,
+hips_wr_hdr_info,
+hips_f_wr_hdr_info,
+hips_rd_hdr,
+hips_frd_hdr,
+hips_wr_hdr,
+hips_fwr_hdr,
+hips_init_hdr,
+hips_frame_skip,
+hips_upd_hdr,
+hips_upd_desc,
+hips_set_desc,
+hips_fralloc,
+hips_nralloc,
+hips_ralloc,
+pipe_pread,
+hips_pixel_size,
+hips_output_pixel_type,
+hips_pixstr,
+hips_destroy_hdr \- Header for the HIPS procedure library.
+.SH "SYNOPSIS"
+.ft B
+#include <hipl_hdr.h>
+.sp
+int hips_rd_hdr_info
+.br
+(
+.br
+	int,
+.br
+	int *,
+.br
+	int *,
+.br
+	int *,
+.br
+	hipl_hdr *
+.br
+);
+.sp
+int hips_display_hdr_info
+.br
+(
+.br
+	FILE *,
+.br
+	hipl_hdr *
+.br
+);
+.sp
+int hips_f_rd_hdr_info
+.br
+(
+.br
+	int,
+.br
+	int,
+.br
+	int *,
+.br
+	int *,
+.br
+	int *,
+.br
+	hipl_hdr *
+.br
+);
+.sp
+void hips_wr_hdr_info
+.br
+(
+.br
+	char *,
+.br
+	int,
+.br
+	char *[],
+.br
+	char *,
+.br
+	hipl_hdr *
+.br
+);
+.sp
+void hips_f_wr_hdr_info
+.br
+(
+.br
+	int,
+.br
+	char *,
+.br
+	int,
+.br
+	char *[],
+.br
+	char *,
+.br
+	hipl_hdr *
+.br
+);
+.sp
+void hips_rd_hdr(hipl_hdr *);
+.sp
+void hips_frd_hdr
+.br
+(
+.br
+	int,
+.br
+	hipl_hdr *
+.br
+);
+.sp
+void hips_wr_hdr(hipl_hdr *);
+.sp
+void hips_fwr_hdr
+.br
+(
+.br
+	int,
+.br
+	hipl_hdr *
+.br
+);
+.sp
+void hips_init_hdr
+.br
+(
+.br
+	hipl_hdr *,
+.br
+	char *,
+.br
+	char *,
+.br
+	int,
+.br
+	char *,
+.br
+	int,
+.br
+	int,
+.br
+	int,
+.br
+	int,
+.br
+	int,
+.br
+	char *,
+.br
+	char *
+.br
+);
+.sp
+void hips_frame_skip
+.br
+(
+.br
+	int,
+.br
+	int,
+.br
+	hipl_hdr *
+.br
+);
+.sp
+void hips_upd_hdr
+.br
+(
+.br
+	hipl_hdr *,
+.br
+	char *,
+.br
+	int,
+.br
+	char **
+.br
+);
+.sp
+void hips_upd_desc
+.br
+(
+.br
+	hipl_hdr *,
+.br
+	char *
+.br
+);
+.sp
+void hips_set_desc
+.br
+(
+.br
+	hipl_hdr *,
+.br
+	char *
+.br
+);
+.sp
+void **hips_fralloc(hipl_hdr *);
+.sp
+void **hips_nralloc
+.br
+(
+.br
+	int,
+.br
+	hipl_hdr *
+.br
+);
+.sp
+void *hips_ralloc(hipl_hdr *);
+.sp
+int pipe_pread
+.br
+(
+.br
+	int,
+.br
+	void *,
+.br
+	int
+.br
+);
+.sp
+int hips_pixel_size(int);
+.sp
+int hips_output_pixel_type(char *);
+.sp
+char *hips_pixstr(int);
+.sp
+void hips_destroy_hdr(hipl_hdr *);
+.ft R
+.SH "PARAMETERS"
+.TP
+.B "int"
+Not Documented.
+.TP
+.B "int *"
+Not Documented.
+.TP
+.B "int *"
+Not Documented.
+.TP
+.B "int *"
+Not Documented.
+.TP
+.B "hipl_hdr *"
+Not Documented.
+.TP
+.B "FILE *"
+Not Documented.
+.TP
+.B "char *"
+Not Documented.
+.TP
+.B "char *[]"
+Not Documented.
+.TP
+.B "char *"
+Not Documented.
+.TP
+.B "char **"
+Not Documented.
+.TP
+.B "void *"
+Not Documented.
+.SH "DESCRIPTION"
+.SS "hips_rd_hdr_info"
+Get HIPS header from stdin.
+.SS "hips_display_hdr_info"
+Display HIPS header information in textual format.
+.SS "hips_f_rd_hdr_info"
+Get HIPS header from file .
+.SS "hips_wr_hdr_info"
+Write HIPS header to stdout.
+.SS "hips_f_wr_hdr_info"
+Write HIPS header to file.
+.SS "hips_rd_hdr"
+Read HIPS header.
+.SS "hips_frd_hdr"
+Read HIPS header from file.
+.SS "hips_wr_hdr"
+Write hips header.
+.SS "hips_fwr_hdr"
+Write HIPS header to file .
+.SS "hips_init_hdr"
+Initialise HIPS header.
+.SS "hips_frame_skip"
+Skip frame of data.
+.SS "hips_upd_hdr"
+Update the header descriptor.
+.SS "hips_upd_desc"
+Update the sequence discriptor.
+.SS "hips_set_desc"
+Set header descriptor.
+.SS "hips_fralloc"
+Allocate memory for a frame.
+.SS "hips_nralloc"
+Allocate memory for n rows of image.
+.SS "hips_ralloc"
+Allocate memory for one image row.
+.SS "pipe_pread"
+Pread routine to read correctly from a pipe .
+.SS "hips_pixel_size"
+Routine to return size of pixel in bytes.
+.SS "hips_output_pixel_type"
+Routine to decode a pixel output type.
+.SS "hips_pixstr"
+Routine to return type string corresponding to a HIPL pixel format.
+.SS "hips_destroy_hdr"
+Routine to destroy HIPS header datastructure.

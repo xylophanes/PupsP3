@@ -1,0 +1,175 @@
+.\" WARNING! THIS FILE WAS GENERATED AUTOMATICALLY BY c2man!
+.\" DO NOT EDIT! CHANGES MADE TO THIS FILE WILL BE LOST!
+.TH "mvm" 3 "24 January 2018" "c2man mvm.h"
+.SH "NAME"
+mvm_show_mvm_objects,
+show_mvm,
+mvm_set_cache_size,
+mvm_page,
+mvm_age_and_order,
+mvm_init,
+mvm_destroy,
+mvm_reset_pager,
+mvm_create_named_swapfile,
+mvm_create_swapfile,
+mvm_delete_swapfile,
+mvm_initialised \- Purpose: header for meta virtual paged object library.
+.SH "SYNOPSIS"
+.ft B
+#include <mvm.h>
+.sp
+extern void mvm_show_mvm_objects(FILE *);
+.sp
+extern void show_mvm(mvm_type *);
+.sp
+extern void mvm_set_cache_size
+.br
+(
+.br
+	int,
+.br
+	mvm_type
+.br
+);
+.sp
+extern int mvm_page
+.br
+(
+.br
+	int,
+.br
+	mvm_type *
+.br
+);
+.sp
+extern int mvm_age_and_order(mvm_type *);
+.sp
+extern void **mvm_init
+.br
+(
+.br
+	char *,
+.br
+	int,
+.br
+	int,
+.br
+	int,
+.br
+	int,
+.br
+	int,
+.br
+	int,
+.br
+	long,
+.br
+	mvm_type *
+.br
+);
+.sp
+extern int mvm_destroy(mvm_type *);
+.sp
+extern int mvm_reset_pager(mvm_type *);
+.sp
+extern int mvm_create_named_swapfile
+.br
+(
+.br
+	char *,
+.br
+	int,
+.br
+	long
+.br
+);
+.sp
+extern int mvm_create_swapfile
+.br
+(
+.br
+	int,
+.br
+	int,
+.br
+	long
+.br
+);
+.sp
+extern int mvm_delete_swapfile
+.br
+(
+.br
+	int,
+.br
+	char *
+.br
+);
+.sp
+extern int mvm_initialised(mvm_type *);
+.ft R
+.SH "PARAMETERS"
+.TP
+.B "FILE *"
+Not Documented.
+.TP
+.B "mvm_type"
+Not Documented.
+.TP
+.BR "int" "	(mvm_page)"
+Page to cache.
+.TP
+.BR "mvm_type *" "	(mvm_page)"
+Meta virtual memory mapper.
+.TP
+.B "char *"
+Name of virtual memory.
+.TP
+.BR "int" "	(mvm_init)"
+Memory initialisation flag.
+.TP
+.BR "int" "	(mvm_init)"
+Memeory access type.
+.TP
+.BR "int" "	(mvm_init)"
+Page scheduling policy.
+.TP
+.BR "int" "	(mvm_init)"
+Pages in virtual memory.
+.TP
+.BR "int" "	(mvm_init)"
+Pages in physical memory.
+.TP
+.BR "int" "	(mvm_init)"
+Backing store descriptor.
+.TP
+.B "long"
+Page size in virtual memory.
+.TP
+.BR "mvm_type *" "	(mvm_init)"
+Virtual memory structure.
+.SH "DESCRIPTION"
+.SS "mvm_show_mvm_objects"
+Show MVM objects attached to current application.
+.SS "show_mvm"
+Show meta virtual memory object statistics.
+.SS "mvm_set_cache_size"
+Change cache size of meta virtual memory object.
+.SS "mvm_page"
+Page a dynamic (data) object.
+.SS "mvm_age_and_order"
+Age and order pages of dynamic object.
+.SS "mvm_init"
+Initialise meta virtual memory object object.
+.SS "mvm_destroy"
+Destroy meta virtual memory object.
+.SS "mvm_reset_pager"
+Reset virtual cache after meta virtual memory access operations.
+.SS "mvm_create_named_swapfile"
+Create swapfile associated with MVM object.
+.SS "mvm_create_swapfile"
+Create MVM swapfile using open file handle.
+.SS "mvm_delete_swapfile"
+Delete swapfile associated with MVM object.
+.SS "mvm_initialised"
+Mark memory as being initialised.

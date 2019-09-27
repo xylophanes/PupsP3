@@ -1,0 +1,37 @@
+#-----------------------------------------------------------------------
+# Makefile for PSRP application. @APPNAME.
+# Extra entries may be needed in
+# LIBS, .o, and .c sections of the makefile.
+# 
+# M.A. O'Neill, Tumbling Dice 23/01/2018
+#-----------------------------------------------------------------------
+
+CFLAGS		=	TARGET_CFLAGS TARGET_ARCHDEPCFLAGS -finline-functions -fopenmp -ffast-math
+LDFLAGS 	=	TARGET_LDFLAGS TARGET_ARCHDEPLDFLAGS -lgomp
+CC		=	gcc
+LIBS 		=
+
+@APPNAME:	@APPNAME.o $(LIBS)
+		$(CC) $(CFLAGS) @APPNAME.o $(LIBS) -o @APPNAME $(LDFLAGS)
+
+@APPNAME.o:	@APPNAME.c $(LIBS)
+		@vtagup VTAG @APPNAME.c
+		@vstamp 
+		$(CC) $(CFLAGS) -DMAX_SLOTS=32 -DSLOT=seg_slot_18		\
+		$(H_OPTS) -DMAX_USE_SLOTS=4 -DUSE=usage_slot_2 -c @APPNAME.c
+
+.PHONY:		clean
+clean:
+		@rm *.o @APPNAME
+
+.PHONY:		install	
+install:
+		@cp -f @APPNAME TARGET_INSTALL_DIR
+
+.PHONY:		unstripped
+unstripped:
+		@cp -f @APPNAME TARGET_INSTALL_DIR
+
+.PHONY:		uninstall
+uninstall	
+		@rm TARGET_INSTALL_DIR/@APPNAME

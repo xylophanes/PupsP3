@@ -1,0 +1,235 @@
+.TH KEPHER 1 "18th August 2015" "PUPSP3 tools" "PUPSP3 tools"
+
+.SH NAME
+KEPHER \- remove stale temporary files from directory 
+.br
+
+.SH SYNOPSIS
+.B kepher 
+[
+.B -usage
+| 
+.B -help
+][
+.B -verbose
+][
+.B -protect
+][
+.B -delete
+][
+.B -ignore
+.I file extension list
+][
+.B -mdir
+][
+.I monitor directory
+][
+.B -mpid
+.I monitor PID 
+|
+.I monitor process name
+]
+[ >& error/status log file
+]
+.br
+
+.SH DESCRIPTION
+.I kepher(1)
+is a garbage recycler which looks in the specified
+.I monitor diretory
+for files of types
+.B .tmp, .lid, .lock, .fifo, .ipm.tmp, .tset.tmp, .tiff.tmp, .tif.tmp, .agf
+and
+.B .run.
+It also looks for stale PUPS/P3
+.B communication channels
+and
+.B lockposts
+see
+.I pups(7).
+.br
+If it finds a file of one of these types it extracts the associated PID and attempts to send a
+.B SIGCONT
+signal to the process owning the file. If it cannot send this signal and the file is owned by the same
+.B UID
+as the
+.I kepher(1)
+process, it assumes the file to be stale (as the process which owned it has terminated) and removes it,
+.br
+
+.br
+.B kepher
+is named after the dung beetle
+.I Kepher nigroaeneus
+which removes white rhino dung from lowveld savannah in South East Africa and recycles it.
+.br
+
+.SH FILES REMOVED
+.I kepher(1)
+currently removes stale temporary:
+.br
+
+.br
+.B tiff.tmp
+.br
+.B tif.tmp
+.br
+.B run
+.br
+.B agf
+(pupsP3
+.I command tail
+file)
+.br
+.B tmp
+.br
+.B ipm.tmp
+(DAISY
+.I ipm
+thumbnail image)
+.br
+.B tset.tmp
+(synonym for DAISY
+.I ipm
+thumbnail image)
+.br
+.B fifo
+(pups/P3
+raw communicaton channel)
+.br
+.B lid
+(pups/P3
+.I lock identifier
+)
+.br
+.B lock
+(pups/P3
+.I lock
+)
+.br
+.B sheap
+(pups/p3
+.I shared heap
+)
+.br
+
+.br
+files. Others may be added in future. Stale
+.I pups(7)
+.B lockposts
+and communication channels are also removed.
+.br
+
+.SH OPTIONS
+
+.B -usage | -help
+display help and copyright information for the
+.I kepher(1)
+filter.
+.br
+
+.B -verbose
+tells
+.I kepher(1)
+to send error/status information to
+.I standard error
+.br
+
+.B -protect
+tells
+.I kepher(1)
+to protect all the files in the directory nominated by
+.B -mdir
+which are not sub-directories. Each file in the directory
+.I foo
+is shadowed by an extra link (see
+.I link(2)
+)
+.I .foo.
+If
+.I foo
+is deleted,
+.I kepher(1)
+uses the shadow link to reconstitute
+.I foo.
+If
+.I .foo
+is deleted then
+.I kepher(1)
+will delete
+.I foo.
+A convenince function
+.I krm(1)
+is provided to perform this function.
+Caveat: the file
+.I kepher.run
+which is used by
+.I kepher(1)
+to store status information cannot be deleted until the
+.I kepher
+process owning it exits.
+.br
+.B -mdir
+.I monitor directory
+tells
+.I kepher(1)
+to look for stale temporary files and PUPS/P3 files sytems objects in
+.I monitor directory.
+This defaults to
+.B /tmp.
+.br
+
+.B -delete
+tells
+.I kepher(1)
+to delete the
+.I monitor directory
+before it exits.
+.br
+
+.B -ignore
+tells
+.I kepher(1)
+to ignore files whose file extension appear on
+.I file extension list.
+Typically this option is used to allow a process (or comamnd script) to directly
+manage its temporary files. The list of file extensions to be ignored must be
+specified in quoted from (e.g. "lock tmp") if there is more than one file extension
+in the list.
+.br
+
+
+
+.B -mpid
+.I monitor PID 
+|
+.B monitor process name
+tells
+.I kepher(1)
+to check whether
+.I monitored process
+is alive and terminate if it is not. If
+.I monitored process
+is 0 then
+.I kepher (1)
+runs until it is manually terminated. Default is
+.I kepher(1)
+runs until manually terminated. The process may be specified by name or PID. If a
+process name is specified it must be unique.
+.br
+
+.SH FILES
+.I kepher.run
+.br
+
+.SH ENVIRONMENT VARIABLES
+None.
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br

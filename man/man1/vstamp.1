@@ -1,0 +1,30 @@
+.TH VSTAMP 1 "16th April 2015" "PUPSP3 build commands" "PUPSP3 build commands"
+
+.SH NAME
+VTAGUP \- Dynamic binary time stamping for PUPS 
+.br
+
+.SH SYNOPSIS
+.B vstamp 
+
+.SH DESCRIPTION
+.I vstampi(1) 
+is a utility for automatically maintaining a software timestamp header vstamp.h,
+which is used by PUPS applications to automatically detect and reject
+stale dynamic objects (for example an out of date CKPT checkpoint file).
+.br
+
+.SH FILES
+vstamp.h
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+ 
+.SH SEE ALSO
+configure(1)
+.br

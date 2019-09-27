@@ -1,0 +1,31 @@
+Standard PUPS libraries - Note that this version of the PUPS libraries
+are supported by ANSI compilers only
+
+To build in production mode
+===========================
+
+Type:
+
+build_pups_services.csh cluster tty force default
+
+Programs can be built by typing:
+configure cluster <makefile template> followed by make.
+
+
+To build in debug mode
+======================
+
+Type:
+
+build_pups_services.csh cluster tty force default debug
+
+Programs which make use of the PUPS/P3 libraries can then be debugged
+by typing:
+
+testconfigure <make template> - to generate debug makefile
+followed by make. The resulting binary can then be debugged
+using (for example gdb).
+
+There is an example program, test.c and associated makefile template
+Make_test.in included in the distribution.
+

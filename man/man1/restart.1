@@ -1,0 +1,84 @@
+.TH RESTART 1 "15th December 2017" "PUPSP3 commands" "PUPSP3 commands"
+
+.SH NAME
+RESTART \- Restart a command/shell-script previously checkpointed via
+.I criu(1) 
+.br
+
+.SH SYNOPSIS
+.B restart 
+.B [-usage | -help]
+.B [-detach] [-d signal delay] !-c <criu checkpoint directory>!
+>& <log file>
+.br
+
+.SH DESCRIPTION
+.I restart(1)
+autimatically restores the state of a command or shell-script using
+.I criu(1)
+checkpointing. The checkpoint is generated either directly using
+.I criu(1)
+or via the
+.I ssave(1)
+wrapper script.
+.br
+
+
+.SH OPTIONS
+
+.B -usage | -help
+display help and copyright information for the
+.I lol(1)
+filter.
+.br
+
+.B -detach
+tells
+.I restart(1)
+to restart the checkpoint in the backgroud. Otherwise, the checkpoint is
+restarted in the foreground (e.g. with /dev/tty as its controlling terminal).
+.br
+
+.B -d
+.I signal delay
+tells
+.I restart(1)
+how long to wait before delivering a SIGRESTART signal to the process group
+restarted by
+.I criu(1).
+The default action for this signal is for members of the restored process
+group to ignore it, but they can elect to install a handler which performs
+vital restart actions (e.g. restarting timers, reconnecting sockets etc).
+.br
+
+.B -c
+.I criu checkpoint pathname 
+tells
+.I restart(1)
+the name of the
+.I criu checkpoint pathname 
+for the checkpoint to be restarted. This option is mandatory.
+.br
+
+.SH SIGNALS
+.B SIGRESTART
+.br
+
+.SH ENVIRONMENT VARIABLES
+None.
+.br
+
+.SH BUGS
+.I None
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br
+
+.SH SEE ALSO
+criu(1), ssave(1)
+.br

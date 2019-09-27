@@ -1,0 +1,95 @@
+#--------------------------------------------------------------------------------------
+# Makefile for PUPS/P3 libraries
+# M.A. O'Neill, Tumbling Dice 23/01/2018
+#--------------------------------------------------------------------------------------
+
+CFLAGS  = 	TARGET_CFLAGS TARGET_ARCHDEPCFLAGS -fPIC -fopenmp -ffast-math -c
+CC	=	gcc
+
+ALL	=	slotman.o utilib.o vec3lib.o larraylib.o cachelib.o nfolib.o casino.o hiplib.o hashlib.o	\
+		fhtlib.o netlib.o dlllib.o psrplib.o eigenlib.o tadlib.o cantorlib.o
+
+.PHONY:		all
+all:		build install
+
+.PHONY:		build
+build:		$(ALL)
+
+slotman.o:	slotman.c
+		$(CC) $(CFLAGS) slotman.c
+
+utilib.o:	utilib.c
+		$(CC) $(CFLAGS) -DSLOT=seg_slot_1 -DUSE=usage_slot_1 utilib.c
+
+vec3lib.o:	vec3lib.c
+		$(CC) $(CFLAGS) -DSLOT=seg_slot_2  vec3lib.c
+
+nfolib.o:	nfolib.c
+		$(CC) $(CFLAGS) -DSLOT=seg_slot_3  nfolib.c
+
+larraylib.o:	larraylib.c
+		$(CC) $(CFLAGS) -DSLOT=seg_slot_4  larraylib.c
+
+cachelib.o:	cachelib.c
+		$(CC) $(CFLAGS) -DSLOT=seg_slot_5  cachelib.c
+
+psomlib.o:	psomlib.c
+		$(CC) $(CFLAGS) -DSLOT=seg_slot_6  psomlib.c
+
+casino.o:	casino.c
+		$(CC) $(CFLAGS) -DSLOT=seg_slot_7  casino.c
+
+hiplib.o:	hiplib.c
+		$(CC) $(CFLAGS) -DSLOT=seg_slot_8  hiplib.c
+
+netlib.o:	netlib.c
+		$(CC) $(CFLAGS) -DSLOT=seg_slot_9  netlib.c
+
+dlllib.o:	dlllib.c
+		$(CC) $(CFLAGS) -DSLOT=seg_slot_10  dlllib.c
+
+fhtlib.o:	fhtlib.c
+		$(CC) $(CFLAGS) -DSLOT=seg_slot_11 fhtlib.c
+
+psrplib.o:	psrplib.c
+		$(CC) $(CFLAGS) -DSLOT=seg_slot_12 psrplib.c
+
+hashlib.o:	hashlib.c
+		$(CC) $(CFLAGS) -DSLOT=seg_slot_13 hashlib.c
+
+eigenlib.o:	eigenlib.c
+		$(CC) $(CFLAGS) -DSLOT=seg_slot_14 eigenlib.c
+
+tadlib.o:	tadlib.c
+		$(CC) $(CFLAGS) -DSLOT=seg_slot_15 tadlib.c
+
+cantorlib.o:	cantorlib.c
+		$(CC) $(CFLAGS) -DSLOT=seg_slot_16 cantorlib.c
+
+.PHONY:		install	
+install:	build
+		@ar rv libpups.a *.o
+		@ranlib libpups.a
+		@somake libpups.so "$(ALL)"
+		@cp -f *.o *.so *.a ../lib.TARGET_LIBEXT
+
+.PHONY:		clean
+clean:		
+		@rm *.o *.so *.a
+
+nfolib.c:	../include.libs/nfo.h
+vec3lib.c:	../include.libs/vector3.h
+larraylib.c:	../include.libs/larray.h
+utilib.c:	../include.libs/utils.h
+casino.c:	../include.libs/casino.h
+hiplib.c:	../include.libs/hipl_hdr.h
+fhtlib.c:	../include.libs/fht.h
+classifylib.c:	../include.libs/classify.h
+netlib.c:	../include.libs/netlib.h
+dlllib.c:	../include.libs/dll.h
+mtdlib.c:	../include.libs/mtd.h
+psrplib.c:	../include.libs/psrp.h
+hashlib.c:	../include.libs/hash.h
+eigenlib.c:	../include.libs/eigen.h
+tadlib.c:	../include.libs/tad.h
+cantorlib.c:	../include.libs/cantor.h

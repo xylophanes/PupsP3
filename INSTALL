@@ -1,0 +1,26 @@
+In the pupsp3 source directory
+
+To build debuggable binaries and libraries type : buildP3.csh tty cluster force default debug
+To build optimised binaries and libraries type  : buildP3.csh tty cluster force default
+
+This will install PUPSP3 binaries in
+
+~/bin
+
+The PUPSP3 libraries will be installed in:
+
+~/lib
+
+and "man" pages in:
+
+~/man
+
+Header and support files will be installed in:
+
+~/p3
+
+To link PUPS/P3 library functions add -lpups to your linker directives
+in makefile - you can use the P3 configure tool against an appropriate
+Make.in file, there are examples (e.g. Make_fsw.in) in the pupscore.src
+subdirectory within the pupsp3 source directory
+

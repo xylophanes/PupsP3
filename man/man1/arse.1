@@ -1,0 +1,89 @@
+.TH ARSE 1 "17 Feburary 2009" "PUPSP3 commands" "PUPSP3 commands"
+
+.SH NAME
+ARSE \- creates an interactive anus (arse hole) from which data for attached payload pipeline is is emitted.  
+.br
+
+.SH SYNOPSIS
+.B arse 
+[ 
+.B -usage
+|
+.B -help
+][
+.B -verbose
+][
+.B -sidebottom
+]!
+.B -hole
+.I arse hole FIFO name
+!
+>& <log file>
+.br
+
+.SH DESCRIPTION
+.I arse(1)
+is an interactive filter which sends data from a payload command pipeline to the user specified 
+.I arse hole FIFO.
+When
+.I arse(1)
+recieves data via
+.I standard input
+it transfers it to the
+.I arse hole FIFO.
+This permits process piplelines which are not composed of
+.B pods of related processes
+to rendezvous and transfer data.
+.br
+
+
+.SH OPTIONS
+
+.B -usage | -help
+display help and copyright information for the
+.I arse(1)
+filter.
+.br
+
+.B -verbose
+log
+.B error/status
+information to
+.I standard output.
+.br
+
+.B -sidebottom
+the arse hole is a
+.B side bottom
+(e.g. data is sent to
+.I standard output
+as well). Functionally this is similar to
+.I tee(1)
+and
+.I xtee(1).
+.br
+
+.B -hole
+.I arse hole FIFO name
+specifies the name of the anus (arse hole) FIFO for this instance of
+.I arse(1)
+.br
+
+
+.SH ENVIRONMENT VARIABLES
+
+None.
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br
+
+.SH SEE ALSO
+gob(1), tee(1), xtee(1)
+.br
+

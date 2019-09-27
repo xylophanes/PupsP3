@@ -1,0 +1,1216 @@
+.\" WARNING! THIS FILE WAS GENERATED AUTOMATICALLY BY c2man!
+.\" DO NOT EDIT! CHANGES MADE TO THIS FILE WILL BE LOST!
+.TH "cantor" 3 "24 January 2018" "c2man cantor.h"
+.SH "NAME"
+cantor_init_node_mutex,
+cantor_init_object_mutex,
+cantor_init_link_mutex,
+cantor_init_nodelist_mutex,
+cantor_get_node_index_from_name,
+cantor_clear_node,
+cantor_phclear_node,
+cantor_clear_nodelist,
+cantor_phclear_nodelist,
+cantor_add_node_to_nodelist,
+cantor_phadd_node_to_nodelist,
+cantor_remove_node_from_nodelist,
+cantor_phremove_node_from_nodelist,
+cantor_set_nodelist_name,
+cantor_set_nodelist_type,
+cantor_add_object_to_node,
+cantor_phadd_object_to_node,
+remove_object_from_node,
+cantor_phremove_object_from_node,
+cantor_node_name_unique,
+cantor_object_tag_unique,
+cantor_get_object_index_from_tag,
+cantor_get_object_tag_from_index,
+cantor_add_link_to_node,
+cantor_phadd_link_to_node,
+cantor_remove_link_from_node,
+cantor_phremove_link_from_node,
+cantor_link_tag_unique,
+cantor_get_link_index_from_tag,
+cantor_get_link_tag_from_index,
+cantor_set_node_name,
+cantor_print_node_info,
+cantor_vhtml_node_info,
+cantor_clear_link,
+cantor_phclear_link,
+cantor_clear_linklist,
+cantor_phclear_linklist,
+cantor_add_node_to_link,
+cantor_phadd_node_to_link,
+cantor_remove_node_from_link,
+cantor_copy_nodelist,
+cantor_phcopy_nodelist,
+cantor_copy_node,
+cantor_phcopy_node,
+cantor_copy_link,
+cantor_phcopy_link,
+cantor_set_link_tag,
+cantor_set_link_type,
+cantor_set_link_flux,
+cantor_set_link_length,
+cantor_compare_nodes,
+cantor_clear_object,
+cantor_phclear_object,
+cantor_clear_objectlist,
+cantor_phclear_objectlist,
+cantor_allocate_objectlist,
+cantor_set_object_name,
+cantor_set_object_type,
+cantor_create_nodelist,
+cantor_set_olink,
+cantor_pointer_live,
+cantor_print_link_info,
+cantor_vhtml_link_info,
+cantor_vhtml_node_browse,
+cantor_vhtml_nodelist_browse,
+cantor_rulefile_from_clustered_link,
+cantor_lock_nodelist,
+cantor_lock_node,
+cantor_lock_object,
+cantor_lock_link,
+cantor_lock_objectlist,
+cantor_lock_routelist,
+cantor_link_intersection,
+cantor_phlink_intersection,
+cantor_link_union,
+cantor_phlink_union,
+cantor_link_difference,
+cantor_phlink_difference,
+cantor_object_intersection,
+cantor_phobject_intersection,
+cantor_object_union,
+cantor_phobject_union,
+cantor_object_difference,
+cantor_phobject_difference \- Purpose: Header for Cantor cellular database library.
+.SH "SYNOPSIS"
+.ft B
+#include <cantor.h>
+.sp
+void cantor_init_node_mutex(node_type *);
+.sp
+void cantor_init_object_mutex(object_type *);
+.sp
+void cantor_init_link_mutex(link_type *);
+.sp
+void cantor_init_nodelist_mutex(nodelist_type *);
+.sp
+int cantor_get_node_index_from_name
+.br
+(
+.br
+	nodelist_type *,
+.br
+	char *
+.br
+);
+.sp
+node_type *cantor_clear_node(node_type *);
+.sp
+node_type *cantor_phclear_node
+.br
+(
+.br
+	node_type *,
+.br
+	int
+.br
+);
+.sp
+nodelist_type *cantor_clear_nodelist(nodelist_type *);
+.sp
+nodelist_type *cantor_phclear_nodelist
+.br
+(
+.br
+	nodelist_type *,
+.br
+	int
+.br
+);
+.sp
+int cantor_add_node_to_nodelist
+.br
+(
+.br
+	nodelist_type *,
+.br
+	node_type *
+.br
+);
+.sp
+int cantor_phadd_node_to_nodelist
+.br
+(
+.br
+	nodelist_type *,
+.br
+	node_type *,
+.br
+	int,
+.br
+	char *
+.br
+);
+.sp
+int cantor_remove_node_from_nodelist
+.br
+(
+.br
+	nodelist_type *,
+.br
+	char *
+.br
+);
+.sp
+int cantor_phremove_node_from_nodelist
+.br
+(
+.br
+	nodelist_type *,
+.br
+	char *,
+.br
+	int
+.br
+);
+.sp
+int cantor_set_nodelist_name
+.br
+(
+.br
+	nodelist_type *nodelist,
+.br
+	char *nodelist_name
+.br
+);
+.sp
+int cantor_set_nodelist_type
+.br
+(
+.br
+	nodelist_type *,
+.br
+	char *
+.br
+);
+.sp
+int cantor_add_object_to_node
+.br
+(
+.br
+	node_type *,
+.br
+	object_type *
+.br
+);
+.sp
+int cantor_phadd_object_to_node
+.br
+(
+.br
+	node_type *,
+.br
+	object_type *,
+.br
+	int,
+.br
+	char *
+.br
+);
+.sp
+int remove_object_from_node
+.br
+(
+.br
+	node_type *,
+.br
+	char *
+.br
+);
+.sp
+int cantor_phremove_object_from_node
+.br
+(
+.br
+	node_type *,
+.br
+	char *,
+.br
+	int
+.br
+);
+.sp
+int cantor_node_name_unique
+.br
+(
+.br
+	nodelist_type *,
+.br
+	char *
+.br
+);
+.sp
+int cantor_object_tag_unique
+.br
+(
+.br
+	node_type *,
+.br
+	char *
+.br
+);
+.sp
+int cantor_get_object_index_from_tag
+.br
+(
+.br
+	node_type *,
+.br
+	char *
+.br
+);
+.sp
+int cantor_get_object_tag_from_index
+.br
+(
+.br
+	char *,
+.br
+	node_type *,
+.br
+	int
+.br
+);
+.sp
+int cantor_add_link_to_node
+.br
+(
+.br
+	node_type *,
+.br
+	link_type *
+.br
+);
+.sp
+int cantor_phadd_link_to_node
+.br
+(
+.br
+	node_type *,
+.br
+	link_type *,
+.br
+	int,
+.br
+	char *
+.br
+);
+.sp
+int cantor_remove_link_from_node
+.br
+(
+.br
+	node_type *,
+.br
+	char *
+.br
+);
+.sp
+int cantor_phremove_link_from_node
+.br
+(
+.br
+	node_type *,
+.br
+	char *,
+.br
+	int
+.br
+);
+.sp
+int cantor_link_tag_unique
+.br
+(
+.br
+	node_type *,
+.br
+	char *
+.br
+);
+.sp
+int cantor_get_link_index_from_tag
+.br
+(
+.br
+	node_type *,
+.br
+	char *
+.br
+);
+.sp
+int cantor_get_link_tag_from_index
+.br
+(
+.br
+	char *,
+.br
+	node_type *,
+.br
+	int
+.br
+);
+.sp
+int cantor_set_node_name
+.br
+(
+.br
+	node_type *,
+.br
+	char *
+.br
+);
+.sp
+int cantor_print_node_info
+.br
+(
+.br
+	FILE *,
+.br
+	node_type *
+.br
+);
+.sp
+int cantor_vhtml_node_info
+.br
+(
+.br
+	int,
+.br
+	char *,
+.br
+	char *,
+.br
+	node_type *
+.br
+);
+.sp
+link_type *cantor_clear_link(link_type *);
+.sp
+link_type *cantor_phclear_link
+.br
+(
+.br
+	link_type *,
+.br
+	int
+.br
+);
+.sp
+link_type **cantor_clear_linklist
+.br
+(
+.br
+	link_type **,
+.br
+	int
+.br
+);
+.sp
+link_type **cantor_phclear_linklist
+.br
+(
+.br
+	link_type **,
+.br
+	int,
+.br
+	int
+.br
+);
+.sp
+int cantor_add_node_to_link
+.br
+(
+.br
+	link_type *,
+.br
+	node_type *
+.br
+);
+.sp
+int cantor_phadd_node_to_link
+.br
+(
+.br
+	link_type *,
+.br
+	node_type *,
+.br
+	int,
+.br
+	char *
+.br
+);
+.sp
+int cantor_remove_node_from_link
+.br
+(
+.br
+	link_type *,
+.br
+	char *
+.br
+);
+.sp
+int cantor_copy_nodelist
+.br
+(
+.br
+	char *,
+.br
+	nodelist_type *,
+.br
+	nodelist_type *
+.br
+);
+.sp
+int cantor_phcopy_nodelist
+.br
+(
+.br
+	int,
+.br
+	char *,
+.br
+	nodelist_type *,
+.br
+	nodelist_type *
+.br
+);
+.sp
+int cantor_copy_node
+.br
+(
+.br
+	char *,
+.br
+	node_type *,
+.br
+	node_type *
+.br
+);
+.sp
+int cantor_phcopy_node
+.br
+(
+.br
+	int,
+.br
+	char *,
+.br
+	node_type *,
+.br
+	node_type *
+.br
+);
+.sp
+int cantor_copy_link
+.br
+(
+.br
+	char *,
+.br
+	link_type *,
+.br
+	link_type *
+.br
+);
+.sp
+int cantor_phcopy_link
+.br
+(
+.br
+	int,
+.br
+	char *,
+.br
+	link_type *,
+.br
+	link_type *
+.br
+);
+.sp
+int cantor_set_link_tag
+.br
+(
+.br
+	link_type *,
+.br
+	char *
+.br
+);
+.sp
+int cantor_set_link_type
+.br
+(
+.br
+	link_type *,
+.br
+	char *
+.br
+);
+.sp
+int cantor_set_link_flux
+.br
+(
+.br
+	link_type *,
+.br
+	double
+.br
+);
+.sp
+int cantor_set_link_length
+.br
+(
+.br
+	link_type *,
+.br
+	double
+.br
+);
+.sp
+int cantor_compare_nodes
+.br
+(
+.br
+	node_type *,
+.br
+	node_type *
+.br
+);
+.sp
+object_type *cantor_clear_object(object_type *);
+.sp
+object_type *cantor_phclear_object
+.br
+(
+.br
+	object_type *,
+.br
+	int
+.br
+);
+.sp
+object_type **cantor_clear_objectlist
+.br
+(
+.br
+	object_type **,
+.br
+	int
+.br
+);
+.sp
+object_type **cantor_phclear_objectlist
+.br
+(
+.br
+	object_type **,
+.br
+	int,
+.br
+	int
+.br
+);
+.sp
+object_type **cantor_allocate_objectlist
+.br
+(
+.br
+	int,
+.br
+	int *
+.br
+);
+.sp
+int cantor_set_object_name
+.br
+(
+.br
+	object_type *,
+.br
+	char *
+.br
+);
+.sp
+int cantor_set_object_type
+.br
+(
+.br
+	object_type *,
+.br
+	char *
+.br
+);
+.sp
+node_type *cantor_create_nodelist
+.br
+(
+.br
+	node_type *,
+.br
+	int,
+.br
+	int *
+.br
+);
+.sp
+int cantor_set_olink
+.br
+(
+.br
+	object_type *,
+.br
+	void *
+.br
+);
+.sp
+void *cantor_pointer_live
+.br
+(
+.br
+	void *,
+.br
+	int
+.br
+);
+.sp
+void cantor_print_link_info
+.br
+(
+.br
+	FILE *,
+.br
+	link_type *
+.br
+);
+.sp
+int cantor_vhtml_link_info
+.br
+(
+.br
+	char *,
+.br
+	char *,
+.br
+	link_type *
+.br
+);
+.sp
+int cantor_vhtml_node_browse
+.br
+(
+.br
+	int,
+.br
+	char *,
+.br
+	node_type *
+.br
+);
+.sp
+int cantor_vhtml_nodelist_browse
+.br
+(
+.br
+	int,
+.br
+	char *,
+.br
+	nodelist_type *
+.br
+);
+.sp
+int cantor_rulefile_from_clustered_link
+.br
+(
+.br
+	char *,
+.br
+	int,
+.br
+	link_type **
+.br
+);
+.sp
+nodelist_type *cantor_lock_nodelist
+.br
+(
+.br
+	int,
+.br
+	char *,
+.br
+	int,
+.br
+	int
+.br
+);
+.sp
+node_type *cantor_lock_node
+.br
+(
+.br
+	int,
+.br
+	char *,
+.br
+	int
+.br
+);
+.sp
+object_type *cantor_lock_object
+.br
+(
+.br
+	int,
+.br
+	char *,
+.br
+	int
+.br
+);
+.sp
+link_type *cantor_lock_link
+.br
+(
+.br
+	int,
+.br
+	char *,
+.br
+	int
+.br
+);
+.sp
+object_type **cantor_lock_objectlist
+.br
+(
+.br
+	int,
+.br
+	char *,
+.br
+	int
+.br
+);
+.sp
+node_type **cantor_lock_routelist
+.br
+(
+.br
+	int,
+.br
+	char *,
+.br
+	int
+.br
+);
+.sp
+int cantor_link_intersection
+.br
+(
+.br
+	char *,
+.br
+	link_type *,
+.br
+	link_type *,
+.br
+	link_type *
+.br
+);
+.sp
+int cantor_phlink_intersection
+.br
+(
+.br
+	int,
+.br
+	char *,
+.br
+	link_type *,
+.br
+	link_type *,
+.br
+	link_type *
+.br
+);
+.sp
+int cantor_link_union
+.br
+(
+.br
+	char *,
+.br
+	link_type *,
+.br
+	link_type *,
+.br
+	link_type *
+.br
+);
+.sp
+int cantor_phlink_union
+.br
+(
+.br
+	int,
+.br
+	char *,
+.br
+	link_type *,
+.br
+	link_type *,
+.br
+	link_type *
+.br
+);
+.sp
+int cantor_link_difference
+.br
+(
+.br
+	char *,
+.br
+	link_type *,
+.br
+	link_type *,
+.br
+	link_type *
+.br
+);
+.sp
+int cantor_phlink_difference
+.br
+(
+.br
+	int,
+.br
+	char *,
+.br
+	link_type *,
+.br
+	link_type *,
+.br
+	link_type *
+.br
+);
+.sp
+int cantor_object_intersection
+.br
+(
+.br
+	char *,
+.br
+	node_type *,
+.br
+	node_type *,
+.br
+	node_type *
+.br
+);
+.sp
+int cantor_phobject_intersection
+.br
+(
+.br
+	int,
+.br
+	char *,
+.br
+	node_type *,
+.br
+	node_type *,
+.br
+	node_type *
+.br
+);
+.sp
+int cantor_object_union
+.br
+(
+.br
+	char *,
+.br
+	node_type *,
+.br
+	node_type *,
+.br
+	node_type *
+.br
+);
+.sp
+int cantor_phobject_union
+.br
+(
+.br
+	int,
+.br
+	char *,
+.br
+	node_type *,
+.br
+	node_type *,
+.br
+	node_type *
+.br
+);
+.sp
+int cantor_object_difference
+.br
+(
+.br
+	char *,
+.br
+	node_type *,
+.br
+	node_type *,
+.br
+	node_type *
+.br
+);
+.sp
+int cantor_phobject_difference
+.br
+(
+.br
+	int,
+.br
+	char *,
+.br
+	node_type *,
+.br
+	node_type *,
+.br
+	node_type *
+.br
+);
+.ft R
+.SH "PARAMETERS"
+.TP
+.B "node_type *"
+Not Documented.
+.TP
+.B "object_type *"
+Not Documented.
+.TP
+.B "link_type *"
+Not Documented.
+.TP
+.B "nodelist_type *"
+Not Documented.
+.TP
+.B "char *"
+Not Documented.
+.TP
+.B "int"
+Not Documented.
+.TP
+.B "nodelist_type *nodelist"
+Not Documented.
+.TP
+.B "char *nodelist_name"
+Not Documented.
+.TP
+.B "FILE *"
+Not Documented.
+.TP
+.B "link_type **"
+Not Documented.
+.TP
+.B "double"
+Not Documented.
+.TP
+.B "object_type **"
+Not Documented.
+.TP
+.B "int *"
+Not Documented.
+.TP
+.B "void *"
+Not Documented.
+.SH "DESCRIPTION"
+.SS "cantor_init_node_mutex"
+Initialise node mutex (recursive) .
+.SS "cantor_init_object_mutex"
+Initialise object mutex (recursive).
+.SS "cantor_init_link_mutex"
+Initialise list mutex (recursive).
+.SS "cantor_init_nodelist_mutex"
+Initialise nodelist mutex (recursive).
+.SS "cantor_get_node_index_from_name"
+Get node index (given node ame).
+.SS "cantor_clear_node"
+Clear node.
+.SS "cantor_phclear_node"
+Clear node.
+.SS "cantor_clear_nodelist"
+Clear node list .
+.SS "cantor_phclear_nodelist"
+Clear node list.
+.SS "cantor_add_node_to_nodelist"
+Add node to nodelist.
+.SS "cantor_phadd_node_to_nodelist"
+Add node to nodelist.
+.SS "cantor_remove_node_from_nodelist"
+Remove node from nodelist.
+.SS "cantor_phremove_node_from_nodelist"
+Remove node from nodelist.
+.SS "cantor_set_nodelist_name"
+Set nodelist name.
+.SS "cantor_set_nodelist_type"
+Set nodelist type.
+.SS "cantor_add_object_to_node"
+Add object to node list.
+.SS "cantor_phadd_object_to_node"
+Add object to node list.
+.SS "remove_object_from_node"
+Remove object from node.
+.SS "cantor_phremove_object_from_node"
+Remove object from node.
+.SS "cantor_node_name_unique"
+Is node name unique?.
+.SS "cantor_object_tag_unique"
+Is object tag unique?.
+.SS "cantor_get_object_index_from_tag"
+Get index of object (in node object table) given object name .
+.SS "cantor_get_object_tag_from_index"
+Get object tag (given index in node object table).
+.SS "cantor_add_link_to_node"
+Add a link (inter-node link) to a node.
+.SS "cantor_phadd_link_to_node"
+Add a link (inter-node link) to a node.
+.SS "cantor_remove_link_from_node"
+Remove a link from a node (using linkweay tag to identify linkway to be removed).
+.SS "cantor_phremove_link_from_node"
+Remove a link from a node (using linkweay tag to identify link to be removed).
+.SS "cantor_link_tag_unique"
+Is link i.d. Tag unique.
+.SS "cantor_get_link_index_from_tag"
+Get index into node link table (using link tag to ientify link required).
+.SS "cantor_get_link_tag_from_index"
+Get link tag (given index into node link table).
+.SS "cantor_set_node_name"
+Set node name.
+.SS "cantor_print_node_info"
+Print (limited) information about a node.
+.SS "cantor_vhtml_node_info"
+Generate VHTML page describing node.
+.SS "cantor_clear_link"
+Clear a link (local process heap).
+.SS "cantor_phclear_link"
+Clear a link (persistent heap).
+.SS "cantor_clear_linklist"
+Clear a list of links.
+.SS "cantor_phclear_linklist"
+Clear a link (persistent heap).
+.SS "cantor_add_node_to_link"
+Add a node to an existing link.
+.SS "cantor_phadd_node_to_link"
+Add a node to an existing link.
+.SS "cantor_remove_node_from_link"
+Remove node (from existing link).
+.SS "cantor_copy_nodelist"
+Copy (process heap) nodelist.
+.SS "cantor_phcopy_nodelist"
+Copy (persistent heap) nodelist.
+.SS "cantor_copy_node"
+Copy (process heap) node.
+.SS "cantor_phcopy_node"
+Copy (persistent heap) node.
+.SS "cantor_copy_link"
+Copy (process heap) link.
+.SS "cantor_phcopy_link"
+Copy a (persistent heap) link.
+.SS "cantor_set_link_tag"
+Set link tag.
+.SS "cantor_set_link_type"
+Set link type.
+.SS "cantor_set_link_flux"
+Set link flux.
+.SS "cantor_set_link_length"
+Set link length.
+.SS "cantor_compare_nodes"
+Compare a pair of nodes.
+.SS "cantor_clear_object"
+Clear object (removing it node objectlist).
+.SS "cantor_phclear_object"
+Clear object (removing it node objectlist).
+.SS "cantor_clear_objectlist"
+Clear an object list (removing it from node).
+.SS "cantor_phclear_objectlist"
+Clear an object list (removing it from node).
+.SS "cantor_allocate_objectlist"
+Allocate an object list.
+.SS "cantor_set_object_name"
+Set object name.
+.SS "cantor_set_object_type"
+Set object type.
+.SS "cantor_create_nodelist"
+Create nodelist.
+.SS "cantor_set_olink"
+Set object link.
+.SS "cantor_pointer_live"
+Is pointer live?.
+.SS "cantor_print_link_info"
+Print nodes in link.
+.SS "cantor_vhtml_link_info"
+Generate VHTML page describing link.
+.SS "cantor_vhtml_node_browse"
+Generate VHTML (and browse it).
+.SS "cantor_vhtml_nodelist_browse"
+Generate VHTML (and browse it).
+.SS "cantor_rulefile_from_clustered_link"
+Generate (rgen) rule file from link data.
+.SS "cantor_lock_nodelist"
+Lock nodelist.
+.SS "cantor_lock_node"
+Lock node.
+.SS "cantor_lock_object"
+Lock object.
+.SS "cantor_lock_link"
+Lock link.
+.SS "cantor_lock_objectlist"
+Lock object list.
+.SS "cantor_lock_routelist"
+Lock routelist (link list).
+.SS "cantor_link_intersection"
+Intersection of (local process heap) link.
+.SS "cantor_phlink_intersection"
+Intersection of (persistent heap) link.
+.SS "cantor_link_union"
+Union of (local process heap) linkways.
+.SS "cantor_phlink_union"
+Union of (persistent heap) linkways.
+.SS "cantor_link_difference"
+Difference of (local process heap) linkways.
+.SS "cantor_phlink_difference"
+Difference of (persistent heap) linkways.
+.SS "cantor_object_intersection"
+Object intersection of (local process heap) nodes.
+.SS "cantor_phobject_intersection"
+Object intersection of (persistent heap) nodes.
+.SS "cantor_object_union"
+Object union of (local process heap) nodes.
+.SS "cantor_phobject_union"
+Object union of (persistent heap) nodes.
+.SS "cantor_object_difference"
+Object difference of (local process heap) nodes */.
+.SS "cantor_phobject_difference"
+Object difference of (persistent heap) nodes.

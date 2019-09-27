@@ -1,0 +1,41 @@
+.TH SDONGLE 1 "1st November 2003" "PUPSP3 build tools" "PUPSP3 build tools"
+
+.SH NAME
+sdongle \- create software dongle (on random inode). 
+
+.SH SYNOPSIS
+.B sdongle 
+[
+.B [-usage | -help]
+]
+.I dongle file name
+>& <log file>
+.br
+
+.SH DESCRIPTION
+.I sdongle(1)
+creates a software dongle file which is located on a random inode. This
+random inode is used by P3M software to authenticate soft dongle based
+software license. This type of licence is not impossible to break, but
+to do so would take a significant amount of time.
+.br
+
+.SH OPTIONS
+
+.B -usage | -help
+display help and copyright information for the
+.I sdongle(1)
+filter.
+.br
+
+.SH ENVIRONMENT VARIABLES
+None.
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br

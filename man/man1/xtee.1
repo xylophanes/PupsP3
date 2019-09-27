@@ -1,0 +1,208 @@
+.TH XTEE 1 "16th April 2015" "PUPSP3 commands" "PUPSP3 commands"
+.SH NAME
+xtee \ extended tee command
+.br
+
+.SH SYNOPSIS
+.B xtee
+[
+.B -pipe
+.I command pipeline
+] | [
+.B -tee_file <tee_file_name>
+][
+.B -nice
+.I cardinal
+][
+.B -argf
+.I argument_file
+][
+.B -help
+][
+.B -usage
+][
+.B -verbose
+][
+.B -growth_protection
+.I retries
+][
+.B -slots
+][
+.B -slotinfo
+][
+.B -compress
+][
+.B -pipe
+][
+.B - fifo
+][
+.B -append
+][
+.B -tee_file
+.I name
+]
+< stdin
+1> stdout
+2> <log file>
+.br
+
+.SH DESCRIPTION
+.I xtee
+is a filter which is based on the standard UNIX filter
+.I tee(1).
+.I xtee(1) takes data from
+.I stdin
+and writes it to
+.I stdout(1).
+In addition, the data is also written to the file or command pipeline specified by the
+.I xtee(1)
+command tail options.
+.br
+
+.SH OPTIONS
+ 
+.B -help
+invokes the on-line context help system. This
+"man" page is displayed. The process then exits.
+.br
+
+.B -growth_protection
+.I retrys
+causes the system to retry an
+.I sbrk(2)
+call up to
+.I retrys
+times. This option permits the program to wait until the core that it requires
+is available rather than simply exiting if
+.I sbrk(2)
+fails.
+.br
+
+.B -argf
+.I argument_file
+tells the filter to take its command line arguments from the specified
+.I argument_file.
+The data format of the argument file is:
+.br
+
+#  ... optional comment line ...
+.B -argflag           [1]
+.br
+.I argument_parameter [1,1]
+.br
+.I argument_parameter [1,2]
+.br
+
+.I argument_parameter [1,n]
+.br
+
+# ... optional comment line ...
+.br
+.B -argflag           [2]
+.br
+.I argument_parameter [1,1]
+.br
+.I argument_parameter [1,2]
+.br
+
+.I argument_parameter [1,n]
+.br
+ 
+.B -nice
+.I cardinal
+determimes the
+.I niceness
+at which the filter is scheduled. In keeping with all UNIX user processes, nice
+must be a cardinal between 0 and 20. The default niceness for
+.I xtee(1)
+is 4.
+.br
+
+.B -usage
+displays program shortform usage.
+.br
+
+.B -version
+displays program version number.
+.br
+
+.B -slots
+displays the
+.I pups(3)
+libraries used in application in short form.
+.br
+
+.B -verbose
+turns on error logging (to standard error).
+.br
+
+.B -slotinfo
+displays the
+.I pups(3)
+libraries used in application in long form giving version, source language,
+programmer and copyright.
+
+.B -pipe
+.I command pipeline
+specifies a command pipeline to which
+.I stdin
+is to be copied.
+.br
+
+.B -tee_file
+.I tee_file_name
+specifies the name of the tee file to which data is to be diverted.
+This option is only valid if
+.B -pipe
+has not been specified.
+.br
+
+.B -fifo
+specifies that the tee file
+.I te_file_name
+will be created as a System V FIFO [named pipe] rather than a regular file.
+This option is only valid if
+.B -pipe
+has not been specified.
+.br
+
+.B -compress
+uses the
+.I pipestream
+functions [see
+.I pups(3)
+] to compress the output to the tee file. If this option is selected, the
+tee file must be a regular file.
+This option is only valid if
+.B -pipe
+has not been specified.
+.br
+
+.B -append
+tells
+.I xtee(1)
+to append (rahter than overwrite)
+.I tee_file_name.
+This option is only valid if
+.I tee_file_name
+is a
+.B regular file
+(e.g. not a
+.B pipe stream
+or a
+.B FIFO
+.br
+
+.SH LIBRARIES
+.I xtee(1)
+makes use of PUPS libraries [Portable UNIX Programming System], see
+.I pups(3)
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd, Gosforth.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br

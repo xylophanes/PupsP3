@@ -1,0 +1,41 @@
+.TH CATFILES 1 "17 January 2003" "PUPSP3 commands" "PUPSP3 commands"
+
+.SH NAME
+CATFILES \- catenate a pair of files preserving inode of first file 
+.br
+
+.SH SYNOPSIS
+.B catfiles 
+.I appendor file
+.I appendee file
+>& <log file>
+.br
+
+.SH DESCRIPTION
+.I catfiles(1)
+catenates a pair of files preserving the inode of the first file. Thus
+if this file is in fact an exported symbolic link, then changes made to
+the file by
+.B any host
+importing it will be visible at the exporting node (and all other nodes
+which import the file). This tool is mostly used in scripts which manipulate
+dynamic configuration files, which are exported as symbolic links to /etc
+files on the exporting host.
+.br
+
+.SH OPTIONS
+
+None
+.br
+
+.SH ENVIRONMENT VARIABLES
+None.
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br

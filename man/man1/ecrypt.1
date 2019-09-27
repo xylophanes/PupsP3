@@ -1,0 +1,66 @@
+.TH ECRYPT 1 "16th April 2015" "PUPSP3 Commands" "PUPSP3 Commands"
+
+.SH NAME
+ECRYPT \- symmetric (8 rotor) enigma code encrytor 
+.br
+
+.SH SYNOPSIS
+.B encrypt 
+.B [-usage | -help]
+< <plaintext> 1> <cipher> 2> <log file>
+.br
+
+.SH DESCRIPTION
+.I ecrypt(1)
+is an application which simulates an 8 rotor
+.B enigma code
+machine and encrypts
+.I plain text
+read from standard input, producing a corresponding
+.I cipher
+on standard output.
+.I ecrypt(1)
+is
+.B symmetric
+so the command
+.br
+.B ecrypt < plaintext | ecrypt
+will write the contents of the file
+.I plaintext
+unchanged to standard ouput.
+.br
+
+
+.SH OPTIONS
+
+.B -usage | -help
+display help and copyright information for the
+.I ecrypt(1)
+filter.
+.br
+
+.B seed
+specifies a seed value which is used by
+.I srand(3)
+to seed the random number generator
+.I rand(3)
+used by
+.I ecrypt(1).
+.br
+
+.SH ENVIRONMENT VARIABLES
+None.
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br
+
+.SH SEE ALSO
+srand(3), rand(3)
+.br
+

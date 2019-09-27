@@ -1,0 +1,103 @@
+.TH DLLGEN 1 "22 February 2009" "PUPSP3 build tools" "PUPSP3 build tools"
+
+.SH NAME
+DLLGEN \- build PUPS DLL source files from skeleton DLL and DLL function files.
+.br
+
+.SH SYNOPSIS
+.B dllgen 
+[
+.B -usage
+|
+.B -help
+] |
+.I init | add
+.I DLL skeleton filename
+.I DLL function skeleton filename
+>& <log file>
+.br
+
+.SH DESCRIPTION
+.I dllgen(1)
+is used to build a PUPS
+.I DLL framework
+from a set of generic
+.I DLL  skeleton files.
+If no skeleton files are specified on the command line, the
+the files
+.I dll_skel.c
+and
+.I dll_skelfunc.c
+(assumed to be in the current directory) are used.
+.br
+This command is interactive. The user is prompted to type in the information which is required
+to generate the DLL files (DLL name, author, author institution, date, purpose
+of DLL, author email) from the skeleton files. The stream editor
+.I sed(1)
+is then called by this application to transform the generic skeleton DLL source wrappers
+into application specific ones. These are written to the specified (source) DLL. With care
+this command inter-operates (in
+.I add
+mode) with the other PUPS source framework generators,
+.I libgen(1)
+and
+.I appgen(1).
+.br
+The default path to the directory containing the skeleton application files, the
+.B P3 Project Directory
+is a compile time option. If
+.I pups(7)
+is installed as
+.B root
+it defaults to
+.B /p3
+otherwise it defaults to
+.B ~/p3
+.br
+
+
+.SH OPTIONS
+.B -usage
+display help and copyright information and usage for the
+.I dllgen(1)
+filter.
+.B init
+tells
+.I dllgen(1)
+to initialise a DLL framework using the
+.I DLL skeleton filename
+specified on the command line or
+.I dll_skel.c
+if none is specified.
+.br
+.B add
+tells
+.I dllgen(1)
+to append
+.I DLL function skeleton filename
+to the dllrary framework or
+.I DLL function skeleton filename
+if none is specified.
+.br
+
+.SH ENVIRONMENT VARIABLES
+.B  PUPS_SKELDLL
+.I file
+specifies the name of PUPS skeleton dllgen (init)
+.I file.
+.br
+.B PUPS_SKELDLLFUNC
+specifies the name of PUPS skeleton dllgen (function)
+.I file.
+.br
+
+.SH SEE ALSO
+appgen(1), libgen(1), sed(1)
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br

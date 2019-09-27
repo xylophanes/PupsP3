@@ -1,0 +1,37 @@
+.TH MKTTY 1 "12 January 2000" "PUPP3 build tools" "PUPSP3 build tools"
+
+.SH NAME
+MKTTY \- PUPS homeostat for /dev/tty.
+.br
+
+.SH SYNOPSIS
+.B mktty
+>& <log file>
+.br
+
+.SH DESCRIPTION
+.I mktty(1)
+is a (suid root) filter which allows the PUPS system to make repairs
+to /dev/tty. Typically, this need to be done after another suid root
+program has unlinked a symlink which points to /dev/tty. This would
+not be needed if POSIX included a unsymlink() call which removes
+a symbolic link (as opposed to the object it is pointing at).
+.br
+
+
+.SH OPTIONS
+
+None.
+.br
+
+.SH ENVIRONMENT VARIABLES
+None.
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br

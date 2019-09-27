@@ -1,0 +1,175 @@
+.TH MAGGOT 1 "16th April 2015" "PUPSP3 commands" "PUPSP3 commands"
+.SH NAME
+.br
+
+maggot \ PSRP stale resource removal process
+.SH SYNOPSIS
+.B maggot 
+[
+.B -nice
+.I cardinal
+][
+.B -argf
+.I argument_file
+][
+.B -growth_protection
+][
+.B -help
+][
+.B -usage
+][
+.B -version
+][
+.B -slots
+][
+.B -slotinfo
+][
+.B -delay_period
+.I minutes
+][
+.B -search
+.I list of directories to be seached
+]
+]
+>& <log file>
+.br
+
+.SH DESCRIPTION
+.I maggot(1)
+is a garbage collection process which periodically scans the PSRP
+.B patchboard
+and
+.B /tmp
+directories for stale PSRP resources (that is FIFO standard I/O bindpost links whose
+associated processes have died). When such stale resources are found they are deleted.
+.I maggot(1)
+can be setup to re-scan the
+.B patchboard
+and
+.B /tmp
+directories after a user specified number of minutes have elapsed. In addition the user can add
+other directories to the list to be scanned either via the command table at startup, or by
+intercting with
+.I maggot(1)
+using the
+.I psrp(1)
+client.
+.br
+
+
+.SH OPTIONS
+ 
+.B -help
+invokes the on-line context help system. This
+"man" page is displayed. The process then exits.
+.br
+
+.B -growth_protection
+.I <retrys>
+causes the system to retry an
+.I sbrk(3)
+call up to
+.I retrys
+times. This option permits the program to wait until the core that it requires
+is available rather than simply exiting if
+.I sbrk(3)
+fails.
+.br
+
+.B -usage
+displays shortform usage string.
+.br
+
+.B -version
+displays program version number.
+.br
+
+.B -slots
+displays short form
+.I pups(3)
+library dependencies.
+.br
+
+.B -slotinfo
+displays long form
+.I pups(3)
+library dependencies.
+.br
+
+.B -argf
+.I argument_file
+tells the filter to take its command line arguments from the specified
+.I argument_file.
+The data format of the argument file is:
+.br
+
+#  ... optional comment line ...
+.br
+.B -argflag           [1]
+.br
+.I argument_parameter [1,1]
+.br
+.I argument_parameter [1,2]
+.br
+
+.I argument_parameter [1,n]
+.br
+
+# ... optional comment line ...
+.br
+.B -argflag           [2]
+.br
+.I argument_parameter [1,1]
+.br
+.I argument_parameter [1,2]
+.br
+
+.I argument_parameter [1,n]
+.br
+ 
+.B -nice
+.I cardinal
+determimes the
+.I niceness
+at which the filter is scheduled. In keeping with all UNIX user processes, nice
+must be a cardinal between 0 and 20. The default niceness for
+.I maggot(1)
+is 4.
+.br
+
+.B -delay_period
+specifies the delay period (in minutes) between file system scans.
+The delay period defaults to 60 minutes.
+.br
+
+.B -search
+is used to specify a list of directories that will be searched in addition to
+the
+.B patchboard
+and
+.B /tmp
+directories.
+.br
+
+.SH PSRP INTERACTIVITY
+Supports interactive querying while running using Process Status Request Protocol [PSRP], see
+.I psrp(1).
+.br         
+
+.SH LIBRARIES
+.I maggot(1)
+uses the PUPS libraries, see
+.I pups(3)
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br
+
+.SH SEE ALSO
+psrp(1), pups(3), pthreads(3)
+

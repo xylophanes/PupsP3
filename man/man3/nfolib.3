@@ -1,0 +1,350 @@
+.\" WARNING! THIS FILE WAS GENERATED AUTOMATICALLY BY c2man!
+.\" DO NOT EDIT! CHANGES MADE TO THIS FILE WILL BE LOST!
+.TH "nfo" 3 "24 January 2018" "c2man nfo.h"
+.SH "NAME"
+least_squares,
+spline,
+moment,
+mnbrak,
+Powell,
+anneal,
+lsq_fgen,
+lint,
+splint,
+trapspl,
+Simpson_spl,
+Milne_diff,
+Brent,
+golden \- Header file for numerical operations libraries,
+.SH "SYNOPSIS"
+.ft B
+#include <nfo.h>
+.sp
+void least_squares
+.br
+(
+.br
+	int,
+.br
+	int,
+.br
+	double [],
+.br
+	double [],
+.br
+	double *,
+.br
+	double *,
+.br
+	double []
+.br
+);
+.sp
+void spline
+.br
+(
+.br
+	double [],
+.br
+	double [],
+.br
+	int,
+.br
+	double,
+.br
+	double,
+.br
+	double []
+.br
+);
+.sp
+void moment
+.br
+(
+.br
+	double [],
+.br
+	int,
+.br
+	double *,
+.br
+	double *,
+.br
+	double *,
+.br
+	double *,
+.br
+	double *,
+.br
+	double *,
+.br
+	double *
+.br
+);
+.sp
+void mnbrak
+.br
+(
+.br
+	double *,
+.br
+	double *,
+.br
+	double *,
+.br
+	double *,
+.br
+	double *,
+.br
+	double *,
+.br
+	double (*)(void)
+.br
+);
+.sp
+void Powell
+.br
+(
+.br
+	double [],
+.br
+	double [][32],
+.br
+	int,
+.br
+	int,
+.br
+	double,
+.br
+	int *,
+.br
+	double *,
+.br
+	double (*)(void),
+.br
+	double (*)(void),
+.br
+	double (*)(void)
+.br
+);
+.sp
+void anneal
+.br
+(
+.br
+	double [],
+.br
+	double,
+.br
+	int,
+.br
+	double,
+.br
+	int *,
+.br
+	double *,
+.br
+	double (*)(void),
+.br
+	double (*)(void),
+.br
+	double (*)(void)
+.br
+);
+.sp
+double lsq_fgen
+.br
+(
+.br
+	double,
+.br
+	int,
+.br
+	double []
+.br
+);
+.sp
+double lint
+.br
+(
+.br
+	double [],
+.br
+	double [],
+.br
+	int,
+.br
+	double
+.br
+);
+.sp
+double splint
+.br
+(
+.br
+	double [],
+.br
+	double [],
+.br
+	double [],
+.br
+	int,
+.br
+	double
+.br
+);
+.sp
+double trapspl
+.br
+(
+.br
+	double,
+.br
+	double,
+.br
+	double,
+.br
+	double [],
+.br
+	double [],
+.br
+	double [],
+.br
+	int
+.br
+);
+.sp
+double Simpson_spl
+.br
+(
+.br
+	double,
+.br
+	double,
+.br
+	double,
+.br
+	double [],
+.br
+	double [],
+.br
+	double [],
+.br
+	int
+.br
+);
+.sp
+double Milne_diff
+.br
+(
+.br
+	int,
+.br
+	double,
+.br
+	double []
+.br
+);
+.sp
+double Brent
+.br
+(
+.br
+	double,
+.br
+	double,
+.br
+	double,
+.br
+	double (*)(void),
+.br
+	double,
+.br
+	double *
+.br
+);
+.sp
+double golden
+.br
+(
+.br
+	double,
+.br
+	double,
+.br
+	double,
+.br
+	double (*)(void),
+.br
+	double,
+.br
+	double *
+.br
+);
+.ft R
+.SH "PARAMETERS"
+.TP
+.B "int"
+Not Documented.
+.TP
+.B "int"
+Not Documented.
+.TP
+.B "double []"
+Not Documented.
+.TP
+.B "double []"
+Not Documented.
+.TP
+.B "double *"
+Not Documented.
+.TP
+.B "double *"
+Not Documented.
+.TP
+.B "double []"
+Not Documented.
+.TP
+.B "double"
+Not Documented.
+.TP
+.B "double"
+Not Documented.
+.TP
+.B "double (*)(void)"
+Not Documented.
+.TP
+.B "double [][32]"
+Not Documented.
+.TP
+.B "int *"
+Not Documented.
+.SH "DESCRIPTION"
+.SS "least_squares"
+Least squares fitting.
+.SS "spline"
+Cubic spline initialisation.
+.SS "moment"
+Standard statistical moments of a distribution.
+.SS "mnbrak"
+Parabolic bracketer for minimia.
+.SS "Powell"
+Multidimensional minimisation.
+.SS "anneal"
+Multidimensional annealer.
+.SS "lsq_fgen"
+Fit function using least squares parameters.
+.SS "lint"
+Linear interpolator.
+.SS "splint"
+Spline interpolator.
+.SS "trapspl"
+Trapezoidal integration.
+.SS "Simpson_spl"
+Integration using Simpsons' rule .
+.SS "Milne_diff"
+Differentiation using Milnes method.
+.SS "Brent"
+Linear minimisation using Brents' method.
+.SS "golden"
+1 dimensional minimisation by Golden Search.

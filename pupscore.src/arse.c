@@ -1,0 +1,452 @@
+/*-----------------------------------------------------------------------------------------------------
+     Purpose: creates an anus (arse hole) to which data from payload pipeline is cat'ed
+
+     Author:  M.A. O'Neill
+              Tumbling Dice Ltd
+              Gosforth
+              Newcastle upon Tyne
+              NE3 4RT
+              United Kingdom
+
+     Version: 2.00 
+     Dated:   30th August 2019 
+     e-mail:  mao@tumblingdice.co.uk
+-----------------------------------------------------------------------------------------------------*/
+
+#include <stdio.h>
+#include <string.h>
+#include <signal.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <xtypes.h>
+
+
+
+
+/*------------------------------------------------------------------------------------------------------
+    Defines which are local to this application ...
+------------------------------------------------------------------------------------------------------*/
+/*-----------------*/
+/* Version of arse */
+/*-----------------*/
+
+#define ARSE_VERSION   "2.00"
+
+
+/*-------------*/
+/* String size */
+/*-------------*/
+
+#define SSIZE          2048 
+
+
+#ifndef FALSE 
+#define FALSE 0 
+#endif /* FALSE */
+
+#ifndef TRUE
+#define TRUE 255
+#endif /* TRUE */
+
+
+
+
+/*------------------------------------------------------------------------------------------------------
+    Variables which are private to this application ...
+------------------------------------------------------------------------------------------------------*/
+
+_PRIVATE char hostname[SSIZE]       = "";
+_PRIVATE char pen[SSIZE]            = "";
+_PRIVATE char arse_fifo_name[SSIZE] = "";
+_PRIVATE int  delete_on_exit        = FALSE;
+_PRIVATE int  verbose               = FALSE;
+_PRIVATE int  outdes                = (-1);
+
+
+
+
+#ifdef BSD_FUNCTION_SUPPORT
+/*-----------------------------------------------------------------------------
+    Strlcpy and stlcat function based on OpenBSD functions ...
+-----------------------------------------------------------------------------*/
+/*------------------*/
+/* Open BSD Strlcat */
+/*------------------*/
+_PRIVATE ssize_t strlcat(char *dst, const char *src, size_t dsize)
+{
+	const char *odst = dst;
+	const char *osrc = src;
+	size_t      n    = dsize;
+	size_t      dlen;
+
+
+        /*------------------------------------------------------------------*/
+	/* Find the end of dst and adjust bytes left but don't go past end. */
+        /*------------------------------------------------------------------*/
+
+	while (n-- != 0 && *dst != '\0')
+		dst++;
+	dlen = dst - odst;
+	n = dsize - dlen;
+
+	if (n-- == 0)
+		return(dlen + strlen(src));
+	while (*src != '\0') {
+		if (n != 0) {
+			*dst++ = *src;
+			n--;
+		}
+		src++;
+	}
+	*dst = '\0';
+
+
+        /*----------------------------*/
+        /* count does not include NUL */
+        /*----------------------------*/
+
+	return(dlen + (src - osrc));
+}
+
+
+
+
+/*------------------*/
+/* Open BSD strlcpy */
+/*------------------*/
+
+_PRIVATE size_t strlcpy(char *dst, const char *src, size_t dsize)
+{
+	const char   *osrc = src;
+	size_t nleft       = dsize;
+
+
+        /*---------------------------------*/
+	/* Copy as many bytes as will fit. */
+        /*---------------------------------*/
+
+	if (nleft != 0) {
+		while (--nleft != 0) {
+			if ((*dst++ = *src++) == '\0')
+				break;
+		}
+	}
+
+
+        /*-----------------------------------------------------------*/
+	/* Not enough room in dst, add NUL and traverse rest of src. */
+        /*-----------------------------------------------------------*/
+
+	if (nleft == 0) {
+		if (dsize != 0)
+
+                        /*-------------------*/
+                        /* NUL-terminate dst */
+                        /*-------------------*/
+
+			*dst = '\0';
+		while (*src++)
+			;
+	}
+
+
+        /*----------------------------*/
+        /* count does not include NUL */
+        /*----------------------------*/
+
+	return(src - osrc - 1);
+}
+#endif /* BSD_FUNCTION_SUPPORT */
+
+
+
+
+/*---------------------------*/
+/* Handle SIGTERM and SIGINT */
+/*---------------------------*/
+
+_PRIVATE int arse_exit(int signum)
+
+{   if(delete_on_exit == TRUE)
+    {  (void)unlink(arse_fifo_name);
+
+       if(verbose == TRUE)
+       {  (void)fprintf(stderr,"%s (%d@%s): exit (arse hole \"%s\" deleted)\n\n",pen,getpid(),hostname,arse_fifo_name);
+          (void)fflush(stderr);
+       }
+
+       exit(0);
+    }
+
+    if(verbose == TRUE)
+    {  (void)fprintf(stderr,"%s (%d@%s): exit\n\n",pen,getpid(),hostname);
+       (void)fflush(stderr);
+    }
+
+    exit(0);
+}
+
+
+
+
+/*----------------*/
+/* FIFO homeostat */
+/*----------------*/
+
+_PRIVATE int arse_fifo_homeostat(int signum)
+
+{   int           bytes_read = (-1);
+    unsigned char buf[SSIZE] = "";
+
+    if(access(arse_fifo_name,F_OK | R_OK) == (-1))
+    {  
+
+       /*---------------------------------------------------------*/
+       /* Suck contents of (stale) FIFO which has become nameless */
+       /*---------------------------------------------------------*/
+
+       (void)fcntl(outdes,F_SETFL,O_NONBLOCK);
+       bytes_read = read(outdes,buf,SSIZE);
+
+       if(bytes_read > 0)
+       {  if(verbose == TRUE)
+          {  (void)fprintf(stderr,"arse [%s] version %s (%d@%s) flushing stale arse hole [\"%s\"]\n\n",
+                                                     pen,ARSE_VERSION,getpid(),hostname,arse_fifo_name);
+             (void)fflush(stderr);
+          }
+
+          (void)write(1,buf,bytes_read);
+       }
+
+       (void)close(outdes);
+
+       if(mknod(arse_fifo_name,0600 | S_IFIFO,0) == (-1))
+       {  if(verbose == TRUE)
+          {  (void)fprintf(stderr,"arse [%s] version %s (%d@%s) failed to creat arse hole \"%s\"]\n\n",
+                                                     pen,ARSE_VERSION,getpid(),hostname,arse_fifo_name);
+             (void)fflush(stderr);
+          }
+
+          exit(-1);
+       }
+       outdes = open(arse_fifo_name,2);
+
+       if(verbose == TRUE)
+       {  (void)fprintf(stderr,"%s (%d@%s): arse hole \"%s\" lost - restoring\n",pen,getpid(),hostname,arse_fifo_name);
+          (void)fflush(stderr);
+       }
+    }
+
+
+    /*----------------------*/
+    /* Reset signal handler */
+    /*----------------------*/
+
+    (void)signal(SIGALRM,(void *)&arse_fifo_homeostat);
+    (void)alarm(1);
+
+    return(0);
+}
+
+
+
+
+/*------------------------------------------------------------------------------------------------------
+    Main entry point for application ...
+------------------------------------------------------------------------------------------------------*/
+
+_PUBLIC int main(int argc, char *argv[])
+
+{   int  i,
+         bytes_read,
+         decoded       = 0,
+         do_sidebottom = FALSE,
+         end_of_data   = TRUE;
+
+    char          newstr[SSIZE] = "";
+    unsigned char buf[SSIZE]    = "";
+
+
+    /*----------------------------*/
+    /* Get process execution name */
+    /*----------------------------*/
+
+    (void)strncpy(pen,argv[0],SSIZE);
+
+
+    /*----------------------*/
+    /* Exit signal handlers */
+    /*----------------------*/
+
+    (void)signal(SIGTERM,(void *)&arse_exit);
+    (void)signal(SIGINT, (void *)&arse_exit);
+    (void)signal(SIGALRM,(void *)&arse_fifo_homeostat);
+    (void)alarm(1);
+
+
+    /*--------------*/
+    /* Get hostname */
+    /*--------------*/
+
+    (void)gethostname(hostname,SSIZE);
+
+
+    /*-------------------------------*/
+    /* Decode command tail arguments */
+    /*-------------------------------*/
+
+    if(isatty(1) == 1)
+    {  if(argc == 1 || strcmp(argv[1],"-usage") == 0 || strcmp(argv[1],"-help") == 0)
+       {  (void)fprintf(stderr,"\narse version %s, (C) Tumbling Dice 2005-2019 (built %s %s)\n\n",ARSE_VERSION,__TIME__,__DATE__);
+          (void)fprintf(stderr,"ARSE is free software, covered by the GNU General Public License, and you are\n");
+          (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
+          (void)fprintf(stderr,"See the GPL and LGPL licences at www.gnu.org for further details\n");
+          (void)fprintf(stderr,"ARSE comes with ABSOLUTELY NO WARRANTY\n\n");
+          (void)fprintf(stderr,"\nUsage: arse [-usage | -help] | [-pen <execution name>] [-sidebottom:FALSE] !-hole <arse hole FIFO name>!\n\n");
+          (void)fflush(stderr);
+
+          exit(-1);
+       }
+    }
+
+    for(i=1; i<argc; ++i)
+    {  if(strcmp(argv[i],"-verbose") == 0)
+          verbose = TRUE;
+       else if(strcmp(argv[i],"-pen") == 0)
+       {  if(fork() == 0)
+          {  int  j,
+                  cnt = 1;
+
+             char args[32][SSIZE] = { "" },
+                  *argptr[32]     = { NULL };
+
+             if(i == argc - 1 || argv[i+1][0] == '-')
+             {  if(verbose == TRUE)
+                {  (void)fprintf(stderr,"%s (%d@%s): expecting process execution name\n\n",pen,getpid(),hostname);
+                   (void)fflush(stderr);
+                }
+
+                exit(-1);
+             }
+
+             (void)strlcpy(args[0],argv[i+1],SSIZE);
+             for(j=1; j<argc; ++j)
+             {  if(j != i && j != i+1)
+                {  (void)strlcpy(args[cnt],argv[j],SSIZE);
+                   argptr[cnt] = (char *)&args[cnt];
+                   ++cnt;
+                }
+             }
+
+             (void)strlcpy(args[0],argv[i+1],SSIZE);
+
+             (void)strlcpy(args[cnt],"\0",SSIZE);
+             argptr[0] = (char *)&args[0];
+
+              if(verbose == TRUE)
+              {  (void)fprintf(stderr,"%s (%d@%s): executing as \"%s\"\n\n",pen,getpid(),hostname,argptr[0]);
+                 (void)fflush(stderr);
+              }
+
+              (void)execvp("arse",argptr);
+
+              if(verbose == TRUE)
+              {  (void)fprintf(stderr,"%s (%d@%s): failed to exec (arse) child process\n\n",pen,getpid(),hostname);
+                 (void)fflush(stderr);
+              }
+
+              exit(-1);
+          }
+          else
+             _exit(-1);
+       }
+       else if(strcmp(argv[i],"-hole") == 0)
+       {  if(i == argc -1 || argv[i+1][0] == '-')
+          {  if(verbose == TRUE)
+             {  (void)fprintf(stderr,"%s (%d@%s): no arse hole FIFO specified\n\n",pen,getpid(),hostname);
+                (void)fflush(stderr);
+             }
+
+             exit(-1);
+          }
+
+          (void)strlcpy(arse_fifo_name,argv[i+1],SSIZE);
+          ++i;
+          decoded += 2;
+       }
+       else  if(strcmp(argv[i],"-sidebottom") == 0)
+       {  do_sidebottom = TRUE;
+          ++decoded;
+      }
+    }
+
+    if(decoded < argc - 2)
+    {   if(verbose == TRUE)
+        {  (void)fprintf(stderr,"%s (%d@%s): unparsed command tail arguments\n\n",pen,getpid(),hostname);
+           (void)fflush(stderr);
+        }
+
+        exit(-1);
+    }
+
+    if(strcmp(arse_fifo_name,"") == 0)
+       (void)snprintf(arse_fifo_name,SSIZE,"arse.%d.%s.fifo",getpid(),hostname);
+
+    if(access(arse_fifo_name,F_OK) == (-1))
+    {  delete_on_exit = TRUE;
+
+       if(mknod(arse_fifo_name,0600 | S_IFIFO,0) == (-1))
+       {  if(verbose == TRUE)
+          {  (void)fprintf(stderr,"arse [%s] version %s (%d@%s) failed to creat arse hole \"%s\"]\n\n",
+                                                     pen,ARSE_VERSION,getpid(),hostname,arse_fifo_name);
+             (void)fflush(stderr);
+          }
+
+          exit(-1);
+       }
+       else
+          (void)strlcpy(newstr,"new",SSIZE);
+    }
+
+    if(verbose == TRUE)
+    {  (void)fprintf(stderr,"\narse [%s] version %s (%d@%s) started using %s arse hole \"%s\"\n\n",
+                                          pen,ARSE_VERSION,getpid(),hostname,newstr,arse_fifo_name);
+       (void)fflush(stderr);
+    }
+
+    outdes = open(arse_fifo_name,2);
+    do {   bytes_read = read(0,buf,512);
+
+           if(bytes_read > 0)
+           {  if(end_of_data == TRUE)
+              {  if(verbose == TRUE)
+                 {  (void)fprintf(stderr,"arse [%s] version %s (%d@%s) new data stream established [to arse hole \"%s\"]\n\n",
+                                                                            pen,ARSE_VERSION,getpid(),hostname,arse_fifo_name);
+                    (void)fflush(stderr);
+                 }
+
+                 end_of_data = FALSE;
+              }
+
+              (void)write(outdes,buf,bytes_read);
+
+
+              /*---------------------------------------------------*/
+              /* If we are a sidebottom we must also write data to */
+              /* standard output as well                           */
+              /*---------------------------------------------------*/
+
+              if(do_sidebottom == TRUE)
+                 (void)write(1,buf,bytes_read); 
+
+              if(bytes_read != 512)
+                 end_of_data = TRUE;
+           }
+
+       } while(1);
+
+    exit(0);
+}

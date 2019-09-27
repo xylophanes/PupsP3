@@ -1,0 +1,25 @@
+We generate our key-pair, a public-key and a private-key. The public-key will be placed on the server, and you will log in with your private-key. When asked, type your passphrase (it'll be needed for future logins, so remember it!):
+
+ssh-keygen -t rsa -C "A comment... usually an email is enough here..."
+
+Then we copy the public key (which we've generated just before) to our (remote) server. The remoteuser should not be root! Choose the default non-root user as remoteuser. (Note the colon at the end of the line! It's important.)
+
+scp -p id_rsa.pub remoteuser@remotehost:/.ssh  [the key]
+scp -p id_rsa remoteuser@remotehost:/.ssh      [lock which matches the key]
+
+Then we log in with SSH, and we copy the public key to its right place:
+
+ssh remoteuser@remotehost
+cd .ssh
+cat id_rsa.pub > ~/.ssh/authorized_keys
+chmod 600 ~/.ssh/authorized_keys
+mv id_rsa.pub ~/.ssh
+logout
+
+ssh remoteuser@remotehost
+
+And if the keypair has worked we don't need a password.
+
+If we have id_rsa on the remote server, we can ssh back in the other direction (e.g. to client) without
+password authentication too.
+

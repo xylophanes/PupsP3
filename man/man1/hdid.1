@@ -1,0 +1,59 @@
+.TH HDID 1 "22 February 2005" "PUPSP3 build tools" "PUPSP3 build tools"
+
+.SH NAME
+HDID \- get serial number of hard disk device 
+.br
+
+.SH SYNOPSIS
+.B hdid 
+[
+.B -usage | -help
+][
+.B [-ecrypt]
+][
+.I hard disk device | default
+] 
+>& <log file>
+.br
+
+.SH DESCRIPTION
+.I hdid(1)
+uses the appropriate
+.I ioctl(2)
+to find the serial number of the specified hard disk device. Optionally this
+serial number may be (enigma) encrypted. This utility is intended to be used
+as a component of the P3M software security subsystem. The hard disk device
+defaults to
+.I /dev/hda1
+.br
+
+.SH OPTIONS
+
+.B -usage | -help
+display help and copyright information for the
+.I hdid(1)
+filter.
+.br
+
+.B -ecrypt 
+tells
+.I hdid(1)
+to (enigma) encrypt disk serial number.
+.br
+
+.SH ENVIRONMENT VARIABLES
+None.
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br
+
+.SH SEE ALSO
+ioctl(2), ioctl_list(2)
+.br
+

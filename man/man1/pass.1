@@ -1,0 +1,312 @@
+.TH PASS 1 "16th April 2015" "PUPSP3 commands" "PUPSP3 commands"
+.SH NAME
+.br
+
+pass \ the PUPS application carrier 
+.SH SYNOPSIS
+.B pass 
+[
+.B -nice
+.I cardinal
+][
+.B -argf
+.I argument_file
+][
+.B -growth_protection
+][
+.B -help
+][
+.B -usage
+][
+.B -version
+][
+.B -slots
+][
+.B -slotinfo
+][
+.B -payload
+.I payload pipeline
+][
+.B -stdio
+][
+.B -fifos
+][
+.B -sdir
+.I sensitive directory
+][
+.B -multithreaded
+][
+.B -tag
+.I tag name
+[][
+.B -lyosome
+.I lyosome lifetime
+]
+[< <stdin>]
+[> <stdout>]
+>& <log file>
+.br
+
+.SH DESCRIPTION
+.I pass 
+is an application carrier which enables non
+.B PUPS
+applications to enjoy the benefits of the
+.B PUPS
+environment.
+.I pass(1)
+provides homeostatic protection for its
+.I payload pipeline
+of applications (if nessessary), and acts as an I/O manager which is capable of reading/writing data from
+.I regular files
+.I FIFOS
+and
+.B PUPS/PSRP
+.I sensitive directories
+.B SID
+'s.
+.I pass(1)
+automatically protects the file system objects it is performing I/O on. In addition if run as a
+.I shy
+process, it also attempts to protect its
+.I payload pipeline
+in addition to its owm thread of execution. 
+.br 
+
+ 
+.SH OPTIONS
+ 
+.B -help
+invokes the on-line context help system for the file system watcher. This
+"man" page is displayed. The process then exits.
+.br
+
+.B -usage
+displays shortform usage string.
+.br
+
+.B -growth_protection
+.I <retrys>
+causes the system to retry an
+.I sbrk(3)
+call up to
+.I retrys
+times. This option permits the program to wait until the core that it requires
+is available rather than simply exiting if
+.I sbrk(3)
+fails.
+.br
+
+.B -version
+displays program version number.
+.br
+
+.B -slots
+displays short form
+.I pups(3)
+library dependencies.
+.br
+
+.B -slotinfo
+displays long form
+.I pups(3)
+library dependencies.
+.br
+
+.B -argf
+.I argument_file
+tells the filter to take its command line arguments from the specified
+.I argument_file.
+The data format of the argument file is:
+.br
+
+#  ... optional comment line ...
+.br
+.B -argflag           [1]
+.br
+.I argument_parameter [1,1]
+.br
+.I argument_parameter [1,2]
+.br
+
+.I argument_parameter [1,n]
+.br
+
+# ... optional comment line ...
+.br
+.B -argflag           [2]
+.br
+.I argument_parameter [1,1]
+.br
+.I argument_parameter [1,2]
+.br
+
+.I argument_parameter [1,n]
+.br
+ 
+.B -nice
+.I cardinal
+determimes the
+.I niceness
+at which the filter is scheduled. In keeping with all UNIX user processes, nice
+must be a cardinal between 0 and 20. The default niceness for
+.I fsw(1)
+is 4.
+.br
+
+.B -usage
+displays program shortform usage.
+.br
+
+.B -version
+displays program version number.
+.br
+
+.B -fifos
+tells
+.I pass(1)
+that any file system objects it may create for output of data are
+.I FIFO
+buffers as opposed to regular files.
+.br
+
+.B -stdio
+tells
+.I pass(1)
+to semnd output data to
+.I stdout
+and error/status log information to
+.I stderr
+.br
+
+.B -sdir
+.I sensitive directory
+tells
+.I pass(1)
+to read data from files (or FIFO's) which appear in the sensitive directory. When files
+which have the correct
+.I tag
+for this particular invocation of
+.I pass(1)
+appear in the sensitive directory, data is extracted from them, and passed to the
+.I payload pipeline.
+When a datasource is exhausted, the corresponding file system object is removed from
+the sensitive directory. Note output file system objects have names of the form
+<input name>.<pass PID>.out and <input name>.<pass PID>.err (for ouptut data and
+error/status log streams respectively). In order to prevent the sensitive directory
+becoming filled with files a
+.I lyosome(1)
+processs is associated with all output files. The
+.I lyosome(1)
+process destroys the file system object associated with it after a user determined
+period of time.
+.br
+
+.B -lyosome
+.I lifetime
+tells
+.I pass(1)
+how long
+.I lyosome(1)
+processes should guard O/P files before destroying them. This option is only valid if
+.B -sdir
+is also specified.
+.br
+
+.B -tag
+.I tag string
+specifies an identification tag which is associated with a particular invocation of
+.I pass(1).
+Files which appear in the sensitive directory which are not tagged, or which are improperly
+tagged, are removed. This option is only valid if
+.B -sdir
+is also specified.
+.br
+
+.B -payload
+.I payload pipeline
+tells
+.I pass(1)
+to run the specified pipeline of commands.
+.I pass(1)
+writes data to the pipelines standard input, and reads data from the pipelines standard output. The
+final source and destination of these datastreams depends on the mode that
+.I pass(1)
+is operating in, as defined by the
+.B -fifos
+.B -stdio
+and
+.B -sdir
+command line flags.
+.br
+
+.B -multithreaded
+tells
+.I pass(1)
+to enter
+.I master
+mode. In this mode each sensitive directory input file is processed on a different thread of control.
+.br
+
+.SH PSRP API INTERFACE
+
+B tag
+.I tag string
+is the
+.B PSRP
+equivalent of the
+.B -tag
+command tail option
+.br
+
+.B omode
+.I stdio | sdir | default
+sets
+.I pass(1)
+output mode from connected
+.I psrp(1)
+client. Default is
+.I stdio.
+.br
+
+.B ftype
+.I fifo | regf | default
+sets 
+.I pass(1)
+output file system object type from connected 
+.I psrp(1)
+client. Default is
+.I regf.
+.br
+
+.B pmode
+.I serial | multithreaded | parallel
+sets 
+.I pass(1)
+processing mode from  connected
+.I psrp(1)
+client. Note
+.I multithreaded
+and
+.I parallel
+are synonyms.
+.br
+
+.SH LIBRARIES
+.I pass(1)
+uses the PUPS libraries, see
+.I pups(3)
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd, Gosforth.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br
+
+.SH See also
+lyosome(1), psrp(1), pups(3)
+.br
+

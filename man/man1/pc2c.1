@@ -1,0 +1,144 @@
+.TH PC2C 1 "16th April 2015" "PUPSP3 build tools" "PUPSP3 build tools"
+
+.SH NAME
+PC2C \- Preprocessor to convert Dynamic C[D] to PUPS-ANSI C.
+.br
+
+.SH SYNOPSIS
+.B pc2c < <D language source> > <PUPS-ANSI C language source> 
+>& <log file>
+.br
+
+.SH DESCRIPTION
+.I pc2c(1)
+is a pre-processor which convert the Dynamic C [D] programming language into an
+equivalent ANSI-C source which can be compiled using the GNU compiler tools, see
+.I gcc(1)
+and
+.I gdb(1)
+and then linked against the PUPS libraries.
+.br
+
+The D language supports a number of dynamic programming extensions to ANSI-C including
+dynamic functions (which are have strong dynamic type checking and brokering). Dynamic
+functions are translated into equivalent PUPS-ANSI C
+.I orifice
+functions which may be dynamically attached to
+.I running
+PUPS/PSRP applications via the
+.I psrp(1)
+client.
+.br
+
+In addition to dynamic functions, the D language also provides support for threads. When
+a D source is converted to PUPS-ANSI C it is automatically made threadsafe as a part of the
+conversion process. Functions are analysed to see if they are threadsafe. If they are not,
+.I pc2c(1)
+automatically inserts mutexes to make sure that unsafe functions cannot be simultaneously
+accessed by more than one thread. The D language extensions also provide language level
+supports for the notion of a root thread (e.g. the thread running when main() is called)
+and a set of
+.I root thread functions
+which may only be called by the root thread, and threadsafe functions which may be called
+by any thread without side effects.
+
+.SH KEYWORDS
+The D language extensions add the following keywords to the ANSI-C programming language:
+.br
+
+.B _DLL_ORIFICE:
+specifies a function is exportable to running PUPS/PSRP applications via the
+.I PUPS orifice protocol.
+.br
+
+.B _ROOTTHREAD:
+specifies a function is only runnable by the
+.I root thread
+(e.g. the first thread run by a process).
+.br
+
+.B _THREADSAFE:
+specifies that a function is threadsafe (and can therefore be called from any thread within a
+process without side effects). Threadsafe functions do not have mutexes automatically inserted
+by
+.I pc2c(1)
+.br
+
+.B _TKEY(keytable)
+defines the current
+.I keytable
+used with the
+.B _TKEY_BIND,
+and
+.B _TKEY_FREE
+directives.
+.br
+
+.B _TKEY_BIND(key)
+specifies than the item
+.I key
+is to be bound into the current keytable.
+.br
+
+.B _TKEY_FREE(key)
+specifies than the item
+.I key
+is to be removed from the current keytable.
+.br
+
+ 
+.I pc2c(1)
+also checks the syntax of other PUPS-ANSI language extensions (e.g. _PROTOTYPE, _PRIVATE,
+_PUBLIC etc.). If an error is found during syntax checking, the offending line is printed
+out with its line number, and conversion is aborted.
+.br
+
+
+.SH LIBRARIES
+In addition to the usual PUPS libraries, D sources translated to PUPS-ANSI C using
+.I pc2c(1)
+need to be linked to a library
+.I tadlib.c
+which provides functions which maybe #defined'd to the following items inserted by
+into the D code:
+.br
+
+_USE_FMUTEX(mutex): defines the name of the current mutex.
+.br
+
+_TKEY(keytable): define current keytable.
+.br
+
+_TKEY_BIND(item): inserts item into current keytable.
+.br
+
+_TKEY_FREE(item): removes item from current keytable.
+.br
+
+_LOCK_THREAD_FMUTEX(mutex): lock mutex.
+.br
+
+_UNLOCK_THREAD_FMUTEX(mutex): unlock mutex.
+.br
+
+.SH OPTIONS
+
+None.
+.br
+
+.SH ENVIRONMENT VARIABLES
+None.
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br
+
+.SH SEE ALSO
+pups(3), gcc(1), gdb(1)
+.br
+

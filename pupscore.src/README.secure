@@ -1,0 +1,28 @@
+Setting authentication token for a secure PSRP server.
+======================================================
+
+1. Interactively (via PSRP connection). Connect to the server in the
+   usual way via the PSRP client and then type secure. The server will
+   prompt for a password (which it will the verify). Subsequent access
+   to the server will only successful if the PSRP services token
+   associated with a connecting psrp client process (set using the
+   password comment) matches the security token on the PSRP server.
+
+2. A PSRP server can read its security token from standard input when
+   it starts up. PSRP clients wishing to access the server must then
+   supply a PSRP services token which matches that of the server, set
+   using the password command.
+
+Restricting commands which a PSRP client can run.
+=================================================
+
+Put the list of permitted commands in <file>. The start up the psrp client
+with -clist <file> in the command tail. This restricts the commands to the
+list specified. Note that this command can be aliased. In addition, it is
+possible to set restricted command lists interactively via the clist command
+of the psrp client. In this case it is advisable to use the password command
+to force authentication of the clist command. Lastly, the command list (and
+authentication token) can be read from a .prsprc initialisation file.
+
+An example clist file cmd.rcl is included in the P3M distribution.
+

@@ -1,0 +1,39 @@
+#-----------------------------------------------------------------------
+# Makefile for PSRP dynamic test process on Linux system
+# M.A. O'Neill, Tumbling Dice 23/01/2018
+#-----------------------------------------------------------------------
+
+CFLAGS		=	TARGET_CFLAGS TARGET_ARCHDEPCFLAGS -DSOAK -DTEST_MATRIX -finline-functions -fopenmp -ffast-math
+LDFLAGS 	=	TARGET_LDFLAGS TARGET_ARCHDEPLDFLAGS -lgomp
+CC		=	gcc
+LIBS		=
+
+test	:	test.o $(LIBS)
+		$(CC) $(CFLAGS) test.o $(LIBS) -o test $(LDFLAGS)
+
+test.o:		test.c $(LIBS)
+		@vtagup VTAG test.c
+		@vstamp 
+		$(CC) $(CFLAGS) -DMAX_SLOTS=32 -DSLOT=seg_slot_18		\
+		$(H_OPTS) -DMAX_USE_SLOTS=4 -DUSE=usage_slot_2 -c test.c
+
+test.c:		../include.libs/utils.h    ../include.libs/slotman.h		\
+		../include.libs/netlib.h   ../include.libs/psrp.h		\
+		../include.libs/dll.h
+
+.PHONY:		clean
+clean:
+		@rm *.o test
+
+.PHONY:		install
+install:
+		@strip test
+		@cp -f test TARGET_INSTALL_DIR
+
+.PHONY:		unstripped
+unstripped:
+		@cp -f test TARGET_INSTALL_DIR
+
+.PHONY:		uninstall
+uninstall:      
+		@rm TARGET_INSTALL_DIR/test		

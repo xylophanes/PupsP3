@@ -1,0 +1,53 @@
+#!/bin/csh
+#
+#-------------------------------------------------------------------------------
+#  Generate HTML versions of PUPS man pages ...
+#  M.A. O'Neill, Tumbling Dice, 2002-2018
+#
+#  $1 is man page root directory (where sources to be man paged are located)
+#  $2 is man page directory 
+#-------------------------------------------------------------------------------
+#
+
+if($# != 2 || $1 == "--usage") then
+	echo ""
+	echo "    PUPSP3 (SUPUPS) manpage to HTML convertor (C) M.A. O'Neill, Tumbling Dice 2002-2018"
+	echo "    Usage: mantohtml <man page root directory> <HTML directory>"
+	echo ""
+	exit 0
+endif
+
+# Get directory containing sources from which man pages are generated
+if(! -e $1) then
+	echo "    mantohtml ERROR: cannot find man page root directory '$1'"
+	exit -1
+endif
+
+# Create directory for man pages generated
+if(! -e $2) then
+	echo "... Creating $2"
+	mkdir $2 >& /dev/null
+else
+	\rm $2/* >&/dev/null
+endif
+
+set pwd = `pwd`
+
+cd $1
+foreach i (`ls -d *`)
+	echo ""
+	echo "... HTMLising man pages in $i"
+	echo ""
+	pushd $i >& /dev/null
+	foreach j (`ls *`)
+		echo "... processing $j"
+		man2html $j >$pwd/$2/$j.html
+	end
+	popd >& /dev/null
+end
+
+echo ""
+echo "    Finished"
+echo ""
+
+exit 0

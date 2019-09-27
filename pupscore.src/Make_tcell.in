@@ -1,0 +1,40 @@
+#-----------------------------------------------------------------------
+# Makefile for PUPS dynamic tcell process on Linux system
+# M.A. O'Neill, Tumbling Dice 23/01/2018
+#-----------------------------------------------------------------------
+
+CFLAGS		=	TARGET_CFLAGS TARGET_ARCHDEPCFLAGS -finline-functions -fopenmp -ffast-math
+LDFLAGS 	=	TARGET_LDFLAGS TARGET_ARCHDEPLDFLAGS -lgomp
+CC		=	gcc
+LIBS		=
+
+tcell	:	tcell.o $(LIBS)
+		$(CC) $(CFLAGS) tcell.o $(LIBS) -o tcell $(LDFLAGS)
+
+tcell.o:	tcell.c $(LIBS)
+		@vtagup VTAG tcell.c
+		@vstamp 
+		$(CC) $(CFLAGS) -DMAX_SLOTS=32 -DSLOT=seg_slot_18		\
+		$(H_OPTS) -DMAX_USE_SLOTS=4 -DUSE=usage_slot_2 -c tcell.c
+
+tcell.c:	../include.libs/utils.h    ../include.libs/slotman.h		\
+		../include.libs/netlib.h   ../include.libs/psrp.h		\
+		../include.libs/dll.h
+
+
+.PHONY:		clean
+clean:
+		@rm *.o tcell
+
+.PHONY:		install	
+install:
+		@strip tcell
+		@cp -f tcell TARGET_INSTALL_DIR
+
+.PHONY:		unstripped	
+unstripped:
+		@cp -f tcell TARGET_INSTALL_DIR
+
+.PHONY:		uninstall
+uninstall:      
+		@rm TARGET_INSTALL_DIR/tcell

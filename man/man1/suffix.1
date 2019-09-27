@@ -1,0 +1,41 @@
+.TH SUFFIX 1 "12 April 2000" "PUPSP3 build tools" "PUPSP3 build tools"
+
+.SH NAME
+SUFFIX \- extract input string suffix.
+.br
+
+.SH SYNOPSIS
+.B suffix
+.I string
+> suffix string
+>& <log file>
+.br
+
+.SH DESCRIPTION
+.I suffix(1)
+is a filter which takes a string of the form <prefix>.<suffix> and
+returns <suffix>. If the string does not contain at least one period
+the string itself is returned. If the string contains more than one period
+all characters after the first period are returned.
+.br
+
+
+.SH OPTIONS
+
+.B -help
+display help and copyright information of the
+.I suffix(1)
+filter.
+.br
+
+.SH ENVIRONMENT VARIABLES
+None.
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br

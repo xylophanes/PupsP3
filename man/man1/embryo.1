@@ -1,0 +1,151 @@
+.TH EMBRYO 1 "16th April 2015" "PUPSP3 service commands" "PUPSP3 service commands"
+.SH NAME
+.br
+
+embryo \ PSRP embryonic process
+.SH SYNOPSIS
+.B embryo 
+[
+.B -nice
+.I cardinal
+][
+.B -argf
+.I argument_file
+][
+.B -growth_protection
+][
+.B -help
+][
+.B -usage
+][
+.B -version
+][
+.B -slots
+][
+.B -slotinfo
+]
+< <stdin>
+> <stdout>
+>& <log file>
+.br
+
+.SH DESCRIPTION
+.I embryo(1)
+is an uncommited PSRP server which supports dynamic function and databag import and multithreading using
+POSIX threads (see
+.I pthreads(3)
+). Functionality is added to the
+.I embryo(1)
+PSRP server using the 
+.I psrp(1)
+and other PSRP interaction clients.
+.br
+
+
+.SH OPTIONS
+ 
+.B -help
+invokes the on-line context help system. This
+"man" page is displayed. The process then exits.
+.br
+
+.B -growth_protection
+.I <retrys>
+causes the system to retry an
+.I sbrk(3)
+call up to
+.I retrys
+times. This option permits the program to wait until the core that it requires
+is available rather than simply exiting if
+.I sbrk(3)
+fails.
+.br
+
+.B -usage
+displays shortform usage string.
+.br
+
+.B -version
+displays program version number.
+.br
+
+.B -slots
+displays short form
+.I pups(3)
+library dependencies.
+.br
+
+.B -slotinfo
+displays long form
+.I pups(3)
+library dependencies.
+.br
+
+.B -argf
+.I argument_file
+tells the filter to take its command line arguments from the specified
+.I argument_file.
+The data format of the argument file is:
+.br
+
+#  ... optional comment line ...
+.br
+.B -argflag           [1]
+.br
+.I argument_parameter [1,1]
+.br
+.I argument_parameter [1,2]
+.br
+
+.I argument_parameter [1,n]
+.br
+
+# ... optional comment line ...
+.br
+.B -argflag           [2]
+.br
+.I argument_parameter [1,1]
+.br
+.I argument_parameter [1,2]
+.br
+
+.I argument_parameter [1,n]
+.br
+ 
+.B -nice
+.I cardinal
+determimes the
+.I niceness
+at which the filter is scheduled. In keeping with all UNIX user processes, nice
+must be a cardinal between 0 and 20. The default niceness for
+.I embryo(1)
+is 4.
+.br
+
+.SH SIGNALS
+SIGUSR2 is used to support PSRP event handling
+.br      
+
+.SH PSRP INTERACTIVITY
+Supports interactive querying while running using Process Status Request Protocol [PSRP], see
+.I psrp(1).
+.br         
+
+
+.SH LIBRARIES
+.I embryo(1)
+uses the PUPS libraries, see
+.I pups(3)
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br
+
+.SH SEE ALSO
+psrp(1), pups(3), pthreads(3)
+
