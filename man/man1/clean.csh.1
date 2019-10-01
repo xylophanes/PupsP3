@@ -1,0 +1,50 @@
+.TH CLEAN 1 "26 April 2002" "PUPSP3 Scripts" "PUPSP3 Scripts"
+
+.SH NAME
+CLEAN \- clean a PUPSP3 distribution tree.
+
+.br
+
+.SH SYNOPSIS
+.B clean 
+.I [usage | --usage] 
+.I [PUPSP3 source directory]
+>& <log file>
+.br
+
+.SH DESCRIPTION
+.I clean(1)
+is a
+.I csh(1)
+shellscript which cleans the PUPSP3 distributiin tree in which it is sitting.
+Specifically,
+.I clean(1)
+removes
+.I .o core shadow and .tmp
+files from source
+.I .src
+directories within the tree, and all files from library and binary
+subdirectories.
+.br
+
+.SH OPTIONS
+
+.B usage
+.B --usage 
+prints out help information about
+.I clean(1)
+.B [PUPSP3 source directory]
+specifies the root of the PUPSP3 source directory which is to be cleaned
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br
+
+.SH SEE ALSO
+csh(1)
+.br

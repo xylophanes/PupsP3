@@ -1,0 +1,995 @@
+.\" Copyright (c)  1985, 2004, Mark O'NEILL (mao@tumblingdice.co.uk)
+.\" All rights reserved.
+.\"
+.\" THIS MANUAL IS PROVIDED IN ITS "AS IS" CONDITION, WITH NO WARRANTY
+.\" WHATSOEVER. NO LIABILITY OF ANY KIND FOR DAMAGES WHATSOEVER RESULTING
+.\" FROM THE USE OF THIS MANUAL WILL BE ACCEPTED.
+.\"
+.Dd January 10th 2008 
+.Dt PUPS/P3-2007 
+.ds vT PUPS/P3 Reference Manual
+.Os PUPS/P3 
+.Sh NAME
+.Nm \&PUPS/P3
+.Nd homeostatic cluster computing for Linux/POSIX
+.Sh INTRODUCTION
+.Nm \&PUPS/P3
+is a set of enhancements for Linux which support persistent and complex
+computations via hoemostasis, persistent object stores and in conjuction
+with the MOSIX(7) system dynamic distributed compute-context load balancing. The
+PUPS/P3 system will work on both standalone computers and within clusters of
+networked commodity PC's. Although inter-operation with MOSIX
+requires Intel-x86 family CPU hardware running Linux, versions of the
+PUPS/P3 system which do not support pre-emptive compute-context process migration
+may be built for any operating system offering full POSIX compliance.
+.sp
+Via
+.Bl PSRP
+(Process Status Request Protocol), the PUPS/P3 system offers comprehensive mechanisms for
+communicating with running processes (PSRP servers). whcih are carrying persistnet computational
+payloads. This communication interface is inherently multi access (multiple clients can talk to
+the same PSRP server process at the same time), and multi user (clients which are owned by different users
+can talk to the same PSRP server process provided that they can authenticate themselves to it). In
+order to support multi-user access, the PUPS/P3 system provides full token based authentication services.
+A user must supply am authenticatio token in order to get client access to a PSRP server which is owned by
+another user. PSRP server processes are contacted using the PSRP client application PSRP. Both the PSRP
+client and the PSRP server have a number of built in commands which are vailable to any client or server
+respectively. In addition, application writers can add further commands to the PSRP server process via
+the dispatch function interface. Two sorts of dipatch function are currently suupported by PUPS/P3:
+static and dynamic. The first type of dipatch function is pre-compiled into a given PSRP server by its
+implementor. The second type of dispatch function is dynamically associated with the PSRP server using
+the dynamic link loader interface supprted by POSIX. In addition to functions, PUPS/P3 also supports the
+static and dynamic attachment of other objects to running PUPS/P3 enabled applications. These include:
+
+.Bl -enum
+.It
+System V shared mememory segments.
+.It
+Databags (simple contiguous data objects organised as a stream of bytes).
+.It
+PUPS/P3 shared heaps.
+.El
+
+.sp
+The PUPS/P3 shared heap is a fully functional implementation of a persistent object store.
+It supports multi-process and multi-user access. In networked environments, given
+an appropriate synchronous file system, for example the MOSIX Files System, MFS(7), the shared 
+heap may be physically located on a different machine to that running the PUPS/P3 enabled process
+or processes mapping it. PUPS/P3 shared heaps are based on the POSIX.1b mmap(2)
+interface, and are created, managed and destroyed using an API which resembles the
+familiar malloc(3) memory allocation package.
+.br
+.Sh REQUIREMENTS
+.br
+.Bl -enum
+.It
+All the nodes in the cluster must be connected by LAN's that support
+TCP/IP under Linux.
+.It
+All nodes must have a mathematical (floating-point) unit.
+.El
+.Sh INSTALLING PUPS/P3 FROM BINARY RPM
+The PUPS/P3 system may be installed either from a binary distribution or from a source
+distribution. The binary distribution, (currently only available for Intel
+x86 compatable processors) is in RedHat RPM format, see rpm(8). In this case the basic
+PUPS/P3 package is installed by obtaining the RPM and then typing.
+.br
+rpm -iv pups.rpm
+.br
+The RedHat package manager then takes care of making sure that all the
+components of the PUPS/P3 system are installed in the correct locations.
+.br
+.Sh SOURCE INSTALLATION 
+Installing the package from source is a little more complex, but it allows
+much more control over the precise capabilities of the system installed. In
+addition, if the system can be  built from source for
+any system which fully supports POSIX. To date PUPS/P3 has been built for
+SunOS, Solaris, BSD4.4, IRix and OSF1 in addition to Linux.
+.sp
+Installation of PUPS/P3 from source is relatively straightforward. Firstly. the
+installation scripts assume that the default shell for the user when building the
+system is either csh(1) or tcsh(1). If neither of these shells is currently the
+default, the default shell must be changed appropriately via the chsh(1) utility.
+After the tarball (compressed tar archive) has been unpacked, the first stage of
+the installation process is to cd(1) to the root directory of the PUPS/P3
+source distribution (dist.p3.src/pupscore.src). The script build_pups_services is
+then run (type: ./install_pups_services) in order to build the PUPS/P3 libraries
+and service functions and install them in the default locations. If the build is
+successful (see build log) and the user is not root (the super-user), by default,
+the binaries for the PUPS/P3 service function, libraries, header files and man
+pages are located in:
+
+.Bl -bullet
+.It
+~/bin
+.It
+~/lib
+.It
+~/include/p3
+.It
+~/man
+.El
+
+.sp
+If the user is root, the default locations are:
+
+.Bl -bullet
+.It
+/usr/bin
+.It
+/usr/lib
+.It
+/usr/include/p3
+.It
+/usr/share/man
+.El
+
+.Sh OPTIONS
+There are number of options which may be specified when building PUPS/P3
+from source. For most installations the cluster option (supporting checkpointing,
+networking, shared heaps and dynamic objects) is the most appropriate choice.
+.sp
+.Bl -enum
+.It
+no option specified: causes a vanilla version of PUPS/P3
+to be built for a standalone machine which is assumed to be non networked. This
+version of PUPS/P3 is very basic and only allows static dispatch functions and databags.
+PSRP interaction is limited to builtin commands supported by the PSRP server and the
+static dispatch functions provided by the application. There is no support for dynamic function
+or data objects, networking or checkpointing.
+.It
+cluster: Build a fully functional PUPS/P3 distribution which supports full networking
+dynamic dispatch functions, shared heaps and checkpointing. 
+.El
+.sp
+.Sh SETTING CUSTOM INSTALLATION DIRECTORIES FOR PUSP/P3
+The following shellscript variables in the build_pups_services sheelscript may be edited
+to chage the default installation locations for the PUPS/P3 software components:
+.sp
+.Bl -bullet
+.It
+set BINDIR = <location of PUPS/P3 service function binaries>
+.It
+set LIBDIR = <location of PUPS/P3 libraries>
+.It
+set HDRDIR = <location of PUPS/P3 header files>
+.It
+set MANDIR = <location of PUPS/P3 man files>
+.El
+.sp
+The user can also elect to build a standalone process migration facility (based on cryopid(7)
+and and extended version of of secure shell, see ssh(1), by setting the build_cryopid and
+build_ssh variables in build_pups_services to "yese" respectively.
+7)
+and and extended version of of secure shell, see ssh(1), by setting the build_cryopid and
+build_ssh variables in build_pups_services to "yes" respectively.
+.sp
+.Sh PUPS/P3 ENVIRONMENT
+The PUPS/P3 environment consists of a number libraries, service functions, build tools
+and daemons.
+.sp
+.Sh LIBRARIES
+Currently there are six PUPS/P3 libraries:
+.sp
+.Bl -enum
+.It
+utilib: which contains general purpose utilities including command tail decoding, extended I/O functionality,
+application process name overloading, extended asynchronous event handling and a number of standard homeostats
+for protecting files and interprocess communication channels.
+.It
+casino: Provides a number of psuedo-random number generators (after Knuth, 1984) and generators for Poisson,
+Normal, Binomial and other well known distributiuon function in order to support applications which use
+stochastic optimisation (e.g. seriate, smboltzmann).
+.It
+netlib: Provides support for network computing including asynchronous signalling of processes running on remote hosts,
+remote execution of processes, gathering of loading (and other status information) from remote hosts.
+.It
+psrplib: Implements PSRP (Process Status Request Protocol).  PSRP is a novel Internet Protocol which enables both users
+and also peer processes (PSRP clients) to interact asynchronously with a running applciation (the PSRP server) on an
+Internet wide basis. PSRP is a secure protocol. With the provision of appropriate authentication tokens (e.g. password,
+PGP signatures etc.) it is possible for a PSRP client to access and make use of resources which it does not own. In
+addition, the PSRP protocol is multithreaded, which means it is possible for a running PSRP server application to be
+simultaneously accessed by multiple PSRP clients. The PSRP library also provides a large number of builtin functions
+which support standard PSRP client-server interactions including:
+.sp
+.Bl -bullet
+.It
+Status information about the PSRP server including number and indentity of any connected client, memory utilisation,
+attached dynamic objects (e.g. persistent object stores and/or dynamic functions), number of open files etc.
+.It
+A mechanism for dynamically importing dynamic functions into a running 
+application. PSRP interface supports the dynamic linking of code modules with strong type checking and
+possible type broking such as the promotion of int to long or the depracation of double to float.
+.It
+A mechanism for attaching and modifying persistent object stores: these are managed using the POSIX memory
+mapping API which permits a process to directly map the contents of a file (containing the persistent object store)
+into its address space. The POSIX memory mapping functionality has been extended to enable memory mapping over 
+network file systems such as NFS or MFS.
+.It
+Mechanisms for modifying the hoemostatic responses of an active PSRP server (e.g. Server checkpointing, migration
+and homeostatic protection can be switched on or off by appropriately authenticated PSRP clients).
+.It
+mvmlib: provides support for PUPS/P3 processes to (optimally) manage their own memory. For example, this mechanism
+is used by the smboltzmann(1) application and permits it to deal efficiently with huge rule matrices
+and lists of degenerate objects.
+.It
+tadlib: provides support for PSRP servers and other PUPS/P3 applications which are multithreaded using the POSIX
+thread, pthread(3) libraries.
+.El
+.Sh PUPS/P3 BUILD TOOLS
+There are a nmber of build tools which can be used used to automate the generation of PUPS/P3 applications.
+These include:
+.Bl -enum
+.It
+pupsconf(1): which is used to generate makefiles from PUPS/P3 makefile templates.
+.It
+vtagup(1): which sets the build number of a given target source file. See vtagup(1) for
+further details.
+.It
+vstamp(1): which timestamps a given target source file. The timestamp generated by this utility
+is used by various PUPS/P3 subsystems to detect stale dynamic objects.
+.It
+downcase(1): changes its argument string to lower case. Used in PUPS/P3 build and install scripts.
+.It
+upcase(1): changes its argument string to upper case.
+.It
+prefix(1): given a string <prefix>.<suffix> writes <prefix> to standard output. Used in PUPS/P3
+build and install scripts.
+.It
+suffix(1): given a string <prefix>.<suffix> writes <suffix> to standard output. Used in PUPS/P3
+build and install scripts.
+.It
+ask(1): prompt for a (user supplied) text string.
+.It
+tas(1): test and set (lock directory). Used by the build scripts to ensure exclusive access to
+source directories in a multithreaded mulituser environment.
+.It
+dynagen(1): generates a block of dynamic hostnames for dhcp(1) leasing.
+.It
+gob(1): creates a mouth (gob hole) into which data for payload application is cat(1)'ed.
+.It
+hdid(1): gets serial number for (EIDE or SATA) hard disk drive.
+.It
+tcell(1): licencing module (for arbitrary non PUPS/P3 applications which uses PUPS/P3 security libraries.
+.It
+servertool(1): starts instance of given PSRP server in xterm window,
+.It
+p3f(1): tests to see if a process is PUPS/P3 aware.
+.It
+vector(1): vectors a PSRP request to a PSRP server running on a remote host.
+.It
+thread(1): executes a homogenous (process) farm
+.It
+error(1): prints error string associated with error numbers on standard output. Essentially, this
+is a wrapper around perror(3).
+.It
+application(1): generates application templates from skeleton template files.
+.El
+.Sh PUPS/P3 SCRIPTS
+The PUPS/P3 distribution includes a number of csh(1) scripts which facilitate building or operating
+the PUPS/P3 environment. These include:
+.Bl -enum
+.It
+share: generates shared object from an object (.o) file (which is argument to share).
+.It
+sharchive: generates shared object from an ar archive (.a) file (which is argument to sharchive).
+.It
+configure: generates a Makefile from a PUPS/P3 Makefile template. Essentially this is a wrapper
+script for pupsconf(1).
+.It
+clean: cleans the PUPS/P3 source tree (prior to a new build of the PUPS/P3 environment).
+.It
+pupsuname: echo CPU and OS architecture to standard output (format is <CPU arch>.<OS arch>). This
+is used by other tools, notably the build and install scripts to put binaries and libraries in
+appropriate places.
+.It
+build_pups_libs: builds PUPS/P3 libraries and installs them in PUPS/P3 directory tree.
+.It
+build_pups_services: builds PUPS/P3 libraries, service functions and daemons and installs them
+in PUPS/P3 directory tree.
+.It
+manc <C source>: builds manual page documentation for <C source> using c2man(1)
+.It
+PSRPTOOL: opens and instance of psrp(1) in an xterm(1) window. This is a wrapper to psrptool(1).
+.It
+WIPE <directory>: removes all stale PSRP resources in specified directory. Defaults to current
+directory.
+.El
+.Sh PUPS/P3 DAEMONS
+The is one PUPS/P3 daemon: connected(8) which periodically checks whether it is possible to connect
+to The Internet (via a local networks nominated gateway). When Internet connectivity changes, connected(1)
+runs an appropriate set of scripts. Although connected(1) is not part of PUPS/P3 proper, it is included in
+the distributions as it works around DNS (Domain Name Server) problems encountered in some operating
+systems.
+
+.Sh SERVICE FUNCTIONS
+The PUPS/P3 service functions are a set of tools which facilitate building of user applications in the PUPS/P3 environment.
+Many of the functions (for example fsw, xcat and xtee) are effectively used as glue modules in virtual dataflow machines
+(which consist co-operating pipelines of application processes). Other functions (for example nkill) extend the
+functionality of existing UNIX tools (e.g. Kill) in potentially useful ways. The PUPS/P3 environment currently
+provides eight service functions:
+.Bl -enum
+.It
+nkill(1): Permits processes (which may be remote) to be signalled using a unique name rather than their Process
+IDentifier (PID).
+.It
+fsw(1), xcat(1), xtee(1): permit the efficent implementation of virtual dataflow machines (VDM's). Fsw(1) is a file system watcher which
+is able to halt the execution of any VDM of which it is a member in the event of the VDM output filesystem becoming
+full. Xcat(1) is primarily intended to act a place marker within VDM's which can be overforked by ephemeral processes
+(e.g. X11 and other interactive applications). Typically, xcat(1) processes
+provide targets within VDM's which can be overlaid by interactive monitoring and/or visulisation applications.
+.It
+embryo(1): is an uncommited PSRP server application. Typically embryo(1) is used to test new PUPS/P3 installations, but
+it may also be used to build applications whose computational payloads are constructed of dynamic functions.
+.It
+pass(1): an application carrier which enables non-PUPS/P3 processes to gain access to PUPS/P3 and PSRP services. Pass provides
+homeostatic  protection  for application payload pipeline, and acts as an I/O manager which is capable of reading/writing
+data to and from  regular files, FIFOS and Sockets. In addition, it provides hoemeostatic protection for  the  file  system
+objects it is performing I/O on, and can provide its payload pipeline with thread-of-execution protection.
+.It
+psrptool(1): start an instance of psrp(1) in and xterm(1) window.
+.It
+ecrypt(1): is a simple 8 rotor symmetric enigma code encryption engine which changes a plaintext to a cipher (and vice verse).
+.It
+hupter(1): delivers SIGHUP, SIGINT, SIGQUIT and SIGTERM signals to a payload process, delvering a SIGTERM signal tot that
+process on receipt of those signals.
+.It
+protect(1): is a file system object protection process level homeostat. This application will provide homeostatic protection
+for the file system objects presented to it on its command line.
+.It
+lyosome(1): is a lightweight non PUPS/P3 aware utility which is similar in function to protect(1) which protects a <file> for a specified period
+of time. When this lifetime  has expired, lyosome deletes the file and exits.
+.It
+lol(1) <lockpost>: tests to see if the owner (PSRP server) of a (simple link) lock. PSRP communication
+channel or PUPS/P3 linkpost file is still alive.
+.It
+hasmosix(1): test to see if Linux kernel has MOSIX extensions.
+.It
+maggot(1): is a service function which cleans the PUPS/P3 environment. It does this by cleaning up stale checkpoint files,
+PSRP fifos, Sockets and other derelict file system objects. Maggot(1) thus acts in a manner which is in keeping with it biological
+namesake! Without the services of the maggot(1), the PUPS/P3 environment would become cluttered with garbage objects generated
+by PUPS/P3 applications and services. The maggot detects and removes these objects returning the space that they occupied
+to the file system: without the cleanup crew, ecosystems, both digital and real-world will cease to function as they
+drown in their own waste!
+.It
+psrp(1): is a text based client which allows the user  sitting at an interactive terminal to interact with PSRP server
+processes. From the standpoint of the user psrp(1) appears to be a pseudo-shell which supports many of the features
+associated with true UNIX shells (e.g. Command history, command line editing, macro language [PSRP Macro Language - PML], initialisation scripts
+etc.). With psrp(1), the user can open an asynchronous connection to any PSRP-server, they can authenticate
+themselves to. Once the server  is open (e.g. a communication channel exists between the psrp(1) client and the server),
+the PSRP protocol is used to transfer requests to the server and its responses back to the psrp(1) client (and hence to
+the users terminal).
+.It
+mktty: is a homeostat for /dev/tty which replaces /dev/tty if it is accidentally (or maliciously removed).
+.It
+catfiles <f1> <f2>: cantenate files <f1> and <f2> preserving the inode of <f1>.
+.El
+.sp
+In addition to the service function described above, the PUPS/P3 environment also makes use of a modified version of the
+Secure Shell (ssh(1)) communication client. The version of ssh(1) used by PUPS/P3 contains a set of extensions which permit
+the ssh(1) client to work non interactively using password authentication. This allows PSRP server processes to use ssh(1) functionality to build
+encrypted tunnels for data traffic between servers on different networked hosts thereby enhancing system security.
+.sp
+.Sh PUPS/P3-MOSIX
+Mosix(7) is an environment which is designed to turn a set of networked commodity PC's running Linux into a
+parallel virtual machine. The MOSIX PVM is a psuedo symetric multiprocessor (SMP) machine with pre-emptive adaptive
+dynamic load balancing. From the standpoint of the PUPS/P3 system inter-operation with MOSIX currently confers two
+advantages:
+.br
+.Bl -enum
+.It
+It provides PUPS/P3 with transparent optimal load balancing across a computer cluster. Because MOSIX provides pre-emptive
+load balancing PUPS/P3 does not have to.
+.It
+MOSIX automatically compares the computational capabilities of hosts and the speed of the networked connections between
+them when cluster load balancing is started.
+.El
+.Sh PUP-MOSIX VIRTUAL PARALLEL MACHINES
+The PUPS/P3-MOSIX cluster is a parallel virtual machine (PVM) which consists of a number of hosts based on networked
+commodity PC hardware running MOSIX enhanced Linux kernels and PUPS/P3-PSRP enabled aplication processes. Typically 
+such a cluster has the following structure:
+.sp
+.Bl -enum
+.It
+A fileserver which exports all cluster-wide NFS and MFS filesystems. Typically this server also exports a /pups
+filesystem containing the binaries for PUPS/P3 service functions and daemons, and  the PUPS/P3 libraries and header files.
+.It
+A NIS server which provides central network information services [NIS] for the cluster. This permits users of the
+cluster to "see" the same environment irrespective of which hardware node they are on.
+.It
+A gateserver which controls access to the rest of the cluster from The Internet. The gateway machine will typically
+support a firewall (based on packet filtering and/or squid(8)), and will have multiple network connections
+(e.g. to a 192.168.1 local network and to the Internet via either a second network card point-to-point [PPP]
+protocol or whatever). Typically the gateserver is a relatively low powered machine: processes started on the
+gateserver rapidly migrate onto compute nodes within the cluster. This gateserver functionality is of course deprecated
+if PUPS/P3 is inter operating with MOSIX-2 which supports grids of co-operating clusters.
+.El
+.sp
+As inferred above, PUPS.P3-MOSIX clusters need not work in isolation. Processes can be checkpointed and migrated between
+clusters should the need arise. In MOSIX-1 the load balacing algorthims need to be augmented so processes migrate to another
+cluster when the mean loading on the outbound cluster exceeds some defined maximum value. Under MOSIX-2, this functionality
+is deprecated. Processes are automatically migrated between co-operatiing MOSIX grids in order to maintain an even process-load across
+all of the co-operating clusters.
+.sp
+.Sh THE PUPS/P3 PROJECT DIRECTORY
+The PUPS/P3 project(1) is the source tree within which an implementor develops PUPS/P3 applications. In order to
+create a PUPS/P3 project, PUPS/P3 tree must have been installed in /home/pups.
+A project is created by typing project <root directory> <architecture>. This 
+will make local copies (in the specified root directory) of all the components required to develop PUPS/P3
+applications. The architecture is a combination of CPU architecture, OS architecture and PUPS architecture.
+For example, a PUPS/P3 cluster installation, running under Linux on an i686 would be specified as IX86.linux.cluster.
+A PUPS/P3  cluster installation, running under Solaris on a SPARC would be SPARC.solaris.cluster. The project command
+creates a directory called src in <root tree>, and installs an example Makefile, skeleton application and DLL 
+development library file in it.
+.sp
+.Sh PUPS/P3 APPLICATION TEMPLATE
+Once the PUPS/P3 project(1) directory is installed and assuming that the implementor is in the directory src,
+the PUPS/P3 application builder may be used to generate an application template using skelpapp.c and
+Make_skelpapp.in by default. The application template is built by invoking the application(1) command
+(if no arguments are given the default skeleton templates in the current directory are used). The
+application builder will prompt (interactively) for the following:
+.Bl -bullet
+.It
+Application name.
+.It
+Author of applciation.
+.It
+Authors E-mail.
+.It
+Authors institution
+.It
+A string describing the purpose of the application
+.It
+The date (year).
+.El
+.sp
+The resulting application template and associated makefile may then be used as a basis for
+the application which is being implemented.
+.sp
+.Sh PSRP CLIENT BUILTIN COMMANDS
+The PSRP client, psrp(1) has its own macro language (PML -- PSRP Macro Language) and a large
+number of builtin commands. PML and its associated builtin commands are documented below:
+.br
+.Bl -enum
+.It
+if <cond> <cmd> : execute command <cmd> if condition <cond> is TRUE.
+.It
+ %<label>: target label for resume command.
+.It
+resume %<label>: resume macro execution at label %<label>.
+.It
+errorabort on|off: PML script aborted if "on" and error code for last command != "ok"
+.It
+exit: exit macro that is currently executing.
+.It
+abort: abort current PML script.
+.It
+atomic <cmd>: do not attempt to expand <cmd> as macro.
+.It
+body <cmd>: show body (if <cmd> is a macro).
+.It
+repeat <cnt> <command>: repeat command (which can be a macro) <cnt> times.
+.It
+rperiod <seconds>: set repeat command repeat interval (in seconds).
+.It
+repeat <command>: repeat command infinitely.
+.It
+raise <cond>: raise condition <cond> (pups_mainly used for testing PML scripts)
+.It
+cinit: enter curses mode. This is mainly used prior to executing commands or
+macros which require curses(3) style screen access.
+.It
+cend: exit curses mode (returns to normal "glass tty" screen).
+.It
+segaction [<action>]: specify/display request the action which is to be taken
+when a server segments (e.g. saves its state and then executes a child which
+inherits that state). In moder PUPS/P3 applications segmentation has been
+rendered obsolete as PUPS/P3 now has its own memory efficient (bubble) memory allocation
+package based on the memory allocator shipped with The Tennessee Checkpointing
+Libraries.
+.It
+thandler [<handler>]: Specify/display thread handler.
+.It
+cls: clear screen (this is usually called just after a cinit command to prepare
+the screen for curses(3) I/O.
+.It
+sleep <secs>: Delay PML script execution for <secs> seconds.
+.It
+retry <on | off>: enable "on" or disable "off" automatic request repetition (if server busy).
+.It
+wait: Make PSRP client wait for server to start (and then connect to it).
+.It
+nowait: Make PSRP client abort connection attempt (if target server is not running).
+.It
+linktype: show type of PSRP channel linkage.
+.It
+linktype <hard | soft>: set type of PSRP channel link to "hard or "soft". If the PSRP
+client is soft linked to the PSRP server it will abort its connection if the server
+is stopped. A PSRP client which is hard linked to a PSRP server will stay connected to the
+server even if the server stops. This option has two uses:
+
+.Bl -enum
+.It
+The debugging of PUP/P3 based virtual dataflow machines.
+.It
+Peer-to-peer PSRP connections between PSRP servers (mediated by slaved interaction clients [SIC's]).
+.El
+
+.It
+version: display version of this PSRP interaction client
+.It
+id: print owner, uid, gid and controlling tty for this [psrp] process.
+.It
+chanstat <directory>: show active PSRP channels in <directory>. If directory
+is ommitted, the default PSRP channel directory, /tmp is assumed.
+.It
+dllstat <DLL pathname>: show orifices (pointers to exportable objects) associated
+with DLL <DLL name>.
+.It
+quit | exit | bye: terminates]  psrp client
+.It
+trys <number>: set number of attempts to open connection to PSRP server to <number> trys.
+.It
+ssh <ruser> [[un]compress]: use [[un]compressed] secure shell protocols in specified modality to connect
+to remote psrp server running on remote hosts (as <ruser>).
+.It
+connect <host>: connect to remote PSRP client on <host>.
+.It
+lcwd  <path>: set current (local) working directory for PSRP client to <path>.
+.It
+open <PSRP server>[@<host>]: open connection to PSRP server process <PSRP server>
+[on <host>]. If host is not specified, it is assumed that the required server is
+running on the local host. The PSRP server may be specified by name or PID.
+.It
+close: close connection to PSRP server process.
+.It
+chelp: display help on builtin commands for client.
+.It
+pager: toggles paging mode [via less(1)] filter on and off
+.It
+quiet: do not display output from builtin PSRP client commands
+.It
+squiet: do not display output from PSRP server dispatch functions.
+.It
+noisy: display output from builtin PSRP client commands
+.It
+snoisy: display output from builtin PSRP server dispatch functions.
+.It
+perror: print error handler status.
+.It
+segcnt: display number of segmentations (for segmented server).
+.It
+medit: update PML (PSRP Macro Language) definition file, <file>.
+.It
+mload <file>: load macro file (overwriting currently loaded list of macros).
+.It
+mappend <file>: append macro <file> to currently loaded list of macros.
+.It
+mpurge all|<file>: delete all PML macros or those in <file>.
+.It
+macros: show tags for all loaded PML macros.
+.It
+user <username>: change session for PSRP client to <username>.
+.It
+password: set remote PSRP services authentication token. If this token is set it
+will be used for authentication when connecting to PSRP servers running on remote
+hosts.
+.It
+diapause: generate restartable PSRP server ckpt file and exit (via
+Cryopid Checkpointing Library).
+.It
+checkpoint: generate restartable PSRP server checkpoint file (via
+Cryopid Checkpointing Library).
+.It
+!<command>: send command to users default shell.
+.It
+relay <slave process>: relay data to/from <slave process> via psuedotty.
+.It
+<server>: <request>: send <request> (server builtin or dispatch function) to PSRP
+server <server>.
+.It
+<server>@<host>: <request>: send <request> (server builtin or dispatch function) to
+PSRP server <server> running on node <host>.
+.It
+c1; c2; c3: process multiple PSRP requests.
+.It
+c "a1 a2": glob argument "a1 a2" to "a1a2".
+.El
+.Sh PSRP SERVER BUILTIN COMMANDS
+In addition to the set of static and dynamic dispatch functions which are built into a
+PSRP server application by the implementor, any PSRP server (that is any program linked
+to the static library psrplib.o or the dynamic library psrplib.so) inherits a number of
+builtin functions which can be accessed via the psrp(1) client. A list of these builtin
+functions is given below:
+.Bl -enum
+log <on | off>: switch server transaction logging <on> or <off>
+.It
+appl_verbose <on | off>: switch server error logging <on> or <off>
+.It
+show: display PSRP handler status showing all dispatch functions, databags an other objects
+attached to the server and server status information.,
+.It
+clients: display clients connected to this server. Currently up to 256 clients may be concurrently
+bound to a given PSRP server. In the present implementation, only one client at a time may actually
+transact with the server (the channels to the other attached clients are temporarily blocked). In
+the future, if concurrent PSRP server application are implemented via the pthreads(3) interface, it
+will be possible to provide non-blocking concurrent access to the PSRP server.
+.It
+bindtype: display the binding type for the current PSRP server. Object binding may be either
+static or (static and) dynamic.
+.It
+help: display on-line help information for builtin (PSRP server) commands.
+.It
+atentrance: display list of (PUPS/P3) application entry functions (these functions are executed once when
+the PSRP server is started).
+.It
+atexit: display list of (PUPS/P3) application exit functions (these functions are executed once when the
+PSRP server exits).
+.It
+retrys <retrys>: set number of time PSRP server <retrys> operation (before aborting).
+.It
+atrestart: display list of (PUPS/P3) application (checkpoint) restart functions. These functions are executed
+after a checkpointed process has restored its state. Typically this functionality is used to re-attach
+dynamic objects which where detached by the process prior to the checkpoint being taked.
+.It 
+atckpt: display list of (PUPS/P3) application (checkpoint) checkpoint functions. These functions are
+executed just before a checkpoint is taken, typically to detach objects such as shared heaps, which are
+not owned by any one process.
+.It
+auto_ckpt [on | off]: toggle automatic checkpointing on or off or get automatic checkpointing status
+(if no arguments supplied).
+.It
+ckstat: show checkpointing parameters.
+.It
+ckset < ... ctail ... >: set checkpoint parameters. Currently the following checkpointing parameters can be
+set:
+.Bl -bullet
+.It
+-ckpt_dir <directory name> | default]: sets name of the directory used to store checkpoints for this PSRP
+server. Deaults to "." (the current directory).
+.It
+[-ckpt_bname <ckpt basebame> | default]: sets the basename for individual checkpoint files for this PSRP
+server. Defaults to <appl_name>.<appl_pid>.<appl_hostname>.ckpt.
+.It
+[-ckpt_mode <mode> |  default]: sets the default file protection bits for individual checkpoint files
+owned by this PSRP server. Defaults to "-rw-r--r--" (e.g. 0644 octal).
+.It
+[-ckpt_fork | -ckpt_nofork]: tells the PSRP server to fork off a child which actually saves the checkpoint. This
+means that the parent process continues to execute its paylaod without having to wait for slow resources like
+disks and network connections.
+.It
+[-ckpt | -no_ckpt]: enable of disable checkpointing. If checkpointing is NOT enabled, none of the above
+checkpointing commands are available (via the PSRP client).
+.El
+.It
+mstat: show memory allocation statistics. The PUPS/P3 libraries have their own memory allocation scheme.
+Memory bubbles are mapped into the address space of a requesting process using mmap(2). Unlike a
+typical malloc(3) based allocation scheme, this memory can also be unmapped from the process address
+space using munmap(2) when it is no longer required and returned to the OS free pool. This model of memory allocation is much more efficient
+in a global sense than the malloc(3) scheme, especially when the memory requirements of a given process are very variable, and
+the process is long lived. In biological terms this memory paradigm is a tropical forest as opposed to a temperate woodland!
+.It
+mset <threshold>: set memory bubble utilisation threshold percent. If the utilisation falls below the
+specified thresholds, the process mapping the bubble call munmap(2) to unmap it from its address space.
+.It
+migratory: enable MOSIX (compute context) process migration.
+.It
+sedentary: disable MOSIX (compute context) process migration.
+.It
+pstat: display /proc filesystem status entry (for PSRP server).
+.It
+tunnel <remote host>: force PSRP server process to tunnel (to named remote host). If checkpointing
+is enabled, then an attempt is made to migrate the process context to the remote host.
+.It
+shy [default]|<cmd list>: set commands to be avoided by this process [default is top(1)]. If any of the
+commands specified are detected by the PSRP server, it will go into hiding (e.g. it will enter a wait
+state). While in the wait state, the PSRP server will continue to scan for the command or commands to
+be avoided but will not run its payload computation, It leaves the wait state once this command or commands
+are no longer detectable. This directive is used to steal time on systems where the PSRP server is not supposed
+to be running in a manner which prevents easy detection of the incursion by the rightful owner of the system (in
+any biological system there is a good living to be made as a parasite)!
+.It
+cwd <path>: set PSRP server current working directory to <path>.
+.It
+vitstat: display status of PUPS/P3 virtual interval timers. PUPS/P3 has up to 32 virtual interval timers.
+Typically, these are used to launch homeostatic functions at regular intervals. For example the PUPS/P3
+file homeostat is a function run by the PUPS/P3 virtual timer subsystem every 0.01 seconds in a vanilla
+PUPS/P3 installation whci undeletes files owned by the PSRP server which have been deleted by a user or another
+process without the acquienence of the PSRP server providing (homeostatic) protection for it.
+.It
+lstat: show concurrently held (link) file locks. Each PSRP server can concurrently hold up 16 concurrent
+locks by default.
+.It
+sigstat: display non default signal handlers.
+.It
+sigstat <sig list>: display detailed data for the signal handlers which correspond to signals in <sig list>.
+For each of these signals, the name of the signal handler, whether the signal handler automatically stays
+installed, and the signals (other than the signal itself) which are blocked while the signal handler is
+running are displayed.
+.It
+maskstat: display signal mask and pending signals for this PSRP server.
+.It
+dstat: display open file descriptors (name of file, whether the file is homeostatically protected [LIVE] or
+not [DEAD], file type, underlying descriptor and the handle of the file are displayed).
+.It
+schedule <f> <t> [<func>]: schedule function <func> between times <f> and <t>. This is effectively a per
+process version of the POSIX cron facility. if <func> is omitted the PSRP server itself sleeps between times <f> and <t>.
+.It
+unschedule <index>: unschedule (e.g. remove) previously scheduled crontab function.
+.It
+crontstat: display the contents of the PSRP server crontab table.
+.It
+rusage: show current resource usage status. This is a wrapper function to getrusage(3).
+.It
+rset: set resource usage limits. This is a wrapper function to setrusage(3). The following arguments are supported:
+.sp
+.Bl -bullet
+.It
+cpu <minutes>: set maximum CPU time for PSRP server process to <minutes>.
+.It
+core <megabytes>: set maximum size for coredump file to <megabytes>. A size of zero means that no core dumps are produced by
+this PSRP server,
+.It
+data <megabytes>: set maximum data segment size (for heap and stack) to <megabytes>. This is virtual memory which may not be
+be mapped into the PSRP server address space in its entirety.
+.It
+rss <megabytes>: set the maximum resident set size to <megabytes>. This is the maximum amount of real memory the PSRP server is
+allowed to have.
+.It
+vmsize <megabytes>: sets maximum virtual memory size to <megabytes>. This is the maximum amount of virtual memory the PSRP server
+is allowed to have.
+.It
+fsize <megabytes>: set the maximum file size for files created by the PSRP server process to <megabytes>.
+.It
+nfiles <files>: set maximum numner of open files for this server process to <files>.
+.It
+nproc <children>: set the maximum number of <children> this PSRP server is allowed to create.
+.El
+.It
+cstat: display active children of this PSRP server.
+.It
+sicstat: display open slaved interaction client channels for this PSRP server.
+.It
+showaliases <n>: show aliases of PSRP object <n> (dispatch function, databag and shared heap).
+.It
+alias <n> <a>: alias (PSRP dispatch function, databag or shared heap) <n> to <a>.
+.It
+unalias <a>: remove alias <a>. Note the root tag of the object (the initial name of the object
+is determined by the objects implementor and cannot be removed).
+.It
+rooted: set process to rooted mode (system context cannot migrate).
+.It
+unrooted: set process to unrooted mode (system context can migrate).
+.It
+parent <name | PID>:  set name/PID of effective parent process for this PSRP server.
+.It
+pexit: This PSRP server exits if its effective parent is terminated.
+.It
+unpexit: This PSRP server does not exit if effective parent is terminated.
+.It
+proclive: protects PSRP server process thread (using herpes algorithm which changes process PID many times a second, thus commands
+like kill(1) will be targetting a process which no longer exists).
+.It
+procdead: unprotects PSRP process thread of exection.
+.It
+live <f1> <f2> ...  : protects list of (open) file system objects (e.g. files, FIFO's and Sockets)  against damage or deletion.
+.It
+dead <f1> <f2> ...  : unprotects list of (open) file system objects (homeostatic protection for these objects is
+revoked).
+.It
+vitab [<n> | shrink]: display [or set to <n> or Procrustes shrink] number of virtal timer table slots.
+.It
+chtab [<n> | shrink]: display [or set to <n> or Procrustes shrink] number of child table slots.
+.It
+ftab [<n> | shrink]: display [or set to <n> or Procrustes shrink] number of file table slots.
+.It
+new <n> <h> <term>: create instance (<n>) of server on host <h>. If <term> is specified, the intial
+instance is terminated. An "ant pheromone trail" algorithm ensures that any servers connected to
+the original instance of the PSRP server can find the new instance (if the original instance has
+been marked for termination).
+.It
+overlay <command>: Overlay server process with <command>. This is essentially a wrapper for a simple
+fork(2) followed by execv(2) of specified command.
+.It
+overfork <command>: Overfork server process with <command>. In this case the PSRP server lends its thread
+of execution to <command> (and remains suspended while <command> is running. This is (typically) used to
+permit "place markers" such as xtee(1) to be temporarly replaced by processes which require specific
+facilities (e.g. a X based graphical application which needs interactive facilties to run).
+.It
+autosave <on | off>: switch automatic saving of dipatch table (at exit) on or off. If autosave is on, a
+file detailing locations of any dynamic objects (and the alias status of all dispatch table objects), will
+be saved to .<appl_name>.psrp (in users home directory) when PSRP server exists.
+.It
+autosave <on | off>: switch automatic saving of dispatch table (at exit) <on> or <off>. If autosave is <on>,
+a file containing the locations of any dynamic objects (and the alias status of all dispatch table objects)
+will be saved to .appl_name.psrp (in the home directory of the user who owns the PSRP server) when the server
+exits. With no arguments simply report autosave status.
+.It
+save <n>: save dispatch table (to PSRP ressource file <n>) immediately.
+.It
+load <n>: load PSRP resource file <n> (possibly modifying current dispatch table).
+.It
+reset: reset dispatch table (returning it to its default state)
+.It
+terminate: terminate (this) PSRP server process
+.It
+detach <name>: detaches specified dynamic object (dynamic function, databag or shared heap) from PSRP server.
+.It
+dll <name> <object DLL>: bind dynamic function in <object DLL> to PSRP servers handler loop with dispatch name <name>. See 
+examples/testdll.c for an examples of the format of PUPS/P3 dynamic link libaries.
+.It
+bag <n> <f> [LIVE|DEAD]:  bind dynamic databag in file <f> to PSRP handler with dispatch name <n>. The specifiers LIVE and DEAD indicate
+whether or not the PSRP server should extend homeostatic protection to the newly attached dynamic databag.
+.It
+heap <n> <f> [LIVE|DEAD] : map shared heap in file <f> to PSRP handler with dispatch name <n>. The specifiers LIVE and DEAD indicate
+whether or not the PSRP server should extend homeostatic protection to the newly attached shared heap.
+.It
+hstat [<heap>]:  show shared heaps mapped into PSRP server process address space.
+or display objects and clients associated with specified <heap>.
+.It
+htab [<n>]: display [or set to <n>] number of shared heap table slots.
+.It
+htab [<size> | shrink]: display [or set to <size> or Procrustes shrink] number of shared heap table objects.
+.It
+hostat <o1> <o2> ... <on>: Show statistics for tracked heap object <tracked object>. With no arguments display
+statistics for all tracked heap objects.
+.El
+.Sh SPECIAL FILES
+There PUPS/P3 system includes a number standard file formats. These include:
+.Bl -enum
+.It
+The skeleton application source file format (examples/skelpapp.c). This is the
+"main" function for a typical PUPS/P3 server application.
+.It
+Orifice file format (examples/testdll.c). This file is an example of the source for
+a PUPS/P3 dynamic link libary. To build a dynamic link library, the functions which are
+exported by the library are coded in the manner documented in testdll.c. The shared
+object is the built by compiling the source normally (using gcc). The shared object
+is then built by typing share <object> <shared object>.
+.El
+.sp
+The files in the examples directory of the PUPS/P3 source tree are self documenting
+examples of these file types: implementors can make copies of these examples and
+use them as a basis for their own applications.
+.Sh SECURITY
+When secure shell protocols are used to carry interhost PSRP communications via
+encrypted tunnels, PUPS/P3 may be considered to be moderately secure. In addition,
+an optional encryption layer has been been added to the Linux buffered file I/O (as a
+PUPS/P3 enhancement to Linux). If this layer is used by applications all communications
+including those between processes on the same host will be secure. Ssh only offers
+encrypted tunnels between hosts.
+.sp
+.SH FILES
+By default if
+PUPS/P3
+is built as
+root
+the binaries are located in
+/usr/bin
+the libraries in
+/usr/lib
+the header files in
+/usr/include/p3
+and the man pages in
+/usr/share/man
+.br
+.Sh BUGS
+Please send bug reports to
+.Pa pupsp3-bugs@tumblingdice.co.uk
+.sp
+There are no bugs (yet) reported, but this will probably change when the PUPS
+sourceforge site goes live! Much of the PUPS/P3 system is well tried and
+tested, but a significant proportion of it it not! Hopefully, the SourceForge
+project will lead to bugs being squashed as well as reported, which will lead to
+an (almost) bug free PUPS/P3 distribution.
+.Sh SEE ALSO
+.Xr csh 1 ,
+.Xr tcsh 1 ,
+.Xr chsh 1 ,
+.Xr ssh 1 ,
+.Xr xterm 1 ,
+.Xr build_pups_services 1 ,
+.Xr install_pups_services 1 ,
+.Xr mtop 1 ,
+.Xr top 1 ,
+.Xr timed 1 ,
+.Xr lilo 1 ,
+.Xr grub 1 ,
+.Xr ask.1 ,
+.Xr lol.1 ,
+.Xr ecrypt 1 ,
+.Xr hupter.1 ,
+.Xr manc.1 ,
+.Xr WIPE.1 ,
+.Xr PSRPTOOL.1 ,
+.Xr psrptool.1 ,
+.Xr vtagup 1 ,
+.Xr vstamp 1 ,
+.Xr pups_isys 1 ,
+.Xr pups_iapp 1 ,
+.Xr pupsconf 1 ,
+.Xr application 1 ,
+.Xr suffix 1 ,
+.Xr prefix 1 ,
+.Xr upcase 1 ,
+.Xr downcase 1 ,
+.Xr dynagen 1 ,
+.Xr gob 1 ,
+.Xr p3f 1,
+.Xr vector 1 ,
+.Xr thread 1 ,
+.Xr hdid 1 ,
+.Xr tcell 1 ,
+.Xr servertool 1 ,
+.Xr connected 8 ,
+.Xr sshd 8 ,
+.Xr xtee 1 ,
+.Xr xcat 1 ,
+.Xr psrp 1 ,
+.Xr pass 1 ,
+.Xr embryo 1 ,
+.Xr lyosome 1 ,
+.Xr protect 1 ,
+.Xr maggot 1 ,
+.Xr fsw 1 ,
+.Xr fork 2 ,
+.Xr execv 2 ,
+.Xr read 2 ,
+.Xr write 2 ,
+.sp
+.Sh HISTORY
+PUPS began life as the MSPS operating environment on the legendary BBC Microcomputer in
+1983. It migrated to C (and UNIX) in 1987, the first UNIX implementations being for SunOS
+and 4.3 BSD. The Linux PUPS implementatation was begun in 1992, but most of the biologically
+inspired functionality was added between 1995 and the present date: the result of an ongoing
+and inspired collaboration between neuroscientists, biologists and computer scientists.
+.sp
+.Sh ACKNOWLEDGEMENTS
+Many people have contributed to PUPS over the last decade. They include (in no particular
+order):
+.Bl -bullet
+.It
+Gully A.P.C Burns (K Mechanics Research Group, University of Southern California).
+.It
+Shyam Kapadia (K Mechanics Research Group, University of Southern California).
+.It
+Ning Zhang (K Mechanics Research Group, University of Southern California).
+.It
+Claus C. Hilgetag (University of Bremen).
+.It
+Andrew Derbyshire (Johns Hopkins University).
+.It
+Sean Taffler (fomerly of University of Oxford).
+.It
+Dom Layfield (formerly of MIT).
+.It
+Peter Rounce (University College, London).
+.It
+Peter Kyberd (University of New Brunswick).
+.It
+Dave Flitney (fomermerly of Department of Statistics, University of Oxford).
+.It
+Mike Roe (Microsoft Research Centre, Cambridge).
+.It
+Jon Crowcroft (University of Cambridge).
+.It
+Peter Spark (Ecsponent Ltd).
+.It
+Peter Hansen (formerly of University of Oxford).
+.It
+Amnon Shiloh (formerly of Hebrew University of Jurusalem).
+.It
+Amnon Barak (Hebrew University of Jurusalem).
+.It
+Lee Ward (US Department of Energy).
+.El
+.sp
+.Sh REFERENCES
+O'Neill M.A. and Hilgetag C-C, 2001: The Portable UNIX Programming System (PUPS) and Cantor: A computational
+environment for the dynamical representation and analysis of complex neurobiological data. Proc Phil. Trans.
+Roy. Soc. Lond. B. 356(1412):1259-1276.
+.sp
+O'Neill M.A, Burns A.P.C. and Hilgetag C-C. 2003: The PUPS-MOSIX Environment: A Homeostatic Environment for
+Neuro- and Bio-Informatic Applications. In Neuroscience Databases: A practical guide. Kotter R. (Ed.), Blackwell
+ISBN 140207 1655.
+

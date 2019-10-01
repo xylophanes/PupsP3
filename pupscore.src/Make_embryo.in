@@ -1,0 +1,40 @@
+#-----------------------------------------------------------------------
+# Makefile for PSRP dynamic embryo process on Linux system
+# M.A. O'Neill, Tumbling Dice 23/01/2018
+#-----------------------------------------------------------------------
+
+CFLAGS		=	TARGET_CFLAGS TARGET_ARCHDEPCFLAGS -fopenmp -finline-functions -fopenmp -ffast-math
+LDFLAGS 	=	TARGET_LDFLAGS TARGET_ARCHDEPLDFLAGS -lgomp
+CC		=	gcc
+LIBS		=	
+
+embryo	:	embryo.o $(LIBS)
+		$(CC) $(CFLAGS) embryo.o $(LIBS) -o embryo $(LDFLAGS)
+
+embryo.o:	embryo.c $(LIBS)
+		@vtagup VTAG embryo.c
+		@vstamp 
+		$(CC) $(CFLAGS) -DMAX_SLOTS=32 -DSLOT=seg_slot_18		\
+		$(H_OPTS) -DMAX_USE_SLOTS=4 -DUSE=usage_slot_2 -c embryo.c
+
+embryo.c:	../include.libs/utils.h    ../include.libs/slotman.h		\
+		../include.libs/netlib.h   ../include.libs/psrp.h		\
+		../include.libs/dll.h
+
+
+.PHONY:		clean
+clean:
+		@rm -f *.o embryo
+
+.PHONY:		install	
+install:
+		@strip embryo
+		@cp -f embryo TARGET_INSTALL_DIR
+
+.PHONY:		unstripped
+unstripped:
+		@cp -f embryo TARGET_INSTALL_DIR
+
+.PHONY:		uninstall
+uninstall:      
+		@rm TARGET_INSTALL_DIR/embryo

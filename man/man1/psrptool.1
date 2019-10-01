@@ -1,0 +1,74 @@
+.TH PSRPTOOL 1 "24th January 2018" "PUPSP3 commands" "PUPSP3 commands"
+
+.SH NAME
+PSRPTOOL \- Starts PSRP client in a new window.
+
+.br
+
+.SH SYNOPSIS
+.B psrptool 
+.I [-usage | -help] 
+][
+.B -sdongle
+.I soft dongle file
+][
+.B -fsize
+.I font size
+][
+.I [PSRP client command tail] 
+>& <log file>
+.br
+
+.SH DESCRIPTION
+.I psrptool(1)
+is a wrapper function which starts a
+.I psrp(1)
+client in a new
+.I xterm(1)
+window. Any arguments to
+.I psrptool(1)
+other than
+.B -help
+or
+.B -usage
+are passed to the PSRP client
+.I psrp(1)
+.br
+
+
+.SH OPTIONS
+
+.B -help
+|
+.B -usage 
+prints out help information about
+.I psrptool(1)
+.br
+
+.B -sdongle
+specifies the
+.I dongle file name
+associated with the
+.I PSRP client command tail
+.br
+
+.B -fsize
+specifies the
+.I font size
+used by the (slaved)
+.I xterm(1)
+shell tool. Defaults to
+.B 6 point.
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br
+
+.SH SEE ALSO
+psrp(1), xterm(1)
+.br

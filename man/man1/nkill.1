@@ -1,0 +1,238 @@
+.TH NKILL 1 "15th April 2015" "PUPSP3 commands" "PUPSP3 commands"
+
+.SH NAME
+NKILL \- distribute signal to process on remote host. 
+.br
+
+.SH SYNOPSIS
+.B nkill 
+[
+.B signame | signum
+][
+.B +vebose
+][
+.B +all
+][
+.B-verbose
+][
+.B -slaved
+][
+.B -all
+][
+.B +binname | +status
+]
+.I !pname-1, ... pname-i, ... pname-n! 
+.I >& <log file>
+.br
+
+.SH DESCRIPTION
+.I nkill(1)
+destributes signals to processes in a manner similar to
+.I kill(1).
+In contrast to
+.I kill(1),
+.I nkill(1)
+is able to translate process names to process identifiers [PID's], and thus able to
+signal
+.B named
+processes. In addition
+.I nkill(1)
+accepts fully qualified process names of the form
+.B <name>@<host[:<username>]>
+or
+.B <PID>@<host[:<username>]>.
+.I nkill(1)
+uses a slaved
+.I ssh(1)
+client to create an encrypted tunnel to the remote host, and to start a local invocation of
+.I nkill(1)
+on that host to propagate the signal to the remote target process.
+.br
+
+
+.SH OPTIONS
+
+.B +verbose
+turns on status/error logging : status and error information is sent to stderr.
+.br
+
+.B -verbose
+turns off status/error logging.
+.br
+
+.B +all
+.I pname
+tells
+.I nkill(1)
+to send signals to all processes on a given host with process (PEN) name
+.I pname.
+.br
+
+.B -all
+.I pname
+tells
+.I nkill(1)
+to send signal to process
+.I pname
+only if it is unique (e.g. the only process named
+.I pname
+running on the target host).
+.br
+
+.B +binname
+tells
+.I nkill(1)
+to use the name of the load binary (rather than the process execution name) when searching
+for processes to kill.  This option and
+.B +binname
+are mutally exclusive.
+.br
+
+.B +status
+tells
+.I nkill(1)
+to extract the name of the binary from
+.B /proc/<pid>/status
+when attempting to do a named kill. This is mainly used to kill resumes processes which have
+been previously frozen by
+.I freeze(1)
+and for which
+.B /proc/<pid>/cmd
+may be empty. This option and
+.B +binname
+are mutally exclusive.
+.br
+
+.B -slaved
+tells
+.I nkill(1)
+to write
+.I terse
+exit codes on
+.I stdout.
+This option is generally specified when
+.I nkill(1)
+is being slaved by a process (as opposed to being used interatively via a tty).
+.br
+
+.B -psrp
+tells
+.I nkill(1)
+to use PSRP protocols to make any connections to remote hosts on which processes are to be killed.
+It is assumed that the
+remote process is owned by the user invoking the remote
+.I nkill(1).
+.br
+
+
+.SH AUTHENTICATION
+If
+.I nkill(1)
+requires an authentication token, it will ask for it using the
+.I getpass(3)
+function.
+
+
+.SH EXAMPLES
+
+.B nkill SIGTERM procname
+.br
+
+send signal SIGTERM to named process (procname).
+.br
+
+.B nkill SIGTERM +verbose +all procname
+.br
+
+send signal sigterm to
+.I all
+processes named procname and log error/status information to stderr.
+.br
+
+.B nkill SIGTERM +verbose procname@hostname
+.br
+
+send SIGTERM to named process procname (only if it is unique) running on host, hostname.
+Log error/status information to stderr.
+.br
+
+.B nkill SIGTERM +verbose +all procname@hostname -all procname2@hostname2 PID
+.br
+
+Send signal SIGTERM to all processes named procname running on hostname and to
+named process procname2 running on hostname2 (if unique). In addition send SIGTERM
+to process with process identifier PID running on localhost.
+.br
+
+.B nkill procname
+.br
+
+send default signal [SIGTERM] to (unique) process procname running on localhost.
+.br
+
+.B nkill -all procname@?
+.br
+
+sends default signal [SIGTERM] to all processes called procname on all hosts specified in
+the host pool database referenced via the environment variable HOSTPOOL.
+.br
+
+.B nkill -all procname@hostpool
+.br
+
+sends default signal [SIGTERM] to all processes called procname on all hosts specified in
+the host pool databased referenced via the environment variable HOSTPOOL.
+.br
+
+
+.SH FILES
+/etc/passwd
+.br
+
+.SH ENVIRONMENT VARIABLES
+HOSTPOOL - points to host pool file, e.g.
+.B setenv HOSTPOOL
+.I hostpool
+tells
+.I nkill(1)
+to read host pool data from the file
+.I hostpool
+(if it exists).
+.br
+
+NKILL_VERBOSE
+tells
+.I nkill(1)
+to behave as if
+.B +verbose
+has been specified prior to processing pidname list.
+.br
+
+NKILL_ALL
+tells
+.I nkill(1)
+to bevae as if
+.B +all
+has been specified prior to processing pidname list.
+.br
+
+
+.SH BUGS
+When using PSRP connection protocols, the authentication mechanism while stronger than that of
+.I rsh(1)
+is not strong enough. The clear text password should be revesibly encrypted in the manner of
+ssh(1) before it is transmitted to the remote host. To seamlessly run multi-host command pipelines
+the username and password must be the same on all machines, which could again compromise system
+security in certain situations.
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+ 
+.SH SEE ALSO
+ssh(1), ps(1), kill(1), freeze(1)
+.br

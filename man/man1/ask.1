@@ -1,0 +1,81 @@
+.TH ASK 1 "7th December  2003" "PUPSP3 Scripts" "PUPSP3 Scripts"
+
+.SH NAME
+ASK \- prompt for text string 
+.br
+
+.SH SYNOPSIS
+.B ask 
+.B [-usage | -help]
+.I [payload command]
+.I [prompt string] 
+>& <log file>
+.br
+
+.SH DESCRIPTION
+.I ask(1)
+prompts for a text string. If a user prompt
+.I prompt_string
+is supplied,
+.I ask(1)
+will use it as a prompt. Otherwise the (default) prompt
+.B ask>
+will be used. The text string is read from
+.B standard input.
+In addition, a
+.B payload command
+may also be specified. This command runs for the lifetime of the current invocation
+of
+.I ask(1)
+and is used to circumvent signal scheduling problems in shellscripts which call
+.I ask(1)
+for input
+.br
+
+
+.SH OPTIONS
+
+.B -usage | -help
+display help and copyright information for the
+.I ask(1)
+filter.
+.br
+
+.B prompt
+is the prompt which
+.I ask(1)
+displays. Defaults to
+.B ask>
+.br
+
+.B payload
+specified a
+.I payload command
+(which may be a shell/perl/TCL script) which runs for the lifetime of the current
+invocation of
+.I ask(1).
+.br
+
+.SH SIGNALS
+.I ask(1)
+has handlers for
+.B SIGHUP,
+.B SIGQUIT,
+.B SIGINT
+and
+.B SIGTERM
+active when running a payload command. Otherwise signal handling is default.
+.br
+
+
+.SH ENVIRONMENT VARIABLES
+None.
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br

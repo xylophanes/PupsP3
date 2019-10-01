@@ -1,0 +1,55 @@
+#--------------------------------------------------------------------------------------
+# Makefile for persistent heap library
+# M.A. O'Neill, Tumbling Dice 23/01/2018
+#--------------------------------------------------------------------------------------
+
+#CPPFLAGS 	= -DUSG
+#CFLAGS		= -g -DDEBUG -I.
+CFLAGS		= -I. -I../include.libs TARGET_PHMALLOC_CFLAGS -fPIC
+CC     		= gcc
+
+.PHONY: 	all
+all:		build install
+
+.PHONY:		build
+build: 		libphmalloc.a phgmalloc.o
+
+install:	build
+		@cp -f phgmalloc.o *.a *.so ../lib.TARGET_LIBEXT
+
+phgmalloc =	pheaplib.c phvalloc.c phmalloc.c phfree.c phcfree.c phrealloc.c phcalloc.c phmorecore.c phmemalign.c
+
+sources =	phvalloc.c phmalloc.c phfree.c phcfree.c phrealloc.c phcalloc.c phmorecore.c phmemalign.c             \
+	  	phmcheck.c phmtrace.c phmstats.c phvm-limit.c phmalloc-find.c pheaplib.c
+
+objects = 	pheaplib.o phvalloc.o phmalloc.o phfree.o phcfree.o phrealloc.o phcalloc.o phmorecore.o phmemalign.o  \
+	  	phmcheck.o phmtrace.o phmstats.o phvm-limit.o phmalloc-find.o
+
+$(objects):	$(headers)
+
+phgmalloc.c:	$(headers) $(phgmalloc) Makefile
+		cat $(headers) $(phgmalloc) > $@-tmp
+		@mv -f $@-tmp $@
+
+libphmalloc.a:	phgmalloc.o
+		@ar crv $@ phgmalloc.o
+		@chmod +wx $@
+		@ranlib $@
+		@somake libphmalloc.so phgmalloc.o
+		@chmod a+w $@
+
+.c.o:
+		$(CC) $(CFLAGS) $(CPPFLAGS) -I. -c $< $(OUTPUT_OPTION)
+
+.PHONY: clean realclean malloc-clean malloc-realclean
+
+clean malloc-clean:
+		-rm -f libphmalloc.a *.o core
+
+realclean malloc-realclean: clean
+		-rm -f TAGS tags *~
+
+# For inside the C library.
+phmalloc.tar phmalloc.tar.Z: FORCE
+		$(MAKE) -C .. $@
+FORCE:

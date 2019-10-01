@@ -1,0 +1,136 @@
+.TH TCELL 1 "16th April 2015" "PUPSP3 commands" "PUPSP3 commands"
+.SH NAME
+tcell \ licensing module (for arbitrary non PUPS codes) 
+.br
+
+.SH SYNOPSIS
+.B tcell 
+[
+.B -pipe
+.I command pipeline
+] | [
+.B -tee_file <tee_file_name>
+][
+.B -nice
+.I cardinal
+][
+.B -argf
+.I argument_file
+][
+.B -help
+][
+.B -usage
+][
+.B -growth_protection
+.I retries
+][
+.B -slots
+][
+.B -slotinfo
+]
+>& <log file>
+.br
+
+.SH DESCRIPTION
+.I tcell(1) 
+is an application which runs the PUPS
+.I securicor
+security module on behalf of its parent process. If licensing conditions
+are not met
+.I tcell(1)
+terminates the parent process. If licensing conditions are met, control is
+passed back to the parent process.
+.br
+
+.SH OPTIONS
+ 
+.B -help
+invokes the on-line context help system. This
+"man" page is displayed. The process then exits.
+.br
+
+.B -growth_protection
+.I retrys
+causes the system to retry an
+.I sbrk(2)
+call up to
+.I retrys
+times. This option permits the program to wait until the core that it requires
+is available rather than simply exiting if
+.I sbrk(2)
+fails.
+.br
+
+.B -argf
+.I argument_file
+tells the filter to take its command line arguments from the specified
+.I argument_file.
+The data format of the argument file is:
+.br
+
+#  ... optional comment line ...
+.B -argflag           [1]
+.br
+.I argument_parameter [1,1]
+.br
+.I argument_parameter [1,2]
+.br
+
+.I argument_parameter [1,n]
+.br
+
+# ... optional comment line ...
+.br
+.B -argflag           [2]
+.br
+.I argument_parameter [1,1]
+.br
+.I argument_parameter [1,2]
+.br
+
+.I argument_parameter [1,n]
+.br
+ 
+.B -nice
+.I cardinal
+determimes the
+.I niceness
+at which the filter is scheduled. In keeping with all UNIX user processes, nice
+must be a cardinal between 0 and 20. The default niceness for
+.I xtee(1)
+is 4.
+.br
+
+.B -usage
+displays program shortform usage.
+.br
+
+.B -version
+displays program version number.
+.br
+
+.B -slots
+displays the
+.I pups(3)
+libraries used in application in short form.
+.br
+
+.B -slotinfo
+displays the
+.I pups(3)
+libraries used in application in long form giving version, source language,
+programmer and copyright.
+
+.SH LIBRARIES
+.I xtee(1)
+makes use of PUPS libraries [Portable UNIX Programming System], see
+.I pups(3)
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd, Gosforth.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br

@@ -1,0 +1,3 @@
+restore:    criu --shell-job --link-remap restore -D checkpoint &
+checkpoint: criu --shell-job --link-remap dump -D checkpoint -t 5476
+

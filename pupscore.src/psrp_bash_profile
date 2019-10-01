@@ -1,0 +1,21 @@
+#------------------------------------------------
+# .bash_profile
+# for PSRP
+#
+# (C) M.A. O'Neill, Tumbling Dice, 2018
+#------------------------------------------------
+
+# Get the aliases and functions
+if [ -f ~/.bashrc ]; then
+	. ~/.bashrc
+fi
+
+#------------------------------------------------
+# User specific environment and startup programs
+# Make sure that local directory and home bin
+# directory are checked for commands first
+#------------------------------------------------
+
+PATH=".":$HOME/bin:$PATH
+
+export PATH

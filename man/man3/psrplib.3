@@ -1,0 +1,797 @@
+.\" WARNING! THIS FILE WAS GENERATED AUTOMATICALLY BY c2man!
+.\" DO NOT EDIT! CHANGES MADE TO THIS FILE WILL BE LOST!
+.TH "psrp" 3 "24 January 2018" "c2man psrp.h"
+.SH "NAME"
+psrp_register_on_abort,
+psrp_ignore_requests,
+psrp_accept_requests,
+psrp_init,
+psrp_attach_static_function,
+psrp_attach_static_databag,
+psrp_attach_dynamic_databag,
+psrp_overlay_server_process,
+psrp_attach_persistent_heap,
+psrp_show_persistent_heaps,
+psrp_detach_object_by_name,
+psrp_detach_object_by_handle,
+psrp_show_object_list,
+int_handler,
+psrp_load_default_dispatch_table,
+psrp_load_dispatch_table,
+psrp_save_dispatch_table,
+psrp_chbrk_handler,
+psrp_std_init,
+psrp_t_arg_errs,
+psrp_error,
+lookup_psrp_object_by_name,
+lookup_psrp_object_by_handle,
+psrp_get_handle_from_name,
+psrp_get_name_from_handle,
+psrp_get_type_from_name,
+psrp_get_type_from_handle,
+psrp_exit,
+psrp_pname_to_pid,
+psrp_pid_to_pname,
+psrp_channelname_to_pid,
+psrp_pid_to_channelname,
+psrp_set_current_sic,
+psrp_unset_current_sic,
+psrp_create_slaved_interaction_client,
+psrp_slaved_client_transaction,
+psrp_destroy_slaved_interaction_client,
+psrp_assign_stdio,
+psrp_assign_fstdio,
+psrp_alias,
+psrp_unalias,
+psrp_show_aliases,
+psrp_duplicate_instance,
+psrp_ifree_tag_list,
+psrp_get_tag_index,
+psrp_isearch_tag_list,
+psrp_get_action_slot_index,
+psrp_destroy_object,
+psrp_ostate,
+psrp_channel_locked,
+psrp_show_open_sics,
+empty_fifo,
+psrp_client_int_handler,
+psrp_new_segment,
+psrp_new_instance,
+psrp_get_server_host,
+psrp_prod_host,
+psrp_find_action_slot_index,
+psrp_write_sic,
+psrp_read_sic,
+psrp_int_sic,
+psrp_reset_dispatch_table,
+psrp_set_client_exitf,
+psrp_reset_client_exitf,
+psrp_crontab_schedule,
+psrp_crontab_unschedule,
+psrp_crontab_init,
+psrp_show_crontab,
+psrp_set_c_code,
+psrp_fork,
+herpes_homeostat,
+shy_homeostat,
+psrp_read_trailfile,
+psrp_cont_handler,
+psrp_rename_channel,
+psrp_remote_start,
+psrp_process_sic_transaction_list,
+psrp_exec_env \- Purpose: header for multithread DLL support library.
+.SH "SYNOPSIS"
+.ft B
+#include <psrp.h>
+.sp
+int psrp_register_on_abort(void *);
+.sp
+void psrp_ignore_requests(void);
+.sp
+void psrp_accept_requests(void);
+.sp
+void psrp_init
+.br
+(
+.br
+	int,
+.br
+	int (*)(int,char *[])
+.br
+);
+.sp
+int psrp_attach_static_function
+.br
+(
+.br
+	char *,
+.br
+	void *
+.br
+);
+.sp
+int psrp_attach_static_databag
+.br
+(
+.br
+	char *,
+.br
+	long int,
+.br
+	unsigned char *
+.br
+);
+.sp
+int psrp_attach_dynamic_databag
+.br
+(
+.br
+	int,
+.br
+	char *,
+.br
+	char *,
+.br
+	int
+.br
+);
+.sp
+int psrp_overlay_server_process
+.br
+(
+.br
+	int,
+.br
+	char *,
+.br
+	char *
+.br
+);
+.sp
+int psrp_attach_persistent_heap
+.br
+(
+.br
+	int,
+.br
+	char *,
+.br
+	char *,
+.br
+	int
+.br
+);
+.sp
+void psrp_show_persistent_heaps(FILE *);
+.sp
+int psrp_detach_object_by_name(char *);
+.sp
+int psrp_detach_object_by_handle(void *);
+.sp
+void psrp_show_object_list(void);
+.sp
+int int_handler(int);
+.sp
+int psrp_load_default_dispatch_table(void);
+.sp
+int psrp_load_dispatch_table
+.br
+(
+.br
+	int,
+.br
+	char *
+.br
+);
+.sp
+int psrp_save_dispatch_table(char *);
+.sp
+int psrp_chbrk_handler
+.br
+(
+.br
+	int,
+.br
+	int
+.br
+);
+.sp
+int psrp_std_init
+.br
+(
+.br
+	int,
+.br
+	char *[]
+.br
+);
+.sp
+int psrp_t_arg_errs
+.br
+(
+.br
+	int,
+.br
+	int *,
+.br
+	char *[]
+.br
+);
+.sp
+void psrp_error(char *);
+.sp
+int lookup_psrp_object_by_name(char *);
+.sp
+int lookup_psrp_object_by_handle(void *);
+.sp
+void *psrp_get_handle_from_name(char *);
+.sp
+int psrp_get_name_from_handle
+.br
+(
+.br
+	void *,
+.br
+	char *
+.br
+);
+.sp
+int psrp_get_type_from_name(char *);
+.sp
+int psrp_get_type_from_handle(void *);
+.sp
+void psrp_exit(void);
+.sp
+int psrp_pname_to_pid(char *);
+.sp
+int psrp_pid_to_pname
+.br
+(
+.br
+	int,
+.br
+	char *
+.br
+);
+.sp
+int psrp_channelname_to_pid
+.br
+(
+.br
+	char *,
+.br
+	char *,
+.br
+	char *
+.br
+);
+.sp
+int psrp_pid_to_channelname
+.br
+(
+.br
+	char *,
+.br
+	int,
+.br
+	char *,
+.br
+	char *
+.br
+);
+.sp
+int psrp_set_current_sic(psrp_channel_type *);
+.sp
+void psrp_unset_current_sic(void);
+.sp
+psrp_channel_type *psrp_create_slaved_interaction_client(char *);
+.sp
+char *psrp_slaved_client_transaction
+.br
+(
+.br
+	int,
+.br
+	psrp_channel_type *,
+.br
+	char *
+.br
+);
+.sp
+psrp_channel_type *psrp_destroy_slaved_interaction_client
+.br
+(
+.br
+	psrp_channel_type *,
+.br
+	int
+.br
+);
+.sp
+int psrp_assign_stdio
+.br
+(
+.br
+	FILE *,
+.br
+	int *,
+.br
+	char *[],
+.br
+	int *,
+.br
+	int *,
+.br
+	int *
+.br
+);
+.sp
+int psrp_assign_fstdio
+.br
+(
+.br
+	FILE *,
+.br
+	int *,
+.br
+	char *[],
+.br
+	FILE *,
+.br
+	FILE *,
+.br
+	FILE *
+.br
+);
+.sp
+int psrp_alias
+.br
+(
+.br
+	char *,
+.br
+	char *
+.br
+);
+.sp
+int psrp_unalias
+.br
+(
+.br
+	char *,
+.br
+	char *
+.br
+);
+.sp
+int psrp_show_aliases(char *);
+.sp
+int psrp_duplicate_instance
+.br
+(
+.br
+	int,
+.br
+	char *
+.br
+);
+.sp
+int psrp_ifree_tag_list(int);
+.sp
+int psrp_get_tag_index(int);
+.sp
+int psrp_isearch_tag_list
+.br
+(
+.br
+	char *,
+.br
+	int
+.br
+);
+.sp
+int psrp_get_action_slot_index(void);
+.sp
+void psrp_destroy_object(int);
+.sp
+int psrp_ostate(char *);
+.sp
+int psrp_channel_locked
+.br
+(
+.br
+	FILE *,
+.br
+	char *
+.br
+);
+.sp
+void psrp_show_open_sics(FILE *);
+.sp
+void empty_fifo(int);
+.sp
+int psrp_client_int_handler(int);
+.sp
+int psrp_new_segment
+.br
+(
+.br
+	char *,
+.br
+	char *,
+.br
+	char *
+.br
+);
+.sp
+int psrp_new_instance
+.br
+(
+.br
+	int,
+.br
+	char *,
+.br
+	char *
+.br
+);
+.sp
+int psrp_get_server_host
+.br
+(
+.br
+	FILE *,
+.br
+	char *,
+.br
+	char [][256]
+.br
+);
+.sp
+int psrp_prod_host
+.br
+(
+.br
+	FILE *,
+.br
+	char *,
+.br
+	char *,
+.br
+	char *,
+.br
+	int,
+.br
+	int *
+.br
+);
+.sp
+int psrp_find_action_slot_index(char *);
+.sp
+int psrp_write_sic
+.br
+(
+.br
+	psrp_channel_type *,
+.br
+	char *
+.br
+);
+.sp
+int psrp_read_sic
+.br
+(
+.br
+	psrp_channel_type *,
+.br
+	char *
+.br
+);
+.sp
+void psrp_int_sic(psrp_channel_type *);
+.sp
+void psrp_reset_dispatch_table(void);
+.sp
+int psrp_set_client_exitf
+.br
+(
+.br
+	int,
+.br
+	char *,
+.br
+	int (*)(int)
+.br
+);
+.sp
+int psrp_reset_client_exitf(int);
+.sp
+int psrp_crontab_schedule
+.br
+(
+.br
+	char *,
+.br
+	char *,
+.br
+	char *,
+.br
+	void *
+.br
+);
+.sp
+int psrp_crontab_unschedule(int);
+.sp
+void psrp_crontab_init(void);
+.sp
+int psrp_show_crontab(FILE *);
+.sp
+void psrp_set_c_code(char *);
+.sp
+int psrp_fork
+.br
+(
+.br
+	char *,
+.br
+	int
+.br
+);
+.sp
+int herpes_homeostat
+.br
+(
+.br
+	void *,
+.br
+	char *
+.br
+);
+.sp
+int shy_homeostat
+.br
+(
+.br
+	void *,
+.br
+	char *
+.br
+);
+.sp
+int psrp_read_trailfile
+.br
+(
+.br
+	char *,
+.br
+	char *,
+.br
+	char *,
+.br
+	char *
+.br
+);
+.sp
+int psrp_cont_handler(int);
+.sp
+int psrp_rename_channel(char *);
+.sp
+int psrp_remote_start
+.br
+(
+.br
+	char *,
+.br
+	int,
+.br
+	int,
+.br
+	char *[]
+.br
+);
+.sp
+char **psrp_process_sic_transaction_list
+.br
+(
+.br
+	char *,
+.br
+	int,
+.br
+	char *
+.br
+);
+.sp
+int psrp_exec_env(char *);
+.ft R
+.SH "PARAMETERS"
+.TP
+.B "void *"
+Not Documented.
+.TP
+.B "int"
+Not Documented.
+.TP
+.B "int (*)(int,char *[])"
+Not Documented.
+.TP
+.B "char *"
+Not Documented.
+.TP
+.B "long int"
+Not Documented.
+.TP
+.B "unsigned char *"
+Not Documented.
+.TP
+.B "FILE *"
+Not Documented.
+.TP
+.B "char *[]"
+Not Documented.
+.TP
+.B "int *"
+Not Documented.
+.TP
+.B "psrp_channel_type *"
+Not Documented.
+.TP
+.B "char [][256]"
+Not Documented.
+.SH "DESCRIPTION"
+.SS "psrp_register_on_abort"
+Register client side abort callback.
+.SS "psrp_ignore_requests"
+Ignore PSRP requests.
+.SS "psrp_accept_requests"
+Accept PSRP requests.
+.SS "psrp_init"
+Initialise PSRP handler.
+.SS "psrp_attach_static_function"
+Attach static function to PSRP handler.
+.SS "psrp_attach_static_databag"
+Attach static databag to PSRP handler.
+.SS "psrp_attach_dynamic_databag"
+Attach static databag to PSRP handler.
+.SS "psrp_overlay_server_process"
+Overlay PSRP server process with new command.
+.SS "psrp_attach_persistent_heap"
+Attach a persistent heap.
+.SS "psrp_show_persistent_heaps"
+Show persistent heaps mapped into process address space.
+.SS "psrp_detach_object_by_name"
+Detach named object from PSRP handler.
+.SS "psrp_detach_object_by_handle"
+Detach object with known handle from PSRP handler.
+.SS "psrp_show_object_list"
+Show attached functions.
+.SS "int_handler"
+Handle PSRP interrupt function request from remote client.
+.SS "psrp_load_default_dispatch_table"
+Load default dispatch table (at server startup).
+.SS "psrp_load_dispatch_table"
+Load a dispatch table class (merging functions on server).
+.SS "psrp_save_dispatch_table"
+Save a dispatch table class.
+.SS "psrp_chbrk_handler"
+Handle broken channel.
+.SS "psrp_std_init"
+Initialise PSRP object function command tail decoder.
+.SS "psrp_t_arg_errs"
+Check for junk on PSRP object function comamnd lines.
+.SS "psrp_error"
+Send error message to client.
+.SS "lookup_psrp_object_by_name"
+Look up item in dispatch table by name.
+.SS "lookup_psrp_object_by_handle"
+Look up item in dispatch table by handle.
+.SS "psrp_get_handle_from_name"
+Get handle of PSRP object from name.
+.SS "psrp_get_name_from_handle"
+Get name of PSRP object from handle.
+.SS "psrp_get_type_from_name"
+Get type of psrp object from name.
+.SS "psrp_get_type_from_handle"
+Get type of psrp object from name.
+.SS "psrp_exit"
+Remove communication channel.
+.SS "psrp_pname_to_pid"
+Resolve pid from process name.
+.SS "psrp_pid_to_pname"
+Resolve process name from process pid.
+.SS "psrp_channelname_to_pid"
+Resolve pid from PSRP channel name.
+.SS "psrp_pid_to_channelname"
+Resolve process name from PSRP channel name.
+.SS "psrp_set_current_sic"
+Set current SIC.
+.SS "psrp_unset_current_sic"
+Unset current SIC.
+.SS "psrp_create_slaved_interaction_client"
+Create a slaved psrp interaction client.
+.SS "psrp_slaved_client_transaction"
+Carry out PSRP transaction via slaved client.
+.SS "psrp_destroy_slaved_interaction_client"
+Destroy psrp slaved interaction client.
+.SS "psrp_assign_stdio"
+Assign descriptors for a PSRP task function.
+.SS "psrp_assign_fstdio"
+Assign streams for a PSRP task function.
+.SS "psrp_alias"
+Provide an alias for a bound PSRP object.
+.SS "psrp_unalias"
+Remove an alias for a bound PSRP object.
+.SS "psrp_show_aliases"
+Show alaises on object.
+.SS "psrp_duplicate_instance"
+Duplicate current process.
+.SS "psrp_ifree_tag_list"
+Free resources allocated to class list.
+.SS "psrp_get_tag_index"
+Search a tag list for the first free slot.
+.SS "psrp_isearch_tag_list"
+Search tag list.
+.SS "psrp_get_action_slot_index"
+Get the index of the next available slot in the dispatch table.
+.SS "psrp_destroy_object"
+Destroy PSRP object.
+.SS "psrp_ostate"
+Get state of PSRP object.
+.SS "psrp_channel_locked"
+Check whether we have client locked on named channel.
+.SS "psrp_show_open_sics"
+Show open slaved interation client channels.
+.SS "empty_fifo"
+Empty a FIFO.
+.SS "psrp_client_int_handler"
+Handler for client side of PSRP interrupt mechanism.
+.SS "psrp_new_segment"
+Start a new server segment.
+.SS "psrp_new_instance"
+Generate duplicate instance a PSRP server.
+.SS "psrp_get_server_host"
+Find host running specified server.
+.SS "psrp_prod_host"
+Prod a remote host (to see if it is alive).
+.SS "psrp_find_action_slot_index"
+Find PSRP dispatch table slot entry.
+.SS "psrp_write_sic"
+Send request over slaved client channel (peer-to-peer).
+.SS "psrp_read_sic"
+Read reply over slaved client channel (perr-to-peer).
+.SS "psrp_int_sic"
+Send abort over slaved client channel (perr-to-peer).
+.SS "psrp_reset_dispatch_table"
+Reset dispatch table.
+.SS "psrp_set_client_exitf"
+Install PSRP channel exit function.
+.SS "psrp_reset_client_exitf"
+Deinstall PSRP channel exit function.
+.SS "psrp_crontab_schedule"
+Schedule a crontab operation.
+.SS "psrp_crontab_unschedule"
+Unschedule a crontab operation.
+.SS "psrp_crontab_init"
+Initialise crontab.
+.SS "psrp_show_crontab"
+Display crontab.
+.SS "psrp_set_c_code"
+Set dispatch function error/status code.
+.SS "psrp_fork"
+Fork a PUPS (server) process.
+.SS "herpes_homeostat"
+Herpes algorithm.
+.SS "shy_homeostat"
+Shy algorithm.
+.SS "psrp_read_trailfile"
+Read trail data from migrated PSRP O/P channel.
+.SS "psrp_cont_handler"
+Handler for SIGCONT */.
+.SS "psrp_rename_channel"
+Rename an existing PSRP channel.
+.SS "psrp_remote_start"
+Start PSRP server on remote host .
+.SS "psrp_process_sic_transaction_list"
+Send list of requests to remote peer (via enslaved PSRP client).
+.SS "psrp_exec_env"
+Set up (exec) ennviroment.

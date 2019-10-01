@@ -1,0 +1,32 @@
+#!/bin/tcsh
+#
+#------------------------------------------------------------------------------------------------------------------
+#  Builds man pages automatically for the PUPSP3 libraries
+#  M.A. O'Neill, Tumbling Dice, 20009
+#-----------------------------------------------------------------------------------------------------------------
+#
+
+#
+# Libraries we required man pages for
+#
+set P3LIBS = "utilib.c psrplib.c netlib.c nfolib.c casino.c dlllib.c hashlib.c cantorlib.c veclib.c tadlib.c mvmlib.c classifylib.c fhtlib.c"
+
+#
+# Directory for man pages
+#
+if($1 == "") then
+	if(! -e c2man) then
+		mkdir c2man
+	endif
+else
+	if(! -e $1) then
+		mkdir $1
+	endif
+endif
+
+foreach i ( $P3LIBS )
+	c2man <$i >c2man/$i.3
+	echo $i done
+end
+
+exit 0

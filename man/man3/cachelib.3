@@ -1,0 +1,370 @@
+.\" WARNING! THIS FILE WAS GENERATED AUTOMATICALLY BY c2man!
+.\" DO NOT EDIT! CHANGES MADE TO THIS FILE WILL BE LOST!
+.TH "cache" 3 "24 January 2018" "c2man cache.h"
+.SH "NAME"
+cache_name2index,
+cache_index2name,
+cache_table_init,
+cache_init_cache,
+cache_add_object,
+cache_create,
+dcache_destroy,
+cache_display_statistics,
+cache_display,
+cache_object_size,
+cache_access_object,
+cache_map_2D_array,
+cache_write,
+cache_get_object_size,
+cache_get_block_size,
+cache_get_blocks,
+cache_get_objects,
+cache_get_name,
+cache_get_mmap_name,
+cache_is_mapped,
+cache_write_mapinfo,
+cache_archive,
+cache_extract,
+cache_read_mapinfo,
+cache_add_block,
+cache_delete_block,
+cache_clear,
+cache_block_set_access,
+cache_set_access,
+cache_block_test_access,
+cache_resize \- Purpose: header for PUPS fast cache library
+.SH "SYNOPSIS"
+.ft B
+#include <cache.h>
+.sp
+int cache_name2index(char *);
+.sp
+int cache_index2name
+.br
+(
+.br
+	char *,
+.br
+	int
+.br
+);
+.sp
+extern int cache_table_init(void);
+.sp
+extern int cache_init_cache(void);
+.sp
+extern int cache_add_object
+.br
+(
+.br
+	unsigned long int,
+.br
+	int
+.br
+);
+.sp
+int cache_create
+.br
+(
+.br
+	int,
+.br
+	char *,
+.br
+	int,
+.br
+	int
+.br
+);
+.sp
+extern int dcache_destroy(int);
+.sp
+extern int cache_display_statistics
+.br
+(
+.br
+	FILE *,
+.br
+	int
+.br
+);
+.sp
+extern int cache_display(FILE *);
+.sp
+extern int cache_object_size
+.br
+(
+.br
+	int,
+.br
+	int,
+.br
+	int
+.br
+);
+.sp
+extern const void *cache_access_object
+.br
+(
+.br
+	int,
+.br
+	int,
+.br
+	int
+.br
+);
+.sp
+extern void **cache_map_2D_array
+.br
+(
+.br
+	void *,
+.br
+	int,
+.br
+	int,
+.br
+	unsigned long int
+.br
+);
+.sp
+extern int cache_write
+.br
+(
+.br
+	char *,
+.br
+	int
+.br
+);
+.sp
+extern long int cache_get_object_size
+.br
+(
+.br
+	int,
+.br
+	int
+.br
+);
+.sp
+extern long int cache_get_block_size(int);
+.sp
+extern long int cache_get_blocks(int c_index);
+.sp
+extern long int cache_get_objects(int c_index);
+.sp
+extern int cache_get_name
+.br
+(
+.br
+	char *,
+.br
+	int
+.br
+);
+.sp
+extern int cache_get_mmap_name
+.br
+(
+.br
+	char *,
+.br
+	int
+.br
+);
+.sp
+extern int cache_is_mapped(int);
+.sp
+extern int cache_write_mapinfo
+.br
+(
+.br
+	char *,
+.br
+	int
+.br
+);
+.sp
+extern int cache_archive
+.br
+(
+.br
+	int,
+.br
+	int,
+.br
+	char *
+.br
+);
+.sp
+extern int cache_extract(char *);
+.sp
+extern int cache_read_mapinfo
+.br
+(
+.br
+	char *,
+.br
+	int
+.br
+);
+.sp
+extern int cache_add_block
+.br
+(
+.br
+	const void *,
+.br
+	unsigned long int,
+.br
+	int,
+.br
+	int,
+.br
+	int,
+.br
+	int
+.br
+);
+.sp
+extern int cache_delete_block
+.br
+(
+.br
+	int,
+.br
+	int
+.br
+);
+.sp
+extern int cache_clear(int c_index);
+.sp
+extern int cache_block_set_access
+.br
+(
+.br
+	int,
+.br
+	int,
+.br
+	int
+.br
+);
+.sp
+extern int cache_set_access
+.br
+(
+.br
+	int,
+.br
+	int
+.br
+);
+.sp
+int cache_block_test_access
+.br
+(
+.br
+	int,
+.br
+	int
+.br
+);
+.sp
+extern int cache_resize
+.br
+(
+.br
+	int,
+.br
+	int
+.br
+);
+.ft R
+.SH "PARAMETERS"
+.TP
+.B "char *"
+Not Documented.
+.TP
+.B "int"
+Not Documented.
+.TP
+.B "unsigned long int"
+Not Documented.
+.TP
+.B "FILE *"
+Not Documented.
+.TP
+.B "void *"
+Not Documented.
+.TP
+.B "int c_index"
+Not Documented.
+.TP
+.B "const void *"
+Not Documented.
+.SH "DESCRIPTION"
+.SS "cache_name2index"
+Get index of cache (from its name).
+.SS "cache_index2name"
+Get name of cache (from its index).
+.SS "cache_table_init"
+Initialise the cache table.
+.SS "cache_init_cache"
+Initialise cache datastructure.
+.SS "cache_add_object"
+Add object to cache (prior to creating cache).
+.SS "cache_create"
+Create cache.
+.SS "dcache_destroy"
+Destroy cache.
+.SS "cache_display_statistics"
+Display cache statistics.
+.SS "cache_display"
+Display cache table .
+.SS "cache_object_size"
+Get size of cache object.
+.SS "cache_access_object"
+Access object in cache (read only).
+.SS "cache_map_2D_array"
+Map 2D (image) array to cache.
+.SS "cache_write"
+Write contents of cache to file.
+.SS "cache_get_object_size"
+Get size of cached object.
+.SS "cache_get_block_size"
+Get size of cache (object) block.
+.SS "cache_get_blocks"
+Number of blocks in cache.
+.SS "cache_get_objects"
+Number of objects per cache block.
+.SS "cache_get_name"
+Get cache name.
+.SS "cache_get_mmap_name"
+Get cache (memory) map file name.
+.SS "cache_is_mapped"
+Is cache memory mapped?.
+.SS "cache_write_mapinfo"
+Write cache mapping information.
+.SS "cache_archive"
+Archive cache.
+.SS "cache_extract"
+Uncompress cache.
+.SS "cache_read_mapinfo"
+Read cache mapping information.
+.SS "cache_add_block"
+Add data to cache block.
+.SS "cache_delete_block"
+Delete block data from cache.
+.SS "cache_clear"
+Clear cache.
+.SS "cache_block_set_access"
+Mark cache block accessible.
+.SS "cache_set_access"
+Set cache access state.
+.SS "cache_block_test_access"
+Test cache access state.
+.SS "cache_resize"
+Resize cache.

@@ -1,0 +1,60 @@
+.TH FARM 1 "2nd September 2019" "PUPSP3 commands" "PUPSP3 commands"
+
+.SH NAME
+THREAD \- execute a homogenous farm.
+.br
+
+.SH SYNOPSIS
+.B farm 
+[
+.B -verbose
+]
+.I farmed process instances
+.I command name
+= 
+>& <log file>
+.br
+
+.SH DESCRIPTION
+.I farm(1)
+is a comamnd which executes homogenous farms. The command which is farmed can be a simple binary or a shell
+script or process pipeline.
+.I farm(1)
+creates a process group for the farm using
+.I setsid(2)
+and then uses
+.I fork(2)
+and
+.I execvp(2)
+to launch a user specified number of instances
+.I farmed instances (
+) of the command (
+.I command name
+). If
+.I farm(1)
+is in the forground it waits for the completion of the farm via the
+.I wait(2)
+call.
+
+.SH OPTIONS
+
+.B -verbose
+Tells
+.I farm(1)
+to report what it is doing via
+.I stderr.
+
+.SH ENVIRONMENT VARIABLES
+none
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+ 
+.SH SEE ALSO
+wait(2), setsid(2), fork(2)
+.br

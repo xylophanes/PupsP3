@@ -1,0 +1,74 @@
+.TH GOB 1 "16th April 2015" "PUPSP3 commands" "PUPSP3 commands"
+
+.SH NAME
+GOB \- creates an interactive  mouth (gob hole) into which data for attached payload pipeline is is put  
+.br
+
+.SH SYNOPSIS
+.B gob
+[ 
+.B -usage
+|
+.B -help
+][
+.B -verbose
+][
+.B -hole
+.I gob hole FIFO name
+]
+>& <log file>
+.br
+
+.SH DESCRIPTION
+.I gob(1)
+is an interactive filter which poll the specified
+.I gob hole FIFO
+for data. When data is placed into the
+.I gob hole FIFO
+.I gob(1)
+reads the data from the FIFO and writes it to downstream processes attached to the
+.I gob(1)
+filter via
+.I standard output.
+.br
+
+
+.SH OPTIONS
+
+.B -usage | -help
+display help and copyright information for the
+.I gob(1)
+filter.
+.br
+
+.B -verbose
+log
+.B error/status
+information to
+.I standard output.
+.br
+
+.B -hole
+.I gob hole FIFO name
+specifies the name of the mouth (gob hole) FIFO for this instance of
+.I gob(1)
+.br
+
+
+.SH ENVIRONMENT VARIABLES
+
+None.
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br
+
+.SH SEE ALSO
+arse(1)
+.br
+

@@ -1,0 +1,60 @@
+.TH HUPTER 1 "6th December 2003" "PUPSP3 commands" "PUPSP3 commands"
+
+.SH NAME
+hupter \- relay SIGHUP to payload process as SIGTERM. 
+.br
+
+.SH SYNOPSIS
+.B hupter 
+.B [-usage | -help]
+.I command
+>& <log file>
+.br
+
+.SH DESCRIPTION
+.I hupter(1)
+is an application which relays
+.B SIGHUP,
+.B SIGQUIT,
+.B SIGINT
+and
+.B SIGTERM
+processes to a (child) payload process as
+.B SIGTERM.
+This permits processes which have been detached from their controlling terminals
+to exit when their parent, usually a
+.B shell
+such as
+.I sh(1)
+or
+.I tcsh(1)
+exits. Useful in shell scripts where process hierarchies need to be cleaned up
+if their parent (shell) process exits abnormally.
+.br
+
+
+.SH OPTIONS
+
+.B -usage | -help
+display help and copyright information for the
+.I pgrelay(1)
+filter.
+.br
+
+.I command
+is the command to be executed. If this is a
+.B pipeline
+it should be enclosed in quotes.
+.br
+
+.SH ENVIRONMENT VARIABLES
+None.
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br

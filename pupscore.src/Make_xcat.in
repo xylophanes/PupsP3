@@ -1,0 +1,42 @@
+#-----------------------------------------------------------------------
+# Makefile for xcat - utility for insertion point marking in dynamic
+#                     pipelines on Linux system
+# 
+# M.A. O'Neill, Tumbling Dice 23/01/2018
+#-----------------------------------------------------------------------
+
+CFLAGS 		=	TARGET_CFLAGS TARGET_ARCHDEPCFLAGS -finline-functions -fopenmp -ffast-math
+LDFLAGS 	=	TARGET_LDFLAGS TARGET_ARCHDEPLDFLAGS -lgomp
+CC		=	gcc
+LIBS		=
+
+
+xcat:		xcat.o $(LIBS)
+		$(CC) $(CFLAGS) xcat.o $(LIBS) -o xcat $(LDFLAGS)
+
+xcat.o:		xcat.c $(LIBS)
+		@vtagup VTAG xcat.c
+		@vstamp
+		$(CC) $(CFLAGS) -DMAX_SLOTS=32 -DSLOT=seg_slot_18		\
+		$(H_OPTS) -DMAX_USE_SLOTS=4 -DUSE=usage_slot_2 -c xcat.c
+
+xcat.c:		../include.libs/utils.h    ../include.libs/slotman.h		\
+                ../include.libs/netlib.h   ../include.libs/psrp.h		\
+                ../include.libs/dll.h 
+
+.PHONY:		clean
+clean:
+		@rm *.o xcat
+
+.PHONY:		install
+install:
+		@strip xcat 
+		@cp -f xcat TARGET_INSTALL_DIR
+
+.PHONY:		unstripped
+unstripped:
+		@cp -f xcat TARGET_INSTALL_DIR
+
+.PHONY:		uninstall
+uninstall:      
+		@rm TARGET_INSTALL_DIR/xcat

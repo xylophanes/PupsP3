@@ -1,0 +1,126 @@
+.TH LYOSOME 1 "19th August 2010" "PUPSP3 commands" "PUPSP3 commands"
+
+.SH NAME
+LYOSOME \- PUPS lightweight file protector/destructor utility.
+
+.br
+
+.SH SYNOPSIS
+.B lyosome
+[
+.B -usage
+|
+.B -help
+] | [
+-verbose
+][
+.B -lifetime
+.I file lifetime in seconds
+][
+.B -always
+][
+.B -d
+.I process name
+]
+.I !<name of file to protect/destruct>!i
+>& <log file>
+.br
+
+.SH DESCRIPTION
+.I lyosome(1)
+is a lightweight utility similar in function to
+.I maggot(1)
+which protects a file for a specified period of time using a methodology
+similar to that used by the PUPS default file protection homeostat. When this
+.I lifetime
+has expired,
+.I lyosome(1)
+deletes the file and exits. If a
+.B directory
+is specified
+.I lyosome(1)
+cannot protect it (yet) but will delete it after the specified
+.I lifetime.
+If the directory is deleted by another process
+.I lyosome(1)
+will then exit.
+.br
+
+
+.SH OPTIONS
+
+.B !<file to protect! 
+specifies the name of the file which is to be protected
+.br
+
+.B -verbose
+tells
+.I lyosome(1)
+to log error and status information to standard error.
+.br
+
+.B -d
+.I process name
+tells
+.I lyosome(1)
+to enter
+.B daemon
+mode. In daemon mode
+.I lysome(1)
+forks into the background and runs in its own session (see
+.I setsid(1)
+). By default stanadard I/O is closed when running daemon mode.
+.br
+
+.B -lifetime
+.I file lifetime in seconds 
+specifies the lifetime of the file in seconds. Defaults to 60 seconds.
+.B -always
+and
+.B -lifetime
+are mutually exclusive options.
+.br
+
+.B -always
+tells
+.I lyosome(1)
+to protect principal until terminated.
+.B -always
+and
+.B -lifetime
+are mutually exclusive options.
+.br 
+ 
+.B SIGNALS
+
+.B SIGUSR1
+Tells
+.I lysome(1)
+to print status information to standard error (if
+.B -verbose
+flag is specified).
+.br
+
+.B SIGUSR2
+Tells
+.I lysome(1)
+to reset the lifetime of its principal(s).
+.br
+
+
+.SH ENVIRONMENT VARIABLES
+None.
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br
+
+.SH SEE ALSO
+maggot(1)
+.br
+

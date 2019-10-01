@@ -1,0 +1,63 @@
+.TH BUILDP3 1 "16th April 2015" "PUPSP3 build scripts" "PUPSP3 build scripts"
+
+.SH NAME
+BUIDP3 \- top level driver script to build PUPS/P3 system. 
+.br
+
+.SH SYNOPSIS
+.B buildP3 
+.I logfile
+.I build type 
+[>2 <log file>]
+.br
+
+.SH DESCRIPTION
+.I buildP3(1)
+is a top level driver script which calls
+.I buld_pupsP3(1)
+.br
+The
+.I logfile
+argument can be either
+.B tty
+in which case output is sent to the users termninal,
+.B null
+in which case output is sent to the data sink (no output) or
+.B logfile
+in which case it is logged to a file in the current directory. Default if not specified
+is
+.B null
+(e.g. no output).
+.br
+
+The
+.I build typpe
+can be either
+.B vanilla
+(basic PUPS/P3 system for 'generic' UNIX system) or
+.B cluster
+(full PUPS/P3 system for POSIX compliant system, e.g. BSD or Linux). Default if not specified
+is
+.B cluster
+.br
+
+.SH OPTIONS
+None.
+.br
+
+.SH ENVIRONMENT VARIABLES
+None.
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br
+
+.SH SEE ALSO
+build_pupsP3(1)
+.br
+

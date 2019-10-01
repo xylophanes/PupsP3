@@ -1,0 +1,7 @@
+To make a dynamic link library containg the functionality in testdll.c
+
+1) compile: gcc -I../include.libs -fPIC -c testdll.c (produces testdll.o)
+2) make shared object: somake testdll.so testdll.o
+3) use dll functionality of PSRP server (e.g. embryo) to attach it.
+
+Not we have to use -fPIC flag to produce position independent code.

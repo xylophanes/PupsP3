@@ -1,0 +1,2546 @@
+.\" WARNING! THIS FILE WAS GENERATED AUTOMATICALLY BY c2man!
+.\" DO NOT EDIT! CHANGES MADE TO THIS FILE WILL BE LOST!
+.TH "utils" 3 "24 January 2018" "c2man utils.h"
+.SH "NAME"
+pups_sigprocmask,
+millitime,
+pups_get_ip_info,
+ch_index,
+rch_index,
+pups_getpwnam,
+pups_getpwuid,
+pups_could_be_poisoned,
+pups_not_poisoned,
+pups_clear_vitimer,
+pups_get_ftab_index_from_stream,
+pups_vitrestart,
+pups_find_free_ftab_index,
+pups_show_link_file_locks,
+pups_lockf,
+pups_get_fs_mountinfo,
+pups_set_errno,
+pups_get_errno,
+iswap,
+fswap,
+pups_seterror,
+pups_error,
+pups_std_init,
+pups_ch_dec,
+pups_str_dec,
+pups_argfile,
+pups_argtline,
+pups_copytail,
+pups_locate,
+pups_i_dec,
+pups_fp_dec,
+pups_check_redirection,
+actoi,
+iabs,
+ieven,
+iodd,
+iodd,
+isign,
+chsign,
+upause,
+xopen,
+xclose,
+pups_protect,
+pups_unprotect,
+pups_lost,
+pups_fd_islive,
+pups_fd_alive,
+pups_fd_dead,
+pups_closeall,
+pups_show_open_fdescriptors,
+strncmps,
+strrext,
+strrextr,
+strip_comment,
+strexccpy,
+strext,
+strin,
+strin2,
+strintok,
+stright,
+strep,
+strepch,
+streptok,
+strtrnc,
+strtrnch,
+strail,
+strdigit,
+strlead,
+strfirst,
+strfrm,
+strchcnt,
+m_strext,
+ch_pos,
+rch_pos,
+mdc_strext,
+mdc_strext2,
+strinp,
+strpdigit,
+strpch,
+mchrep,
+strccpy,
+strempty,
+fsign,
+sqr,
+iround,
+pups_find_ftab_index,
+pups_get_ftab_index,
+xfopen,
+xfdopen,
+xfclose,
+pups_strp_commnts,
+pups_t_arg_errs,
+pups_pipe_write,
+pups_set_alloc_opt,
+xmalloc,
+xrealloc,
+xcalloc,
+xfree,
+pups_set_state,
+pups_get_state,
+pups_show_state,
+pups_creator,
+pups_not_creator,
+pups_execls,
+xaalloc,
+xafree,
+sort2,
+pups_get_directory_entries,
+pups_get_multikeyed_directory_entries,
+pups_sread,
+pups_swrite,
+pups_search_path,
+pups_set_pen,
+pups_register_entrance_f,
+pups_deregister_entrance_f,
+pups_show_entrance_f,
+pups_register_exit_f,
+pups_deregister_exit_f,
+pups_show_exit_f,
+pups_register_abort_f,
+pups_show_abort_f,
+deregister_pups_abort_f,
+pups_exit,
+pups_pipe_read,
+pupsighold,
+pupsigrelse,
+pupshold,
+pupsrelse,
+pups_sighandle,
+pups_signalpause,
+pups_signalpending,
+pups_show_sigstatus,
+pups_show_sigmaskstatus,
+pups_signametosigno,
+pups_signotosigname,
+pups_show_siglstatus,
+pups_sigvector,
+pups_monitor,
+strdate,
+pups_setvitimer,
+pups_clearvitimer,
+vitmer_restart,
+pups_show_vitimers,
+pups_set_fs_hsm_parameters,
+pups_write_homeostat,
+pups_default_fd_homeostat,
+pups_default_parent_homeostat,
+pups_check_fs_space,
+pups_attach_homeostat,
+pups_detach_homeostat,
+pups_sleep,
+pupsualarm,
+get_lock,
+pups_release_lock,
+pups_get_fd_lock,
+pups_release_fd_lock,
+pups_fname2fdes,
+pups_fname2fstream,
+pups_fname2index,
+pups_fdes2index,
+pups_pipestream_obituary_enable,
+pups_pipestream_obituary_disable,
+xfork,
+xcreat,
+xfchmod,
+xstrlen,
+pups_tmalloc,
+pups_tcalloc,
+pups_trealloc,
+pups_tnametoptr,
+pups_tpartnametoptr,
+pups_ttypetoptr,
+pups_tfree,
+pups_taalloc,
+pups_tafree,
+pups_tshowobject,
+pups_tshowobjects,
+xfgets,
+pupswait,
+pupswaitpid,
+pups_set_child_name,
+pups_clear_chtab_slot,
+pups_show_children,
+pups_noauto_child,
+pups_auto_child,
+strcomment,
+strclr,
+pups_sigtabsave,
+pups_sigtabrestore,
+pups_tty_echoing_off,
+pups_tty_echoing_on,
+pups_lexec,
+pups_statkill,
+set_ftab_id,
+pups_get_ftab_index_by_id,
+pups_get_ftab_index_by_name,
+pups_clear_ftab_slot,
+pups_init_child_table,
+pups_lseek,
+pups_get_load_average,
+pups_is_seekable,
+pups_fifo_relay,
+pups_get_link_file_lock,
+pups_release_link_file_lock,
+pups_wait_until_file_loaded,
+xunlink,
+pups_usleep,
+pups_fdes_set_stable,
+pups_fdes_reset_stable,
+pups_is_on_isofs,
+pups_is_on_fisofs,
+pups_is_on_nfs,
+pups_is_on_fnfs,
+pups_cpfile,
+pups_fcpfile,
+pups_malarm,
+pups_cmd_running,
+pups_i_own,
+pups_restart_enable,
+pups_restart_disable,
+pups_crc_p32,
+pups_get_signature,
+pups_sign,
+pupsfprintf,
+pupssprintf,
+pupslseek,
+pups_replace_cmd_tail_item,
+pups_insert_cmd_tail_item,
+pups_clear_cmd_tail,
+pups_segv_backtrack_handler,
+pups_backtrack,
+pups_file_updated,
+pups_host_reachable,
+xflock,
+xflockfile,
+pups_show_flock_locks,
+strsub,
+pups_checkuser,
+pups_check_appl_password,
+pups_getpass,
+pups_check_pass_set,
+pups_get_file_type,
+pups_copy_file \- Header for the standard utilities library.
+.SH "SYNOPSIS"
+.ft B
+#include <utils.h>
+.sp
+int pups_sigprocmask
+.br
+(
+.br
+	int,
+.br
+	const sigset_t *restrict,
+.br
+	sigset_t *restrict
+.br
+);
+.sp
+double millitime(void);
+.sp
+int pups_get_ip_info
+.br
+(
+.br
+	const char *,
+.br
+	char *,
+.br
+	char *
+.br
+);
+.sp
+int ch_index
+.br
+(
+.br
+	char *,
+.br
+	char
+.br
+);
+.sp
+int rch_index
+.br
+(
+.br
+	char *,
+.br
+	char
+.br
+);
+.sp
+struct passwd *pups_getpwnam(char *);
+.sp
+struct passwd *pups_getpwuid(int);
+.sp
+int pups_could_be_poisoned(int);
+.sp
+void pups_not_poisoned(int);
+.sp
+int pups_clear_vitimer
+.br
+(
+.br
+	int,
+.br
+	int
+.br
+);
+.sp
+int pups_get_ftab_index_from_stream(FILE *);
+.sp
+int pups_vitrestart(void);
+.sp
+int pups_find_free_ftab_index(void);
+.sp
+int pups_show_link_file_locks(FILE *);
+.sp
+int pups_lockf
+.br
+(
+.br
+	int,
+.br
+	int,
+.br
+	unsigned long int
+.br
+);
+.sp
+int pups_get_fs_mountinfo
+.br
+(
+.br
+	char *,
+.br
+	char *
+.br
+);
+.sp
+void pups_set_errno(int);
+.sp
+int pups_get_errno(void);
+.sp
+void iswap
+.br
+(
+.br
+	int *,
+.br
+	int *
+.br
+);
+.sp
+void fswap
+.br
+(
+.br
+	double *,
+.br
+	double *
+.br
+);
+.sp
+void pups_seterror
+.br
+(
+.br
+	FILE *,
+.br
+	int,
+.br
+	int
+.br
+);
+.sp
+int pups_error(char *);
+.sp
+void pups_std_init
+.br
+(
+.br
+	int,
+.br
+	int *,
+.br
+	char *,
+.br
+	char *,
+.br
+	char *,
+.br
+	char *,
+.br
+	char *[]
+.br
+);
+.sp
+char pups_ch_dec
+.br
+(
+.br
+	int *,
+.br
+	int *,
+.br
+	char *[]
+.br
+);
+.sp
+char *pups_str_dec
+.br
+(
+.br
+	int *,
+.br
+	int *,
+.br
+	char *[]
+.br
+);
+.sp
+void pups_argfile
+.br
+(
+.br
+	int,
+.br
+	int *,
+.br
+	char *[],
+.br
+	int []
+.br
+);
+.sp
+void pups_argtline(char *);
+.sp
+void pups_copytail
+.br
+(
+.br
+	int *,
+.br
+	char *[],
+.br
+	char *[]
+.br
+);
+.sp
+int pups_locate
+.br
+(
+.br
+	int *,
+.br
+	char *,
+.br
+	int *,
+.br
+	char *[],
+.br
+	int
+.br
+);
+.sp
+int pups_i_dec
+.br
+(
+.br
+	int *,
+.br
+	int *,
+.br
+	char *[]
+.br
+);
+.sp
+double pups_fp_dec
+.br
+(
+.br
+	int *,
+.br
+	int *,
+.br
+	char *[]
+.br
+);
+.sp
+void pups_check_redirection(des_t des);
+.sp
+int actoi(char);
+.sp
+int iabs(int);
+.sp
+int ieven(int);
+.sp
+int iodd(int);
+.sp
+int iodd(int);
+.sp
+int isign(int);
+.sp
+int chsign(char);
+.sp
+int upause(char *);
+.sp
+int xopen
+.br
+(
+.br
+	char *,
+.br
+	int,
+.br
+	int
+.br
+);
+.sp
+int xclose(int);
+.sp
+int pups_protect
+.br
+(
+.br
+	char *,
+.br
+	char *,
+.br
+	void *
+.br
+);
+.sp
+int pups_unprotect(char *);
+.sp
+int pups_lost(int);
+.sp
+int pups_fd_islive(int);
+.sp
+int pups_fd_alive
+.br
+(
+.br
+	int,
+.br
+	char *,
+.br
+	void *
+.br
+);
+.sp
+int pups_fd_dead(int);
+.sp
+void pups_closeall(void);
+.sp
+void pups_show_open_fdescriptors(FILE *);
+.sp
+int strncmps
+.br
+(
+.br
+	char *,
+.br
+	char *
+.br
+);
+.sp
+int strrext
+.br
+(
+.br
+	char *,
+.br
+	char *,
+.br
+	char
+.br
+);
+.sp
+int strrextr
+.br
+(
+.br
+	char *,
+.br
+	char *,
+.br
+	char
+.br
+);
+.sp
+int strip_comment
+.br
+(
+.br
+	FILE *,
+.br
+	int *,
+.br
+	char *
+.br
+);
+.sp
+int strexccpy
+.br
+(
+.br
+	char *,
+.br
+	char *,
+.br
+	char *
+.br
+);
+.sp
+int strext
+.br
+(
+.br
+	char,
+.br
+	char *,
+.br
+	char *
+.br
+);
+.sp
+int strin
+.br
+(
+.br
+	char *,
+.br
+	char *
+.br
+);
+.sp
+char *strin2
+.br
+(
+.br
+	char *,
+.br
+	char *
+.br
+);
+.sp
+int strintok
+.br
+(
+.br
+	char *,
+.br
+	char *,
+.br
+	char *
+.br
+);
+.sp
+int stright
+.br
+(
+.br
+	char *,
+.br
+	char *,
+.br
+	char *
+.br
+);
+.sp
+int strep
+.br
+(
+.br
+	char *,
+.br
+	char *,
+.br
+	char *,
+.br
+	char *
+.br
+);
+.sp
+int strepch
+.br
+(
+.br
+	char *,
+.br
+	char *,
+.br
+	char
+.br
+);
+.sp
+int streptok
+.br
+(
+.br
+	char *,
+.br
+	char *,
+.br
+	char *,
+.br
+	char *,
+.br
+	char *
+.br
+);
+.sp
+int strtrnc
+.br
+(
+.br
+	char *,
+.br
+	char,
+.br
+	int
+.br
+);
+.sp
+int strtrnch
+.br
+(
+.br
+	char *,
+.br
+	char,
+.br
+	int
+.br
+);
+.sp
+int strail
+.br
+(
+.br
+	char *,
+.br
+	char
+.br
+);
+.sp
+int strdigit(char *);
+.sp
+char *strlead
+.br
+(
+.br
+	char *,
+.br
+	char
+.br
+);
+.sp
+char *strfirst(char *);
+.sp
+char *strfrm
+.br
+(
+.br
+	char *,
+.br
+	char,
+.br
+	int
+.br
+);
+.sp
+int strchcnt
+.br
+(
+.br
+	char,
+.br
+	char *
+.br
+);
+.sp
+int m_strext
+.br
+(
+.br
+	int,
+.br
+	char,
+.br
+	char *,
+.br
+	char *
+.br
+);
+.sp
+int ch_pos
+.br
+(
+.br
+	char *,
+.br
+	char
+.br
+);
+.sp
+int rch_pos
+.br
+(
+.br
+	char *,
+.br
+	char
+.br
+);
+.sp
+int mdc_strext
+.br
+(
+.br
+	char *,
+.br
+	int *,
+.br
+	char *,
+.br
+	char *
+.br
+);
+.sp
+int mdc_strext2
+.br
+(
+.br
+	char *,
+.br
+	int *,
+.br
+	int *,
+.br
+	int *,
+.br
+	char *,
+.br
+	char *
+.br
+);
+.sp
+int strinp
+.br
+(
+.br
+	unsigned long int *,
+.br
+	char *,
+.br
+	char *
+.br
+);
+.sp
+int strpdigit
+.br
+(
+.br
+	char *,
+.br
+	char *
+.br
+);
+.sp
+char *strpch
+.br
+(
+.br
+	char,
+.br
+	char *
+.br
+);
+.sp
+void mchrep
+.br
+(
+.br
+	char,
+.br
+	char *,
+.br
+	char *
+.br
+);
+.sp
+char *strccpy
+.br
+(
+.br
+	char *,
+.br
+	char *
+.br
+);
+.sp
+int strempty(char *);
+.sp
+double fsign(double);
+.sp
+double sqr(double);
+.sp
+int iround(double);
+.sp
+int pups_find_ftab_index(void);
+.sp
+int pups_get_ftab_index(int);
+.sp
+FILE *xfopen
+.br
+(
+.br
+	char *,
+.br
+	char *,
+.br
+	int
+.br
+);
+.sp
+FILE *xfdopen
+.br
+(
+.br
+	int,
+.br
+	char *
+.br
+);
+.sp
+FILE *xfclose(FILE *);
+.sp
+FILE *pups_strp_commnts
+.br
+(
+.br
+	char,
+.br
+	FILE *,
+.br
+	char *
+.br
+);
+.sp
+void pups_t_arg_errs
+.br
+(
+.br
+	int *,
+.br
+	char *[]
+.br
+);
+.sp
+int pups_pipe_write
+.br
+(
+.br
+	des_t,
+.br
+	void *,
+.br
+	psize_t
+.br
+);
+.sp
+void pups_set_alloc_opt(int);
+.sp
+void *xmalloc(psize_t);
+.sp
+void *xrealloc
+.br
+(
+.br
+	void *,
+.br
+	psize_t
+.br
+);
+.sp
+void *xcalloc
+.br
+(
+.br
+	pindex_t,
+.br
+	psize_t
+.br
+);
+.sp
+void *xfree(void *);
+.sp
+void pups_set_state(char *);
+.sp
+void pups_get_state(char *);
+.sp
+void pups_show_state(void);
+.sp
+int pups_creator(int);
+.sp
+int pups_not_creator(int fdes);
+.sp
+int pups_execls(char *);
+.sp
+void **xaalloc
+.br
+(
+.br
+	pindex_t,
+.br
+	pindex_t,
+.br
+	psize_t
+.br
+);
+.sp
+void **xafree
+.br
+(
+.br
+	pindex_t,
+.br
+	void **
+.br
+);
+.sp
+void sort2
+.br
+(
+.br
+	int,
+.br
+	double [],
+.br
+	double []
+.br
+);
+.sp
+char **pups_get_directory_entries
+.br
+(
+.br
+	char *,
+.br
+	char *,
+.br
+	int *,
+.br
+	int *
+.br
+);
+.sp
+char **pups_get_multikeyed_directory_entries
+.br
+(
+.br
+	char *,
+.br
+	int,
+.br
+	char **,
+.br
+	int *,
+.br
+	int *
+.br
+);
+.sp
+unsigned long int pups_sread
+.br
+(
+.br
+	int,
+.br
+	char *,
+.br
+	unsigned long int
+.br
+);
+.sp
+unsigned long int pups_swrite
+.br
+(
+.br
+	int,
+.br
+	char *,
+.br
+	unsigned long int
+.br
+);
+.sp
+char *pups_search_path
+.br
+(
+.br
+	char *,
+.br
+	char *
+.br
+);
+.sp
+void pups_set_pen
+.br
+(
+.br
+	char *[],
+.br
+	char *,
+.br
+	char *
+.br
+);
+.sp
+int pups_register_entrance_f
+.br
+(
+.br
+	char *,
+.br
+	void *,
+.br
+	char *
+.br
+);
+.sp
+int pups_deregister_entrance_f(void *);
+.sp
+void pups_show_entrance_f(FILE *);
+.sp
+int pups_register_exit_f
+.br
+(
+.br
+	char *,
+.br
+	void *,
+.br
+	char *
+.br
+);
+.sp
+int pups_deregister_exit_f(void *);
+.sp
+void pups_show_exit_f(FILE *);
+.sp
+int pups_register_abort_f
+.br
+(
+.br
+	char *,
+.br
+	void *,
+.br
+	char *
+.br
+);
+.sp
+void pups_show_abort_f(FILE *);
+.sp
+int deregister_pups_abort_f
+.br
+(
+.br
+	FILE *,
+.br
+	void *
+.br
+);
+.sp
+int pups_exit(int);
+.sp
+unsigned long int pups_pipe_read
+.br
+(
+.br
+	int,
+.br
+	void *,
+.br
+	unsigned long int
+.br
+);
+.sp
+int pupsighold
+.br
+(
+.br
+	int,
+.br
+	int
+.br
+);
+.sp
+int pupsigrelse(int);
+.sp
+void pupshold(int);
+.sp
+void pupsrelse(int);
+.sp
+int pups_sighandle
+.br
+(
+.br
+	int,
+.br
+	char *,
+.br
+	void *,
+.br
+	sigset_t *
+.br
+);
+.sp
+int pups_signalpause(int);
+.sp
+int pups_signalpending(int);
+.sp
+void pups_show_sigstatus(FILE *);
+.sp
+void pups_show_sigmaskstatus(FILE *);
+.sp
+int pups_signametosigno(char *);
+.sp
+char *pups_signotosigname
+.br
+(
+.br
+	int,
+.br
+	char *
+.br
+);
+.sp
+int pups_show_siglstatus
+.br
+(
+.br
+	int,
+.br
+	FILE *
+.br
+);
+.sp
+int pups_sigvector
+.br
+(
+.br
+	int,
+.br
+	sigjmp_buf *
+.br
+);
+.sp
+int pups_monitor
+.br
+(
+.br
+	int,
+.br
+	int,
+.br
+	int
+.br
+);
+.sp
+void strdate(char *);
+.sp
+int pups_setvitimer
+.br
+(
+.br
+	char *,
+.br
+	int,
+.br
+	int,
+.br
+	time_t,
+.br
+	char *,
+.br
+	void *
+.br
+);
+.sp
+int pups_clearvitimer(char *);
+.sp
+int vitmer_restart(void);
+.sp
+void pups_show_vitimers(FILE *);
+.sp
+int pups_set_fs_hsm_parameters
+.br
+(
+.br
+	int,
+.br
+	int,
+.br
+	char *
+.br
+);
+.sp
+int pups_write_homeostat
+.br
+(
+.br
+	int,
+.br
+	int (*)(int)
+.br
+);
+.sp
+int pups_default_fd_homeostat
+.br
+(
+.br
+	void *,
+.br
+	char *
+.br
+);
+.sp
+void pups_default_parent_homeostat
+.br
+(
+.br
+	void *,
+.br
+	char *
+.br
+);
+.sp
+int pups_check_fs_space(int);
+.sp
+int pups_attach_homeostat
+.br
+(
+.br
+	int,
+.br
+	void *
+.br
+);
+.sp
+int pups_detach_homeostat(int);
+.sp
+int pups_sleep(int);
+.sp
+int pupsualarm(unsigned long int);
+.sp
+int get_lock
+.br
+(
+.br
+	char *,
+.br
+	int
+.br
+);
+.sp
+int pups_release_lock(char *);
+.sp
+int pups_get_fd_lock
+.br
+(
+.br
+	int,
+.br
+	int
+.br
+);
+.sp
+int pups_release_fd_lock(int);
+.sp
+int pups_fname2fdes(char *);
+.sp
+FILE *pups_fname2fstream(char *);
+.sp
+int pups_fname2index(char *);
+.sp
+int pups_fdes2index(int);
+.sp
+int pups_pipestream_obituary_enable(int);
+.sp
+int pups_pipestream_obituary_disable(int);
+.sp
+int xfork
+.br
+(
+.br
+	int,
+.br
+	int
+.br
+);
+.sp
+int xcreat
+.br
+(
+.br
+	char *,
+.br
+	int
+.br
+);
+.sp
+int xfchmod
+.br
+(
+.br
+	int,
+.br
+	int
+.br
+);
+.sp
+int xstrlen(char *);
+.sp
+void *pups_tmalloc
+.br
+(
+.br
+	unsigned long int,
+.br
+	char *,
+.br
+	char *
+.br
+);
+.sp
+void *pups_tcalloc
+.br
+(
+.br
+	int,
+.br
+	unsigned long int,
+.br
+	char *,
+.br
+	char *
+.br
+);
+.sp
+void *pups_trealloc
+.br
+(
+.br
+	void *,
+.br
+	unsigned long int
+.br
+);
+.sp
+void *pups_tnametoptr(char *);
+.sp
+void *pups_tpartnametoptr(char *);
+.sp
+void *pups_ttypetoptr(char *);
+.sp
+void *pups_tfree(void *);
+.sp
+void **pups_taalloc
+.br
+(
+.br
+	pindex_t,
+.br
+	pindex_t,
+.br
+	psize_t,
+.br
+	char *,
+.br
+	char *
+.br
+);
+.sp
+void **pups_tafree(void **);
+.sp
+int pups_tshowobject
+.br
+(
+.br
+	FILE *,
+.br
+	void *
+.br
+);
+.sp
+int pups_tshowobjects
+.br
+(
+.br
+	FILE *,
+.br
+	int
+.br
+);
+.sp
+char *xfgets
+.br
+(
+.br
+	char *,
+.br
+	unsigned long int,
+.br
+	FILE *
+.br
+);
+.sp
+int pupswait
+.br
+(
+.br
+	int,
+.br
+	int *
+.br
+);
+.sp
+int pupswaitpid
+.br
+(
+.br
+	int,
+.br
+	int,
+.br
+	int *
+.br
+);
+.sp
+int pups_set_child_name
+.br
+(
+.br
+	int,
+.br
+	char *
+.br
+);
+.sp
+int pups_clear_chtab_slot
+.br
+(
+.br
+	int,
+.br
+	int
+.br
+);
+.sp
+void pups_show_children(FILE *);
+.sp
+void pups_noauto_child(void);
+.sp
+void pups_auto_child(void);
+.sp
+int strcomment(char *);
+.sp
+void strclr(char *);
+.sp
+void pups_sigtabsave
+.br
+(
+.br
+	int,
+.br
+	sigtab_type *
+.br
+);
+.sp
+void pups_sigtabrestore
+.br
+(
+.br
+	int,
+.br
+	sigtab_type *
+.br
+);
+.sp
+int pups_tty_echoing_off
+.br
+(
+.br
+	FILE *,
+.br
+	struct termios *
+.br
+);
+.sp
+void pups_tty_echoing_on
+.br
+(
+.br
+	FILE *,
+.br
+	int,
+.br
+	struct termios
+.br
+);
+.sp
+int pups_lexec
+.br
+(
+.br
+	char *,
+.br
+	char *,
+.br
+	int
+.br
+);
+.sp
+int pups_statkill
+.br
+(
+.br
+	int,
+.br
+	int
+.br
+);
+.sp
+int set_ftab_id
+.br
+(
+.br
+	int,
+.br
+	int
+.br
+);
+.sp
+int pups_get_ftab_index_by_id(int);
+.sp
+int pups_get_ftab_index_by_name(char *);
+.sp
+int pups_clear_ftab_slot
+.br
+(
+.br
+	int,
+.br
+	int
+.br
+);
+.sp
+void pups_init_child_table(int);
+.sp
+int pups_lseek
+.br
+(
+.br
+	int,
+.br
+	unsigned long int,
+.br
+	int
+.br
+);
+.sp
+double pups_get_load_average(int which_load_average);
+.sp
+int pups_is_seekable(int);
+.sp
+int pups_fifo_relay
+.br
+(
+.br
+	int,
+.br
+	int,
+.br
+	int
+.br
+);
+.sp
+int pups_get_link_file_lock
+.br
+(
+.br
+	int,
+.br
+	char *
+.br
+);
+.sp
+int pups_release_link_file_lock(char *);
+.sp
+void pups_wait_until_file_loaded(int);
+.sp
+int xunlink(char *);
+.sp
+int pups_usleep(unsigned long int);
+.sp
+void pups_fdes_set_stable(void);
+.sp
+void pups_fdes_reset_stable(void);
+.sp
+int pups_is_on_isofs(char *);
+.sp
+int pups_is_on_fisofs(int);
+.sp
+int pups_is_on_nfs(char *);
+.sp
+int pups_is_on_fnfs(int);
+.sp
+int pups_cpfile
+.br
+(
+.br
+	char *,
+.br
+	char *,
+.br
+	int
+.br
+);
+.sp
+int pups_fcpfile
+.br
+(
+.br
+	int,
+.br
+	int
+.br
+);
+.sp
+int pups_malarm(unsigned long int);
+.sp
+int pups_cmd_running(void);
+.sp
+int pups_i_own(int);
+.sp
+int pups_restart_enable(void);
+.sp
+int pups_restart_disable(void);
+.sp
+int pups_crc_p32
+.br
+(
+.br
+	unsigned long int,
+.br
+	unsigned char *
+.br
+);
+.sp
+int pups_get_signature
+.br
+(
+.br
+	char *,
+.br
+	char
+.br
+);
+.sp
+int pups_sign
+.br
+(
+.br
+	int,
+.br
+	char *,
+.br
+	char *,
+.br
+	char
+.br
+);
+.sp
+int pupsfprintf
+.br
+(
+.br
+	FILE *,
+.br
+	char *,
+.br
+	...
+.br
+);
+.sp
+int pupssprintf
+.br
+(
+.br
+	char *,
+.br
+	char *,
+.br
+	...
+.br
+);
+.sp
+int pupslseek
+.br
+(
+.br
+	int,
+.br
+	unsigned long int,
+.br
+	int
+.br
+);
+.sp
+int pups_replace_cmd_tail_item
+.br
+(
+.br
+	char *,
+.br
+	char *
+.br
+);
+.sp
+int pups_insert_cmd_tail_item
+.br
+(
+.br
+	char *,
+.br
+	char *
+.br
+);
+.sp
+int pups_clear_cmd_tail(void);
+.sp
+int pups_segv_backtrack_handler(int);
+.sp
+int pups_backtrack(int);
+.sp
+int pups_file_updated(char *);
+.sp
+int pups_host_reachable(char *);
+.sp
+int xflock
+.br
+(
+.br
+	int,
+.br
+	int,
+.br
+	off_t,
+.br
+	off_t,
+.br
+	int
+.br
+);
+.sp
+int xflockfile
+.br
+(
+.br
+	char *,
+.br
+	int,
+.br
+	off_t,
+.br
+	off_t,
+.br
+	int
+.br
+);
+.sp
+int pups_show_flock_locks(FILE *);
+.sp
+int strsub
+.br
+(
+.br
+	char *,
+.br
+	char *,
+.br
+	char *,
+.br
+	char *
+.br
+);
+.sp
+int pups_checkuser
+.br
+(
+.br
+	char *,
+.br
+	char *
+.br
+);
+.sp
+int pups_check_appl_password(char *);
+.sp
+int pups_getpass(char *);
+.sp
+int pups_check_pass_set(void);
+.sp
+char *pups_get_file_type(char *);
+.sp
+int pups_copy_file
+.br
+(
+.br
+	int,
+.br
+	char *,
+.br
+	char *
+.br
+);
+.ft R
+.SH "PARAMETERS"
+.TP
+.B "int"
+Not Documented.
+.TP
+.B "const sigset_t *restrict"
+Not Documented.
+.TP
+.B "sigset_t *restrict"
+Not Documented.
+.TP
+.B "const char *"
+Not Documented.
+.TP
+.B "char *"
+Not Documented.
+.TP
+.B "char *"
+Not Documented.
+.TP
+.B "char"
+Not Documented.
+.TP
+.B "FILE *"
+Not Documented.
+.TP
+.B "unsigned long int"
+Not Documented.
+.TP
+.B "int *"
+Not Documented.
+.TP
+.B "int *"
+Not Documented.
+.TP
+.B "double *"
+Not Documented.
+.TP
+.B "double *"
+Not Documented.
+.TP
+.B "char *[]"
+Not Documented.
+.TP
+.B "int []"
+Not Documented.
+.TP
+.B "des_t des"
+Not Documented.
+.TP
+.B "void *"
+Not Documented.
+.TP
+.B "unsigned long int *"
+Not Documented.
+.TP
+.B "double"
+Not Documented.
+.TP
+.B "des_t"
+Not Documented.
+.TP
+.B "psize_t"
+Not Documented.
+.TP
+.B "pindex_t"
+Not Documented.
+.TP
+.B "int fdes"
+Not Documented.
+.TP
+.B "void **"
+Not Documented.
+.TP
+.B "double []"
+Not Documented.
+.TP
+.B "double []"
+Not Documented.
+.TP
+.B "char **"
+Not Documented.
+.TP
+.B "sigset_t *"
+Not Documented.
+.TP
+.B "sigjmp_buf *"
+Not Documented.
+.TP
+.B "time_t"
+Not Documented.
+.TP
+.B "int (*)(int)"
+Not Documented.
+.TP
+.B "sigtab_type *"
+Not Documented.
+.TP
+.B "struct termios *"
+Not Documented.
+.TP
+.B "struct termios"
+Not Documented.
+.TP
+.B "int which_load_average"
+Not Documented.
+.TP
+.B "unsigned char *"
+Not Documented.
+.TP
+.B "..."
+Not Documented.
+.TP
+.B "off_t"
+Not Documented.
+.TP
+.B "off_t"
+Not Documented.
+.SH "DESCRIPTION"
+.SS "pups_sigprocmask"
+Thread aware sigprockmask().
+.SS "millitime"
+Get time (accurate to milliseconds).
+.SS "pups_get_ip_info"
+Get node name and I.P. Address associated with network interface.
+.SS "ch_index"
+Forward indexing function.
+.SS "rch_index"
+Reverse indexing function.
+.SS "pups_getpwnam"
+Extended getpwnam routine (which searches NIS passwd map).
+.SS "pups_getpwuid"
+Extended getpwuid routine (which searches NIS passwd map).
+.SS "pups_could_be_poisoned"
+Set up support child prior to dangerous operation.
+.SS "pups_not_poisoned"
+Cancel support child (at end of dangerous operation).
+.SS "pups_clear_vitimer"
+Clear a virtual timer datastructure.
+.SS "pups_get_ftab_index_from_stream"
+Get file table index (associated with a stream).
+.SS "pups_vitrestart"
+Restart virtual interval timers.
+.SS "pups_find_free_ftab_index"
+Find free file table index.
+.SS "pups_show_link_file_locks"
+Show number of link file locks concurrently held.
+.SS "pups_lockf"
+Apply file lock.
+.SS "pups_get_fs_mountinfo"
+Test to see if file is on a mounted filesystem.
+.SS "pups_set_errno"
+Set system error number.
+.SS "pups_get_errno"
+Get system error number.
+.SS "iswap"
+Swap a pair of integers.
+.SS "fswap"
+Swap a pair of floats.
+.SS "pups_seterror"
+Set error handler parameters.
+.SS "pups_error"
+Error handler.
+.SS "pups_std_init"
+Read standard items from command tail.
+.SS "pups_ch_dec"
+Decode character item from command tail.
+.SS "pups_str_dec"
+Decode string item from command tail.
+.SS "pups_argfile"
+Load argument vector from file.
+.SS "pups_argtline"
+Generate effective command tail string from secondary argument vector.
+.SS "pups_copytail"
+Copy command tail.
+.SS "pups_locate"
+Locate switch in command tail.
+.SS "pups_i_dec"
+Decode integer from command tail.
+.SS "pups_fp_dec"
+Decode float from command tail.
+.SS "pups_check_redirection"
+Check if a terminal device has been redirected.
+.SS "actoi"
+Convert character to integer.
+.SS "iabs"
+Get absolute value of integer.
+.SS "ieven"
+Test for even integer.
+.SS "iodd"
+Test for odd integer.
+.SS "iodd"
+Get absolute value of integer.
+.SS "isign"
+Test for integer sign.
+.SS "chsign"
+Get sign of character.
+.SS "upause"
+Pause/test routine.
+.SS "xopen"
+Check for level 1 file; open it if it exists.
+.SS "xclose"
+Close file.
+.SS "pups_protect"
+Protect an (unopened) file.
+.SS "pups_unprotect"
+Unprotect an (unopened) file.
+.SS "pups_lost"
+Return the number of times a live file descriptor has been lost (and recreated).
+.SS "pups_fd_islive"
+Test if file descriptor is living .
+.SS "pups_fd_alive"
+Make dead file descriptor alive.
+.SS "pups_fd_dead"
+Kill living file descriptor.
+.SS "pups_closeall"
+CLose all open (ftab) file descriptors.
+.SS "pups_show_open_fdescriptors"
+Display currently open files.
+.SS "strncmps"
+Test for existence of substring.
+.SS "strrext"
+Strip an extension from a string.
+.SS "strrextr"
+Reverse strip an extension from a string.
+.SS "strip_comment"
+Strip a comment from an input file.
+.SS "strexccpy"
+Copy string excluding characters.
+.SS "strext"
+Extract substring from string.
+.SS "strin"
+Check if string 2 is a substring of string 1.
+.SS "strin2"
+Check if string 2 is a substring of string 1
+returning tail of string 1.
+.SS "strintok"
+Check if string 2 is a substring of string 1 [with string 2 demarcation check].
+.SS "stright"
+Check if string 3 is to right of string 2 within string 1.
+.SS "strep"
+Replace string s3 with string s4 globally within string s1, returning as string s2.
+.SS "strepch"
+Replace string with a character constant.
+.SS "streptok"
+Replace string demarcated string s3 with string s4 globally within string s1, returning
+as string s2.
+.SS "strtrnc"
+Truncate string at demarcation character (from string tail).
+.SS "strtrnch"
+Truncate string at demarcation character (from string head).
+.SS "strail"
+Strip (nominated) trailing character string.
+.SS "strdigit"
+Strip trailing character string (which begins with digit).
+.SS "strlead"
+Strip (nominated) leading characters from string.
+.SS "strfirst"
+Return substring which starts at first non-whitespace character.
+.SS "strfrm"
+Extract string.
+.SS "strchcnt"
+Count number of time character occurs in string.
+.SS "m_strext"
+Extract substring from string [multiple embedded comparisons].
+.SS "ch_pos"
+Routine to return the position of a character in a string.
+.SS "rch_pos"
+Routine to return the reverse position of a character in a string.
+.SS "mdc_strext"
+Extract substring from string with multiple demarcation characters.
+.SS "mdc_strext2"
+Extract substring from string with multiple demarcation characters.
+.SS "strinp"
+Look for occurence of string 1 inside string 2 returning index to string 1.
+.SS "strpdigit"
+Strip numeric characters from a string.
+.SS "strpch"
+Strip character from string.
+.SS "mchrep"
+Replace characters in string with nominated character.
+.SS "strccpy"
+Copy string returning state of copied string pointer.
+.SS "strempty"
+Test for empty string (contains only whitespace and control chars).
+.SS "fsign"
+Find sign of float.
+.SS "sqr"
+Pascal compatable squaring routine.
+.SS "iround"
+Pascal compatable round routine.
+.SS "pups_find_ftab_index"
+Get next free PUPS file table index.
+.SS "pups_get_ftab_index"
+Get next free PUPS file table index.
+.SS "xfopen"
+Open file.
+.SS "xfdopen"
+Bind descriptor to stream.
+.SS "xfclose"
+Close file.
+.SS "pups_strp_commnts"
+Strip comments from file.
+.SS "pups_t_arg_errs"
+Print arguments which have not been parsed by application.
+.SS "pups_pipe_write"
+Extended write - checks that N bytes are in fact written.
+.SS "pups_set_alloc_opt"
+Set memory allocator (extended) options.
+.SS "xmalloc"
+Extended malloc - checks for allocation.
+.SS "xrealloc"
+Extended realloc - checks for allocation.
+.SS "xcalloc"
+Extended calloc - checks for allocation.
+.SS "xfree"
+Extended free - checks for unassigned pointer.
+.SS "pups_set_state"
+Save an application state vector.
+.SS "pups_get_state"
+Routine to get an application state vector.
+.SS "pups_show_state"
+Display an application state vector.
+.SS "pups_creator"
+Register name of (file) creator.
+.SS "pups_not_creator"
+Relinquish creator rights to file.
+.SS "pups_execls"
+Generate command vector from string and then do execv */.
+.SS "xaalloc"
+Routine to allocate a two dimensional array.
+.SS "xafree"
+Routine to free a two dimensional array.
+.SS "sort2"
+Routine to perform a heapsort.
+.SS "pups_get_directory_entries"
+Get entries in directory.
+.SS "pups_get_multikeyed_directory_entries"
+Get (multikeyed) entries in directory.
+.SS "pups_sread"
+Read call which is not interrupted by signal handling.
+.SS "pups_swrite"
+Write call which is not interrupted by signal handling.
+.SS "pups_search_path"
+Search a path for an item.
+.SS "pups_set_pen"
+Set process execution name.
+.SS "pups_register_entrance_f"
+Register process entrance function.
+.SS "pups_deregister_entrance_f"
+Deregister process entrance function.
+.SS "pups_show_entrance_f"
+Show entrance functions.
+.SS "pups_register_exit_f"
+Register process exit function.
+.SS "pups_deregister_exit_f"
+Deregister process exit function.
+.SS "pups_show_exit_f"
+Show exit functions.
+.SS "pups_register_abort_f"
+Register process abort function.
+.SS "pups_show_abort_f"
+Show abort functions.
+.SS "deregister_pups_abort_f"
+Deregister process abort  function.
+.SS "pups_exit"
+PUPS process exit */.
+.SS "pups_pipe_read"
+Pipe read */.
+.SS "pupsighold"
+Block signal (for critical code sequence protection).
+.SS "pupsigrelse"
+Release blocked signals.
+.SS "pupshold"
+Block PUPS signals.
+.SS "pupsrelse"
+Release all PUPS signals */.
+.SS "pups_sighandle"
+PUPS signal handler.
+.SS "pups_signalpause"
+Suspend process until specified signal is recieved.
+.SS "pups_signalpending"
+Check to see if specified signal is pending.
+.SS "pups_show_sigstatus"
+PUPS signal handler status.
+.SS "pups_show_sigmaskstatus"
+PUPS signal mask/signal pending status.
+.SS "pups_signametosigno"
+Convert signal name to signal number.
+.SS "pups_signotosigname"
+Convert signal number to signal name.
+.SS "pups_show_siglstatus"
+PUPS signal handler extended status.
+.SS "pups_sigvector"
+PUPS signal handler exit vectorer.
+.SS "pups_monitor"
+Test to see if data is available on descriptor.
+.SS "strdate"
+Return date string.
+.SS "pups_setvitimer"
+Set up PUPS virtual interval timer.
+.SS "pups_clearvitimer"
+Clear PUPS virtual interval timer.
+.SS "vitmer_restart"
+Restart timer system.
+.SS "pups_show_vitimers"
+Show PUPS virtual interval timer.
+.SS "pups_set_fs_hsm_parameters"
+Set homeostatic file state parameters.
+.SS "pups_write_homeostat"
+Homeostatic write check routine.
+.SS "pups_default_fd_homeostat"
+Homeostat for stdio redirected to FIFO's.
+.SS "pups_default_parent_homeostat"
+Monitor effective parent process.
+.SS "pups_check_fs_space"
+File system space homeostat.
+.SS "pups_attach_homeostat"
+Attach homeostat to file table entry.
+.SS "pups_detach_homeostat"
+Detach homeostat from file table entry.
+.SS "pups_sleep"
+VT timer compatable sleep routine.
+.SS "pupsualarm"
+Microsecond alarm function.
+.SS "get_lock"
+Get (named) file lock.
+.SS "pups_release_lock"
+Release (named) file lock.
+.SS "pups_get_fd_lock"
+Get PUPS file descriptor lock.
+.SS "pups_release_fd_lock"
+Release PUPS file descriptor lock.
+.SS "pups_fname2fdes"
+Get file descriptor (from filename).
+.SS "pups_fname2fstream"
+Get file stream (from filename).
+.SS "pups_fname2index"
+Get file table index (from file name).
+.SS "pups_fdes2index"
+Get file table index (from file descriptor).
+.SS "pups_pipestream_obituary_enable"
+Enable obituary (for child).
+.SS "pups_pipestream_obituary_disable"
+Disable obituary (for child).
+.SS "xfork"
+Extended fork routine.
+.SS "xcreat"
+Extended creat command.
+.SS "xfchmod"
+Extended fchmod which updates ftab.
+.SS "xstrlen"
+Extended strlen command.
+.SS "pups_tmalloc"
+Tracked malloc routine.
+.SS "pups_tcalloc"
+Tracked calloc routine.
+.SS "pups_trealloc"
+Tracked realloc routine.
+.SS "pups_tnametoptr"
+Convert tracked object name to heap address.
+.SS "pups_tpartnametoptr"
+Convert partial tracked object name to heap address.
+.SS "pups_ttypetoptr"
+Convert type to heap address.
+.SS "pups_tfree"
+Tracked object free.
+.SS "pups_taalloc"
+Tracked dynamic array allocation.
+.SS "pups_tafree"
+Tracked dynamic array free.
+.SS "pups_tshowobject"
+Display tracked object attributes.
+.SS "pups_tshowobjects"
+Display tracked object table.
+.SS "xfgets"
+Extended fgets function.
+.SS "pupswait"
+PUPS wait function.
+.SS "pupswaitpid"
+PUPS waitpid function.
+.SS "pups_set_child_name"
+Set child name associated with child process.
+.SS "pups_clear_chtab_slot"
+Clear a child table slot.
+.SS "pups_show_children"
+Show active children.
+.SS "pups_noauto_child"
+Switch automatic child handling off (for a process we wish
+to wait for explicitily).
+.SS "pups_auto_child"
+Re-enable automatic child handling.
+.SS "strcomment"
+Is string a comment string? (first non-space character '#').
+.SS "strclr"
+Set all characters in string to NULL ('\\0').
+.SS "pups_sigtabsave"
+Save a PUPS sigtab entry.
+.SS "pups_sigtabrestore"
+Restore a PUPS sigtab entry.
+.SS "pups_tty_echoing_off"
+Turn local echoing off (on tty).
+.SS "pups_tty_echoing_on"
+Turn local tty echoing on (on tty) */.
+.SS "pups_lexec"
+Execute command (pipeline) locally */.
+.SS "pups_statkill"
+PUPS statkill -- pids which belong to terminated or stopped process
+return error.
+.SS "set_ftab_id"
+Set file table id tag.
+.SS "pups_get_ftab_index_by_id"
+Get file table index (from id tag).
+.SS "pups_get_ftab_index_by_name"
+Get file table index (from file name).
+.SS "pups_clear_ftab_slot"
+Clear file table slot.
+.SS "pups_init_child_table"
+Initialise child table.
+.SS "pups_lseek"
+Lseek() function which is PUPS signal safe.
+.SS "pups_get_load_average"
+Get load average.
+.SS "pups_is_seekable"
+Test to see if fdes is asscoiated with a seekable device.
+.SS "pups_fifo_relay"
+Relay data to a process slaved via a pair of FIFO's.
+.SS "pups_get_link_file_lock"
+Get file lock [using link()].
+.SS "pups_release_link_file_lock"
+Release file lock [set using link()].
+.SS "pups_wait_until_file_loaded"
+Wait for a file to load.
+.SS "xunlink"
+Wait for file to be unlinked before returning to caller.
+.SS "pups_usleep"
+Interaction free version of usleep().
+.SS "pups_fdes_set_stable"
+Set file content stability flag.
+.SS "pups_fdes_reset_stable"
+Reset file content stability flag.
+.SS "pups_is_on_isofs"
+Check to see if current file is on CDFS.
+.SS "pups_is_on_fisofs"
+Check to see if current file is on CDFS.
+.SS "pups_is_on_nfs"
+Check to see if current file is on NFS.
+.SS "pups_is_on_fnfs"
+Check to see if current file is on NFS.
+.SS "pups_cpfile"
+Copy file (by name).
+.SS "pups_fcpfile"
+Copy file (by descriptor).
+.SS "pups_malarm"
+PUPS microsecond alarm.
+.SS "pups_cmd_running"
+Check for host scanning (ps, top etc).
+.SS "pups_i_own"
+Do I own the current process?.
+.SS "pups_restart_enable"
+Enable abort restart (on reciept of SIGQUIT).
+.SS "pups_restart_disable"
+Disable abort restart (on reciept of SIGQUIT).
+.SS "pups_crc_p32"
+Compute psuedo 32 bit cyclic redundancy checksum.
+.SS "pups_get_signature"
+Extract CRC signature from file name.
+.SS "pups_sign"
+Sign a file (with its CRC checksum).
+.SS "pupsfprintf"
+PUPS signal safe fprintf function.
+.SS "pupssprintf"
+PUPS signal safe sprintf function.
+.SS "pupslseek"
+PUPS signal safe lseek function.
+.SS "pups_replace_cmd_tail_item"
+Replace command tail tem at specified location.
+.SS "pups_insert_cmd_tail_item"
+Insert item into the command tail.
+.SS "pups_clear_cmd_tail"
+Clear command tail.
+.SS "pups_segv_backtrack_handler"
+Handler for backtracking (when segmentation violation occurs).
+.SS "pups_backtrack"
+Set a backtrack re-entry point (in process address space).
+.SS "pups_file_updated"
+Has file been updated?.
+.SS "pups_host_reachable"
+Is host reachable?.
+.SS "xflock"
+Set (fcntl) file lock (on descriptor).
+.SS "xflockfile"
+Set (fcntl) file lock (on named file).
+.SS "pups_show_flock_locks"
+Display flock locks currently held by caller process.
+.SS "strsub"
+Substitute substring.
+.SS "pups_checkuser"
+Authenticate user.
+.SS "pups_check_appl_password"
+Authenticate secure service password.
+.SS "pups_getpass"
+Authenticate a user.
+.SS "pups_check_pass_set"
+Check that application has password set.
+.SS "pups_get_file_type"
+Get file type.
+.SS "pups_copy_file"
+Copy file.
