@@ -8,8 +8,8 @@
              NE3 4RT
              United Kingdom
 
-    Dated:   27th September 2019 
-    Version: 5.00 
+    Version: 5.06 
+    Dated:   6th October 2023 
     E-mail:  mao@tumblingdice.co.uk
 ------------------------------------------------------------------------------*/
 
@@ -165,7 +165,7 @@ _PRIVATE void psrplib_slot(int level)
 {   (void)fprintf(stderr,"lib psrplib %s: [ANSI C]\n",PSRPLIB_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 1995-2019 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 1995-2022 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
        (void)fprintf(stderr,"PUPS/P3 multiuser threadsafe PSRP [SUPUPS] library (built %s %s)\n\n",__TIME__,__DATE__);
     }
@@ -595,7 +595,7 @@ _PUBLIC void psrp_ignore_requests(void)
     {  (void)fprintf(stderr,"psrp_ignore_requests: attempt by non root thread to perform PUPS/P3 PSRP operation");
        (void)fflush(stderr);
 
-       pups_exit(-1);
+       pups_exit(255);
     } 
 
     ignore_pups_signals   = TRUE;
@@ -1075,6 +1075,7 @@ _PUBLIC void psrp_init(const int bind_status, const int (*psrp_process_status)(c
     (void)sigaddset(&chan_set,SIGPSRP);
     (void)sigaddset(&chan_set,SIGCHLD);
     (void)sigaddset(&init_set,SIGABRT);
+    (void)sigaddset(&init_set,SIGALRM);
 
 
     /*-----------------------------------------------*/
@@ -1087,6 +1088,7 @@ _PUBLIC void psrp_init(const int bind_status, const int (*psrp_process_status)(c
     (void)sigaddset(&chan_set,SIGPSRP);
     (void)sigaddset(&psrp_set,SIGCHLD);
     (void)sigaddset(&psrp_set,SIGABRT);
+    (void)sigaddset(&init_set,SIGALRM);
 
 
     /*-----------------------------------------------------*/
@@ -1099,6 +1101,7 @@ _PUBLIC void psrp_init(const int bind_status, const int (*psrp_process_status)(c
     (void)sigaddset(&init_set,SIGPSRP);
     (void)sigaddset(&init_set,SIGCHLD);
     (void)sigaddset(&init_set,SIGABRT);
+    (void)sigaddset(&init_set,SIGALRM);
 
 
     /*-----------------------------------------------------*/
@@ -1335,7 +1338,9 @@ _PUBLIC int psrp_attach_static_databag(const char               *object_tag,
     tag_index = psrp_get_tag_index(slot_index);
 
     (void)strlcpy(psrp_object_list[slot_index].object_tag[tag_index],object_tag,SSIZE);
-    psrp_object_list[slot_index].object_tag[tag_index]  = (char *)pups_malloc(SSIZE);
+
+    if(psrp_object_list[slot_index].object_tag[tag_index] == (char *)NULL)
+       psrp_object_list[slot_index].object_tag[tag_index] = (char *)pups_malloc(SSIZE);
 
     psrp_object_list[slot_index].object_handle     = (void *)databag_handle;
     psrp_object_list[slot_index].object_size       = databag_size;
@@ -1456,12 +1461,18 @@ _PUBLIC int psrp_attach_dynamic_databag(const _BOOLEAN     search,  // If TRUE s
            bag_handle     = (_BYTE *)pups_realloc((void *)bag_handle,bag_size);
            bag_bytes_read = pups_pipe_read(bag_des,bag_handle,PSRP_BAG_TABLE_SIZE);
        } while(bag_bytes_read == PSRP_BAG_TABLE_SIZE);
- 
-    psrp_object_list[slot_index].object_tag[tag_index] = (char *)pups_malloc(SSIZE);
-    psrp_object_list[slot_index].object_f_name         = (char *)pups_malloc(SSIZE);
-    psrp_object_list[slot_index].object_handle         = (void *)bag_handle;
-    psrp_object_list[slot_index].object_size           = bag_size;
-    psrp_object_list[slot_index].object_type           = PSRP_DYNAMIC_DATABAG;
+
+    if(psrp_object_list[slot_index].object_tag[tag_index] == (char *)NULL) 
+       psrp_object_list[slot_index].object_tag[tag_index] = (char *)pups_malloc(SSIZE);
+
+    if(psrp_object_list[slot_index].object_f_name == (char *)NULL)
+       psrp_object_list[slot_index].object_f_name = (char *)pups_malloc(SSIZE);
+
+    if(psrp_object_list[slot_index].object_handle == (void *)NULL)
+       psrp_object_list[slot_index].object_handle = (void *)bag_handle;
+
+    psrp_object_list[slot_index].object_size = bag_size;
+    psrp_object_list[slot_index].object_type = PSRP_DYNAMIC_DATABAG;
 
     (void)strlcpy(psrp_object_list[slot_index].object_tag[tag_index],object_tag,SSIZE);
     (void)strlcpy(psrp_object_list[slot_index].object_f_name,bag_file_name,SSIZE);
@@ -1567,8 +1578,12 @@ _PUBLIC int psrp_attach_persistent_heap(const _BOOLEAN      search,    // If TRU
     if((psrp_object_list[slot_index].hid = msm_heap_attach(heap_file_name,h_mode)) == (-1))
        return(PSRP_DISPATCH_ERROR);
 
-    psrp_object_list[slot_index].object_tag[tag_index] = (char *)pups_malloc(SSIZE);
-    psrp_object_list[slot_index].object_f_name         = (char *)pups_malloc(SSIZE);
+    if(psrp_object_list[slot_index].object_tag[tag_index] == (char *)NULL)
+       psrp_object_list[slot_index].object_tag[tag_index] = (char *)pups_malloc(SSIZE);
+
+    if(psrp_object_list[slot_index].object_f_name == (char *)NULL)
+       psrp_object_list[slot_index].object_f_name = (char *)pups_malloc(SSIZE);
+
     psrp_object_list[slot_index].object_handle         = (void *)htable[psrp_object_list[slot_index].hid].addr;
     psrp_object_list[slot_index].object_size           = (-1);
     psrp_object_list[slot_index].object_type           = PSRP_PERSISTENT_HEAP;
@@ -1639,7 +1654,10 @@ _PUBLIC int psrp_attach_static_function(const char    *object_tag,
     psrp_object_list[slot_index].aliases               = 0;
     psrp_object_list[slot_index].aliases_allocated     = 0;
     tag_index                                          = psrp_get_tag_index(slot_index);
-    psrp_object_list[slot_index].object_tag[tag_index] = (char *)pups_malloc(SSIZE);
+
+    if(psrp_object_list[slot_index].object_tag[tag_index] == (char *)NULL)
+       psrp_object_list[slot_index].object_tag[tag_index] = (char *)pups_malloc(SSIZE);
+
     psrp_object_list[slot_index].object_handle         = object_handle;
     psrp_object_list[slot_index].object_size           = 0;
     psrp_object_list[slot_index].object_type           = PSRP_STATIC_FUNCTION;
@@ -1762,8 +1780,13 @@ _PUBLIC int psrp_attach_dynamic_function(const _BOOLEAN  search,  // Search for 
     psrp_object_list[slot_index].aliases               = 0;
     psrp_object_list[slot_index].aliases_allocated     = 0;
     tag_index                                          = psrp_get_tag_index(slot_index);
-    psrp_object_list[slot_index].object_tag[tag_index] = (char *)pups_malloc(SSIZE);
-    psrp_object_list[slot_index].object_f_name         = (char *)pups_malloc(SSIZE);
+
+    if(psrp_object_list[slot_index].object_tag[tag_index] == (char *)NULL)
+       psrp_object_list[slot_index].object_tag[tag_index] = (char *)pups_malloc(SSIZE);
+
+    if(psrp_object_list[slot_index].object_f_name == (char *)NULL)
+       psrp_object_list[slot_index].object_f_name = (char *)pups_malloc(SSIZE);
+
     psrp_object_list[slot_index].object_handle         = object_handle;
     psrp_object_list[slot_index].object_size           = 0;
     psrp_object_list[slot_index].object_type           = PSRP_DYNAMIC_FUNCTION;
@@ -1859,6 +1882,12 @@ _PUBLIC void psrp_show_object_list(void)
     #endif /* PSRP_AUNTHENTICATE */
 
     #ifdef MAIL_SUPPORT
+
+
+    /*---------*/
+    /* Postbox */
+    /*---------*/
+
     if(appl_mailable == TRUE)
     {  if(strcmp(appl_mime_type,"all") == 0)
           (void)fprintf(psrp_out,"    %s (%d@%s) has postbox \"%s\" (extracting all MIME message parts)\n",
@@ -1874,9 +1903,17 @@ _PUBLIC void psrp_show_object_list(void)
                                                                                                     appl_mdir,
                                                                                                appl_mime_type);
     }
+
+
+    /*------------*/
+    /* No postbox */
+    /*------------*/
+
     else
        (void)fprintf(psrp_out,"    %s (%d@%s) does not have a postbox (does not support e-mail interaction)\n",appl_name,appl_pid,appl_host);
+    (void)fflush(psrp_out);
     #endif /* MAIL_SUPPORT */
+
 
 
     #ifndef NO_NET
@@ -1913,19 +1950,20 @@ _PUBLIC void psrp_show_object_list(void)
           {  (void)fprintf(psrp_out,"    %04d: \"%-32s\" (entry at %016lx virtual)    ",i,
                                                         psrp_object_list[i].object_tag[0],
                                      (unsigned long int)psrp_object_list[i].object_handle);
+              (void)fflush(psrp_out);
 
               switch(psrp_object_list[i].object_type)
               {   case PSRP_STATIC_DATABAG:    (void)fprintf(psrp_out,"  Static databag (%d bytes)",
-                                                                     psrp_object_list[i].object_size);
+                                                                    psrp_object_list[i].object_size);
    
                                                break; 
 
                   case PSRP_PERSISTENT_HEAP:   (void)fprintf(psrp_out,"  Persistent heap(%d bytes)\n",
-                                                                   psrp_object_list[i].object_size);
+                                                                      psrp_object_list[i].object_size);
                                                break;
 
                   case PSRP_DYNAMIC_DATABAG:   (void)fprintf(psrp_out,"  Dynamic databag (%d bytes)\n",
-                                                                        psrp_object_list[i].object_size);
+                                                                       psrp_object_list[i].object_size);
                                                break;
 
                   case PSRP_DYNAMIC_FUNCTION:  (void)fprintf(psrp_out,"  Dynamic function\n");
@@ -1945,6 +1983,8 @@ _PUBLIC void psrp_show_object_list(void)
           (void)fprintf(psrp_out,"\n\n    %04d PSRP objects bound to dispatch handler (%04d slots free)\n\n",psrp_object_list_used,psrp_object_list_used - psrp_object_list_size);
        else if(psrp_object_list_used  == 1)
           (void)fprintf(psrp_out,"\n\n    %04d PSRP object bound to dispatch handler (%04d slots free)\n\n",1,psrp_object_list_used - 1);
+
+       (void)fflush(psrp_out);
     }
 
     if(appl_wait == TRUE)
@@ -4156,12 +4196,14 @@ re_dispatch:
 
     if(psrp_exec_action_object(r_argc,&status,r_argv) == TRUE)
     {
-       /*---------------*/
-       /* Command error */
-       /*---------------*/
 
-       if(status == PUPS_ERROR && psrp_error_handling == TRUE)
-       {  (void)fprintf(psrp_out,"    Command error (%s)\n",r_argv[0]);
+       /*--------------------------------------*/
+       /* Command error                        */
+       /* Non zero return code indicates error */
+       /*--------------------------------------*/
+
+       if(status < 0  && psrp_error_handling == TRUE)
+       {  (void)fprintf(psrp_out,"    Command returned error (%s)\n",r_argv[0]);
           (void)fflush(psrp_out);
 
           (void)strlcpy(psrp_c_code,"err",SSIZE);
@@ -4277,11 +4319,8 @@ _PRIVATE int psrp_handler(int signum)
     char request[SSIZE]             = "",
          get_object_command[SSIZE]  = "",
          psrp_channel_name[SSIZE]   = "",
-         object_type_str[SSIZE]     = "",
          request_str[SSIZE]         = "",
          psrp_ckpt_status[SSIZE]    = "";
-
-    FILE *object_type_stream = (FILE *)NULL;
 
     sigset_t set;
 
@@ -4622,7 +4661,7 @@ _PUBLIC int psrp_save_dispatch_table(const char *autoload_file_name)
 
     (void)fprintf(autoload_stream,"#-------------------------------------------------------------------\n");
     (void)fprintf(autoload_stream,"#    PSRP dispatch table resource file version 1.0                  \n");
-    (void)fprintf(autoload_stream,"#    (C) M.A. O'Neill, Tumbling Dice, Gosforth, 2019                \n");
+    (void)fprintf(autoload_stream,"#    (C) M.A. O'Neill, Tumbling Dice, Gosforth, 2022                \n");
     (void)fprintf(autoload_stream,"#-------------------------------------------------------------------\n");
     (void)fprintf(autoload_stream,"\n\n");
 
@@ -5323,7 +5362,7 @@ _PRIVATE int psrp_builtin_ssh_port(const int argc, const char *argv[])
           /*------------------------------------------------*/
           /* ssh is using user defined port. This is useful */
           /* when the remote psrp server is running is a    */
-          /* Docker or LXC container                        */
+          /* container                                      */
           /*------------------------------------------------*/
 
           (void)fprintf(psrp_out,"remote ssh port must be an (>= 0)\n");
@@ -5800,7 +5839,7 @@ _PRIVATE int psrp_builtin_terminate_process(const int argc, const char *argv[])
 
     (void)raise(SIGTERM);
 
-    pups_exit(-1);
+    pups_exit(255);
 }
 
 
@@ -6208,7 +6247,7 @@ _PRIVATE int psrp_builtin_help(const int argc, const char *argv[])
     /*-------------------------------------------*/  
 
     (void)fprintf(psrp_out,"\n\n    PSRP request handler version 2.16 (protocol %5.2F)\n",PSRP_PROTOCOL_VERSION);
-    (void)fprintf(psrp_out,"    (C) M.A. O'Neill, Tumbling Dice, 1995-2019\n\n");
+    (void)fprintf(psrp_out,"    (C) M.A. O'Neill, Tumbling Dice, 1995-2022\n\n");
     (void)fprintf(psrp_out,"    Builtin commands\n");
     (void)fprintf(psrp_out,"    ================\n\n");
     (void)fflush(psrp_out);
@@ -7409,23 +7448,24 @@ _PUBLIC int psrp_pname_to_pid(const char *process_name)
     while((next_item = readdir(dirp)) != (struct dirent *)NULL)
     {    if(sscanf(next_item->d_name,"%d",&pid) == 1) 
          {  (void)snprintf(procpidpath,SSIZE,"/proc/%d/cmdline",pid);
-            stream = fopen(procpidpath,"r");
+            if ((stream = fopen(procpidpath,"r")) != (FILE *)NULL)
+            {  
+               (void)strlcpy(cmd_line,"",SSIZE);
+               (void)fgets(cmd_line,SSIZE,stream);
+               (void)fclose(stream);
 
-            (void)strlcpy(cmd_line,"",SSIZE);
-            (void)fgets(cmd_line,SSIZE,stream);
-            (void)fclose(stream);
+               if(strncmp(cmd_line,process_name,strlen(process_name)) == 0)
+               {  ++cnt;
 
-            if(strncmp(cmd_line,process_name,strlen(process_name)) == 0)
-            {  ++cnt;
+                  if(cnt > 1)
+                  {  (void)closedir(dirp);
+                      pups_set_errno(ESRCH);
 
-               if(cnt > 1)
-               {  (void)closedir(dirp);
-                  pups_set_errno(ESRCH);
+                      return(PSRP_DUPLICATE_PROCESS_NAME);
+                  }
 
-                  return(PSRP_DUPLICATE_PROCESS_NAME);
+                  target_pid = pid;
                }
-
-               target_pid = pid;
             }
          }
     }
@@ -8053,12 +8093,17 @@ _PUBLIC psrp_channel_type *psrp_create_slaved_interaction_client(const char  *ps
     /*---------------------------------------------------*/
 
     channel[sic_index].index   = sic_index;
-    channel[sic_index].in_name = (char *)pups_malloc(SSIZE);
+
+    if(channel[sic_index].in_name == (char *)NULL)
+       channel[sic_index].in_name = (char *)pups_malloc(SSIZE);
     (void)strlcpy(channel[sic_index].in_name, sic_channel_in_name,SSIZE);
 
-    channel[sic_index].out_name  = (char *)pups_malloc(SSIZE);
+    if(channel[sic_index].out_name == (char *)NULL)
+       channel[sic_index].out_name  = (char *)pups_malloc(SSIZE);
     (void)strlcpy(channel[sic_index].out_name,sic_channel_out_name,SSIZE);
-    channel[sic_index].host_name = (char *)pups_malloc(SSIZE);
+
+    if(channel[sic_index].host_name == (char *)NULL)
+       channel[sic_index].host_name = (char *)pups_malloc(SSIZE);
 
     if(host_name == (char *)NULL)
     {  (void)strlcpy(channel[sic_index].host_name,appl_host,SSIZE);
@@ -8077,11 +8122,13 @@ _PUBLIC psrp_channel_type *psrp_create_slaved_interaction_client(const char  *ps
     /*----------------------*/
 
     if(ssh_portNo >  0)
-    {  channel[sic_index].ssh_port = (char *)pups_malloc(SSIZE); 
+    {  if(channel[sic_index].ssh_port == (char *)NULL)
+          channel[sic_index].ssh_port = (char *)pups_malloc(SSIZE); 
        (void)strlcpy(channel[sic_index].ssh_port,ssh_port,SSIZE);
     }
 
-    channel[sic_index].pen  = (char *)pups_malloc(SSIZE);
+    if(channel[sic_index].pen  == (char *)NULL)
+       channel[sic_index].pen  = (char *)pups_malloc(SSIZE);
     (void)strlcpy(channel[sic_index].pen,eff_psrp_pen,SSIZE);
 
 
@@ -8212,7 +8259,7 @@ _PUBLIC psrp_channel_type *psrp_create_slaved_interaction_client(const char  *ps
           /* We should not get here -- if we do an error has occured */
           /*---------------------------------------------------------*/
 
-          _exit(-1);
+          _exit(255);
        }
 
 
@@ -8341,7 +8388,7 @@ _PUBLIC psrp_channel_type *psrp_create_slaved_interaction_client(const char  *ps
           /* We should not get here -- if we do an error has occured */
           /*---------------------------------------------------------*/
 
-          _exit(-1);
+          _exit(255);
        }
 
 
@@ -9082,7 +9129,9 @@ _PUBLIC int psrp_alias(const char *name, const char *alias)
              }
              else
              {  alias_index = psrp_get_tag_index(i);
-                psrp_object_list[i].object_tag[alias_index] = (char *)pups_malloc(SSIZE);
+
+                if(psrp_object_list[i].object_tag[alias_index] == (char *)NULL)
+                   psrp_object_list[i].object_tag[alias_index] = (char *)pups_malloc(SSIZE);
                 (void)strlcpy(psrp_object_list[i].object_tag[alias_index],alias,SSIZE);
 
                 if(appl_verbose == TRUE)
@@ -9803,7 +9852,7 @@ _PUBLIC int psrp_new_segment(const char *name,             // Name of process
           /* We should not get here -- if we do an error has occured */
           /*---------------------------------------------------------*/
 
-          _exit(-1);
+          _exit(255);
        }
 
        /*---------------------*/
@@ -10125,6 +10174,7 @@ _PUBLIC int psrp_new_segment(const char *name,             // Name of process
 
 /*-----------------------------------------------*/
 /* Send end of operation (return code) to client */
+/* this is the psrp service return code          */
 /*-----------------------------------------------*/
 
 _PRIVATE void psrp_endop(char *op_tag)
@@ -10773,7 +10823,7 @@ _PUBLIC int psrp_overlay_server_process(const _BOOLEAN over_fork, const char *co
                                                       date,appl_name,appl_pid,appl_host,appl_owner,command_name);
                 (void)fflush(stderr);
              }
-             exit(-1);
+             exit(255);
           }
 
           (void)snprintf(channel_wait_in,SSIZE,"%s.wait",channel_name_in);
@@ -11903,12 +11953,12 @@ _PRIVATE int psrp_builtin_show_rusage(const int argc, const char *argv[])
     (void)getrusage(RUSAGE_SELF,&buf);
 
     (void)fprintf(psrp_out,"\n\nCurrent resource usage (for PSRP server \"%s\")\n\n",appl_name);
-    (void)fprintf(psrp_out,"User time                    : %4.4F minutes\n", (FTYPE)(buf.ru_utime.tv_sec)/60.0);
-    (void)fprintf(psrp_out,"System time                  : %4.4F minutes\n", ((FTYPE)buf.ru_stime.tv_sec)/60.0);
-    (void)fprintf(psrp_out,"Max resident size            : %4.4F Mbytes\n",  ((FTYPE)buf.ru_maxrss)/1000000.0);
-    (void)fprintf(psrp_out,"Integral shared memory size  : %4.4F Mbytes\n",  ((FTYPE)buf.ru_ixrss)/1000000.0);
-    (void)fprintf(psrp_out,"Integral unshared data size  : %4.4F Mbytes\n",  ((FTYPE)buf.ru_idrss)/1000000.0);
-    (void)fprintf(psrp_out,"Integral unshared stack size : %4.4F Mbytes\n\n",((FTYPE)buf.ru_isrss)/1000000.0);
+    (void)fprintf(psrp_out,"User time                    : %9.4F minutes\n", (FTYPE)(buf.ru_utime.tv_sec)/60.0);
+    (void)fprintf(psrp_out,"System time                  : %9.4F minutes\n", ((FTYPE)buf.ru_stime.tv_sec)/60.0);
+    (void)fprintf(psrp_out,"Max resident size            : %9.4F Mbytes\n",  ((FTYPE)buf.ru_maxrss)/1000000.0);
+    (void)fprintf(psrp_out,"Integral shared memory size  : %9.4F Mbytes\n",  ((FTYPE)buf.ru_ixrss)/1000000.0);
+    (void)fprintf(psrp_out,"Integral unshared data size  : %9.4F Mbytes\n",  ((FTYPE)buf.ru_idrss)/1000000.0);
+    (void)fprintf(psrp_out,"Integral unshared stack size : %9.4F Mbytes\n\n",((FTYPE)buf.ru_isrss)/1000000.0);
     (void)fflush(psrp_out);
 
     (void)fprintf(psrp_out,"\n\nCurrent resource limits (for PSRP server \"%s\")\n\n",appl_name);
@@ -11917,45 +11967,45 @@ _PRIVATE int psrp_builtin_show_rusage(const int argc, const char *argv[])
     if(rlim.rlim_cur == RLIM_INFINITY)
        (void)fprintf(psrp_out,"CPU time                     : unlimited\n");
     else
-       (void)fprintf(psrp_out,"CPU time                     : %4.4F minutes\n",(FTYPE)(rlim.rlim_cur)/60.0);
+       (void)fprintf(psrp_out,"CPU time                     : %9.4F minutes\n",(FTYPE)(rlim.rlim_cur)/60.0);
 
     (void)getrlimit(RLIMIT_CORE,&rlim);
     if(rlim.rlim_cur == RLIM_INFINITY)
        (void)fprintf(psrp_out,"Core size                    : unlimited\n");
     else
-       (void)fprintf(psrp_out,"Core size                    : %4.4F Mbytes\n",(FTYPE)(rlim.rlim_cur)/1000000.0);
+       (void)fprintf(psrp_out,"Core size                    : %9.4F Mbytes\n",(FTYPE)(rlim.rlim_cur)/1000000.0);
 
     
     (void)getrlimit(RLIMIT_DATA,&rlim);
     if(rlim.rlim_cur == RLIM_INFINITY)
        (void)fprintf(psrp_out,"Data segment size            : unlimited\n");
     else
-       (void)fprintf(psrp_out,"Data segment size            : %4.4F Mbytes\n",(FTYPE)(rlim.rlim_cur)/1000000.0);
+       (void)fprintf(psrp_out,"Data segment size            : %9.4F Mbytes\n",(FTYPE)(rlim.rlim_cur)/1000000.0);
 
     
     (void)getrlimit(RLIMIT_STACK,&rlim);
     if(rlim.rlim_cur == RLIM_INFINITY)
        (void)fprintf(psrp_out,"Stack size                   : unlimited\n");
     else
-       (void)fprintf(psrp_out,"Stack size                   : %4.4F Mbytes\n",(FTYPE)(rlim.rlim_cur)/1000000.0);
+       (void)fprintf(psrp_out,"Stack size                   : %9.4F Mbytes\n",(FTYPE)(rlim.rlim_cur)/1000000.0);
 
     (void)getrlimit(RLIMIT_RSS,&rlim);
     if(rlim.rlim_cur == RLIM_INFINITY)
        (void)fprintf(psrp_out,"Resident set size            : unlimited\n");
     else
-       (void)fprintf(psrp_out,"Resident set size            : %4.4F Mbytes\n",(FTYPE)(rlim.rlim_cur)/1000000.0);
+       (void)fprintf(psrp_out,"Resident set size            : %9.4F Mbytes\n",(FTYPE)(rlim.rlim_cur)/1000000.0);
 
     (void)getrlimit(RLIMIT_AS,&rlim);
     if(rlim.rlim_cur == RLIM_INFINITY)
        (void)fprintf(psrp_out,"Virtual memory size          : unlimited\n");
     else
-       (void)fprintf(psrp_out,"Virtual memory size          : %4.4F Mbytes\n",(FTYPE)(rlim.rlim_cur)/1000000.0);
+       (void)fprintf(psrp_out,"Virtual memory size          : %9.4F Mbytes\n",(FTYPE)(rlim.rlim_cur)/1000000.0);
        
     (void)getrlimit(RLIMIT_FSIZE,&rlim);
     if(rlim.rlim_cur == RLIM_INFINITY)
        (void)fprintf(psrp_out,"Max file size                : unlimited\n");
     else
-       (void)fprintf(psrp_out,"Max file size                : %4.4F Mbytes\n",(FTYPE)(rlim.rlim_cur)/1000000.0);
+       (void)fprintf(psrp_out,"Max file size                : %9.4F Mbytes\n",(FTYPE)(rlim.rlim_cur)/1000000.0);
     
       
     (void)getrlimit(RLIMIT_NOFILE,&rlim);
@@ -13197,7 +13247,7 @@ _PRIVATE void psrp_create_trailfile(char *trail_file_name,
 
     (void)fprintf(stream,"#--------------------------------------------------------------------\n");
     (void)fprintf(stream,"#    PSRP migration trail file version 1.02\n");
-    (void)fprintf(stream,"#    (C) M.A. O'Neill, Tumbling Dice 2019\n");
+    (void)fprintf(stream,"#    (C) M.A. O'Neill, Tumbling Dice 2022\n");
     (void)fprintf(stream,"#---------------------------------------------------------------------\n\n");
     (void)fflush(stream);
     (void)fprintf(stream,"%s %s %s\n\n",pen,host,host_port);
@@ -15037,4 +15087,19 @@ _PUBLIC int psrp_client_block(const _BOOLEAN block)
 
     pups_set_errno(OK);
     return(0);
+}
+
+
+
+/*-----------------------------------------*/
+/* Is PEN (porcess execution name) unique? */
+/*-----------------------------------------*/
+ 
+_PUBLIC void psrp_pen_unique(void)
+
+{
+    if(psrp_pname_to_pid(appl_name) == PSRP_DUPLICATE_PROCESS_NAME)
+    {  (void)strlcpy(errstr,"PEN (%s) is not unique",SSIZE);
+       pups_error(errstr);
+    }
 }

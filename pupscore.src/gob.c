@@ -8,13 +8,14 @@
               NE3 4RT
               United Kingdom
 
-     Version: 2.02 
-     Dated:   18th September 2019 
+     Version: 2.03 
+     Dated:   24th May 2022
      E-mail:  mao@tumblingdice.co.uk
 -----------------------------------------------------------------------------------------------------*/
 
 #include <stdio.h>
 #include <string.h>
+#include <bsd/string.h>
 #include <signal.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -33,7 +34,7 @@
 /* Version of gob */
 /*----------------*/
 
-#define GOB_VERSION   "2.00"
+#define GOB_VERSION   "2.03"
 
 
 /*-------------*/
@@ -63,102 +64,6 @@ static char gob_fifo_name[SSIZE] = "";
 static int  delete_on_exit       = FALSE;
 static int  verbose              = FALSE;
 static int  indes                = (-1);
-
-
-
-
-#ifdef BSD_FUNCTION_SUPPORT
-/*-----------------------------------------------------------------------------
-    Strlcpy and stlcat function based on OpenBSD functions ...
------------------------------------------------------------------------------*/
-/*------------------*/
-/* Open BSD Strlcat */
-/*------------------*/
-_PRIVATE size_t strlcat(char *dst, const char *src, size_t dsize)
-{
-	const char *odst = dst;
-	const char *osrc = src;
-	size_t      n    = dsize;
-	size_t      dlen;
-
-
-        /*------------------------------------------------------------------*/
-	/* Find the end of dst and adjust bytes left but don't go past end. */
-        /*------------------------------------------------------------------*/
-
-	while (n-- != 0 && *dst != '\0')
-		dst++;
-	dlen = dst - odst;
-	n = dsize - dlen;
-
-	if (n-- == 0)
-		return(dlen + strlen(src));
-	while (*src != '\0') {
-		if (n != 0) {
-			*dst++ = *src;
-			n--;
-		}
-		src++;
-	}
-	*dst = '\0';
-
-
-        /*----------------------------*/
-        /* count does not include NUL */
-        /*----------------------------*/
-
-	return(dlen + (src - osrc));
-}
-
-
-
-
-/*------------------*/
-/* Open BSD strlcpy */
-/*------------------*/
-
-_PRIVATE size_t strlcpy(char *dst, const char *src, size_t dsize)
-{
-	const char   *osrc = src;
-	size_t nleft       = dsize;
-
-
-        /*---------------------------------*/
-	/* Copy as many bytes as will fit. */
-        /*---------------------------------*/
-
-	if (nleft != 0) {
-		while (--nleft != 0) {
-			if ((*dst++ = *src++) == '\0')
-				break;
-		}
-	}
-
-
-        /*-----------------------------------------------------------*/
-	/* Not enough room in dst, add NUL and traverse rest of src. */
-        /*-----------------------------------------------------------*/
-
-	if (nleft == 0) {
-		if (dsize != 0)
-
-                        /*-------------------*/
-                        /* NUL-terminate dst */
-                        /*-------------------*/
-
-			*dst = '\0';
-		while (*src++)
-			;
-	}
-
-
-        /*----------------------------*/
-        /* count does not include NUL */
-        /*----------------------------*/
-
-	return(src - osrc - 1);
-}
-#endif /* BSD_FUNCTION_SUPPORT */
 
 
 
@@ -229,7 +134,7 @@ _PRIVATE int gob_fifo_homeostat(int signum)
              (void)fflush(stderr);
           }
 
-          exit(-1);
+          exit(255);
        }
        indes = open(gob_fifo_name,2);
 
@@ -298,7 +203,7 @@ _PUBLIC int main(int argc, char *argv[])
 
     if(isatty(1) == 1)
     {  if(argc == 1 || strcmp(argv[1],"-usage") == 0 || strcmp(argv[1],"-help") == 0)
-       {  (void)fprintf(stderr,"\ngob version %s, (C) Tumbling Dice 2005-2019 (built %s %s)\n\n",GOB_VERSION,__TIME__,__DATE__);
+       {  (void)fprintf(stderr,"\ngob version %s, (C) Tumbling Dice 2005-2022 (built %s %s)\n\n",GOB_VERSION,__TIME__,__DATE__);
           (void)fprintf(stderr,"GOB is free software, covered by the GNU General Public License, and you are\n");
           (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
           (void)fprintf(stderr,"See the GPL and LGPL licences at www.gnu.org for further details\n");
@@ -306,7 +211,7 @@ _PUBLIC int main(int argc, char *argv[])
           (void)fprintf(stderr,"\nUsage: gob [-usage | -help] | [-pen <execution name>] !-hole <gob hole FIFO name>!\n\n");
           (void)fflush(stderr);
 
-          exit(-1);
+          exit(255);
        }
     }
 
@@ -327,7 +232,7 @@ _PUBLIC int main(int argc, char *argv[])
                    (void)fflush(stderr);
                 }
 
-                exit(-1);
+                exit(255);
              }
 
              (void)strlcpy(args[0],argv[i+1],SSIZE);
@@ -356,10 +261,10 @@ _PUBLIC int main(int argc, char *argv[])
                  (void)fflush(stderr);
               }
 
-              exit(-1);
+              exit(255);
           }
           else
-             _exit(-1);
+             _exit(255);
        }
        else if(strcmp(argv[i],"-hole") == 0)
        {  if(i == argc -1 || argv[i+1][0] == '-')
@@ -368,7 +273,7 @@ _PUBLIC int main(int argc, char *argv[])
                 (void)fflush(stderr);
              }
 
-             exit(-1);
+             exit(255);
           }
 
           (void)strlcpy(gob_fifo_name,argv[i+1],SSIZE);
@@ -383,7 +288,7 @@ _PUBLIC int main(int argc, char *argv[])
            (void)fflush(stderr);
         }
 
-        exit(-1);
+        exit(255);
     }
 
     if(strcmp(gob_fifo_name,"") == 0)
@@ -398,7 +303,7 @@ _PUBLIC int main(int argc, char *argv[])
              (void)fflush(stderr);
           }
 
-          exit(-1);
+          exit(255);
        }
        else
           (void)strlcpy(newstr,"new",SSIZE);

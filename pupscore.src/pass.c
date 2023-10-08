@@ -9,8 +9,8 @@
              NE3 4RT
              United Kingdom
 
-    Dated:   30th August 2019 
     Version: 2.00 
+    Dated:   4th January 2022
     E-mail:  mao@@tumblingdice.co.uk
 -------------------------------------------------------------------------------------------------------*/
 
@@ -87,7 +87,7 @@ _PRIVATE void pass_slot(int level)
 {   (void)fprintf(stderr,"int dynamic app (PSRP) pass %s: [ANSI C, PUPS MTD D]\n",PASS_VERSION);
  
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 2005-2019 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 2005-2022 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
        (void)fprintf(stderr,"PUPS/PSRP service server-client (built %s %s)\n\n",__TIME__,__DATE__);
     }
@@ -246,7 +246,7 @@ _PRIVATE char     *tsname[SSIZE]   = { (char *) NULL };  /* List of sdir input f
     checkpoint files) ...
 -------------------------------------------------------------------------------------------------------*/
 
-#define VTAG  4175
+#define VTAG  4584
 
 extern int appl_vtag = VTAG;
 
@@ -280,7 +280,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
                   PASS_VERSION,
                   "M.A. O'Neill",
                   "(PSRP) pass",
-                  "2019",
+                  "2022",
                   argv);
 
 
@@ -739,7 +739,7 @@ _PRIVATE void sdir_loop(char *sdir, char *command_pipeline)
                             (void)fflush(stderr);
                          }
 
-                         exit(-1);
+                         exit(255);
                       }
                          
                       if(use_fifos == TRUE)
@@ -836,7 +836,7 @@ _PRIVATE void sdir_loop(char *sdir, char *command_pipeline)
                           {  (void)setsid();
                              (void)pups_execls(lyosome_command);
 
-                             exit(-1);
+                             exit(255);
                           }
 
                           (void)snprintf(lyosome_command,SSIZE,"lyosome -lifetime 60 %s",sdepath);
@@ -844,7 +844,7 @@ _PRIVATE void sdir_loop(char *sdir, char *command_pipeline)
                           {  (void)setsid();
                              (void)pups_execls(lyosome_command);
 
-                             exit(-1);
+                             exit(255);
                           }
                        }         
 

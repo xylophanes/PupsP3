@@ -1,0 +1,4 @@
+
+## Anyone can find out what sort of environment they are running in
+ALL     ALL=NOPASSWD:   /sbin/virt-what
+

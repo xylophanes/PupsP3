@@ -8,8 +8,8 @@
               NE3 4RT
               United Kingdom
 
-     Version: 2.00
-     Dated:   30th August 2019 
+     Version: 2.01
+     Dated:   24th May 2022
      E-mail:  mao@tumblingdice.co.uk
 ---------------------------------------------------------------------------------------*/
 
@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <xtypes.h>
 #include <string.h>
+#include <bsd/string.h>
 #include <stdlib.h>
 
 #ifdef HAVE_READLINE
@@ -30,7 +31,7 @@
 /* Version of dllgen */ 
 /*-------------------*/
 
-#define DLLGEN_VERSION    "2.00"
+#define DLLGEN_VERSION    "2.01"
 
 
 /*-------------*/
@@ -47,103 +48,6 @@
 #ifndef DEFAULT_BASEPATH
 #define DEFAULT_BASEPATH    "./"
 #endif /* DEFAULT_BASEPATH */
-
-
-
-
-
-#ifdef BSD_FUNCTION_SUPPORT
-/*-----------------------------------------------------------------------------
-    Strlcpy and stlcat function based on OpenBSD functions ...
------------------------------------------------------------------------------*/
-/*------------------*/
-/* Open BSD Strlcat */
-/*------------------*/
-_PRIVATE size_t strlcat(char *dst, const char *src, size_t dsize)
-{
-	const char *odst = dst;
-	const char *osrc = src;
-	size_t      n    = dsize;
-	size_t      dlen;
-
-
-        /*------------------------------------------------------------------*/
-	/* Find the end of dst and adjust bytes left but don't go past end. */
-        /*------------------------------------------------------------------*/
-
-	while (n-- != 0 && *dst != '\0')
-		dst++;
-	dlen = dst - odst;
-	n = dsize - dlen;
-
-	if (n-- == 0)
-		return(dlen + strlen(src));
-	while (*src != '\0') {
-		if (n != 0) {
-			*dst++ = *src;
-			n--;
-		}
-		src++;
-	}
-	*dst = '\0';
-
-
-        /*----------------------------*/
-        /* count does not include NUL */
-        /*----------------------------*/
-
-	return(dlen + (src - osrc));
-}
-
-
-
-
-/*------------------*/
-/* Open BSD strlcpy */
-/*------------------*/
-
-_PRIVATE size_t strlcpy(char *dst, const char *src, size_t dsize)
-{
-	const char   *osrc = src;
-	size_t nleft       = dsize;
-
-
-        /*---------------------------------*/
-	/* Copy as many bytes as will fit. */
-        /*---------------------------------*/
-
-	if (nleft != 0) {
-		while (--nleft != 0) {
-			if ((*dst++ = *src++) == '\0')
-				break;
-		}
-	}
-
-
-        /*-----------------------------------------------------------*/
-	/* Not enough room in dst, add NUL and traverse rest of src. */
-        /*-----------------------------------------------------------*/
-
-	if (nleft == 0) {
-		if (dsize != 0)
-
-                        /*-------------------*/
-                        /* NUL-terminate dst */
-                        /*-------------------*/
-
-			*dst = '\0';
-		while (*src++)
-			;
-	}
-
-
-        /*----------------------------*/
-        /* count does not include NUL */
-        /*----------------------------*/
-
-	return(src - osrc - 1);
-}
-#endif /* BSD_FUNCTION_SUPPORT */
 
 
 
@@ -239,7 +143,7 @@ _PUBLIC int main(int argc, char *argv[])
     _BOOLEAN dll_init             = FALSE;
 
     if(argc == 1 || argc > 4 || argc == 2 && (strcmp(argv[1],"-usage") == 0 || strcmp(argv[1],"-help") == 0))
-    {  (void)fprintf(stderr,"\nPUPS/P3 DLL generator version %s, (C) Tumbling Dice, 2002-2019 (built %s %s)\n",DLLGEN_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nPUPS/P3 DLL generator version %s, (C) Tumbling Dice, 2002-2022 (built %s %s)\n",DLLGEN_VERSION,__TIME__,__DATE__);
        (void)fprintf(stderr,"Usage: dllgen [skeleton DLL file | skeleton DLL function file]\n\n");
        (void)fflush(stderr);
        (void)fprintf(stderr,"DLLGEN is free software, covered by the GNU General Public License, and you are\n");
@@ -249,7 +153,7 @@ _PUBLIC int main(int argc, char *argv[])
        (void)fprintf(stderr,"Base path is: \"%s\"\n\n",DEFAULT_BASEPATH);
        (void)fflush(stderr);
 
-       exit(-1);
+       exit(255);
     }
     else if(argc >= 2)
     {  if(strcmp(argv[1],"init") == 0)
@@ -281,11 +185,11 @@ _PUBLIC int main(int argc, char *argv[])
        {  (void)fprintf(stderr,"\ndllgen: \"init\" or \"add\" expected\n\n");
           (void)fflush(stderr);
 
-          exit(-1);
+          exit(255);
        }
     }
     else
-    {  (void)fprintf(stderr,"\nPUPS/P3 DLL generator version %s, (C) Tumbling Dice, 2002-2018 (built %s %s)\n",DLLGEN_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nPUPS/P3 DLL generator version %s, (C) Tumbling Dice, 2002-2022 (built %s %s)\n",DLLGEN_VERSION,__TIME__,__DATE__);
        (void)fprintf(stderr,"Usage: dllgen [skeleton DLL file | skeleton DLL function file]\n\n");
        (void)fflush(stderr);
        (void)fprintf(stderr,"DLLGEN is free software, covered by the GNU General Public License, and you are\n");
@@ -294,24 +198,24 @@ _PUBLIC int main(int argc, char *argv[])
        (void)fprintf(stderr,"DLLGEN comes with ABSOLUTELY NO WARRANTY\n\n");
        (void)fflush(stderr);
 
-       exit(-1);
+       exit(255);
     }
 
     if(dll_init == TRUE && access(dll_skelpapp,F_OK | R_OK | W_OK) == (-1))
     {  (void)fprintf(stderr,"\ndllgen: cannot find skeleton DLL template file \"%s\"\n\n",dll_skelpapp);
        (void)fflush(stderr);
 
-       exit(-1);
+       exit(255);
     }
 
     if(access(dll_func_skelpapp,F_OK | R_OK | W_OK) == (-1))
     {  (void)fprintf(stderr,"\ndllgen: cannot find skeleton DLL function template file \"%s\"\n\n",dll_func_skelpapp);
        (void)fflush(stderr);
 
-       exit(-1);
+       exit(255);
     }
 
-    (void)fprintf(stderr,"\nPUPS/P3 DLL template generator version %s (C) M.A. O'Neill, Tumbling Dice, 2002-2018\n\n",DLLGEN_VERSION);
+    (void)fprintf(stderr,"\nPUPS/P3 DLL template generator version %s (C) M.A. O'Neill, Tumbling Dice, 2002-2022\n\n",DLLGEN_VERSION);
     (void)fflush(stderr); 
 
     (void)read_line(dll_name,"dllgen (DLL name)> ");
@@ -326,7 +230,7 @@ _PUBLIC int main(int argc, char *argv[])
        {  (void)fprintf(stderr,"\ndllgen: specific template \"%s\" not found\n\n",filestr);
           (void)fflush(stderr);
 
-          exit(-1);
+          exit(255);
        }
     }
     else
@@ -365,7 +269,7 @@ _PUBLIC int main(int argc, char *argv[])
        {  (void)fprintf(stderr,"\ndllgen: failed to execute stream editor (sed) command\n\n");
           (void)fflush(stderr);
 
-          exit(-1);
+          exit(255);
        }
     }
 
@@ -387,7 +291,7 @@ _PUBLIC int main(int argc, char *argv[])
     {  (void)fprintf(stderr,"\ndllgen: failed to execute stream editor (sed) command\n\n");
        (void)fflush(stderr);
 
-       exit(-1);
+       exit(255);
     }
 
     if(dll_init == TRUE)

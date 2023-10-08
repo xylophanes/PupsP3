@@ -8,8 +8,8 @@
              NE3 4RT
              United Kingdom
 
-    Version: 2.00 
-    Dated:   30th August 2019 
+    Version: 2.02 
+    Dated:   7th January 2022
     E-Mail:  mao@tumblingdice.co.uk 
 ------------------------------------------------------------------------------*/
 
@@ -29,7 +29,7 @@
 /* Version */
 /***********/
 
-#define HIPLIB_VERSION  "2.00"
+#define HIPLIB_VERSION  "2.02"
 
 
 /*-------------*/
@@ -265,16 +265,16 @@ _PROTOTYPE _EXPORT void tiff_to_hips(_BOOLEAN, int, char **, char *, char *);
 
 #ifdef IMG_SUPPORT
 // Read Kontron IMG image
-_PROTOTYPE _EXPORT void konrton_read_hdr(int  fdes, _BOOLEAN, img_hdr_type *);
+_PROTOTYPE _EXPORT void img_read_hdr(int  fdes, _BOOLEAN, img_hdr_type *);
 
 // Write Kontron IMG image
-_PROTOTYPE _EXPORT void kontron_write_hdr(int fdes, img_hdr_type *);
+_PROTOTYPE _EXPORT void img_write_hdr(int fdes, _BOOLEAN, img_hdr_type *);
 
-// Convert Kontron image to HIPS image
-_PUBLIC void kontron_to_hips(_BOOLEAN, int, char *[], char *, char *);
+// Convert Kontron IMG image to HIPS image
+_PUBLIC void img_to_hips(_BOOLEAN, int, char *[], char *, char *);
 
-// Convert HIPS image to Kontron image
-_PUBLIC void hips_to_kontron(char *, char *);
+// Convert HIPS image to Kontron IMG image
+_PUBLIC void hips_to_img(_BOOLEAN, char *, char *);
 #endif /* IMG_SUPPORT */
 
 #ifdef _CPLUSPLUS

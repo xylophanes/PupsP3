@@ -10,8 +10,8 @@
              NE3 4RT
              United Kingdom
 
-    Dated:   27th September 2019 
     Version: 2.00 
+    Dated:   4th January 2022
     Email:   mao@tumblingdice.co.uk
 -------------------------------------------------------------------*/
 
@@ -208,7 +208,7 @@ _PROTOTYPE _EXTERN char *msm_map_objectindex2name(const unsigned int, const unsi
 // Translate persistent object map index to address 
 _PROTOTYPE _EXTERN void *msm_map_objectindex2addr(const unsigned int, const unsigned int);
 
-// Map a (shared) address to object table index
+// Map a (persistent) address to object table index
 _PROTOTYPE _EXTERN int msm_map_objectaddr2index(const unsigned int, const void *);
 
 // Is this mapname unique?
@@ -217,7 +217,7 @@ _PROTOTYPE _EXTERN int msm_mapname_unique(const unsigned int, const char *);
 // Show persistent heap object table
 _PROTOTYPE _EXTERN int msm_show_mapped_objects(const unsigned int, const FILE *);
 
-// Show details of object in shared heap
+// Show details of object in persistent heap
 _PROTOTYPE _EXTERN  int msm_show_mapped_object(const unsigned int, const unsigned int, const FILE *);
 
 // Translate persistent heap descriptor to name
@@ -254,10 +254,10 @@ _PROTOTYPE _EXTERN int msm_set_autodestruct_state(const unsigned int, const _BOO
 _PROTOTYPE _EXTERN _BOOLEAN msm_phobject_exists(const unsigned int, const char *);
 
 
-/*-----------------------------------------------------*/
-/* Set shared heap addressing to local (PHM_MAP_LOCAL) */
-/* or relative (PHM_MAP_REMOTE)                        */
-/*-----------------------------------------------------*/
+/*--------------------------------------------------------*/
+/* Set pesistent heap addressing to local (PHM_MAP_LOCAL) */
+/* or relative (PHM_MAP_REMOTE)                           */
+/*--------------------------------------------------------*/
 
 _PROTOTYPE _EXTERN int msm_map_address_mode(const unsigned int, const unsigned int);
 

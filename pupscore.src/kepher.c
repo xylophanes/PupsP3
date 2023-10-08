@@ -8,8 +8,8 @@
               NE3 4RT
               United Kingdom
 
-     Version: 3.00 
-     Dated:   30th August 2019 
+     Version: 3.01
+     Dated:   24th May 2022
      E-mail:  mao@tumblingdice.co.uk
 ---------------------------------------------------------------------------------------*/
 
@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <bsd/string.h>
 #include <signal.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -33,7 +34,7 @@
 /* Version of kepher */
 /*-------------------*/
  
-#define KEPHER_VERSION    "3.00"
+#define KEPHER_VERSION    "3.01"
 #define EXTENSION_LIST    "fifo tmp run agf pheap lid lock"
 
 
@@ -73,103 +74,6 @@ _PRIVATE int      nfiles                     = 0;
 /*---------------------------------------------------------------------------------------
     Local functions ...
 ---------------------------------------------------------------------------------------*/
-
-
-#ifdef BSD_FUNCTION_SUPPORT
-/*--------------------------------------------------------------------------------------
-    Strlcpy and stlcat function based on OpenBSD functions ...
---------------------------------------------------------------------------------------*/
-/*------------------*/
-/* Open BSD Strlcat */
-/*------------------*/
-_PRIVATE size_t strlcat(char *dst, const char *src, size_t dsize)
-{
-	const char *odst = dst;
-	const char *osrc = src;
-	size_t      n    = dsize;
-	size_t      dlen;
-
-
-        /*------------------------------------------------------------------*/
-	/* Find the end of dst and adjust bytes left but don't go past end. */
-        /*------------------------------------------------------------------*/
-
-	while (n-- != 0 && *dst != '\0')
-		dst++;
-	dlen = dst - odst;
-	n = dsize - dlen;
-
-	if (n-- == 0)
-		return(dlen + strlen(src));
-	while (*src != '\0') {
-		if (n != 0) {
-			*dst++ = *src;
-			n--;
-		}
-		src++;
-	}
-	*dst = '\0';
-
-
-        /*----------------------------*/
-        /* count does not include NUL */
-        /*----------------------------*/
-
-	return(dlen + (src - osrc));
-}
-
-
-
-
-/*------------------*/
-/* Open BSD strlcpy */
-/*------------------*/
-
-_PRIVATE size_t strlcpy(char *dst, const char *src, size_t dsize)
-{
-	const char   *osrc = src;
-	size_t nleft       = dsize;
-
-
-        /*---------------------------------*/
-	/* Copy as many bytes as will fit. */
-        /*---------------------------------*/
-
-	if (nleft != 0) {
-		while (--nleft != 0) {
-			if ((*dst++ = *src++) == '\0')
-				break;
-		}
-	}
-
-
-        /*-----------------------------------------------------------*/
-	/* Not enough room in dst, add NUL and traverse rest of src. */
-        /*-----------------------------------------------------------*/
-
-	if (nleft == 0) {
-		if (dsize != 0)
-
-                        /*-------------------*/
-                        /* NUL-terminate dst */
-                        /*-------------------*/
-
-			*dst = '\0';
-		while (*src++)
-			;
-	}
-
-
-        /*----------------------------*/
-        /* count does not include NUL */
-        /*----------------------------*/
-
-	return(src - osrc - 1);
-}
-#endif /* BSD_FUNCTION_SUPPORT */
-
-
-
 
 #ifdef HAVE_PROCFS
 /*---------------------------------------------------------------------------------------
@@ -685,7 +589,7 @@ _PUBLIC int main(int argc, char *argv[])
           (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
           (void)fprintf(stderr,"See the GPL and LGPL licences at www.gnu.org for further details\n");
           (void)fprintf(stderr,"KEPHER comes with ABSOLUTELY NO WARRANTY\n\n");
-          (void)fprintf(stderr,"\nkepher lightweight garbage collector version %s, (C) Tumbling Dice, 2010-2019 (built %s %s)\n",KEPHER_VERSION,__TIME__,__DATE__);
+          (void)fprintf(stderr,"\nkepher lightweight garbage collector version %s, (C) Tumbling Dice, 2010-2022 (built %s %s)\n",KEPHER_VERSION,__TIME__,__DATE__);
           (void)fprintf(stderr,"Usage: kepher [-help | -usage] | [-verbose:FALSE]\n");
           (void)fprintf(stderr,"              [-mpid <monitor pid | monitor pname>]\n"); 
           (void)fprintf(stderr,"              [-mdir <directory to clean:/tmp>]\n");
@@ -723,7 +627,7 @@ _PUBLIC int main(int argc, char *argv[])
                 (void)fflush(stderr);
              }
 
-             exit(-1);
+             exit(255);
           }
           (void)strcpy(mdir,argv[i+1]);
 
@@ -739,7 +643,7 @@ _PUBLIC int main(int argc, char *argv[])
                 (void)fflush(stderr);
              }
 
-             exit(-1);
+             exit(255);
           }
           (void)strcpy(ignoreExtensionList,argv[i+1]);
 
@@ -754,7 +658,7 @@ _PUBLIC int main(int argc, char *argv[])
                 (void)fflush(stderr);
              }
 
-             exit(-1);
+             exit(255);
           }
 
           if(sscanf(argv[i+1],"%d",&mpid) != 1 || mpid <= 0)
@@ -765,7 +669,7 @@ _PUBLIC int main(int argc, char *argv[])
              {  (void)fprintf(stderr,"kepher (%d@%s): ERROR monitor process must be interger (>0)\n",getpid(),hostname);
                 (void)fflush(stderr);
              }
-             exit(-1);
+             exit(255);
              #endif /* !HAVE_PROCFS */
 
              #ifdef HAVE_PROCFS
@@ -776,7 +680,7 @@ _PUBLIC int main(int argc, char *argv[])
                                                                                                    getpid(),hostname,pname);
                    (void)fflush(stderr);
                 }
-                exit(-1);
+                exit(255);
              }
              #endif /* HAVE_PROCFS */
 
@@ -789,7 +693,7 @@ _PUBLIC int main(int argc, char *argv[])
     }
 
     if(do_verbose == TRUE)
-    {  (void)fprintf(stderr,"\n    kepher lightweight garbage collector (version %s)\n    (C) M.A. O'Neill, Tumbling Dice, 2010-2019\n",
+    {  (void)fprintf(stderr,"\n    kepher lightweight garbage collector (version %s)\n    (C) M.A. O'Neill, Tumbling Dice, 2010-2022\n",
                                                                                                                          KEPHER_VERSION);
        (void)fprintf(stderr,"\n    Process %d on host \"%s\" monitoring \"%s\" for stale .tmp, .fifo, .run, .lock and .lid files\n",
                                                                                                              getpid(),hostname,mdir);
@@ -826,7 +730,7 @@ _PUBLIC int main(int argc, char *argv[])
              (void)fflush(stderr);
           }
 
-          exit(-1);
+          exit(255);
        }
        else if(do_verbose == TRUE)
        {  (void)strdate(date);
@@ -847,7 +751,7 @@ _PUBLIC int main(int argc, char *argv[])
              (void)fflush(stderr);
           }
 
-          exit(-1);
+          exit(255);
        }
 
        (void)fscanf(krstream,"%d",&kpid);
@@ -899,7 +803,7 @@ _PUBLIC int main(int argc, char *argv[])
                                                            date,getpid(),hostname);
        }
 
-       exit(-1);
+       exit(255);
     }
 
 
@@ -919,7 +823,7 @@ _PUBLIC int main(int argc, char *argv[])
           }
        }
 
-       exit(-1);
+       exit(255);
     }
 
 

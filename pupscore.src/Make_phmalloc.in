@@ -1,7 +1,7 @@
-#--------------------------------------------------------------------------------------
+#---------------------------------------
 # Makefile for persistent heap library
-# M.A. O'Neill, Tumbling Dice 23/01/2018
-#--------------------------------------------------------------------------------------
+# M.A. O'Neill, Tumbling Dice 04/01/2022
+#---------------------------------------
 
 #CPPFLAGS 	= -DUSG
 #CFLAGS		= -g -DDEBUG -I.
@@ -41,6 +41,11 @@ libphmalloc.a:	phgmalloc.o
 .c.o:
 		$(CC) $(CFLAGS) $(CPPFLAGS) -I. -c $< $(OUTPUT_OPTION)
 
+
+#--------------
+# Clean section
+#--------------
+
 .PHONY: clean realclean malloc-clean malloc-realclean
 
 clean malloc-clean:
@@ -49,7 +54,11 @@ clean malloc-clean:
 realclean malloc-realclean: clean
 		-rm -f TAGS tags *~
 
-# For inside the C library.
+
+#-------------------------
+# For inside the C library
+#-------------------------
+
 phmalloc.tar phmalloc.tar.Z: FORCE
 		$(MAKE) -C .. $@
 FORCE:

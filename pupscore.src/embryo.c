@@ -9,8 +9,8 @@
              NE3 4RT
              United Kingdom
 
-    Dated:   26th September 2019
     Version: 3.00 
+    Dated:   4th January 2022
     E-mail:  mao@tumblingdice.co.uk
 ----------------------------------------------------------------------------------*/
 
@@ -333,7 +333,7 @@ _PRIVATE int tsic(int argc, char *argv[])
    }
 
    if(replys != (char **)NULL)
-      (void)xafree(n_requests,(void *)replys);
+      (void)pups_afree(n_requests,(void *)replys);
 
    return(PSRP_OK);
 }
@@ -354,7 +354,7 @@ _PRIVATE void embryo_slot(int level)
 {   (void)fprintf(stderr,"int app (PSRP) embryo %s: [ANSI C, PUPS MTD D]\n",EMBRYO_VERSION);
  
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 1996-2019 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 1996-2022 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. ONeill\n");
        (void)fprintf(stderr,"Unassigned PSRP dynamic process (built %s %s)\n\n",__TIME__,__DATE__);
     }
@@ -458,7 +458,7 @@ _BOOLEAN looper = TRUE;
 /* Software I.D. tag  */
 /*--------------------*/
 
-#define VTAG  7081
+#define VTAG  7491
 
 extern int appl_vtag = VTAG;
 
@@ -535,7 +535,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
                   EMBRYO_VERSION,
                   "M.A. O'Neill",
                   "(PSRP) embryo",
-                  "2019",
+                  "2022",
                   argv);
 
 
@@ -689,7 +689,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
 
        if((hdes1 = msm_heap_attach("heap1",
                                    pheap_flags)) == (-1))
-           pups_exit(-1);
+           pups_exit(255);
 
 
        /*------------------------------------*/
@@ -698,7 +698,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
 
        if((hdes2 = msm_heap_attach("heap2",
                                    pheap_flags)) == (-1))
-           pups_exit(-1);
+           pups_exit(255);
 
 
        /*-------------------------------------------*/

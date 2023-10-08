@@ -21,7 +21,7 @@
    or (US mail) as Mike Haertel c/o Free Software Foundation.
 
    Shared heap modifications by Mark O'Neill, Tumbling DIce  <mao@tumblingdice.co.uk>
-   (C) M.A. O'Neill. Tumbling Dice 2005-2018
+   (C) M.A. O'Neill. Tumbling Dice 2005-2022
 --------------------------------------------------------------------------------------*/
 
 #ifndef _PHMALLOC_H
@@ -248,16 +248,16 @@ typedef union
   } malloc_info;
 
 
-/*--------------------------------------*/
-/* Pointer to shared heap object tables */
-/*--------------------------------------*/
+/*------------------------------------------*/
+/* Pointer to persistent heap object tables */
+/*------------------------------------------*/
 
 extern phobmap_type ***_shobjectmap;
 
 
-/*------------------------------------------------*/
-/* Pointer to heap parameter table on shared heap */
-/*------------------------------------------------*/
+/*----------------------------------------------------*/
+/* Pointer to heap parameter table on persistent heap */
+/*----------------------------------------------------*/
 
 extern int **pheap_parameters;
 

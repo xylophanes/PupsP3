@@ -21,7 +21,7 @@
      Cambridge, MA 02139, USA.
 
     Shared heap modifications by Mark O'Neill (mao@tuumblingdice.o.uk)
-    (C) 1998-2019 M.A. O'Neill, Tumbling Dice
+    (C) 1998-2022 M.A. O'Neill, Tumbling Dice
 -------------------------------------------------------------------------------*/
 
 #ifdef emacs

@@ -1,8 +1,8 @@
 /*------------------------------------------------------------------------------
     Purpose: distributed programming library. Note almost all functions in
              this library are #ifdef'd. There are two sets, one for a
-             generic UNIX enviroment and one with minimal functionality
-             for non UNIX environments.
+             generic POSIX enviroment and one with minimal functionality
+             for non POSIX environments.
 
     Author:  M.A. O'Neill
              Tumbling Dice Ltd
@@ -11,8 +11,8 @@
              NE3 4RT
              United Kingdom
 
-    Dated:   27th September 2019 
     Version: 5.00 
+    Dated:   4th January 2022
     E-Mail:  mao@tumblingdice.co.uk 
 ------------------------------------------------------------------------------*/
 
@@ -158,7 +158,7 @@ _PROTOTYPE _EXPORT int pups_rkill(const char *, const char *, const char *, cons
 /* associated descriptor                                     */
 /*-----------------------------------------------------------*/
 
-_PROTOTYPE _EXPORT int pipestream_kill_disable(const int);
+_PROTOTYPE _EXPORT int pups_pipestream_kill_disable(const int);
 
 
 /*----------------------------------------------------------*/
@@ -166,7 +166,7 @@ _PROTOTYPE _EXPORT int pipestream_kill_disable(const int);
 /* associated descriptor                                    */
 /*----------------------------------------------------------*/
 
-_PROTOTYPE _EXPORT int pipestream_kill_enable(const int);
+_PROTOTYPE _EXPORT int pups_pipestream_kill_enable(const int);
 
 
 #ifdef _CPLUSPLUS

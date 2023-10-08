@@ -9,8 +9,8 @@
              NE3 4RT
              United Kingdom
 
-    Dated:   30th August 2019 
-    Version: 2.00 
+    Version: 3.02 
+    Dated:   7th October 2023
     E-mail:  mao@tumblingdice.co.uk
 -------------------------------------------------------------------------------------------------------*/
 
@@ -22,6 +22,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <string.h>
+#include <bsd/string.h>
 #include <errno.h>
 #include <vstamp.h>
 #include <sys/stat.h>
@@ -31,7 +32,7 @@
 /* Version of maggot */
 /*-------------------*/
 
-#define MAGGOT_VERSION    "2.00"
+#define MAGGOT_VERSION    "3.02"
 
 
 
@@ -71,7 +72,7 @@ _PRIVATE void maggot_slot(int level)
 {   (void)fprintf(stderr,"int app (PSRP) maggot %s: [ANSI C]\n",MAGGOT_VERSION);
  
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 1999-2018 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 1999-2022 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
        (void)fprintf(stderr,"The digital maggot (PUPS stale resource and garbage collection) (built %s)\n\n",__TIME__,__DATE__);
     }
@@ -90,9 +91,11 @@ _PRIVATE void maggot_slot(int level)
 
 _PRIVATE void maggot_usage()
 
-{   (void)fprintf(stderr,"[-delay_period <minutes:60>]\n"); 
+{   
     (void)fprintf(stderr,"[-search <directory list:/tmp;/fifos/<localhost>]\n");
-    (void)fprintf(stderr,"[-global]\n\n");
+    (void)fprintf(stderr,"[-parse <key list>\n");
+    (void)fprintf(stderr,"[-delay_period <minutes:60>]\n"); 
+    (void)fprintf(stderr,"[-global:FALSE]\n\n");
     (void)fprintf(stderr,"[>& <ASCII log file>]\n\n");
 
     (void)fprintf(stderr,"Signals\n\n");
@@ -134,6 +137,7 @@ _EXTERN char appl_build_date[SSIZE] = __DATE__;
 
 #define N_ENTRIES     1024
 #define MAX_S_DIRS    32
+#define MAX_KEYS      32
 
 
 
@@ -158,11 +162,21 @@ _PROTOTYPE _PRIVATE _BOOLEAN psrp_remove_stale_objects(char *, char *);
 /* PUPS exit function */
 _PROTOTYPE _PRIVATE void maggot_exit_f(char *);
 
+/* PSRP function to set delay period */
+_PROTOTYPE _PRIVATE int set_delay_period(int, char *[]);
+
 /* PSRP function to add a directory to scan list */
 _PROTOTYPE _PRIVATE int add_directory(int, char *[]);
 
 /* PSRP function to remove a directory from scan list */
 _PROTOTYPE _PRIVATE int remove_directory(int, char *[]);
+
+/* PSRP function to add a key to key list */
+_PROTOTYPE _PRIVATE int add_key(int, char *[]);
+
+/* PSRP function to remove a key from key  list */
+_PROTOTYPE _PRIVATE int remove_key(int, char *[]);
+
 
 
 
@@ -170,22 +184,24 @@ _PROTOTYPE _PRIVATE int remove_directory(int, char *[]);
 /*-------------------------------------------------------------------------------------------------------
     Variables which are private to this module ...
 -------------------------------------------------------------------------------------------------------*/
-                                              /*-------------------------------------------------------*/
-_PRIVATE int  n_entries    = 0;               /* Directory entries (used in directory scanning)        */
-_PRIVATE int  scan_cnt     = 0;               /* Number of scan of directories completed               */
-_PRIVATE int  start_time   = 0;               /* Start of last file system scan                        */
-_PRIVATE int  delay_period = 60;              /* Period between file system scans                      */
-_PRIVATE int  d_cnt        = 0;               /* Number of user defined directories scanned            */
-_PRIVATE int  delete_cnt   = 0;               /* Number of stale PSRP items removed by this maggot     */
-_PRIVATE int  log_wrap_cnt = 1024;            /* Number of objects logged before log file wraps        */
-_PRIVATE int  items_logged = 0;               /* Items in log file                                     */
-_PRIVATE long wrap_pos     = 0L;              /* Rewrap position in log file                           */ 
-_PRIVATE struct stat buf;                     /* Stat buffer for determining log stream type           */
-_PRIVATE char   d_list[MAX_S_DIRS][SSIZE];    /* List of user scanned directories                      */
-_PRIVATE char   **entry_list = (char **)NULL; /* List of PSRP resources which may be stale             */
-_PRIVATE _BOOLEAN e_l_allocated = FALSE;      /* TRUE if directory entry list allocated                */
-_PRIVATE _BOOLEAN global_maggot = FALSE;      /* TRUE if maggot cleaning up global files               */
-                                              /*-------------------------------------------------------*/
+                                                           /*---------------------------------------------------------*/
+_PRIVATE int         n_entries          = 0;               /* Directory entries (used in directory scanning)          */
+_PRIVATE int         scan_cnt           = 0;               /* Number of scan of directories completed                 */
+_PRIVATE int         start_time         = 0;               /* Start of last file system scan                          */
+_PRIVATE int         delay_period       = 60;              /* Period between file system scans                        */
+_PRIVATE int         d_cnt              = 0;               /* Number of user defined directories scanned              */
+_PRIVATE int         key_cnt              = 0;             /* Number of user defined serach keys                      */
+_PRIVATE int         delete_cnt         = 0;               /* Number of stale PSRP items removed by this maggot       */
+_PRIVATE int         log_wrap_cnt       = 1024;            /* Number of objects logged before log file wraps          */
+_PRIVATE int         items_logged       = 0;               /* Items in log file                                       */
+_PRIVATE long        wrap_pos           = 0L;              /* Rewrap position in log file                             */ 
+_PRIVATE _BOOLEAN    e_l_allocated      = FALSE;           /* TRUE if directory entry list allocated                  */
+_PRIVATE _BOOLEAN    global_maggot      = FALSE;           /* TRUE if maggot cleaning up global PUPS/P3 log files     */
+_PRIVATE char        **entry_list        = (char **)NULL;  /* List of PSRP resources which may be stale               */
+_PRIVATE struct stat buf;                                  /* Stat buffer for determining log stream type             */
+_PRIVATE char        d_list[MAX_S_DIRS][SSIZE];            /* List of user scanned directories                        */
+_PRIVATE char        key_list[MAX_S_DIRS][SSIZE];          /* List of user search keys                                */
+                                                           /*---------------------------------------------------------*/
 
 
 
@@ -194,7 +210,7 @@ _PRIVATE _BOOLEAN global_maggot = FALSE;      /* TRUE if maggot cleaning up glob
     checkpoint files) ...
 -------------------------------------------------------------------------------------------------------*/
 
-#define VTAG  3359
+#define VTAG  3787
 
 extern int appl_vtag = VTAG;
 
@@ -225,8 +241,8 @@ _PUBLIC int pups_main(int argc, char *argv[])
                   MAGGOT_VERSION,
                   "M.A. O'Neill",
                   "(PSRP) maggot",
-                           "2018",
-                             argv);
+                  "2023",
+                  argv);
 
 
     /*-------------------------*/
@@ -238,7 +254,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
 
        if(appl_verbose == TRUE)
        {  (void)strdate(date);
-          (void)fprintf(stderr,"%s %s(%d@%s:%s): globaln maggot\n",date,
+          (void)fprintf(stderr,"%s %s (%d@%s:%s): global maggot\n",date,
                                                               appl_name,
                                                                appl_pid,
                                                               appl_host,
@@ -265,12 +281,12 @@ _PUBLIC int pups_main(int argc, char *argv[])
 
     if(appl_verbose == TRUE)
     {  (void)strdate(date);
-       (void)fprintf(stderr,"%s %s(%d@%s:%s): PSRP filesystem period of grace for stale resources is %d minutes\n",date,
-                                                                                                              appl_name,
-                                                                                                               appl_pid,
-                                                                                                              appl_host,
-                                                                                                             appl_owner,
-                                                                                                        delay_period/60);
+       (void)fprintf(stderr,"%s %s (%d@%s:%s): PSRP filesystem period of grace for stale resources is %d minutes\n",date,
+                                                                                                               appl_name,
+                                                                                                                appl_pid,
+                                                                                                               appl_host,
+                                                                                                              appl_owner,
+                                                                                                         delay_period/60);
        (void)fflush(stderr);
     }
 
@@ -290,59 +306,138 @@ _PUBLIC int pups_main(int argc, char *argv[])
     if((ptr = pups_locate(&init,"search",&argc,args,0)) != NOT_FOUND)
     {  char d_name[SSIZE] = "";
 
-       while(strccpy(d_name,pups_str_dec(&ptr,&argc,args)) != (char *)NULL)
-       {    /* Can we access directory */ 
-            if(stat(d_name,&buf) == (-1) && appl_verbose == TRUE)
-            {  (void)strdate(date);
-               (void)fprintf(stderr,"%s %s(%d@%s:%s): cannot access %s\n",date,
-                                                                     appl_name,
-                                                                      appl_pid,
-                                                                     appl_host,
-                                                                    appl_owner,
-                                                                        d_name);       
-                (void)fflush(stderr);
-            }
+       do {   
+               /*----------------------*/
+               /* Test for end of list */
+               /*----------------------*/
+
+               (void)strccpy(d_name,pups_str_dec(&ptr,&argc,args));
+               if (strcmp(d_name,"") == 0)
+                  break;
 
 
-            /*-------------------------------------------------------*/
-            /* Is the directory actually identified as such by stat? */
-            /*-------------------------------------------------------*/
+               /*------------------------*/
+               /* Process next directory */
+               /*------------------------*/
+ 
+               else
+               {
+ 
+                  /*-------------------------*/
+                  /* Can we access directory */ 
+                  /*-------------------------*/
 
-            if(!S_ISDIR(buf.st_mode) && appl_verbose == TRUE)
-            {  (void)strdate(date);
-               (void)fprintf(stderr,"%s %s(%d@%s:%s) %s is not a directory\n",date,
-                                                                         appl_name,
-                                                                          appl_pid,
-                                                                         appl_host,
-                                                                        appl_owner,
-                                                                            d_name); 
-                (void)fflush(stderr);
-            }
-            else
-            {  
+                  if(stat(d_name,&buf) == (-1) && appl_verbose == TRUE)
+                  {  (void)strdate(date);
+                     (void)fprintf(stderr,"%s %s (%d@%s:%s): cannot access %s\n",date,
+                                                                            appl_name,
+                                                                             appl_pid,
+                                                                            appl_host,
+                                                                           appl_owner,
+                                                                               d_name);       
+                      (void)fflush(stderr);
+                  }
 
-               /*-----------------------------------------------------------------*/
-               /* Add the directory to the list of those which are to be searched */
-               /* by this maggot                                                  */ 
-               /*-----------------------------------------------------------------*/
 
-               if(appl_verbose == TRUE)
-               {  (void)strdate(date);
-                  (void)fprintf(stderr,"%s %s(%d@%s:%s) searching directory %s\n",date,
-                                                                             appl_name,
-                                                                              appl_pid,
-                                                                             appl_host,
-                                                                            appl_owner,
-                                                                                d_name);
-                  (void)fflush(stderr);
+                  /*-------------------------------------------------------*/
+                  /* Is the directory actually identified as such by stat? */
+                  /*-------------------------------------------------------*/
+
+                  if(!S_ISDIR(buf.st_mode) && appl_verbose == TRUE)
+                  {  (void)strdate(date);
+                     (void)fprintf(stderr,"%s %s (%d@%s:%s) %s is not a directory\n",date,
+                                                                                appl_name,
+                                                                                 appl_pid,
+                                                                                appl_host,
+                                                                               appl_owner,
+                                                                                   d_name); 
+                      (void)fflush(stderr);
+                  }
+
+
+                  /*-----------------------------------------------------------------*/
+                  /* Add the directory to the list of those which are to be searched */
+                  /* by this maggot                                                  */ 
+                  /*-----------------------------------------------------------------*/
+
+                  else
+                  {  
+
+                     if(appl_verbose == TRUE)
+                     {  (void)strdate(date);
+                        (void)fprintf(stderr,"%s %s (%d@%s:%s) searching directory %s\n",date,
+                                                                                    appl_name,
+                                                                                     appl_pid,
+                                                                                    appl_host,
+                                                                                   appl_owner,
+                                                                                       d_name);
+                        (void)fflush(stderr);
+                     }
+
+
+                     if(d_cnt == MAX_S_DIRS)
+                        pups_error("[maggot] too many user defined search directories");
+                     else
+                     {  (void)strlcpy(d_list[d_cnt++],d_name,SSIZE);
+                        (void)strlcpy(d_name,"",SSIZE);
+                     }
+                  }
+               }
+           } while (TRUE);
+    }
+
+
+    /*---------------------*/
+    /* Initialise key list */
+    /*---------------------*/
+
+    for(i=0; i<MAX_KEYS; ++i)
+       (void)strlcpy(key_list[i],"notset",SSIZE);
+
+
+    /*-------------------------------*/
+    /* User user defined search keys */
+    /*-------------------------------*/
+
+    if((ptr = pups_locate(&init,"parse",&argc,args,0)) != NOT_FOUND)
+    {  char key[SSIZE] = "";
+
+       do {  
+
+               /*----------------------*/
+               /* Test for end of list */
+               /*----------------------*/
+
+               (void)strccpy(key,pups_str_dec(&ptr,&argc,args));
+               if (strcmp(key,"") == 0)
+                  break;
+
+
+               /*------------------------*/
+               /* Add search key to list */
+               /*------------------------*/
+
+               else
+               {  if(appl_verbose == TRUE)
+                  {  (void)strdate(date);
+                     (void)fprintf(stderr,"%s %s (%d@%s:%s) adding search key %s\n",date,
+                                                                               appl_name,
+                                                                                appl_pid,
+                                                                               appl_host,
+                                                                              appl_owner,
+                                                                                     key);
+                      (void)fflush(stderr);
+                  }
+
+                  if(d_cnt == MAX_KEYS)
+                     pups_error("[maggot] too many user defined search keys");
+                  else
+                  {  (void)strlcpy(key_list[key_cnt++],key,SSIZE);
+                     (void)strlcpy(key,"",SSIZE);
+                  }
                }
 
-               (void)strlcpy(d_list[d_cnt++],d_name,SSIZE);
-
-               if(d_cnt == MAX_S_DIRS)
-                  pups_error("[maggot] too many user defined search directories");
-            }
-       }
+       } while(TRUE);
     }
 
 
@@ -362,12 +457,12 @@ _PUBLIC int pups_main(int argc, char *argv[])
 
     if(appl_verbose == TRUE)
     {  (void)strdate(date);
-       (void)fprintf(stderr,"%s %s(%d@%s:%s): log wrap count is %d items\n",date,
-                                                                       appl_name,
-                                                                        appl_pid,
-                                                                       appl_host,
-                                                                      appl_owner,
-                                                                    log_wrap_cnt);
+       (void)fprintf(stderr,"%s %s (%d@%s:%s): log wrap count is %d items\n",date,
+                                                                        appl_name,
+                                                                         appl_pid,
+                                                                        appl_host,
+                                                                       appl_owner,
+                                                                     log_wrap_cnt);
        (void)fflush(stderr);
     }
 
@@ -379,11 +474,11 @@ _PUBLIC int pups_main(int argc, char *argv[])
     pups_t_arg_errs(argd,args);
 
     if(appl_verbose == TRUE)
-    {  (void)fprintf(stderr,"%s %s(%d@%s:%s): started\n",date,
-                                                    appl_name,
-                                                     appl_pid,
-                                                    appl_host,
-                                                   appl_owner);
+    {  (void)fprintf(stderr,"%s %s (%d@%s:%s): started\n",date,
+                                                     appl_name,
+                                                      appl_pid,
+                                                     appl_host,
+                                                    appl_owner);
        (void)fflush(stderr);
     }
 
@@ -401,8 +496,11 @@ _PUBLIC int pups_main(int argc, char *argv[])
 ---------------------------------------------------------------------------------------------------------*/
 
     (void)psrp_init(PSRP_STATUS_ONLY | PSRP_HOMEOSTATIC_STREAMS,&psrp_process_status);
+    (void)psrp_attach_static_function("delay_period",    &set_delay_period);
     (void)psrp_attach_static_function("add_directory",   &add_directory);
     (void)psrp_attach_static_function("remove_directory",&remove_directory);
+    (void)psrp_attach_static_function("add_key",         &add_key);
+    (void)psrp_attach_static_function("remove_key",      &remove_key);
     (void)psrp_accept_requests();
 
 /*---------------------------------------------------------------------------------------------------------
@@ -418,7 +516,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
     filesystems of its host and removes stale resources ...
 ---------------------------------------------------------------------------------------------------------*/
 
-    do {    int i;
+    do {    unsigned int i;
 
 
             /*-------------------------------------------*/
@@ -444,6 +542,14 @@ _PUBLIC int pups_main(int argc, char *argv[])
                (void)psrp_remove_stale_objects(appl_fifo_dir,"pst");
                (void)psrp_remove_stale_objects("/tmp","fifo");
                (void)psrp_remove_stale_objects("/tmp","pst");
+
+
+               /*---------------------------*/
+               /* Process user defined keys */
+               /*---------------------------*/
+
+               for (i=0; i<key_cnt; ++i)
+                   (void)psrp_remove_stale_objects("/tmp",key_list[i]);
             }
 
 
@@ -453,13 +559,32 @@ _PUBLIC int pups_main(int argc, char *argv[])
             /*-------------------------------------------------*/
 
             for(i=0; i<d_cnt; ++i)
-            {  if(strcmp(d_list[i],"notset") != 0)
+            {  unsigned int j;
+
+               if(strcmp(d_list[i],"notset") != 0)
                {  (void)psrp_remove_stale_objects(d_list[i],"fifo");
                   (void)psrp_remove_stale_objects(d_list[i],"pst");
+
+
+                  /*---------------------------*/
+                  /* Process user defined keys */
+                  /*---------------------------*/
+
+                  for (j=0; j<key_cnt; ++j)
+                      (void)psrp_remove_stale_objects(d_list[i],key_list[j]);
                }
             }
 
        } while(TRUE);
+
+
+    /*------------------------------------*/
+    /* If we are running as root recreate */
+    /* /dev/tty and /dev/null             */
+    /*------------------------------------*/
+
+    if (getuid() == 0)
+       (void)system("mktty");
 
     pups_exit(0);
 }
@@ -474,9 +599,10 @@ _PUBLIC int pups_main(int argc, char *argv[])
 _PRIVATE int psrp_process_status(int argc, char *argv[])
 
 {    int i,
-         u_d_scan_dirs = 0;
+         u_d_scan_dirs  = 0,
+         u_key_cnt      = 0;
 
-     (void)fprintf(psrp_out,"    maggot version 1.04 status\n");
+     (void)fprintf(psrp_out,"\n\n    maggot version %s status\n",MAGGOT_VERSION);
      (void)fprintf(psrp_out,"    ==========================\n\n");
 
 #if defined(CRIU_SUPPORT)
@@ -489,10 +615,16 @@ _PRIVATE int psrp_process_status(int argc, char *argv[])
      if(strin(appl_fifo_dir,"fifos") == TRUE)
         (void)fprintf(psrp_out,"    Scanning \"/tmp\" for stale PSRP objects\n");
 
+
+     /*----------------------------------*/
+     /* User defined directories scanned */
+     /*----------------------------------*/
+
      for(i=0; i<d_cnt; ++i)
      {  if(strcmp(d_list[i],"notset") != 0)
         {  if(u_d_scan_dirs == 0)
-           {  (void)fprintf(psrp_out,"\n\n    User defined directory(s) to be scanned\n\n");
+           {  (void)fprintf(psrp_out,"\n\n    User defined directory(s) to be scanned\n");
+              (void)fprintf(psrp_out,"    =======================================\n\n");
               (void)fflush(psrp_out);
            } 
 
@@ -505,13 +637,35 @@ _PRIVATE int psrp_process_status(int argc, char *argv[])
 
      if(u_d_scan_dirs > 0)
         (void)fprintf(psrp_out,"\n    Total of %d user defined directory(s) to be scanned\n",d_cnt);
-     else
-        (void)fprintf(psrp_out,"\n");
+
+
+     /*----------------*/
+     /* User file keys */
+     /*----------------*/
+
+     for(i=0; i<key_cnt; ++i)
+     {  if(strcmp(key_list[i],"notset") != 0)
+        {  if(u_key_cnt == 0)
+           {  (void)fprintf(psrp_out,"\n\n    User file keys\n");
+              (void)fprintf(psrp_out,"    ==============\n\n");
+              (void)fflush(psrp_out);
+           } 
+
+           (void)fprintf(psrp_out,"    %d:  Stale files containing key \"%s\" will be removed\n",i,key_list[i]);
+           (void)fflush(psrp_out);
+
+           ++u_key_cnt;
+        }
+     } 
+
+     if(u_key_cnt > 0)
+        (void)fprintf(psrp_out,"\n    Total of %d user defined file keys\n",key_cnt);
+
 
      if(delete_cnt == 0)
-        (void)fprintf(psrp_out,"    No stale PSRP resources removed\n\n",delete_cnt);
+        (void)fprintf(psrp_out,"\n\n    No stale PSRP resources removed\n\n",delete_cnt);
      else
-        (void)fprintf(psrp_out,"    %d stale PSRP resources removed\n\n",delete_cnt);
+        (void)fprintf(psrp_out,"\n\n    %d stale PSRP resources removed\n\n",delete_cnt);
      (void)fflush(psrp_out);
 
      return(PSRP_OK);
@@ -519,16 +673,79 @@ _PRIVATE int psrp_process_status(int argc, char *argv[])
 
 
 
+/*--------------------------------------------*.
+/* Parse pid in <file name>-<pid> format file */
+/*--------------------------------------------*/
 
-/*---------------------------------------------------------------------------------------------------------
-    Routine to remove stale items from PSRP file systems ...
----------------------------------------------------------------------------------------------------------*/
+_PRIVATE int parse_pidname(unsigned char *filename)
+
+{    unsigned int i,
+                  size    = 0,
+                  cnt     = 0,
+                  pid_pos = 0;
+
+     int  pid             = (-1);
+     char pidstr[SSIZE]   = "";
+
+
+     /*----------------------*/
+     /* Filename string size */
+     /*----------------------*/
+
+     size = strlen(filename);
+
+
+     /*--------------------------*/
+     /* Find start of PID string */
+     /*--------------------------*/
+
+     for (i=size; i>0; --i)
+     {   if (filename[i] == '-')
+         {  pid_pos = i + 1;
+            break;
+         }
+     }
+
+
+     /*--------*/
+     /* No PID */
+     /*--------*/
+
+     if (pid_pos == 0)
+        return (-1);
+
+
+     /*----------------*/
+     /* Get PID string */
+     /*----------------*/
+
+     for (i=pid_pos; i<size; ++i)
+     {   pidstr[cnt] = filename[i];
+         ++cnt;
+     }
+
+
+     /*-------------------*/
+     /* Get (integer) PID */
+     /*-------------------*/
+
+     (void)sscanf(pidstr,"%d",&pid);
+     return (pid);
+}
+
+
+
+
+/*------------------------------------------------------*/
+/* Routine to remove stale items from PSRP file systems */
+/*------------------------------------------------------*/
 
 _PRIVATE _BOOLEAN psrp_remove_stale_objects(char *directory, char *object_key)
 
-{   int i,
-        entry_cnt,
-        psrp_pid;
+{   unsigned int i;
+
+    int entry_cnt  = 0,
+        psrp_pid   = (-1);
 
 
     /*----------------------------------------------------------*/
@@ -567,12 +784,16 @@ _PRIVATE _BOOLEAN psrp_remove_stale_objects(char *directory, char *object_key)
        (void)strclr(hostname);
        psrp_pid    = (-1);
        (void)strlcpy(next_entry,entry_list[i],SSIZE);
-       mchrep(' ',".:",next_entry); 
-       if(sscanf(next_entry,"%s%s%s%s%s%d",strdum,strdum,hostname,strdum,strdum,&psrp_pid) == 6)
+       mchrep(' ',":#",next_entry);
+
+                                                                                                         /*------------------------------*/
+       if(sscanf(next_entry,"%s%s%s%s%s%d",strdum,strdum,hostname,strdum,strdum,&psrp_pid) == 6    ||    /* Standard PUP/P3 files/FIFO's */
+          (psrp_pid = parse_pidname(entry_list[i]))                                        >= 0     )    /* <filename>-<pid>             */
+                                                                                                         /*------------------------------*/
        {  int    ret,
                  c_time;
 
-          char   pathname[1024];
+          char        pathname[1024] = "";
           struct stat buf;
 
 
@@ -594,9 +815,9 @@ _PRIVATE _BOOLEAN psrp_remove_stale_objects(char *directory, char *object_key)
           else
           #endif /* SSH_SUPPORT */
 
-             ret = kill(psrp_pid,SIGALIVE);
-
+          ret    = kill(psrp_pid,SIGALIVE);
           c_time = time((time_t *)NULL);
+
           if(psrp_pid != (-1)                         &&
              c_time - buf.st_mtime >  delay_period    &&
              psrp_pid              != appl_pid        &&
@@ -622,12 +843,12 @@ _PRIVATE _BOOLEAN psrp_remove_stale_objects(char *directory, char *object_key)
                 }
 
                 (void)strdate(date);
-                (void)fprintf(stderr,"%s %s(%d@%s:%s): stale PSRP resource (%s) has been removed\n",date,
-                                                                                               appl_name,
-                                                                                                appl_pid,
-                                                                                               appl_host,
-                                                                                               appl_host,
-                                                                                           entry_list[i]);
+                (void)fprintf(stderr,"%s %s (%d@%s:%s): stale PSRP resource (%s) has been removed\n",date,
+                                                                                                appl_name,
+                                                                                                 appl_pid,
+                                                                                                appl_host,
+                                                                                               appl_owner,
+                                                                                            entry_list[i]);
                 (void)fflush(stderr);
                 ++delete_cnt;
              }
@@ -676,7 +897,7 @@ _PRIVATE void maggot_exit_f(char *arg_str)
 
 _PRIVATE int add_directory(int argc, char *argv[])
 
-{   int i;
+{   unsigned int i;
 
 
     /*-----------------------------------------------*/
@@ -684,7 +905,7 @@ _PRIVATE int add_directory(int argc, char *argv[])
     /*-----------------------------------------------*/
 
     if(argc != 2)
-    {  (void)fprintf(psrp_out,"usage: add_directory <name of scanned directory>\n");
+    {  (void)fprintf(psrp_out,"\n    usage: add_directory <name of scanned directory>\n\n");
        (void)fflush(psrp_out);
 
        return(PSRP_OK);
@@ -697,10 +918,10 @@ _PRIVATE int add_directory(int argc, char *argv[])
 
     (void)stat(argv[1],&buf);
     if(!S_ISDIR(buf.st_mode))
-    {  (void)fprintf(psrp_out,"add_directory: %s is not a directory\n",argv[1]);
+    {  (void)fprintf(psrp_out,"\n    ERROR add_directory: %s is not a directory\n\n",argv[1]);
        (void)fflush(psrp_out);
 
-       return(PSRP_OK);
+       return(PSRP_ERROR);
     }
 
 
@@ -710,10 +931,10 @@ _PRIVATE int add_directory(int argc, char *argv[])
 
     for(i=0; i<MAX_S_DIRS; ++i)
     {  if(strcmp(d_list[i],argv[1]) == 0)
-       {  (void)fprintf(psrp_out,"add_directory: %s is already in the list of scanned directories\n",argv[1]);
+       {  (void)fprintf(psrp_out,"    ERROR add_directory: %s is already in the list of scanned directories\n",argv[1]);
           (void)fflush(psrp_out);
 
-          return(PSRP_OK);
+          return(PSRP_ERROR);
        }
     }
 
@@ -724,17 +945,13 @@ _PRIVATE int add_directory(int argc, char *argv[])
 
     for(i=0; i<MAX_S_DIRS; ++i)
     {  
-
-       (void)fprintf(stderr,"%s[%d]\n",d_list[i],i);
-       (void)fflush(stderr);
-
        if(strncmp(d_list[i],"notset",6) == 0)
        {  (void)strlcpy(d_list[i],argv[1],SSIZE);
 
           if(i >= d_cnt)
              ++d_cnt;
 
-          (void)fprintf(psrp_out,"add_directory: %s added to scanned directory list\n",argv[1]);
+          (void)fprintf(psrp_out,"    add_directory: %s added to scanned directory list\n",argv[1]);
           (void)fflush(psrp_out);
 
           return(PSRP_OK);
@@ -746,12 +963,12 @@ _PRIVATE int add_directory(int argc, char *argv[])
 
 
 /*---------------------------------------------------------------------------------------------------------
-   Static PSRP function which adds directories to the list of directories to be scanned ...
+   Static PSRP function which removes directory from the list of directories to be scanned ...
 ---------------------------------------------------------------------------------------------------------*/
 
 _PRIVATE int remove_directory(int argc, char *argv[])
 
-{   int i;
+{   unsigned int i;
 
 
     /*-----------------------------------------------*/
@@ -759,7 +976,7 @@ _PRIVATE int remove_directory(int argc, char *argv[])
     /*-----------------------------------------------*/
 
     if(argc != 2)
-    {  (void)fprintf(psrp_out,"usage: remove_directory <name of scanned directory>\n");
+    {  (void)fprintf(psrp_out,"\n    usage: remove_directory <name of scanned directory>\n\n");
        (void)fflush(psrp_out);
 
        return(PSRP_OK);
@@ -774,14 +991,165 @@ _PRIVATE int remove_directory(int argc, char *argv[])
     {  if(strcmp(argv[1],d_list[i]) == 0)
        {  (void)strlcpy(d_list[i],"notset",SSIZE);
 
-          (void)fprintf(psrp_out,"remove_directory: %s has been removed from scanned directory list\n",argv[1]);
+          (void)fprintf(psrp_out,"    remove_directory: %s has been removed from scanned directory list\n",argv[1]);
           (void)fflush(psrp_out);
 
           return(PSRP_OK);
        }
     }
 
-    (void)fprintf(psrp_out,"remove_directory: %s not found in scanned directory list\n",argv[1]);
+    (void)fprintf(psrp_out,"\n    ERROR remove_directory: %s not found in scanned directory list\n\n",argv[1]);
+    (void)fflush(psrp_out);
+
+    return(PSRP_ERROR);
+}
+
+
+
+
+/*---------------------------------------------------------------------------------------------------------
+   Static PSRP function which adds key to key list ...
+---------------------------------------------------------------------------------------------------------*/
+
+_PRIVATE int add_key(int argc, char *argv[])
+
+{   unsigned int i;
+
+
+    /*-----------------------------------------------*/
+    /* Check that we have the correct argument count */   
+    /*-----------------------------------------------*/
+
+    if(argc != 2)
+    {  (void)fprintf(psrp_out,"usage: add_key <key>\n");
+       (void)fflush(psrp_out);
+
+       return(PSRP_OK);
+    }
+
+
+    /*-------------------------------------*/
+    /* Check to see if key already in list */
+    /*-------------------------------------*/
+
+    for(i=0; i<MAX_KEYS; ++i)
+    {  if(strcmp(key_list[i],argv[1]) == 0)
+       {  (void)fprintf(psrp_out,"\n    ERROR add_key: %s is already in key list\n\n",argv[1]);
+          (void)fflush(psrp_out);
+
+          return(PSRP_ERROR);
+       }
+    }
+
+
+    /*-----------------*/
+    /* Add key to list */
+    /*-----------------*/
+
+    for(i=0; i<MAX_KEYS; ++i)
+    {  
+       if(strncmp(key_list[i],"notset",6) == 0)
+       {  (void)strlcpy(key_list[i],argv[1],SSIZE);
+
+          if(i >= key_cnt)
+             ++key_cnt;
+
+          (void)fprintf(psrp_out,"    add_key: %s added to key list\n",argv[1]);
+          (void)fflush(psrp_out);
+
+          return(PSRP_OK);
+       }
+    }
+}
+
+
+
+
+/*---------------------------------------------------------------------------------------------------------
+   Static PSRP function which removes key from key list ...
+---------------------------------------------------------------------------------------------------------*/
+
+_PRIVATE int remove_key(int argc, char *argv[])
+
+{   unsigned int i;
+
+
+    /*-----------------------------------------------*/
+    /* Check that we have the correct argument count */
+    /*-----------------------------------------------*/
+
+    if(argc != 2)
+    {  (void)fprintf(psrp_out,"    usage: remove_key <key>\n");
+       (void)fflush(psrp_out);
+
+       return(PSRP_OK);
+    }
+
+
+    /*----------------------------------------------------------------*/
+    /* Search for directory and remove it from scanned directory list */
+    /*----------------------------------------------------------------*/
+
+    for(i=0; i<key_cnt; ++i)
+    {  if(strcmp(argv[1],key_list[i]) == 0)
+       {  (void)strlcpy(key_list[i],"notset",SSIZE);
+
+          (void)fprintf(psrp_out,"    remove_key: %s has been removed from file key list\n\n",argv[1]);
+          (void)fflush(psrp_out);
+
+          return(PSRP_OK);
+       }
+    }
+
+    (void)fprintf(psrp_out,"\n    ERROR remove_key: %s not found in file key list\n\n",argv[1]);
+    (void)fflush(psrp_out);
+
+    return(PSRP_ERROR);
+}
+
+
+
+
+/*---------------------------------------------------------------------------------------------------------
+   Static PSRP function which sets scan delay period ...
+---------------------------------------------------------------------------------------------------------*/
+
+_PRIVATE int set_delay_period(int argc, char *argv[])
+
+{   int tmp_delay_period;
+
+
+    /*-----------------------------------------------*/
+    /* Check that we have the correct argument count */
+    /*-----------------------------------------------*/
+
+    if(argc != 2)
+    {  (void)fprintf(psrp_out,"    usage: delay_period <seconds>\n");
+       (void)fflush(psrp_out);
+
+       return(PSRP_OK);
+    }
+
+
+    /*--------------*/
+    /* Sanity check */
+    /*--------------*/
+
+    if (sscanf(argv[1],&tmp_delay_period) != 1 || tmp_delay_period < 0)
+    {  (void)fprintf(psrp_out,"\n    ERROR: expecting delay period (integer >= 0)\n\n");
+       (void)fflush(psrp_out);
+
+       return(PSRP_ERROR);
+    }
+
+
+    /*----------------------*/
+    /* Set new delay period */
+    /*----------------------*/
+
+    delay_period = tmp_delay_period;
+
+    (void)fprintf(psrp_out,"    set_delay_period: scan delay period is now %04d seconds\n\n");
     (void)fflush(psrp_out);
 
     return(PSRP_OK);

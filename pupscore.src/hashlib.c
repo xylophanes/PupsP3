@@ -9,7 +9,7 @@
              United Kingdom
 
     Version: 3.00 
-    Dated:   27th September 2019
+    Dated:   4th January 2022
     E-Mail:  mao@tumblingdice.co.uk
 ------------------------------------------------------------------------------*/
 
@@ -44,7 +44,7 @@ _PRIVATE void hashlib_slot(int level)
 {   (void)fprintf(stderr,"lib hashlib %s: [ANSI C]\n",HASH_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 1995-2019 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 1995-2022 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
        (void)fprintf(stderr,"PUPS/P3 hash storage library (built %s %s)\n\n",__TIME__,__DATE__);
     }

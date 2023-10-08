@@ -1,4 +1,4 @@
-.TH PSRP 1 "16th April 2015" "PUPSP3 commands" "PUPSP3 commands"
+.TH PSRP 1 "12th April 2021" "PUPSP3 commands" "PUPSP3 commands"
 .SH NAME
 .br
 
@@ -28,50 +28,43 @@ psrp \ PSRP process interrogation client
 ][
 .B -sname
 .I PSRP server process name
-]i[
+][
 .B -spid
 .I PSRP server process pid
-[
-.B -max_trys
+][
+.B -trys
 .I trys
-]][
-.B -on
-.I host name
 ][
 .B -wait
 ][
 .B -nowait
 ][
-.B -channel
-.I channel name
+.B -quiet
+][
+.B -squiet
 ][
 .B -c
 .I PSRP command string
 ][
 .B -log
 ][
-.B -remote
-.I hostname 
-.I client
-.I client-pid
-][
-.B -password
-][
-.I authentication token
-][
-.B -username
+.B -user
 .I user-name
 ][
 .B -slaved
+][
+.B -from
+][
+.B -recursive
 ][
 .B -noprompt
 ][
 .B -clist
 .I clist file name
 ]
-< <stdin>
-> <stdout>
->& <log file>
+[< <stdin>]
+[1> <stdout>]
+[2> <log file>]
 .br
 
 .SH DESCRIPTION
@@ -183,13 +176,6 @@ tells the PSRP how many times to try to connect to the server process. Defaults 
 3 tries with 1 second delay between each.
 .br
 
-.B -on
-.I host name
-tells
-.I psrp(1)
-the name of the host it is to execute on
-.br
-
 .B -wait
 tells
 psrp(1)
@@ -202,13 +188,16 @@ tells
 to abort connection attempt if specified server is not running.
 .br
 
-.B -channel
-.I channel name
+.B -quiet
+tell
+.I psrp(1)
+not to produce ouptu from builtin commands
+.br
+
+.B -squiet
 tells
 .I psrp(1)
-to attempt to conenct the nominated server process via the named channel. By default
-.I psrp(1)
-will try to conenct to the nominated servers primary channel.
+not to produce output from (psrp) server commands
 .br
 
 .B -c
@@ -221,21 +210,6 @@ which takes appropriate action.
 tells
 .I psrp(1)
 to log transactions with server process.
-.br
-
-.B -remote
-tells this invocation of
-.I psrp(1)
-that it is a remote client (started by either the
-.I psrp(1)
-.B -on
-option, or interactively from a running local
-.I psrp(1)
-process using an appropriate inbuilt command such as
-.B connect
-.br
-.B hostname
-is the name of the basal host from which the remote PSRP client is being run.
 .br
 
 .B client 
@@ -301,7 +275,7 @@ mao). Typically, a pseudo identifier would not allow other uses direct access to
 capability to run a shell.
 .br
 
-.B slaved
+.B -slaved
 tells
 .I psrp(1)
 that it being used by a PSRP server process which wishes to make peer-to-peer PSRP connections with other
@@ -309,6 +283,20 @@ PSRP servers. In this mode PSRP protocol status is sent to stdout. This is used 
 is slaving
 .I psrp(1)
 to determine the status of its peer-to-peer connection.
+.br
+
+.B -from
+tells
+.I psrp(1)
+the (host) location of a rmeote client.
+.br
+
+.B -recursive
+tells
+.I psrp(1)
+to mark this (slaved) instance as recursive. This happens automatically, when
+.I psrp(1)
+is processing an aggregate command.
 .br
 
 .B -noprompt
@@ -655,11 +643,20 @@ uses the PUPS libraries, see
 .I pups(7)
 .br
 
-.SH BUGS
-Using shells interactively from
-.I psrp(1)
-under certain flavours of UNIX (notably those which are SVR4 based) can cause the
-client to crash.
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
+.br
+
+.SH ENVIRONMENTAL VARIABLES
+none.
 .br
 
 .SH COPYRIGHT
@@ -671,5 +668,5 @@ M.A. O'Neill.
 .br
 
 .SH SEE ALSO
-getpass(3), pups(7), mtdlib(3), curses(3), rttyd(1), xrshd(1)
+getpass(3), pups(7), mtdlib(3), curses(3)
 

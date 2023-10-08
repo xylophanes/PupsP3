@@ -10,8 +10,8 @@
               NE3 4RT
               United Kingdom
 
-    Dated:   27th September 2019  
     Version: 2.00 
+    Dated:   4th January 2022
     Email:   mao@tumblingdice.co.uk
 -----------------------------------------------------------------------------------*/
 
@@ -221,7 +221,7 @@ _PRIVATE void pheap_slot(int level)
 {   (void)fprintf(stderr,"lib hseaplib %s: [ANSI C]\n",PHEAP_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 2003-2019 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 2003-2022 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
        (void)fprintf(stderr,"PUPS/P3 persistent heap support library (built %s %s)\n\n",__TIME__,__DATE__);
     }
@@ -3291,7 +3291,7 @@ _PUBLIC int msm_save_heapstate(const char *ssave_dir)
      or (US mail) as Mike Haertel c/o Free Software Foundation.
 
      Shared heap modifications by Mark O'Neill (mao@tumblingdice.co.uk)
-     (C) 1998-2019 M.A. O'Neill, Tumbling Dice
+     (C) 1998-2022 M.A. O'Neill, Tumbling Dice
 ---------------------------------------------------------------------------*/
 
 #ifndef GLIBC
@@ -3346,7 +3346,7 @@ _PUBLIC __ptr_t phvalloc (const unsigned int hdes, const __malloc_size_t size, c
    or (US mail) as Mike Haertel c/o Free Software Foundation.
 
    Persistent heap modifications by Mark O'Neill (mao@tumblingdice.co.uk) 
-   (C) 1998-2019 M.A. O'Neill, Tumbling Dice
+   (C) 1998-2022 M.A. O'Neill, Tumbling Dice
 -----------------------------------------------------------------------------*/
 
 #include <stdio.h>
@@ -3564,19 +3564,19 @@ _PRIVATE int initialize (int hdes)
   (void)pthread_mutex_lock(&htab_mutex);
   #endif /* PTHREAD_SUPPORT */
 
-  /*------------------------------------------------------------------------*/
-  /* If we are importing a persistent heap which already exists             */
-  /* we need to pull all of the parameters required by the                  */
-  /* memory allocator from the shared heap. Mark O'Neill 14th November 1997 */
-  /*------------------------------------------------------------------------*/
+  /*----------------------------------------------------------------------------*/
+  /* If we are importing a persistent heap which already exists                 */
+  /* we need to pull all of the parameters required by the                      */
+  /* memory allocator from the persistent heap. Mark O'Neill 14th November 1997 */
+  /*----------------------------------------------------------------------------*/
 
   if(htable[hdes].exists == FALSE)
   {
 
-     /*-------------------------------------------------------------------*/
-     /* Before doing anything else grab some memory on the shared heap to */
-     /* store parameters. Mark O'Neill 14th November 1997                 */
-     /*-------------------------------------------------------------------*/
+     /*-----------------------------------------------------------------------*/
+     /* Before doing anything else grab some memory on the persistent heap to */
+     /* store parameters. Mark O'Neill 14th November 1997                     */
+     /*-----------------------------------------------------------------------*/
 
      _pheap_parameters[hdes] = msm_sbrk (hdes, N_PARAMETERS*sizeof(long));
 
@@ -3859,9 +3859,9 @@ _PUBLIC __ptr_t phmalloc (const unsigned int hdes, __malloc_size_t  size, const 
   req_size = size;
 
 
-  /*----------------------------------------------------------------------*/
-  /* Does this shared object already exits? If so, we cannot allocate it! */
-  /*----------------------------------------------------------------------*/
+  /*--------------------------------------------------------------------------*/
+  /* Does this persistent object already exits? If so, we cannot allocate it! */
+  /*--------------------------------------------------------------------------*/
 
   if(name != (const char *)NULL && msm_phobject_exists(hdes,name))
   {  errno = EEXIST;
@@ -4157,7 +4157,7 @@ _PUBLIC __ptr_t phmalloc (const unsigned int hdes, __malloc_size_t  size, const 
     or (US mail) as Mike Haertel c/o Free Software Foundation.
 
     Persistent heap modifications by Mark O'Neill (mao@tumblingdice.co.uk)
-    (C) 1998-2019 M.A. O'Neill, Tumbling Dice
+    (C) 1998-2022 M.A. O'Neill, Tumbling Dice
 -------------------------------------------------------------------------------------------------------*/
 
 #include <stdio.h>
@@ -4182,9 +4182,9 @@ _IMPORT __malloc_size_t   *pheapsize;
 _PROTOTYPE _EXTERN int msm_map_object(const unsigned int, const unsigned int, const void *, const char *);
 
 
-/*---------------------------------------------------------------------------*/
-/* Remove a shared object from shared object map within shared meory segment */
-/*---------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------------------------*/
+/* Remove a persistent object persistent object map within persistent memory segment */
+/*-----------------------------------------------------------------------------------*/
 
 _PROTOTYPE _EXTERN int msm_unmap_object(const unsigned int, const unsigned int);
 
@@ -4532,7 +4532,7 @@ void *phfree (const unsigned int hdes, const __ptr_t ptr)
     Cambridge, MA 02139, USA.
 
     Shared heap code by Mark O'Neill (mao@tumblingdice.co.uk)
-    (C) 1998-2019 M.A. O'Neill, Tumbling Dice
+    (C) 1998-2022 M.A. O'Neill, Tumbling Dice
 --------------------------------------------------------------------------*/
 
 #ifndef	_PHMALLOC_INTERNAL
@@ -4580,7 +4580,7 @@ _PUBLIC void phcfree (int hdes,  __ptr_t ptr)
     or (US mail) as Mike Haertel c/o Free Software Foundation.
 
     Persistent heap modifications by Mark O'Neill (mao@tumblingdice.co.uk)
-    (C) 1998-2019 M.A. O'Neill, Tumbling Dice
+    (C) 1998-2022 M.A. O'Neill, Tumbling Dice
 -------------------------------------------------------------------------*/
 
 #ifndef	_PHMALLOC_INTERNAL
@@ -5016,7 +5016,7 @@ _PUBLIC __ptr_t phrealloc (const unsigned int hdes, const __ptr_t ptr, __malloc_
    or (US mail) as Mike Haertel c/o Free Software Foundation.
 
    Shared heap modifications by Mark O'Neill (mao@tumblingdice.co.uk)
-   (C) 1998-2019 M.A. O'Neill, Tumbling Dice
+   (C) 1998-2022 M.A. O'Neill, Tumbling Dice
 --------------------------------------------------------------------------*/
 
 #include <errno.h>
@@ -5088,7 +5088,7 @@ _PUBLIC __ptr_t phcalloc (const unsigned int hdes, const __malloc_size_t nmemb, 
     the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
 
     Persistent heap modifications by Mark O'Neill (mao@tumblingdice.co.uk)
-    (C) 1998-2019 M.A. O'Neill, Tumbling Dice
+    (C) 1998-2022 M.A. O'Neill, Tumbling Dice
 ----------------------------------------------------------------------------*/
 
 #include <pheap.h>
@@ -5152,7 +5152,7 @@ _PUBLIC __ptr_t __default_phmorecore (int hdes,  int increment)
     Cambridge, MA 02139, USA.  
 
     Persistent heap modification by Mark O'Neill (mao@tumblingdice.co.uk)
-    (C) 1998-2019 M.A. O'Neill, Tumbling Dice
+    (C) 1998-2022 M.A. O'Neill, Tumbling Dice
 ----------------------------------------------------------------------------*/
 
 #ifndef	_PHMALLOC_INTERNAL

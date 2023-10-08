@@ -1,4 +1,4 @@
-.TH MANC 1 "11 January 2008" "PUPSP3 Scripts" "PUPSP3 Scripts"
+.TH MANC 1 "11th January 2008" "PUPSP3 Scripts" "PUPSP3 Scripts"
 
 .SH NAME
 MANC \- generate man page from C/C++ source using c2man application. 
@@ -8,7 +8,7 @@ MANC \- generate man page from C/C++ source using c2man application.
 .B manc 
 .I C/C++ source file name
 .I man page name 
->& <log file>
+[2> <log file>]
 .br
 
 .SH DESCRIPTION
@@ -22,10 +22,21 @@ source files using the
 application
 .br
 
-
 .SH OPTIONS
 
 None.
+.br
+
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
 .br
 
 .SH ENVIRONMENT VARIABLES

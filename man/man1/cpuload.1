@@ -1,0 +1,78 @@
+.TH CPULOAD 1 "11th December 2020" "PUPSP3 build tools" "PUPSP3 build tools"
+
+.SH NAME
+CPULOAD \- homeostatic CPU load monitor.
+.br
+
+.SH SYNOPSIS
+.B cpuload 
+.B [-usage | -help]
+[2> <log file>]
+.br
+
+.SH DESCRIPTION
+.I cpuload(1)
+is a filter which uses an underlying instance of the
+.I mpstat(1)
+utility to continously monitor CPU loading. It is full homeostatic and protects
+its process and critical files. CPU lading (averaged over a sliding 32 second
+window) is written to /tmp/cpuloading (which can be read by the user or other
+processes in order to detetmine the current time averaged CPU loading).
+.br
+
+.SH OPTIONS
+
+.B -usage
+|
+.B -help
+tells
+.I cpuload(1)
+to display help information and then exit.
+.br
+
+.SH SIGNALS
+.I cpuload(1)
+has handlers for
+.B SIGHUP,
+.B SIGQUIT,
+.B SIGINT
+and
+.B SIGTERM
+if any these signals are caught
+.I cpuload(1)
+will cleanup and exit.
+.br
+
+.SH FILES
+.I /tmp/cpuloading
+.br
+.I /tmp/cpuload.pid
+.br
+
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error (i.e. SIGTERM, SIGQUIT caught).
+.br
+
+.SH ENVIRONMENT VARIABLES
+None.
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br
+
+.SH SEE ALSO
+mpstat(1).
+

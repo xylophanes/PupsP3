@@ -8,9 +8,9 @@
              NE3 4RT
              United Kingdom
 
-    E-Mail:  mao@tumblingdice.co.uk 
-    Dated:   8th June 2018 
     Version: 1.16
+    Dated:   4th January 2022
+    E-Mail:  mao@tumblingdice.co.uk 
 ------------------------------------------------------------------------------*/
 
 #ifndef SLOTMAN_H

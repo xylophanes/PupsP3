@@ -1,36 +1,81 @@
 #!/bin/bash
-
-#---------------------------------------------------------------------
-# Edit echo to return machine architecture:
-#      e.g. echo ix86.linux    - linux system. Intel 80x86 Proc.
-#           echo sparc.linux   - linux system. SPARC Proc.
-#           echo sparc.sunos   - SunOS system. SPARC Proc
-#           echo sparc.solaris - Solaris system. SPARC proc.
-#           echo axp.osf1      - Digital UNIX system. AXP Proc.
 #
-#---------------------------------------------------------------------
-#
+#--------------------------------------------------
+# Get PUPS/P3 system architecture
+# (C) M.A. O'Neill, Tumbling Dice, 4th January 2022
+#-------------------------------------------------- 
+#--------------------
+# Parse command line
+#--------------------
 
-if [ $# -ge 1 ]  ||  [ "$1" = "usage" ] || [ "$1" = "help" ] ; then
-	echo ""
-	echo "    PUPS-2019 (SUPUPS) system architecture identifier script (c) M.A. O'Neill, Tumbling Dice 2002-2019"
-	echo ""
+do_upcase=FALSE
+if [ "$#" -gt 0 ] ; then
 
-        echo "    Usage: pupsuname [usage] | [help]"
-        echo ""
-        exit 1
+
+	#--------
+	# Upcase
+	#--------
+
+	if [ "$1" = upcase ] ; then
+		do_upcase=TRUE
+
+
+	#--------------------
+	# Error - show usage
+	#--------------------
+
+	else
+		echo ""
+		echo "    PUPS-2000 (SUPUPS) system architecture identifier script (c) M.A. O'Neill, Tumbling Dice 2002-2022"
+		echo ""
+
+        	echo "Usage: pupsuname [upcase]"
+        	echo ""
+
+        	exit 255
+	fi
 fi
+
+
+#--------------------
+# PUPS/P3 build type
+#--------------------
 
 BTYPE=unknown 
 if [ -e ~/p3 ] ; then
-	if [ $(ls ~/p3 | grep cluster) != "" ] ; then
+
+	if [  "$(ls ~/p3 | grep cluster)" != ""  ] ; then
 		BTYPE=cluster
-	elif [ $(ls ~/p3 | grep vanilla) != "" ] ; then
+	elif [ "$(ls ~/p3 | grep vanilla)" != "" ] ;  then
                 BTYPE=vanilla
 	else
 		BTYPE=unknown
 	fi
 fi
 
+
+#--------------------------
+# Upcase if asked to do so
+#--------------------------
+
+if [ "$do_upcase" = TRUE ] ; then
+
+	MACHTYPE=$(upcase $MACHTYPE)
+	OSTYPE=$(upcase $OSTYPE)
+	BTYPE=$(upcase $BTYPE)
+
+fi
+
+
+#--------------------------------------
+# PUPS/P3 archecture identifier string
+#--------------------------------------
+
 echo $MACHTYPE.$OSTYPE.$BTYPE 
+
+
+#------
+# Done
+#------
+
 exit 0

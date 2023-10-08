@@ -4,7 +4,7 @@
     means the code is (a) POSIX compliant and (b) can often make better use of
     memory resources than traditional memory allocation packages.   
 
-    (C) M.A. O'Neill, 02-09-2019, mao@tumblingdice.co.uk.
+    (C) M.A. O'Neill, 03-06-2021, mao@tumblingdice.co.uk.
 -------------------------------------------------------------------------------------*/
 
 
@@ -15,11 +15,12 @@
 #include <math.h>
 #include <errno.h>
 #include <typedefs.h>
+#include <stdatomic.h>
+
 
 #ifdef PTHREAD_SUPPORT
 #include <pthread.h>
 #endif /* PTHREAD_SUPPORT */
-
 
 #define __NOT_LIB_SOURCE__
 #include <xtypes.h>
@@ -116,6 +117,35 @@ _PRIVATE double         munmap_utilisation = 10.0;
 
 #define jloc(l)   ((void *) (&l->space))
 #define jmal(l)   ((Jmalloc) (((void *)l) - JMSZ + PTSZ))
+
+
+/*----------------------------------------------------------------------------
+    Enter critical section.
+----------------------------------------------------------------------------*/
+
+static atomic_flag flag = { 0 };
+static int enter_malloc_critical(void)
+
+{  while(atomic_flag_test_and_set(&flag) == 1)
+         (void)usleep(100);
+
+   return(0);
+}
+
+
+
+/*-----------------------------------------------------------------------------
+   Leave critical section
+-----------------------------------------------------------------------------*/
+
+static int leave_malloc_critical(void)
+
+{  
+    atomic_flag_clear(&flag);
+    return(0);
+}
+
+
 
 
 /*---------------------------------------------------------------------------- 
@@ -216,7 +246,7 @@ _PRIVATE void dump_core(void)
    memlist->space = (void *)NULL;
 
 #ifdef P3_SUPPORT
-   pups_exit(-1);
+   pups_exit(255);
 #endif /* P3_SUPPORT */
 
 }
@@ -241,8 +271,11 @@ _PRIVATE void *set_used(Jmalloc l)
     The required memory is mapped into the process address space
     using mmap() ...
 ----------------------------------------------------------------------------*/ 
+/*------------------------------------------*/
+/* malloc() called by calloc() or realloc() */
+/*------------------------------------------*/
 
-_PUBLIC void *malloc(size_t size)
+_PRIVATE void *malloc_internal(const _BOOLEAN is_internal, size_t size)
 {
   int new_pages;
 
@@ -273,23 +306,18 @@ _PUBLIC void *malloc(size_t size)
      return NULL;
   }
 
+
   /*----------------------------------------------------*/
   /* We cannot permit signals to be handled in malloc() */
   /* if we are about to enter a critical section        */
   /*----------------------------------------------------*/
 
-  (void)sigfillset(&set);
-
-  #ifdef PTHREAD_SUPPORT
-  (void)pthread_sigmask(SIG_BLOCK,&set,&old_set);
-  #else
-  (void)sigprocmask(SIG_BLOCK,&set,&old_set);
-  #endif /* THREAD_SUPPORT */
-
- 
-  #ifdef PTHREAD_SUPPORT
-  (void)pthread_mutex_lock(&ckpt_malloc_mutex);
-  #endif /* THREAD_SUPPORT */
+  if(is_internal == FALSE)
+  {  (void)sigfillset (&set);
+     (void)sigemptyset(&old_set);
+     (void)sigprocmask(SIG_SETMASK,&set,&old_set);
+     (void)enter_malloc_critical();
+  }
 
   do_init();
 
@@ -299,7 +327,7 @@ _PUBLIC void *malloc(size_t size)
   /* address space of the calling process. This means that each new item will occupy at least 1 */
   /* page of memory irrespective of its actual size. On modern machines, with large amounts of  */
   /* memory this is an acceptable overhead, given that the resulting code is much cleaner and   */
-  /* easier to read than a conventional malloc package.                                         */
+  /* easier to manipulate than a conventional malloc package.                                   */
   /*--------------------------------------------------------------------------------------------*/   
 
   new_pages = (size + JMSZ) / GPAGESIZE + 1;
@@ -332,19 +360,14 @@ _PUBLIC void *malloc(size_t size)
 
      errno = ENOMEM; 
 
-      #ifdef PTHREAD_SUPPORT
-      (void)pthread_mutex_unlock(&ckpt_malloc_mutex);
-      #endif /* PTHREAD_SUPPORT */
-
-
      /*---------------------*/
      /* Restore signal mask */
      /*---------------------*/
-     #ifdef PTHREAD_SUPPORT
-     (void)pthread_sigmask(SIG_SETMASK,&old_set,(sigset_t *)NULL);
-     #else
-     (void)sigprocmask(SIG_SETMASK,&old_set,(sigset_t *)NULL);
-     #endif /* PTHREAD_SUPPORT */
+
+     if(is_internal == FALSE)
+     {  (void)leave_malloc_critical();
+        (void)sigprocmask(SIG_SETMASK,&old_set,(sigset_t *)NULL);
+     }
 
      return NULL;
   }
@@ -379,22 +402,27 @@ if(l->mmap_size > 0)
    loc = set_used(l);
    malloc_called++;
 
-   #ifdef PTHREAD_SUPPORT
-   (void)pthread_mutex_unlock(&ckpt_malloc_mutex);
-   #endif /* PTHREAD_SUPPORT */
-
 
    /*---------------------*/
    /* Restore signal mask */
    /*---------------------*/
 
-   #ifdef PTHREAD_SUPPORT
-   (void)pthread_sigmask(SIG_SETMASK,&old_set,(sigset_t *)NULL);
-   #else
-   (void)sigprocmask(SIG_SETMASK,&old_set,(sigset_t *)NULL);
-   #endif /* PTHREAD_SUPPORT */
+   if(is_internal == FALSE)
+   {  (void)leave_malloc_critical();
+      (void)sigprocmask(SIG_SETMASK,&old_set,(sigset_t *)NULL);
+   }
 
    return(loc);
+}
+
+
+/*--------------------------------------*/
+/* malloc() called by external function */
+/*--------------------------------------*/
+
+_PUBLIC void *malloc(size_t size)
+
+{    return(malloc_internal(FALSE,size));
 }
 
 
@@ -404,8 +432,11 @@ if(l->mmap_size > 0)
     Free -- free the memory bubble associated with loc, unmapping memory
     associated with it from the process address space ... 
 ----------------------------------------------------------------------------*/ 
+/*----------------------------------------*/
+/* free() called by calloc() or realloc() */
+/*----------------------------------------*/
 
-_PUBLIC void free(const void *loc)
+_PRIVATE void free_internal(const _BOOLEAN is_internal, const void *loc)
 {
   Jmalloc l;
   Jmalloc pl, nl;
@@ -427,17 +458,12 @@ _PUBLIC void free(const void *loc)
   /* We cannot allow signals to be handled in free() */
   /*-------------------------------------------------*/
 
-  (void)sigfillset(&set);
-
-  #ifdef PTHREAD_SUPPORT
-  (void)pthread_sigmask(SIG_BLOCK,&set,&old_set);
-  #else
-  (void)sigprocmask(SIG_BLOCK,&set,&old_set);
-  #endif /* PTHREAD_SUPPORT */
-
-  #ifdef PTHREAD_SUPPORT
-  (void)pthread_mutex_lock(&ckpt_malloc_mutex);
-  #endif /* PTHREAD_SUPPORT */
+  if(is_internal == FALSE)
+  {  (void)sigfillset (&set);
+     (void)sigemptyset(&old_set);
+     (void)sigprocmask(SIG_SETMASK,&set,&old_set);
+     (void)enter_malloc_critical();
+  }
 
   do_init();
   free_called++;
@@ -482,7 +508,7 @@ _PUBLIC void free(const void *loc)
   {  (void)fprintf(stderr,"errno is %d\n",errno);
      (void)fflush(stderr);
 
-     exit(-1);
+     exit(255);
   }                 
 
   pl->flink = nl;
@@ -497,24 +523,28 @@ _PUBLIC void free(const void *loc)
   if(initialised == TRUE)
      errno = 0;
 
-  #ifdef PTHREAD_SUPPORT
-  (void)pthread_mutex_unlock(&ckpt_malloc_mutex);
-  #endif /* PTHREAD_SUPPORT */
-
 
   /*---------------------*/
   /* Restore signal mask */
   /*---------------------*/
 
-   #ifdef PTHREAD_SUPPORT
-  (void)pthread_sigmask(SIG_SETMASK,&old_set,(sigset_t *)NULL);
-  #else
-  (void)sigprocmask(SIG_SETMASK,&old_set,(sigset_t *)NULL);
-  #endif /* PTHREAD_SUPPORT */
-
+  if(is_internal == FALSE)
+  {  (void)leave_malloc_critical();
+     (void)sigprocmask(SIG_SETMASK,&old_set,(sigset_t *)NULL);
+  }
+  
   return;
 }
 
+
+/*-----------------------------*/
+/* Called by external function */
+/*-----------------------------*/
+
+_PUBLIC void free(const void *loc)
+
+{ return(free_internal(FALSE,loc));
+}
 
 
 
@@ -535,6 +565,7 @@ _PUBLIC void *realloc(const void *ptr, const size_t size)
   _BYTE   *loc2 = (_BYTE *)NULL;
 
   size_t i,
+         old_size,
          new_size;
 
   sigset_t set,
@@ -543,9 +574,16 @@ _PUBLIC void *realloc(const void *ptr, const size_t size)
   if(initialised == TRUE)
      errno = 0;
 
-  if(size == 0)
+
+  /*---------------------------------------------*/
+  /* We are not in critical section of realloc() */
+  /* so free() is effectively external           */
+  /*---------------------------------------------*/
+
+  new_size = size;
+  if(new_size == 0)
   {  if(ptr != (void *)NULL)
-        (void)free(ptr);
+        free(ptr);
 
      return((void *)NULL);
   }
@@ -555,32 +593,26 @@ _PUBLIC void *realloc(const void *ptr, const size_t size)
   /* This case reduces to malloc() */
   /*-------------------------------*/
 
-  if(ptr == (const void *)NULL && size > 0)
-  {  loc = (void *)malloc(size);
+  if(ptr == (const void *)NULL && new_size > 0)
+  {  loc = (void *)malloc_internal(TRUE,new_size);
      return(loc);
   }
-
-  #ifdef PTHREAD_SUPPORT
-  (void)pthread_mutex_lock(&ckpt_malloc_mutex);
-  #endif /* PTHREAD_SUPPORT */
 
 
   /*----------------------------------------------------*/
   /* We cannot allow signals to be handled in realloc() */
   /*----------------------------------------------------*/
 
-  (void)sigfillset(&set);
-
-  #ifdef PTHREAD_SUPPORT
-  (void)pthread_sigmask(SIG_BLOCK,&set,&old_set);
-  #else
-  (void)sigprocmask(SIG_BLOCK,&set,&old_set);
-  #endif /* PTHREAD_SUPPORT */
+  (void)sigfillset (&set);
+  (void)sigemptyset(&old_set);
+  (void)sigprocmask(SIG_SETMASK,&set,&old_set);
+  (void)enter_malloc_critical();
 
   loc = (_BYTE *)ptr;
   do_init();
 
-  l = jmal(loc); 
+  l        = jmal(loc); 
+  old_size = l->size;
 
 
   /*---------------------------------------------------------------------------*/
@@ -596,10 +628,9 @@ _PUBLIC void *realloc(const void *ptr, const size_t size)
 (void)fflush(stderr);
 #endif /* JMALLOC_DEBUG */
 
-  if (size < l->mmap_size - JMSZ - 2*PTSZ)
+  if (new_size < l->mmap_size - JMSZ - 2*PTSZ)
   {     double utilisation;
 
-        new_size    = size;
         utilisation = 100.0*(double)new_size/(double)l->mmap_size;
 
 #ifdef JMALLOC_DEBUG
@@ -607,23 +638,22 @@ _PUBLIC void *realloc(const void *ptr, const size_t size)
 (void)fflush(stderr);
 #endif /* JMALLOC_DEBUG */
 
+
+        /*--------------------------*/
+        /* Can this bubble be used? */
+        /*--------------------------*/
+
         if(l->mmap_size == GPAGESIZE || utilisation > munmap_utilisation) 
         {  l->size   = new_size;
-
-           #ifdef PTHREAD_SUPPORT
-           (void)pthread_mutex_unlock(&ckpt_malloc_mutex);
-           #endif /* PTHREAD_SUPPORT */
 
 
            /*---------------------*/
            /* Restore signal mask */
            /*---------------------*/
 
-           #ifdef PTHREAD_SUPPORT
-           (void)pthread_sigmask(SIG_SETMASK,&old_set,(sigset_t *)NULL);
-           #else
+           (void)leave_malloc_critical();
            (void)sigprocmask(SIG_SETMASK,&old_set,(sigset_t *)NULL);
-           #endif /* PTHREAD_SUPPORT */
+
 
 #ifdef JMALLOC_DEBUG
 (void)fprintf(stderr,"REALLOC: adjusting block of 0x%010x (new size 0x%010x)\n",l->size,size);
@@ -645,8 +675,6 @@ _PUBLIC void *realloc(const void *ptr, const size_t size)
 #endif /* JMALLOC_DEBUG */
 
   }
-  else
-     new_size = l->size;
 
 
   /*---------------------------------------------------------------------------*/
@@ -656,10 +684,16 @@ _PUBLIC void *realloc(const void *ptr, const size_t size)
   /* prevent an acute memory shortage occuring.                                */
   /*---------------------------------------------------------------------------*/
 
-  loc2 = malloc(size);
-  for (i = 0; i < new_size; i++)
+  loc2 = malloc_internal(TRUE,new_size);
+  for (i = 0; i < old_size; i++)
       loc2[i] = loc[i];
-  free(loc);
+
+
+  /*-------------------------------------------*/
+  /* In critical section so free() is internal */
+  /*-------------------------------------------*/
+
+  free_internal(TRUE,loc);
 
 #ifdef JMALLOC_DEBUG
 (void)fprintf(stderr,"REALLOC [0x%010x] returned 0x%010x (with loc1 free)\n",(unsigned long)ptr,(unsigned long)l);
@@ -667,20 +701,12 @@ _PUBLIC void *realloc(const void *ptr, const size_t size)
 #endif /* JMALLOC_DEBUG */
 
 
-  #ifdef PTHREAD_SUPPORT
-  (void)pthread_mutex_unlock(&ckpt_malloc_mutex);
-  #endif /* PTHREAD_SUPPORT */
-
-
   /*---------------------*/
   /* Restore signal mask */
   /*---------------------*/
 
-  #ifdef PTHREAD_SUPPORT
-  (void)pthread_sigmask(SIG_SETMASK,&old_set,(sigset_t *)NULL);
-  #else
+  (void)leave_malloc_critical();
   (void)sigprocmask(SIG_SETMASK,&old_set,(sigset_t *)NULL);
-  #endif /* PTHREAD_SUPPORT */
 
   return loc2;
 }
@@ -711,37 +737,22 @@ _PUBLIC void *calloc(const size_t nelem, const size_t elsize)
   /* We cannot allow signals to be handled in calloc() */
   /*---------------------------------------------------*/
 
-  (void)sigfillset(&set);
-
-  #ifdef PTHREAD_SUPPORT
-  (void)pthread_sigmask(SIG_BLOCK,&set,&old_set);
-  #else
-  (void)sigprocmask(SIG_BLOCK,&set,&old_set);
-  #endif /* PTHREAD_SUPPORT */
-
-  #ifdef PTHREAD_SUPPORT
-  (void)pthread_mutex_lock(&ckpt_malloc_mutex);
-  #endif /* PTHREAD_SUPPORT */
+  (void)sigfillset (&set);
+  (void)sigemptyset(&old_set);
+  (void)sigprocmask(SIG_SETMASK,&set,&old_set);
+  (void)enter_malloc_critical();
 
   sz  = nelem*elsize;
-  ptr = malloc(sz);
+  ptr = malloc_internal(TRUE,sz);
   if(ptr == (_BYTE *)NULL)
   {
-
-     #ifdef PTHREAD_SUPPORT
-     (void)pthread_mutex_unlock(&ckpt_malloc_mutex);
-     #endif /* PTHREAD_SUPPORT */
-
 
      /*---------------------*/
      /* Restore signal mask */
      /*---------------------*/
 
-     #ifdef PTHREAD_SUPPORT
-     (void)pthread_sigmask(SIG_SETMASK,&old_set,(sigset_t *)NULL);
-     #else
+     (void)leave_malloc_critical();
      (void)sigprocmask(SIG_SETMASK,&old_set,(sigset_t *)NULL);
-     #endif /* PTHREAD_SUPPORT */
 
      return NULL;
   }
@@ -753,20 +764,13 @@ _PUBLIC void *calloc(const size_t nelem, const size_t elsize)
   for (i = i * sizeof(int); i < sz; i++)
       ptr[i] = 0;
 
-  #ifdef PTHREAD_SUPPORT
-  (void)pthread_mutex_unlock(&ckpt_malloc_mutex);
-  #endif /* PTHREAD_SUPPORT */
-
 
   /*---------------------*/
   /* Restore signal mask */
   /*---------------------*/
 
-  #ifdef PTHREAD_SUPPORT
-  (void)pthread_sigmask(SIG_SETMASK,&old_set,(sigset_t *)NULL);
-  #else
+  (void)leave_malloc_critical();
   (void)sigprocmask(SIG_SETMASK,&old_set,(sigset_t *)NULL);
-  #endif /* PTHREAD_SUPPORT */
 
   return ((void *)ptr);
 }
@@ -834,9 +838,7 @@ _PUBLIC void jmalloc_usage(const int show_bubbles, const FILE *stream)
      return;
   }
 
-  #ifdef PTHREAD_SUPPORT
-  (void)pthread_mutex_lock(&ckpt_malloc_mutex);
-  #endif /* THREAD_SUPPORT */
+  (void)enter_malloc_critical();
 
   do_init(); 
 
@@ -861,8 +863,8 @@ _PUBLIC void jmalloc_usage(const int show_bubbles, const FILE *stream)
              else
                 utilisation = 0.0;
 
-             (void)fprintf(stream,"    %04d: bubble at 0x%010x virtual, size 0x%010x, used 0x%010x (utilisation %4.2f %%)\n",
-                                                            cnt,(unsigned long)next + JMSZ,next->size,next->mmap_size,utilisation);
+             (void)fprintf(stream,"    %04d: bubble at 0x%010x virtual, size 0x%010x, used 0x%010x (utilisation %5.2f %%)\n",
+                                                       cnt,(unsigned long)next + JMSZ,next->size,next->mmap_size,utilisation);
              (void)fflush(stream);
           }
 
@@ -875,14 +877,11 @@ _PUBLIC void jmalloc_usage(const int show_bubbles, const FILE *stream)
       } while(next != start);
 
    utilisation = 100.0*(double)mem_used/(double)mem_allocated;
-   (void)fprintf(stream,"\n\n    %04d bubbles currently mapped into process address space (utilisation theshold is %4.2f %%)\n",
+   (void)fprintf(stream,"\n\n    %04d bubbles currently mapped into process address space (utilisation theshold is %5.2f %%)\n",
                                                                                                          cnt,munmap_utilisation);
-   (void)fprintf(stream,"    Total memory used 0x%010x bytes, allocated 0x%010x bytes (utilisation %4.2f %%)\n\n",
+   (void)fprintf(stream,"    Total memory used 0x%010x bytes, allocated 0x%010x bytes (utilisation %5.2f %%)\n\n",
                                                                                     mem_used,mem_allocated,utilisation);
    (void)fflush(stream); 
 
-  #ifdef PTHREAD_SUPPORT
-  (void)pthread_mutex_unlock(&ckpt_malloc_mutex);
-  #endif /* PTHREAD_SUPPORT */
-
+   (void)leave_malloc_critical();
 }

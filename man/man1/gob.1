@@ -16,7 +16,7 @@ GOB \- creates an interactive  mouth (gob hole) into which data for attached pay
 .B -hole
 .I gob hole FIFO name
 ]
->& <log file>
+[2> <log file>]
 .br
 
 .SH DESCRIPTION
@@ -54,6 +54,17 @@ specifies the name of the mouth (gob hole) FIFO for this instance of
 .I gob(1)
 .br
 
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
+.br
 
 .SH ENVIRONMENT VARIABLES
 

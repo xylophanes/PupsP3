@@ -8,8 +8,8 @@
               NE3 4RT
               United Kingdom
 
-     Dated:   23rd January 2018
      Version: 1.06
+     Dated:   4th January 2022
      E-mail:  mao@tumblingdice.co.uk
 ---------------------------------------------------------------------------------------*/
 
@@ -27,7 +27,7 @@
 int main(int argc, char *argv[])
 
 {  if(argc != 2)
-   {  (void)fprintf(stderr,"\nError number to code tranlator version %s, (C) Tumbling Dice, 2002-2018 (built %s %s)\n",ERROR_VERSION,__TIME__,__DATE__);
+   {  (void)fprintf(stderr,"\nError number to code tranlator version %s, (C) Tumbling Dice, 2002-2022 (built %s %s)\n",ERROR_VERSION,__TIME__,__DATE__);
       (void)fprintf(stderr,"\nUsage: error <numeric error code>\n\n");
       (void)fprintf(stderr,"ERROR is free software, covered by the GNU General Public License, and you are\n");
       (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
@@ -37,7 +37,7 @@ int main(int argc, char *argv[])
 
       (void)fflush(stderr);
 
-       exit(-1);
+       exit(255);
    }
 
    (void)sscanf(argv[1],"%d",&errno);

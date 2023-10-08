@@ -9,7 +9,7 @@
              United Kingdom
 
     Version: 1.00
-    Dated:   23rd January 2018 
+    Dated:   4th January 2022
     E-Mail:  mao@tumblingdice.co.uk 
 ------------------------------------------------------------------------------*/
 
@@ -19,7 +19,7 @@
 
                            /*-------------------------------------------------*/
 #define UNIX     1         /* Define this to be a UNIX system                 */
-#define VM_SIZE  15000000  /* Virtual memory size (for shared heaps etc.)     */
+#define VM_SIZE  15000000  /* Virtual memory size (for persistent heaps etc.) */
                            /*-------------------------------------------------*/
 
 #include  <ansi.h>

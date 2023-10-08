@@ -8,8 +8,8 @@
              NE3 4RT
              United Kingdom
 
-    Version: 18.00
-    Dated:   27th Sepember 2019
+    Version: 21.02 
+    Dated:   7th October 2023 
     E-mail:  mao@tumblingdice.co.uk
 -----------------------------------------------------------------------------------------------*/
 
@@ -42,6 +42,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include <bsd/string.h>
 #include <setjmp.h>
 #include <errno.h>
 #include <pwd.h>
@@ -94,7 +95,7 @@
 /* Version */
 /*---------*/
 
-#define PSRP_VERSION          "18.0"
+#define PSRP_VERSION          "21.02"
 
 
 /*---------------------------------------------*/
@@ -102,7 +103,7 @@
 /*---------------------------------------------*/
 
 
-#define PSRP_MAX_HISTORY      100
+#define PSRP_MAX_HISTORY      1024
 #define PML_VERSION           1.03
 #define PSRP_LOCAL_ATOMIC     1
 #define PSRP_LOCAL_AGGREGATE  2
@@ -150,7 +151,7 @@ _PRIVATE void psrp_slot(int level)
 {   (void)fprintf(stdout,"int app psrp %s: [ANSI C]\n",PSRP_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stdout,"(C) 1994-2019 Tumbling Dice\n");
+    {  (void)fprintf(stdout,"(C) 1994-2022 Tumbling Dice\n");
        (void)fprintf(stdout,"Author: M.A. O'Neill\n");
        (void)fprintf(stdout,"PSRP (protocol %5.2F) communication shell (built %s %s)\n",PSRP_PROTOCOL_VERSION,__TIME__,__DATE__);
        (void)fflush(stdout);
@@ -174,6 +175,8 @@ _PRIVATE void psrp_usage(void)
     (void)fprintf(stdout,"\n[-noprompt:FALSE]\n");
     (void)fprintf(stdout,"[-log:FALSE]\n");
     (void)fprintf(stdout,"[-trys <attempts to connect to server PSRP channel>]]\n\n");
+    (void)fprintf(stdout,"[-quiet:FALSE]\n");
+    (void)fprintf(stdout,"[-squiet:FALSE]\n");
     (void)fprintf(stdout,"[-c <PSRP request to be executed>]\n");
     (void)fprintf(stdout,"[-hard:FALSE]\n");
     (void)fprintf(stdout,"[-log:FALSE>]\n");
@@ -542,7 +545,7 @@ _PROTOTYPE _PRIVATE void psrp_yield_channel(void);
 /* Software I.D. tag */
 /*-------------------*/
 
-#define VTAG  7043
+#define VTAG  7492
 extern int appl_vtag = VTAG;
 
 
@@ -554,7 +557,7 @@ extern int appl_vtag = VTAG;
 
 _PRIVATE int hup_handler(int signum)
 
-{   (void)pups_exit(-1);
+{   (void)pups_exit(255);
 }
 
 
@@ -601,7 +604,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
                   PSRP_VERSION,
                   "M.A. O'Neill",
                   "psrp",
-                  "2019",
+                  "2022",
                   argv);
 
 
@@ -625,14 +628,13 @@ _PUBLIC int pups_main(int argc, char *argv[])
     (void)signal(SIGHUP,(void *)&hup_handler);
 
 
-
     /*--------------------------------------------------------------------------*/
     /* Get password to authenticate connection to PSRP services on remote hosts */
     /*--------------------------------------------------------------------------*/
 
     if(pups_locate(&init,"startmsg",&argc,args,0) != NOT_FOUND)
     {  (void)fprintf(stderr,"\n    PSRP client version %s, [build %6d]\n",PSRP_VERSION,appl_vtag);
-       (void)fprintf(stderr,"    (C) M.A. O'Neill, Tumbling Dice 2019\n\n");
+       (void)fprintf(stderr,"    (C) M.A. O'Neill, Tumbling Dice 2022\n\n");
        (void)fflush(stderr);
     }
 
@@ -990,7 +992,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
                        (void)fflush(stdout);
                     }
 
-                    pups_exit(-1);
+                    pups_exit(255);
                  }
               }
 
@@ -1034,7 +1036,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
 
           
           if(strcmp(psrp_c_code,"ok") != 0)
-             pups_exit(-1);
+             pups_exit(255);
           pups_exit(0);
 
 process_found:
@@ -1049,6 +1051,24 @@ process_found:
        else
           (void)strlcpy(psrp_server,"none",SSIZE);
     }
+
+
+    /*---------------------------------------------*/
+    /* Do not produce output from builtin commands */
+    /* (when in non-interactive mode)              */
+    /*---------------------------------------------*/
+
+    if(pups_locate(&init,"quiet",&argc,args,0) != NOT_FOUND)
+       pel_appl_verbose = FALSE;
+
+
+    /*---------------------------------------------------*/
+    /* Do not produce output from (psrp) server commands */
+    /* (when in non-interactive mode)                    */
+    /*---------------------------------------------------*/
+
+    if(pups_locate(&init,"squiet",&argc,args,0) != NOT_FOUND)
+       server_verbose = FALSE;
 
 
     /*-----------------------------------------*/
@@ -1094,6 +1114,13 @@ process_found:
     pups_t_arg_errs(argd,args);
 
 
+    /*----------------*/
+    /* Handle SIGPIPE */
+    /*----------------*/
+
+    (void)pups_sighandle(SIGPIPE,"psrp_int_handler",(void *)psrp_int_handler,(sigset_t *)NULL);
+
+
     /*-------------------------------------------------------------*/
     /* Current client is alway 1 for client end of PSRP connection */
     /*-------------------------------------------------------------*/
@@ -1135,7 +1162,7 @@ process_found:
     remove_junk();
 
     if(strcmp(psrp_c_code,"ok") != 0)
-       pups_exit(-1);
+       pups_exit(255);
     pups_exit(0);
 }
 
@@ -1159,7 +1186,8 @@ _PRIVATE void psrp_command_loop(void)
     /* Process interrupt requests (from user) */
     /*----------------------------------------*/
 
-    (void)pups_sighandle(SIGINT,"psrp_int_handler",(void *)&psrp_int_handler, (sigset_t *)NULL);
+    if(interactive_mode == TRUE)
+       (void)pups_sighandle(SIGINT,"psrp_int_handler",(void *)&psrp_int_handler, (sigset_t *)NULL);
 
 toploop:
 
@@ -1167,6 +1195,7 @@ toploop:
                chars,
                state,
                restore_signum;
+
 
            do {
 
@@ -1177,9 +1206,11 @@ toploop:
                   /* appropriately                           */
                   /*-----------------------------------------*/
 
-                  (void)pupshold(ALL_PUPS_SIGS);
-                  (void)pups_set_jump_vector();
-                  (void)pups_sighandle(SIGINT,"psrp_int_handler",(void *)&psrp_int_handler, (sigset_t *)NULL);
+                  if(interactive_mode == TRUE)
+                  {  (void)pupshold(ALL_PUPS_SIGS);
+                     (void)pups_set_jump_vector();
+                     (void)pups_sighandle(SIGINT,"psrp_int_handler",(void *)&psrp_int_handler, (sigset_t *)NULL);
+                  }
 
                   if((restore_signum = sigsetjmp(command_loop_top,1)) > 0) 
                   {  
@@ -1198,7 +1229,8 @@ toploop:
                      /* Re-enable processing of interrupt requests (from user) */
                      /*--------------------------------------------------------*/
 
-                     (void)pups_sighandle(SIGINT,"psrp_int_handler",(void *)&psrp_int_handler, (sigset_t *)NULL);
+                     if(interactive_mode == TRUE)
+                       (void)pups_sighandle(SIGINT,"psrp_int_handler",(void *)&psrp_int_handler, (sigset_t *)NULL);
 
 
                      /*-------------------------------------------------------------*/
@@ -1552,10 +1584,11 @@ _PRIVATE _BOOLEAN psrp_process_command(char *request_line)
                {  if(busy_retry_mode == TRUE)
                   {  if(pel_appl_verbose == TRUE)
                      {  (void)fprintf(stdout,"\nautomatic request retry mode currently enabled\n");
-                        (void)fprintf(stdout,"will make %d attempts to pass current request to server (at 1 second intervals)\n\n",
-                                                                                                                          max_trys);
+                        (void)fprintf(stdout,"will make %d attempts to pass current request to server (at 1000 millisecond intervals)\n\n",
+                                                                                                                                  max_trys);
                      }
                   }
+
                   else if(pel_appl_verbose == TRUE)
                   {  (void)fprintf(stdout,"\nautomatic request retry mode currently disabled\n");
                      (void)fprintf(stdout,"will abort current request (if server currently busy)\n\n");
@@ -1579,13 +1612,13 @@ _PRIVATE _BOOLEAN psrp_process_command(char *request_line)
                   goto next_request;
                }
 
-               if(strcmp(mode,"on") == 0)
+               else if(strcmp(mode,"on") == 0)
                {  busy_retry_mode = TRUE;
 
                   if(pel_appl_verbose == TRUE)
                   {  (void)fprintf(stdout,"\nautomatic request retry mode enabled\n");
-                     (void)printf(stdout,"will make %d attempts to pass current request to server (at 1 second intervals)\n\n",
-                                                                                                                      max_trys);
+                     (void)printf(stdout,"will make %d attempts to pass current request to server (at 1000 millisecond intervals)\n\n",
+                                                                                                                              max_trys);
                   }
                }
                else
@@ -2196,7 +2229,7 @@ _PRIVATE _BOOLEAN psrp_process_command(char *request_line)
                   /*--------------------------------------------------------------*/
 
                   pups_error("[psrp_process_command] failed to execute local slaved PSRP server (for aggregate command)");
-                  exit(-1);
+                  exit(255);
                }
 
 
@@ -2212,7 +2245,8 @@ _PRIVATE _BOOLEAN psrp_process_command(char *request_line)
                   /* command is interrupted                                    */
                   /*-----------------------------------------------------------*/
 
-                  (void)pups_sighandle(SIGINT,"psrp_int_handler",(void *)&psrp_int_handler, (sigset_t *)NULL);
+                  if(interactive_mode == TRUE)
+                     (void)pups_sighandle(SIGINT,"psrp_int_handler",(void *)&psrp_int_handler, (sigset_t *)NULL);
 
 
                   /*-------------------------------------------------*/
@@ -2227,7 +2261,9 @@ _PRIVATE _BOOLEAN psrp_process_command(char *request_line)
                   /* Restore default action for SIGINT */
                   /*-----------------------------------*/
 
-                  (void)pups_sighandle(SIGINT,"psrp_int_handler",(void *)NULL, (sigset_t *)NULL);
+                  if(interactive_mode == TRUE)
+                     (void)pups_sighandle(SIGINT,"ignore",SIG_IGN, (sigset_t *)NULL);
+
 
                   /*-----------------------------------------------------*/
                   /* For some reason ssh gives an exit code of 255 when  */
@@ -2321,7 +2357,7 @@ _PRIVATE _BOOLEAN psrp_process_command(char *request_line)
                   /*--------------------------------------------------------------*/
 
                   pups_error("[psrp_process_command] failed to build ssh channel to remote host");
-                  exit(-1);
+                  exit(255);
                }
 
 
@@ -2338,7 +2374,8 @@ _PRIVATE _BOOLEAN psrp_process_command(char *request_line)
                   /* command is interrupted                                 */
                   /*--------------------------------------------------------*/
 
-                  (void)pups_sighandle(SIGINT,"psrp_int_handler",(void *)&psrp_int_handler, (sigset_t *)NULL);
+                  if(interactive_mode == TRUE)
+                     (void)pups_sighandle(SIGINT,"psrp_int_handler",(void *)&psrp_int_handler, (sigset_t *)NULL);
 
 
                   /*----------------------------------------------------*/
@@ -2353,7 +2390,8 @@ _PRIVATE _BOOLEAN psrp_process_command(char *request_line)
                   /* Restore default action for SIGINT */
                   /*-----------------------------------*/
 
-                  (void)pups_sighandle(SIGINT,"psrp_int_handler",(void *)NULL, (sigset_t *)NULL);
+                  if(interactive_mode == TRUE)
+                     (void)pups_sighandle(SIGINT,"ignore",SIG_IGN, (sigset_t *)NULL);
 
                   if(ret < 0)
                   {  (void)fprintf(stdout,"\nfailed to execute ssh command (on remote host \"%s\")\n",psrp_host);
@@ -2576,7 +2614,7 @@ _PRIVATE _BOOLEAN psrp_process_command(char *request_line)
 
                else if(strcmp(tmpstr,"off") == 0)
                {  do_datasink = FALSE;
-                  (void)pups_sighandle(SIGPIPE,"default",SIG_DFL,(sigset_t *)NULL);
+                  (void)pups_sighandle(SIGPIPE,"psrp_int_handler",(void *)psrp_int_handler,(sigset_t *)NULL);
 
                   (void)fprintf(stdout,"\npaging mode disabled\n\n");
                   (void)fflush(stdout);
@@ -2847,8 +2885,11 @@ _PRIVATE _BOOLEAN psrp_process_command(char *request_line)
 
             if(strncmp(request,"version",7) == 0)
             {  if(pel_appl_verbose == TRUE)
-               {  char machtype[SSIZE] = "",
-                       ostype[SSIZE]   = "",
+               {  int is_vmtype        = FALSE;
+		       
+		  char machtype[SSIZE] = "",
+                       vmtype  [SSIZE] = "",
+                       ostype  [SSIZE] = "",
                        hostname[SSIZE] = "";
 
                   (void)fprintf(stdout,"\nPSRP interaction client %s (PSRP protocol %5.2F, PML version %5.2F)\n",
@@ -2865,14 +2906,17 @@ _PRIVATE _BOOLEAN psrp_process_command(char *request_line)
                   (void)pups_sysinfo(hostname,ostype,(char *)NULL,machtype);
 
 
-                  /*-----------------------------------------------*/
-                  /* Check to see if we are running in a container */
-                  /*-----------------------------------------------*/
+                  /*-------------------------------------------------------*/
+                  /* Check to see if we are running in virtual environment */
+                  /*-------------------------------------------------------*/
 
-                  if(pups_is_in_container((char *)NULL) == TRUE)
-                     (void)fprintf(stdout,"\n    Running in %s.%s container (%s)\n",machtype,ostype,hostname);
-                  else
-                     (void)fprintf(stdout,"\n    Running on %s.%s host (%s)\n",machtype,ostype,hostname);
+                  is_vmtype= pups_os_is_virtual(vmtype);
+		  if(is_vmtype == TRUE)
+                     (void)fprintf(stdout,"\n    Running in %s %s %s host (%s)\n",        machtype,ostype,vmtype,hostname);
+                  else if(is_vmtype == FALSE)
+                     (void)fprintf(stdout,"\n    Running on %s %s bare-metal host (%s)\n",machtype,ostype,hostname);
+		  else
+                     (void)fprintf(stdout,"\n    Running on %s %s unknown host\n",        machtype,ostype,hostname);           
                   (void)fflush(stdout);
 
                   #ifdef ECRYPT_SUPPORT
@@ -2936,7 +2980,7 @@ _PRIVATE _BOOLEAN psrp_process_command(char *request_line)
                   (void)fprintf(stdout,"    [with slaved commands                 ]\n");
                   #endif /* SLAVED_COMMANDS */
 
-                  (void)fprintf(stdout,"\nCopyright (C), Tumbling Dice, 1994-2019 (built %s %s)\n\n",__TIME__,__DATE__);
+                  (void)fprintf(stdout,"\nCopyright (C), Tumbling Dice, 1994-2022 (built %s %s)\n\n",__TIME__,__DATE__);
                   (void)fprintf(stdout,"PSRP is free software, covered by the GNU General Public License, and you are\n");
                   (void)fprintf(stdout,"welcome to change it and/or distribute copies of it under certain conditions.\n");
                   (void)fprintf(stdout,"See the GPL and LGPL licences at www.gnu.org for further details\n");
@@ -2962,14 +3006,15 @@ _PRIVATE _BOOLEAN psrp_process_command(char *request_line)
 
                   #ifdef SSH_SUPPORT
                   if(is_remote == TRUE)
-                  { 
+                  {  char vmtype[SSIZE] = "";
 
-                     /*--------------------------------*/
-                     /* Are we running in a container? */
-                     /*--------------------------------*/
 
-                     if(pups_is_in_container((char *)NULL) == TRUE)
-                        (void)fprintf(stdout,"    this client is in a remote container [from %s]\n",remote_host_pathname);
+                     /*----------------------------------------*/
+                     /* Are we running in virtual environment? */
+                     /*----------------------------------------*/
+
+                     if(pups_os_is_virtual(vmtype) == TRUE)
+                        (void)fprintf(stdout,"    this client is in a remote %s instance [from %s]\n",vmtype,remote_host_pathname);
                      else
                         (void)fprintf(stdout,"    this client is remote [from %s]\n",remote_host_pathname);
 
@@ -2981,14 +3026,15 @@ _PRIVATE _BOOLEAN psrp_process_command(char *request_line)
                   }
                   else
                   #endif /* SSH_SUPPORT */
-                  {  
+                  {  char vmtype[SSIZE] = "";
 
-                     /*--------------------------------*/
-                     /* Are we running in a container? */
-                     /*--------------------------------*/
 
-                     if(pups_is_in_container((char *)NULL) == TRUE)
-                        (void)fprintf(stdout,"    this client is local to container \"%s\"\n",appl_host);
+                     /*----------------------------------------*/
+                     /* Are we running in virtual environment? */
+                     /*----------------------------------------*/
+
+                     if(pups_os_is_virtual(vmtype) == TRUE)
+                        (void)fprintf(stdout,"    this client is local to %s instance \"%s\"\n",vmtype,appl_host);
                      else
                         (void)fprintf(stdout,"    this client is local to host \"%s\"\n",appl_host);
                      (void)fflush(stdout);
@@ -4058,7 +4104,7 @@ busy_retry:
                  else
                  {  if(psrp_log == TRUE) 
                     {  (void)fprintf(stdout,"\nServer process %s (%d@%s) EOT sent\n\n",
-                                       psrp_server,server_pid,psrp_host,psrp_string);
+                                          psrp_server,server_pid,psrp_host,psrp_string);
                        (void)fflush(stdout);
                     }
                  }
@@ -4096,9 +4142,10 @@ busy_retry:
                  {  (void)fprintf(stdout,"psrp: retrying request (%s)\n",request);
                     (void)fflush(stdout);
 
-                    (void)pups_sleep(1);
                     if(busy_retry_mode == TRUE && try_cnt++ < max_trys)
+                    {  (void)pups_usleep(1000);
                        goto busy_retry;
+                    }
                  }
 
 
@@ -4129,7 +4176,7 @@ next_request: ++req_cnt;
 
              if(pups_error_abort == TRUE && strcmp(psrp_c_code,"ok") != 0)
              {  if(interactive_mode == FALSE)
-                   pups_exit(-1);
+                   pups_exit(255);
                 else
                    pups_sigvector(SIGALRM,&command_loop_top);
              }
@@ -4608,7 +4655,7 @@ _PRIVATE int chan_client_handler(const int signum)
 
     cend();
     remove_junk();
-    pups_exit(-1);
+    pups_exit(255);
 }
 
 
@@ -4706,7 +4753,6 @@ _PRIVATE _BOOLEAN psrp_open_server(void)
     /* only hold locks on an OPEN file object                                          */
     /*---------------------------------------------------------------------------------*/
 
-    //pups_seterror((FILE *)NULL,NONE,(-1));
     while((client_in = pups_fopen((char *)channel_name_in, "r+",DEAD)) == (FILE *)NULL)
     {     (void)pups_usleep(100);
           ++trys;
@@ -4730,8 +4776,6 @@ _PRIVATE _BOOLEAN psrp_open_server(void)
              return(FALSE);
           }
     }
-
-    //pups_seterror(stdout,PRINT_ERROR_STRING & EXIT_ON_ERROR,(-1));
 
     (void)stat(channel_name_in,&buf);
     in_inode = buf.st_ino;
@@ -5246,7 +5290,7 @@ _PRIVATE void builtin_open_psrp_server(char *request)
               /*--------------------------------------------------------------*/
 
               pups_error("[builtin_open_psrp_server] failed to open ssh channel to remote host");
-              exit(-1);
+              exit(255);
            }
            else
            {
@@ -5652,7 +5696,7 @@ _PRIVATE int psrp_int_handler(const int signum)
         {  (void)remove_junk();
 
            if(strcmp(psrp_c_code,"ok") != 0)
-              (void)pups_exit(-1);
+              (void)pups_exit(255);
 
            (void)pups_exit(0);
         }
@@ -5716,7 +5760,7 @@ _PRIVATE int psrp_int_handler(const int signum)
         #endif /* PSRP_DEBUG */
         
         if(strcmp(psrp_c_code,"ok") != 0)
-          (void)pups_exit(-1);
+          (void)pups_exit(255);
         (void)pups_exit(0);
      }
 
@@ -5743,7 +5787,17 @@ _PRIVATE int psrp_int_handler(const int signum)
 
      --r_cnt;
 
-done:  (void)pups_sigvector(SIGALRM, &command_loop_top);
+
+done:
+
+         /*----------------------------------------*/
+         /* If interrupt generated by SIGPIPE exit */
+         /*----------------------------------------*/
+
+         if(signum == SIGPIPE)
+            pups_exit(255);
+
+         (void)pups_sigvector(SIGALRM, &command_loop_top);
 
 }
 
@@ -5850,6 +5904,7 @@ _PRIVATE void server_alive_handler(vttab_type *tinfo, char *args)
         }
      }
 
+
      ret = pups_statkill(server_pid,SIGALIVE); 
 
      if(ret == PUPS_TERMINATED || (ret == PUPS_STOPPED && psrp_hard_link == FALSE))
@@ -5911,7 +5966,7 @@ _PRIVATE void server_alive_handler(vttab_type *tinfo, char *args)
 
         if(prompt == FALSE)
         {  if(strcmp(psrp_c_code,"ok") != 0)
-             (void)pups_exit(-1);
+             (void)pups_exit(255);
            pups_exit(0);
         }
 
@@ -5964,7 +6019,7 @@ _PRIVATE void server_alive_handler(vttab_type *tinfo, char *args)
 
         if(prompt == FALSE)
         {  if(strcmp(psrp_c_code,"ok") != 0)
-             (void)pups_exit(-1);
+             (void)pups_exit(255);
            pups_exit(0);
         }
 
@@ -6114,7 +6169,7 @@ _PRIVATE void server_alive_handler(vttab_type *tinfo, char *args)
 
                   if(prompt == FALSE)
                   {  if(strcmp(psrp_c_code,"ok") != 0)
-                        (void)pups_exit(-1);
+                        (void)pups_exit(255);
                      pups_exit(0);
                   }
 
@@ -6214,7 +6269,7 @@ _PRIVATE void server_alive_handler(vttab_type *tinfo, char *args)
 
                   if(prompt == FALSE)
                   {  if(strcmp(psrp_c_code,"ok") != 0)
-                        pups_exit(-1);
+                        pups_exit(255);
                      pups_exit(0);
                   }
 
@@ -8609,7 +8664,6 @@ _PRIVATE void psrp_show_channels(_BOOLEAN show_all_servers, char *directory)
     }
 
     entry_list = pups_get_directory_entries(directory,"psrp",&n_entries,&entry_cnt);
-
     for(i=0; i<n_entries; ++i)
     {
 
@@ -8634,7 +8688,6 @@ _PRIVATE void psrp_show_channels(_BOOLEAN show_all_servers, char *directory)
 
           char procpidpath[SSIZE] = "",
                binname[SSIZE]     = "";
-
 
           #ifdef PSRP_DEBUG
           (void)fprintf(stderr,"ENTRY LIST[%d]: \"%s\"\n",i,entry_list[i]);
@@ -8903,7 +8956,7 @@ _PRIVATE _BOOLEAN builtin_connect_remote_client(char *request)
        pups_error("psrp: failed to build ssh channel to remote host");
 
        (void)strlcpy(psrp_c_code,"sexerr",SSIZE);
-       exit(-1);
+       exit(255);
     }
 
 
@@ -9464,24 +9517,24 @@ _PRIVATE int psrp_migrate_client_to_server_host(void)
        else
        {  if(is_remote == TRUE)
              (void)snprintf(remote_psrp_command,SSIZE,"%s -pen %s -on %s -ssh_port %s -wait -sname %s -from %s %s %d",
-                                                                                                 appl_bin_name,
-                                                                                                     appl_name, 
-                                                                                                   remote_host,
-                                                                                              remote_host_port,
-                                                                                                 remote_server,
-                                                                                                 from_hostname,
-                                                                                                     appl_name,
-                                                                                               from_client_pid);
+                                                                                                        appl_bin_name,
+                                                                                                            appl_name, 
+                                                                                                          remote_host,
+                                                                                                     remote_host_port,
+                                                                                                        remote_server,
+                                                                                                        from_hostname,
+                                                                                                            appl_name,
+                                                                                                      from_client_pid);
           else
              (void)snprintf(remote_psrp_command,SSIZE,"%s -pen %s -on %s -ssh_port %s -wait -sname %s -from %s %s %d",
-                                                                                                 appl_bin_name,
-                                                                                                     appl_name,
-                                                                                                   remote_host,
-                                                                                              remote_host_port,
-                                                                                                 remote_server,
-                                                                                                     appl_host,
-                                                                                                     appl_name,
-                                                                                                      appl_pid);
+                                                                                                        appl_bin_name,
+                                                                                                            appl_name,
+                                                                                                          remote_host,
+                                                                                                     remote_host_port,
+                                                                                                        remote_server,
+                                                                                                            appl_host,
+                                                                                                            appl_name,
+                                                                                                             appl_pid);
        }
 
        #ifdef PSRP_DEBUG
@@ -9498,7 +9551,7 @@ _PRIVATE int psrp_migrate_client_to_server_host(void)
 
           if(is_remote == TRUE)
           {  if(strcmp(psrp_c_code,"ok") != 0)
-                pups_exit(-1);
+                pups_exit(255);
              pups_exit(0);
           }
        }
@@ -9859,7 +9912,7 @@ name_extracted:
              (void)fflush(stdout);
 
              if(exit_on_terminate == TRUE)
-                pups_exit(-1);
+                pups_exit(255);
 
              ++cnt;
           }
@@ -9903,11 +9956,13 @@ name_extracted:
 _PRIVATE int psrp_virtual_maggot(char *dirname)
 
 
-{   int    ret,
-           lock_pid,
-           deleted    = 0;
+{   int    ret              = 0,
+	   cnt              = 0,
+           owner            = 0,
+           lock_pid         = 0,
+           deleted          = 0;
 
-    DIR    *dirp = (DIR *)NULL;
+    DIR    *dirp            = (DIR *)NULL;
 
     char   tmpstr[SSIZE]    = "",
            next_item[SSIZE] = "";
@@ -9917,11 +9972,11 @@ _PRIVATE int psrp_virtual_maggot(char *dirname)
     if((dirp = opendir(dirname)) == (DIR *)NULL)
        return(-1);
 
-    do {    
-
-            next_entry = readdir(dirp);
+    do {    next_entry = readdir(dirp);
 
             (void)strext(' ',(char *)NULL,(char *)NULL);
+
+
             if(next_entry != (struct dirent *)NULL           &&
                (strncmp(next_entry->d_name,"psrp",4) == 0    ||
                 strncmp(next_entry->d_name,"pups",4) == 0    ||
@@ -9931,7 +9986,7 @@ _PRIVATE int psrp_virtual_maggot(char *dirname)
                char   item_path[SSIZE] = "";
 
                (void)strlcpy(tmpstr,next_entry->d_name,SSIZE); 
-               (void)mchrep(' ',".#:",tmpstr);
+               (void)mchrep(' ',"#:",tmpstr);  // MAO removed '.'
 
 
                /*----------------------*/
@@ -9940,28 +9995,62 @@ _PRIVATE int psrp_virtual_maggot(char *dirname)
 
                (void)snprintf(item_path,SSIZE,"%s/%s",dirname,next_entry->d_name);
                (void)lstat(item_path,&buf);
-               if(buf.st_uid == getuid())
+
+               if(getuid() == 0 || buf.st_uid == getuid())
                {
 
+		  /*--------------------------------*/
+		  /* Parse psrp object name for PID */
+		  /*--------------------------------*/
+
+                  cnt = 0;
                   do {    ret = strext(' ',next_item,tmpstr);
 
-                          if(sscanf(next_item,"%d",&lock_pid) == 1)
+
+                          /*-----*/
+                          /* PID */
+                          /*-----*/
+
+                          if(cnt == 0)
+                          {  if(sscanf(next_item,"%d",&lock_pid) == 1)
+		                ++cnt;
+                          }
+
+
+                          /*-------*/
+                          /* Owner */
+                          /*-------*/
+
+                          else if(cnt == 1)
+                          {  if(sscanf(next_item,"%d",&owner) == 1)
+		                ++cnt;
+                          }
+
+
+			  /*----------------------------*/
+			  /* Have process PID and owner */
+			  /*----------------------------*/
+
+			  if(cnt == 2)
                           {
                              #ifdef PSRP_DEBUG 
-                             (void)fprintf(stderr,"OWNER %d, ITEM \"%s\"\n",lock_pid,item_path);
+                             (void)fprintf(stderr,"OWNER %d  LOCK PID %d: ITEM \"%s\"\n",owner,lock_pid,item_path);
                              (void)fflush(stderr);
                              #endif /* PSRP_DEBUG */
+
 
                              /*----------------*/
                              /* Is owner live? */
                              /*----------------*/
 
                              if(kill(lock_pid,SIGALIVE) == (-1))
-                             {  ++deleted;
+                             {  
+
+                                ++deleted;
                                 (void)unlink(item_path);
 
                                 #ifdef PSRP_DEBUG 
-                                (void)fprintf(stderr,"OWNER %d, ITEM REMOVED \"%s\"\n",lock_pid,item_path);
+                                (void)fprintf(stderr,"OWNER %d  LOCK PID %d: ITEM REMOVED \"%s\"\n",owner,lock_pid,item_path);
                                 (void)fflush(stderr);
                                 #endif /* PSRP_DEBUG */
                              }
@@ -9973,6 +10062,14 @@ _PRIVATE int psrp_virtual_maggot(char *dirname)
                }
             }
         } while(next_entry != (struct dirent *)NULL);
+
+
+    /*-------------------------------------*/
+    /* Repair potential damage to /dev/tty */
+    /*-------------------------------------*/
+
+    if (getuid() == 0)
+       (void)system("mktty");
 
     return(deleted);
 }

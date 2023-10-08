@@ -9,8 +9,8 @@
               NE3 4RT
               United Kingdom
 
-     Version: 2.00 
-     Dated:   30th August 2019 
+     Version: 2.02 
+     Dated:   4th May 2022
      E-mail:  mao@tumblingdice.co.uk
 ---------------------------------------------------------------------------------------*/
 
@@ -19,6 +19,7 @@
 #include <stdlib.h>
 #include <xtypes.h>
 #include <string.h>
+#include <bsd/string.h>
 #include <stdlib.h>
 
 #ifdef HAVE_READLINE
@@ -31,7 +32,7 @@
 /* Version of appgen */
 /*-------------------*/
 
-#define APPGEN_VERSION    "2.00"
+#define APPGEN_VERSION    "2.02"
 
 
 /*---------------*/
@@ -48,104 +49,6 @@
 #ifndef DEFAULT_BASEPATH
 #define DEFAULT_BASEPATH  "./" 
 #endif /* DEFAULT_BASEPATH */
-
-
-
-
-#ifdef BSD_FUNCTION_SUPPORT
-/*------------------------------------------------------------------------------------
-    Strlcpy and stlcat function based on OpenBSD functions ...
-------------------------------------------------------------------------------------*/
-/*------------------*/
-/* Open BSD Strlcat */
-/*------------------*/
-_PRIVATE size_t strlcat(char *dst, const char *src, size_t dsize)
-{
-	const char *odst = dst;
-	const char *osrc = src;
-	size_t      n    = dsize;
-	size_t      dlen;
-
-
-        /*------------------------------------------------------------------*/
-	/* Find the end of dst and adjust bytes left but don't go past end. */
-        /*------------------------------------------------------------------*/
-
-	while (n-- != 0 && *dst != '\0')
-		dst++;
-	dlen = dst - odst;
-	n = dsize - dlen;
-
-	if (n-- == 0)
-		return(dlen + strlen(src));
-	while (*src != '\0') {
-		if (n != 0) {
-			*dst++ = *src;
-			n--;
-		}
-		src++;
-	}
-	*dst = '\0';
-
-
-        /*----------------------------*/
-        /* count does not include NUL */
-        /*----------------------------*/
-
-	return(dlen + (src - osrc));
-}
-
-
-
-
-/*------------------*/
-/* Open BSD strlcpy */
-/*------------------*/
-
-_PRIVATE size_t strlcpy(char *dst, const char *src, size_t dsize)
-{
-	const char   *osrc = src;
-	size_t nleft       = dsize;
-
-
-        /*---------------------------------*/
-	/* Copy as many bytes as will fit. */
-        /*---------------------------------*/
-
-	if (nleft != 0) {
-		while (--nleft != 0) {
-			if ((*dst++ = *src++) == '\0')
-				break;
-		}
-	}
-
-
-        /*-----------------------------------------------------------*/
-	/* Not enough room in dst, add NUL and traverse rest of src. */
-        /*-----------------------------------------------------------*/
-
-	if (nleft == 0) {
-		if (dsize != 0)
-
-                        /*-------------------*/
-                        /* NUL-terminate dst */
-                        /*-------------------*/
-
-			*dst = '\0';
-		while (*src++)
-			;
-	}
-
-
-        /*----------------------------*/
-        /* count does not include NUL */
-        /*----------------------------*/
-
-	return(src - osrc - 1);
-}
-#endif /* BSD_FUNCTION_SUPPORT */
-
-
 
 
 
@@ -247,7 +150,7 @@ _PUBLIC int main(int argc, char *argv[])
        }
     }
     else if(argc == 2 && (strcmp(argv[1],"-usage") == 0 || strcmp(argv[1],"-help") == 0))
-    {  (void)fprintf(stderr,"\nPUPS/P3 application generator version %s, (C) Tumbling Dice, 2002-2018 (built %s %s)\n",APPGEN_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nPUPS/P3 application generator version %s, (C) Tumbling Dice, 2002-2022 (built %s %s)\n",APPGEN_VERSION,__TIME__,__DATE__);
        (void)fprintf(stderr,"Usage: application [skeleton application file]\n\n");
        (void)fflush(stderr);
        (void)fprintf(stderr,"APPLICATION is free software, covered by the GNU General Public License, and you are\n");
@@ -257,14 +160,14 @@ _PUBLIC int main(int argc, char *argv[])
        (void)fprintf(stderr,"Base path: \"%s\"\n\n",DEFAULT_BASEPATH);
        (void)fflush(stderr);
 
-       exit(-1);
+       exit(255);
     }
     else if(argc == 3)
     {  (void)strlcpy(make_skelpapp,argv[1],SSIZE);
        (void)strlcpy(skelpapp,argv[2],SSIZE);
     }
     else
-    {  (void)fprintf(stderr,"\nPUPS/P3 application generator version %s, (C) Tumbling Dice, 2002-2018 (built %s %s)\n",APPGEN_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nPUPS/P3 application generator version %s, (C) Tumbling Dice, 2002-2022 (built %s %s)\n",APPGEN_VERSION,__TIME__,__DATE__);
        (void)fprintf(stderr,"Usage: application [skeleton application file]\n\n");
        (void)fflush(stderr);
        (void)fprintf(stderr,"APPLICATION is free software, covered by the GNU General Public License, and you are\n");
@@ -273,7 +176,7 @@ _PUBLIC int main(int argc, char *argv[])
        (void)fprintf(stderr,"APPLICATION comes with ABSOLUTELY NO WARRANTY\n\n");
        (void)fflush(stderr);
 
-       exit(-1);
+       exit(255);
     }
 
     if(access(skelpapp,F_OK | R_OK | W_OK) == (-1))
@@ -281,14 +184,14 @@ _PUBLIC int main(int argc, char *argv[])
                                                                                                           skelpapp,make_skelpapp);
        (void)fflush(stderr);
 
-       exit(-1);
+       exit(255);
     }
 
     if(access(make_skelpapp,F_OK | R_OK | W_OK) == (-1))
     {  (void)fprintf(stderr,"\napplication: cannot find skeleton/access application template makefile \"%s\"\n\n",make_skelpapp);
        (void)fflush(stderr);
 
-       exit(-1);
+       exit(255);
     }
 
     (void)fprintf(stderr,"\nPUPS/P3 application generator version 1.03 (C) M.A. O'Neill, Tumbling Dice, 2011\n\n");

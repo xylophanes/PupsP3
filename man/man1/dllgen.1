@@ -1,4 +1,4 @@
-.TH DLLGEN 1 "22 February 2009" "PUPSP3 build tools" "PUPSP3 build tools"
+.TH DLLGEN 1 "22nd February 2009" "PUPSP3 build tools" "PUPSP3 build tools"
 
 .SH NAME
 DLLGEN \- build PUPS DLL source files from skeleton DLL and DLL function files.
@@ -14,7 +14,7 @@ DLLGEN \- build PUPS DLL source files from skeleton DLL and DLL function files.
 .I init | add
 .I DLL skeleton filename
 .I DLL function skeleton filename
->& <log file>
+[2> <log file>]
 .br
 
 .SH DESCRIPTION
@@ -78,6 +78,17 @@ to append
 to the dllrary framework or
 .I DLL function skeleton filename
 if none is specified.
+.br
+
+.SH SIGNALS
+.I ask(1)
+has handlers for
+.B SIGHUP,
+.B SIGQUIT,
+.B SIGINT
+and
+.B SIGTERM
+active when running a payload command. Otherwise signal handling is default.
 .br
 
 .SH ENVIRONMENT VARIABLES

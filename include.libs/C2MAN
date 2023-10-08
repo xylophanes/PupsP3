@@ -2,7 +2,7 @@
 #
 #-------------------------------------------------------------------------------------------------------------
 #  Generate stub man page documentation from a C or C++ source using c2man application
-#  (C) M.A. O'Neill 2009-2018
+#  (C) M.A. O'Neill 2009-2021
 #
 #  $1 is source file to generate man page from.
 #  $2 is name of man page file.
@@ -17,7 +17,7 @@
 if($1 == "usage" || $1 == "help") then
 	echo
 	echo "CM2MAN version 1.00"
-	echo "(C) M.A. O'Neill, Tumbling Dice, 2018"
+	echo "(C) M.A. O'Neill, Tumbling Dice, 2009-2021"
 	echo ""
 	echo "Usage CM2MAN <source C file> !<man.3 file>"
 	echo ""
@@ -31,7 +31,7 @@ if($1 == "usage" || $1 == "help") then
 else
 
 	echo "CM2MAN version 1.00"
-	echo "(C) M.A. O'Neill, Tumbling Dice, 2018"
+	echo "(C) M.A. O'Neill, Tumbling Dice, 2009-2021"
 	echo ""
 endif
 

@@ -1,4 +1,4 @@
-.TH LOL 1 "20 Decemeber 2007" "PUPSP3 commands" "PUPSP3 commands"
+.TH LOL 1 "20th December 2007" "PUPSP3 commands" "PUPSP3 commands"
 
 .SH NAME
 LOL \- test to see if the owner of a (simple link) lock, PSRP communication channel or P3
@@ -9,7 +9,7 @@ linkpost file is live
 .B lol 
 .B [-usage | -help]
 .I lock identifer file name | PSRP communication channel name | P3 lockpost file name
->& <log file>
+[2> <log file>]
 .br
 
 .SH DESCRIPTION
@@ -25,7 +25,6 @@ If the channel/lock does not exit
 .B NOT_FOUND
 is returned.
 .br
-
 
 .SH OPTIONS
 
@@ -65,12 +64,24 @@ PSRP communication channel specified could not be found on the host running
 ).
 .br
 
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
+.br
+
 .SH ENVIRONMENT VARIABLES
 None.
 .br
 
 .SH BUGS
-Only works for lids originated by local processes at present.
+Currently Only works for lids originated by local processes.
 
 .SH COPYRIGHT
 (C) Tumbling Dice Ltd.

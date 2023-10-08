@@ -1,6 +1,5 @@
 /*------------------------------------------------------------------------------
-    Purpose: Check status of file system before trying to write data to
-             it.
+    Purpose: Check status of file system before trying to write data to it.
 
      Author:  M.A. O'Neill
               Tumbling Dice Ltd
@@ -9,8 +8,8 @@
               NE3 4RT
               United Kingdom
 
-    Version: 2.00 
-    Dated:   30th August 2019 
+    Version: 5.00 
+    Dated:   5th October 2023 
     E-mail:  mao@tumblingdice.co.uk 
 ------------------------------------------------------------------------------*/
 
@@ -27,7 +26,7 @@
 /* Version of fsw */
 /*----------------*/
 
-#define FSW_VERSION    "2.00"
+#define FSW_VERSION    "3.00"
 
 #ifdef BUBBLE_MEMORY_SUPPORT
 #include <bubble.h>
@@ -78,7 +77,7 @@ _PRIVATE void fsw_slot(int level)
 {   (void)fprintf(stderr,"int app fsw %s: [ANSI C]\n",FSW_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 2005-2019 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 2005-2022 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
        (void)fprintf(stderr,"File system status filter (built %s %s)\n\n",__TIME__,__DATE__);
     }
@@ -199,7 +198,7 @@ _PRIVATE int psrp_process_status(int argc, char *argv[])
     checkpoint files) ...
 -------------------------------------------------------------------------------*/
 
-#define VTAG  3337
+#define VTAG  3746
 
 extern int appl_vtag = VTAG;
 
@@ -238,9 +237,9 @@ _PUBLIC int pups_main(int argc, char *argv[])
                   &argc,
                   FSW_VERSION,
                   "M.A. O'Neill",
-                           "fsw",
-                          "2019",
-                            argv);
+                  "fsw",
+                  "2023",
+                  argv);
 
     (void)psrp_init(PSRP_STATUS_ONLY  | PSRP_HOMEOSTATIC_STREAMS, &psrp_process_status);
     (void)psrp_load_default_dispatch_table();
@@ -258,7 +257,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
     /* Get number of blocks at which the wait state is triggered */
     /*-----------------------------------------------------------*/
 
-    if((ptr = pups_locate(&init,"fs_blocks",&argc,args,0)) != NOT_FOUND)
+    if ((ptr = pups_locate(&init,"fs_blocks",&argc,args,0)) != NOT_FOUND)
     {  if((fs_blocks = pups_i_dec(&ptr,&argc,args)) == INVALID_ARG)
           pups_error("[fsw] expecting wait state trigger block count");
 
@@ -270,7 +269,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
     /* Protect output file */
     /*---------------------*/
 
-    if((ptr = pups_locate(&init,"homeostatic",&argc,args,0)) != NOT_FOUND)
+    if ((ptr = pups_locate(&init,"homeostatic",&argc,args,0)) != NOT_FOUND)
     {  int  outdes = (-1);
 
        if(strccpy(output_f_name,pups_str_dec(&ptr,&argc,args)) == (char *)NULL)
@@ -285,7 +284,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
        {  (void)fprintf(stderr,"fsw: output file (%s) does not exist/is not accessible\n",output_f_name);
           (void)fflush(stderr);
 
-          pups_exit(-1);
+          pups_exit(255);
        }
 
 
@@ -304,7 +303,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
        /* data is written to it?                           */
        /*--------------------------------------------------*/
 
-       if(pups_locate(&init,"guard",&argc,args,0) != NOT_FOUND)
+       if (pups_locate(&init,"guard",&argc,args,0) != NOT_FOUND)
           guard = TRUE;
     }
 
@@ -315,18 +314,43 @@ _PUBLIC int pups_main(int argc, char *argv[])
 
     pups_t_arg_errs(argd,args);
 
-    if(isatty(0) == 1)
-       pups_error("[fsw] no file attached to stdin");
-
-    if(isatty(1) == 1)
-       pups_error("[fsw] no file attached to stdout");
-
-/*------------------------------------------------------------------------------
-    This is the pups_main part of the program - it takes data from stdin and
-    pushes it to stdout ...
-------------------------------------------------------------------------------*/
 
     (void)pups_set_fs_hsm_parameters(1,fs_blocks,(char *)NULL); 
+
+
+    /*----------------------------------------------*/
+    /* If fsw is not in a pipeline check space on   */
+    /* filesystem. If sufficient space remains      */
+    /* exit immediately otherwise block until space */
+    /* becomes available                            */
+    /*----------------------------------------------*/
+
+    if (isatty(0) == 1 && isatty(1) == 1)
+    {  (void)pups_write_homeostat(1,(void *)NULL);
+       pups_exit(0);
+    }
+
+
+    /*---------------*/
+    /* No input pipe */
+    /*---------------*/
+
+    else if(isatty(0) == 1)
+       pups_error("[fsw] no file/pipe attached to stdin");
+
+
+    /*----------------*/
+    /* No output pipe */
+    /*----------------*/
+
+    else if (isafile(1) != 1)
+       pups_error("[fsw] no file attached to stdout");
+
+
+    /*-------------------------------------------*/
+    /* Read data from stdin and  write to stdout */
+    /*-------------------------------------------*/
+
     do { 
            bytes_read = read(0,line_of_input,SSIZE);
 

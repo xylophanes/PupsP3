@@ -6,8 +6,8 @@
              Gosforth,
              Tyne and Wear NE3 4RT.
 
-    Dated:   27th September 2019 
-    Version: 2.00 
+    Version: 4.14 
+    Dated:   18th September 2023 
     E-mail:  mao@tumblingdice.co.uk
 ------------------------------------------------------------------------------*/
 
@@ -37,12 +37,11 @@
 /*----------------------------------------*/
 /* Defines which are local to this module */
 /*----------------------------------------*/
-
 /***********/
 /* Version */
-/**********/
+/***********/
 
-#define CACHELIB_VERSION        "2.00"
+#define CACHELIB_VERSION        "4.12"
 
 
 /*-------------*/
@@ -85,9 +84,12 @@
 
 
 // Tag flags
+#define DEFAULT_TAG             0
 #define SCRATCH_TAG             9999
 #define ALL_CACHE_TAGS          (-1)
 
+// Block flags
+#define BLOCK_IMMORTAL          (-1)
 
 // Cache archive flags
 #define COMPRESS                (1 <<  0)
@@ -110,6 +112,7 @@
 #define CACHE_HAVELOCK          (1 << 12)
 #define CACHE_WRLOCK            (1 << 13)
 #define CACHE_RDLOCK            (1 << 14)
+#define CACHE_LIVE              (1 << 15)
 
 
 /*-----------------------------------------*/
@@ -135,9 +138,10 @@ typedef struct {
                     /*-------------------------------*/
 
                     unsigned long int crc;                                          // CRC for cache buffer
-                    char              name[SSIZE];                                  // Name of this cache
-                    char              mapinfo_name[SSIZE];                          // Name of memory mapped information file
-                    char              mmap_name[SSIZE];                             // Name of memory mapped file
+                    unsigned char     path[SSIZE];                                  // Path to cache (in filesystem)
+                    unsigned char     name[SSIZE];                                  // Name of this cache
+                    unsigned char     mapinfo_name[SSIZE];                          // Name of memory mapped information file
+                    unsigned char     mmap_name[SSIZE];                             // Name of memory mapped file
                     pthread_mutex_t   mutex;                                        // Access mutex
                     int               mapinfo_fd;                                   // File descriptor of mapinfo file
                     int               mmap_fd;                                      // File descriptor of memory mapped file
@@ -153,6 +157,7 @@ typedef struct {
                     unsigned long int block_size;                                   // Size of one cache block
                     unsigned long int object_offset[MAX_CACHE_BLOCK_OBJECTS];       // Offsets to objects in cache block
                     unsigned long int object_size[MAX_CACHE_BLOCK_OBJECTS];         // Sizes of cache block objects
+                    unsigned int      colsize;                                      // Cache-cordination list size
 
 
                     /*---------------------------------*/
@@ -163,6 +168,9 @@ typedef struct {
                     block_mtype       *blockmap;                                    // Pointer mapping into cache block
                     unsigned int      *tag;                                         // Block tags
                     _BYTE             *flags;                                       // Block flags
+                    int               *lifetime;                                    // Block lifetime (-1) - IMMORTAL implies block is not volatile
+                    unsigned int      *hubness;                                     // Block hubness
+                    unsigned int      *binding;                                     // Block binding 
                     pthread_rwlock_t  *rwlock;                                      // Block access rwlocks
                } cache_type;
 
@@ -210,6 +218,12 @@ _PROTOTYPE _EXTERN int cache_create(const _BOOLEAN, const unsigned int, const ch
 
 // Sync cache */
 _PROTOTYPE _EXTERN int cache_msync(const _BOOLEAN, const unsigned int);
+
+// Cache live
+_PUBLIC int cache_live(const _BOOLEAN, const unsigned int);
+
+// Cache dead 
+_PUBLIC int cache_dead(const _BOOLEAN, const unsigned int);
 
 // Destroy cache
 _PROTOTYPE _EXTERN int cache_destroy(const _BOOLEAN, const _BOOLEAN, const unsigned int);
@@ -269,7 +283,10 @@ _PROTOTYPE _EXTERN _BOOLEAN cache_already_loaded(const _BOOLEAN, const char *, c
 _PROTOTYPE _EXTERN void *cache_is_allocated(const _BOOLEAN, const unsigned int);
 
 // Write cache mapping information
-_PROTOTYPE _EXTERN unsigned long int cache_write_mapinfo(const _BOOLEAN, const _BOOLEAN, const char *, const unsigned int);
+_PROTOTYPE _EXTERN unsigned long int cache_write_mapinfo(const _BOOLEAN, const _BOOLEAN, const char *, const unsigned int, const unsigned int);
+
+// Read cache mapping information
+_PROTOTYPE _EXTERN unsigned long int cache_read_mapinfo (const _BOOLEAN, const _BOOLEAN, const char *, const unsigned int, const unsigned int);
 
 // Archive cache
 _PROTOTYPE _EXTERN int cache_archive(const _BOOLEAN, const _BOOLEAN, const char *);
@@ -277,14 +294,14 @@ _PROTOTYPE _EXTERN int cache_archive(const _BOOLEAN, const _BOOLEAN, const char 
 // Uncompress cache
 _PROTOTYPE _EXTERN int cache_extract(const char *);
 
-// Read cache mapping information
-_PROTOTYPE _EXTERN unsigned long int cache_read_mapinfo(const _BOOLEAN, const _BOOLEAN, const char *, const unsigned int);
-
 // Is cache block used? 
 _PROTOTYPE _EXTERN _BOOLEAN cache_block_used(const _BOOLEAN, const unsigned int, const unsigned int);
 
 // Get number of used blocks in cache
-//_PROTOTYPE _EXTERN int cache_blocks_used(const _BOOLEAN, const unsigned int);
+_PROTOTYPE _EXTERN int cache_blocks_used(const _BOOLEAN, const unsigned int);
+
+// Reset number of used blocks in cache to zero
+_PROTOTYPE _EXTERN int cache_blocks_reset_used(const _BOOLEAN, const unsigned int);
 
 // Lock block
 _PROTOTYPE _EXTERN int cache_lock_block(const unsigned int, const unsigned int, const unsigned int, const unsigned int);
@@ -317,8 +334,11 @@ _PROTOTYPE _EXTERN int cache_add_block(const void *,
                                        const _BOOLEAN,
                                        const unsigned int);
 
-// Delete block data from cache
+// Delete a block data from cache
 _PROTOTYPE _EXTERN _BOOLEAN cache_delete_block(const _BOOLEAN, const _BOOLEAN, const unsigned int, const unsigned int);
+
+// Restore a block of data to cache
+_PROTOTYPE _EXTERN _BOOLEAN cache_restore_block(const _BOOLEAN, const _BOOLEAN, const unsigned int, const unsigned int);
 
 // Clear cache
 _PROTOTYPE _EXTERN int cache_clear(const _BOOLEAN, const unsigned int, const int);
@@ -329,7 +349,7 @@ _PUBLIC int cache_merge(const _BOOLEAN, const unsigned int, const unsigned int, 
 // Get string repesentation of blockag i.d
 _PROTOTYPE _EXTERN int cache_get_blocktag_id_str(const unsigned int, char *);
 
-// Show tag of specified cache block 
+// Get tag of specified cache block 
 _PROTOTYPE _EXTERN int cache_get_blocktag(const _BOOLEAN, const unsigned int, const unsigned int);
 
 // Set tag of specified cache block 
@@ -337,6 +357,30 @@ _PROTOTYPE _EXTERN int cache_set_blocktag(const _BOOLEAN, const unsigned int, co
 
 // Change tags of specified cache blocks
 _PROTOTYPE _EXTERN int cache_change_blocktag(const _BOOLEAN, const unsigned int, const int, const int);
+
+// Get lifetime of specified cache block 
+_PROTOTYPE _EXTERN int cache_get_blocklifetime(const _BOOLEAN, const unsigned int, const unsigned int);
+
+// Set lifetime of specified cache block 
+_PROTOTYPE _EXTERN int cache_set_blocklifetime(const _BOOLEAN, const int, const unsigned int, const unsigned int);
+
+// Get hubness of specified cache block 
+_PROTOTYPE _EXTERN unsigned int cache_get_blockhubness(const _BOOLEAN, const unsigned int, const unsigned int);
+
+// Set hubness of specified cache block 
+_PROTOTYPE _EXTERN int cache_set_blockhubness(const _BOOLEAN, const unsigned int, const unsigned int, const unsigned int);
+
+// Get binding of specified cache block 
+_PROTOTYPE _EXTERN unsigned int cache_get_blockbinding(const _BOOLEAN, const unsigned int, const unsigned int);
+
+// Set binding of specified cache block 
+_PROTOTYPE _EXTERN int cache_set_blockbinding(const _BOOLEAN, const unsigned int, const unsigned int, const unsigned int);
+
+// Get co-ordination list size for cache
+_PROTOTYPE _EXTERN unsigned int cache_get_colsize(const _BOOLEAN, const unsigned int);
+
+// Set co-ordination list size for cache
+_PROTOTYPE _EXTERN int cache_set_colsize(const _BOOLEAN, unsigned int, const unsigned int);
 
 // Compact cache
 _PROTOTYPE _EXTERN int cache_compact(const _BOOLEAN, const int);

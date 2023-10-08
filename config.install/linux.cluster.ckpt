@@ -1,6 +1,6 @@
 #----------------------------------------------------------------
 # Configuration file for installed cluster enabled Linux system
-# M.A. O'Neill, Tumbling Dice, 02/09/2019 
+# M.A. O'Neill, Tumbling Dice, 2009-2022 
 #----------------------------------------------------------------
 
 TARGET_OS
@@ -10,7 +10,7 @@ linux
 # Architecture dependent compile flags
 #--------------------------------------
 TARGET_ARCHDEPCFLAGS
--DBSD_FUNCTION_SUPPORT -DHAVE_CURSES -DSSH_SUPPORT -DHAVE_READLINE -DGLIBC -DTIFF_SUPPORT -DIMG_SUPPORT -DZLIB_SUPPORT
+-DBSD_FUNCTION_SUPPORT -DHAVE_CURSES -DSSH_SUPPORT -DHAVE_READLINE -DGLIBC -DFLOAT -DTIFF_SUPPORT -DIMG_SUPPORT -DZLIB_SUPPORT
 
 #------------------------------------------------------------------------------------------------------------
 # Comment -DESCURE line if you DON'T want a secure installation (which is disk specific)
@@ -21,7 +21,7 @@ TARGET_CFLAGS
 -w -Wfatal-errors OPTIMIZE -rdynamic -I. -IINCPATH -DARCH -D_GNU_SOURCE -D_XOPEN_SOURCE -DFTYPE -DPSRP_ENABLED
 -DCHAN_IS_POLL -DSHADOW_SUPPORT -DPERSISTENT_HEAP_SUPPORT -DSOCKET_SUPPORT -DDLL_SUPPORT -DPSRP_AUTHENTICATE
 -DPTHREAD_SUPPORT -DIPV6_SUPPORT -DCRIU_SUPPORT -DBUBBLE_MEMORY_SUPPORT -DMAIL_SUPPORT -DZLIB_SUPPORT -DTIFF_SUPPORT
--D__NO_PROTO__ -DHAVE_PROC_FS -DIMMUNE
+-D__NO_PROTO__ -DHAVE_PROC_FS
 #-DSECURE -DSEQUENCE_SEED=9999 -DDISK_SERIAL='\"DSN\"' -DVENDOR_MAIL_ADDRESS='\"mao@tumblingdice.co.uk\"'
 
 #-------------------
@@ -45,8 +45,17 @@ linux.cluster
 TARGET_LIBC_LOCATION
 LIBPATH
 
+#-----------------------------
+# Location of binary directory
+#-----------------------------
 TARGET_INSTALL_DIR
 BASEPATH/bin
+
+#----------------------------
+# Location of "man" directory
+#----------------------------
+TARGET_MAN_DIR
+BASEPATH/share/man/man1
 
 end
 

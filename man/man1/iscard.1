@@ -7,7 +7,7 @@ ISCARD \- test to see if string is a cardinal number
 .SH SYNOPSIS
 .B iscard 
 .I string 
->& <log file>
+[2> <log file>]
 .br
 
 .SH DESCRIPTION
@@ -21,6 +21,18 @@ If not, the string
 .B FALSE
 is printed to
 .I standard output 
+.br
+
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
 .br
 
 .SH ENVIRONMENT VARIABLES

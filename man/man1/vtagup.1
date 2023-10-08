@@ -17,9 +17,8 @@ VTAGUP \- Dynamic version I.D. control for PUPS
 !!
 .I Source file name 
 !!
->& <log file>
+[2> <log file>]
 .br
-
 
 .SH DESCRIPTION
 .I vtagup(1) 
@@ -43,6 +42,22 @@ sets the value of the build tag to user defined value.
 
 .SH FILES
 C/C++ sourcefile
+.br
+
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
+.br
+
+.SH ENVIRONMENTAL VARIABLES
+none.
 .br
 
 .SH COPYRIGHT

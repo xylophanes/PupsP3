@@ -1,5 +1,5 @@
-/*-------------------------------------------------------------------------
-     Purpose: Send signal to process(es) on remote machine(s)
+/*-------------------------------------------------------------------------------
+     Purpose: Send signalto named process(es) which could be on remote machine(s)
 
      Author:  M.A. O'Neill
               Tumbling Dice Ltd
@@ -8,13 +8,14 @@
               NE3 4RT
               United Kingdom
 
-     Version: 5.00 
-     Dated:   30th August 2019 
+     Version: 5.01 
+     Dated:   24th May 2022
      E-mail:  mao@tumblingdice.co.uk
-------------------------------------------------------------------------*/
+-------------------------------------------------------------------------------*/
 
 #include <stdio.h>
 #include <string.h>
+#include <bsd/string.h>
 #include <xtypes.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -71,7 +72,7 @@
 /* Version of nkill */
 /*------------------*/
 
-#define NKILL_VERSION "5.00"
+#define NKILL_VERSION "5.01"
 
 
 /*-------------*/
@@ -160,107 +161,6 @@ _PRIVATE _BOOLEAN slaved                = FALSE;
 
 
 /*------------------------------------------------------------------------
-    Functions which are private to this application ...
-------------------------------------------------------------------------*/
-
-#ifdef BSD_FUNCTION_SUPPORT
-/*------------------------------------------------------------------------
-    Strlcpy and stlcat function based on OpenBSD functions ...
-------------------------------------------------------------------------*/
-/*------------------*/
-/* Open BSD Strlcat */
-/*------------------*/
-_PRIVATE size_t strlcat(char *dst, const char *src, size_t dsize)
-{
-	const char *odst = dst;
-	const char *osrc = src;
-	size_t      n    = dsize;
-	size_t      dlen;
-
-
-        /*------------------------------------------------------------------*/
-	/* Find the end of dst and adjust bytes left but don't go past end. */
-        /*------------------------------------------------------------------*/
-
-	while (n-- != 0 && *dst != '\0')
-		dst++;
-	dlen = dst - odst;
-	n = dsize - dlen;
-
-	if (n-- == 0)
-		return(dlen + strlen(src));
-	while (*src != '\0') {
-		if (n != 0) {
-			*dst++ = *src;
-			n--;
-		}
-		src++;
-	}
-	*dst = '\0';
-
-
-        /*----------------------------*/
-        /* count does not include NUL */
-        /*----------------------------*/
-
-	return(dlen + (src - osrc));
-}
-
-
-
-
-/*------------------*/
-/* Open BSD strlcpy */
-/*------------------*/
-
-_PRIVATE size_t strlcpy(char *dst, const char *src, size_t dsize)
-{
-	const char   *osrc = src;
-	size_t nleft       = dsize;
-
-
-        /*---------------------------------*/
-	/* Copy as many bytes as will fit. */
-        /*---------------------------------*/
-
-	if (nleft != 0) {
-		while (--nleft != 0) {
-			if ((*dst++ = *src++) == '\0')
-				break;
-		}
-	}
-
-
-        /*-----------------------------------------------------------*/
-	/* Not enough room in dst, add NUL and traverse rest of src. */
-        /*-----------------------------------------------------------*/
-
-	if (nleft == 0) {
-		if (dsize != 0)
-
-                        /*-------------------*/
-                        /* NUL-terminate dst */
-                        /*-------------------*/
-
-			*dst = '\0';
-		while (*src++)
-			;
-	}
-
-
-        /*----------------------------*/
-        /* count does not include NUL */
-        /*----------------------------*/
-
-	return(src - osrc - 1);
-}
-#endif /* BSD_FUNCTION_SUPPORT */
-
-
-
-
-
-/*------------------------------------------------------------------------
     Main entry point to code ...
 ------------------------------------------------------------------------*/
 
@@ -293,7 +193,7 @@ _PUBLIC int main(int argc, char *argv[])
     /*-------------------------------------------------------*/
 
     if(argc < 2 || strcmp(argv[1],"-usage") == 0 || strcmp(argv[1],"-help") == 0)
-    {  (void)fprintf(stderr,"\nnkill version %s, (C) 1999-2019 Tumbling Dice (built %s)\n",NKILL_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nnkill version %s, (C) 1999-2022 Tumbling Dice (built %s)\n",NKILL_VERSION,__TIME__,__DATE__);
        (void)fprintf(stderr,"\nUsage: nkill [+/-all] [+/-verbose] [+binname | +status] [-slaved:FALSE] [-psrp] !signum | signame! <process-list>\n");
        (void)fprintf(stderr,"\nProcess list entries have the following forms:\n\n");
        (void)fprintf(stderr,"numeric-pid              :    Process identifier on local host\n");
@@ -316,7 +216,7 @@ _PUBLIC int main(int argc, char *argv[])
        (void)fprintf(stderr,"See the GPL and LGPL licences at www.gnu.org for further details\n");
        (void)fprintf(stderr,"NKILL comes with ABSOLUTELY NO WARRANTY\n\n");
 
-       exit(-1);
+       exit(255);
     }
 
 
@@ -398,7 +298,7 @@ _PUBLIC int main(int argc, char *argv[])
              {  (void)fprintf(stderr,"\nnkill: not connected to a tty\n\n");
                 (void)fflush(stderr);
 
-                exit(-1);
+                exit(255);
              }
 
              (void)gethostname(local_hostname,SSIZE); 
@@ -451,7 +351,7 @@ _PUBLIC int main(int argc, char *argv[])
                     {  (void)fprintf(stderr,"Permission denied\n");
                        (void)fflush(stderr);
 
-                       exit(-1);
+                       exit(255);
                    }
                 }
              }
@@ -459,7 +359,7 @@ _PUBLIC int main(int argc, char *argv[])
              {  (void)fprintf(stderr,"nkill: signalling of processes on remote host not supported (no ssh support)\n");
                 (void)fflush(stderr);
 
-                exit(-1);
+                exit(255);
              } 
              #endif /* SSH_SUPPORT */
           }
@@ -642,7 +542,7 @@ _PRIVATE _BOOLEAN nkill(FILE   *stream,   /* Error log/status stream            
              (void)fflush(stream);
           }
 
-          exit(-1);
+          exit(255);
        }
     }
 
@@ -734,7 +634,7 @@ _PRIVATE _BOOLEAN nkill(FILE   *stream,   /* Error log/status stream            
              /* We should not get here */
              /*------------------------*/
 
-             _exit(-1);
+             _exit(255);
          }
 
 
@@ -828,7 +728,7 @@ _PRIVATE _BOOLEAN nkill(FILE   *stream,   /* Error log/status stream            
                 (void)execlp("ssh","ssh","-l",username,rhost,remote_nkill_command,(char *)NULL);
 
 
-             _exit(-1);
+             _exit(255);
           }
 
 

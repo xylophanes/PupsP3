@@ -1,7 +1,7 @@
 /*--------------------------------------------------------------------------------
    Includes for memory limit warnings.
    Copyright (C) 1990, 1993, 1994 Free Software Foundation, Inc.
-   Copyright (C) 2001-2018, Mark O'Neill, Tumbling Dice <mao@tumblingdice.co.uk>
+   Copyright (C) 2001-2022, Mark O'Neill, Tumbling Dice <mao@tumblingdice.co.uk>
 
    This file is based on part of the GNU C Library.
 

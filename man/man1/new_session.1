@@ -1,4 +1,4 @@
-.TH NEW_SESSION 1 "8 February 2003" "PUPSP3 Script" "PUPSP3 Scripts"
+.TH NEW_SESSION 1 "8th February 2003" "PUPSP3 Script" "PUPSP3 Scripts"
 
 .SH NAME
 NEW_SESSION \- create a new session for subsequent commands 
@@ -7,7 +7,7 @@ NEW_SESSION \- create a new session for subsequent commands
 .SH SYNOPSIS
 .B new_session 
 .B [-usage | -help]
->& <log file>
+[2> <log file>]
 .br
 
 .SH DESCRIPTION
@@ -36,6 +36,18 @@ as their process group leader.
 display help and copyright information for the
 .I new_session(1)
 filter.
+.br
+
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
 .br
 
 .SH ENVIRONMENT VARIABLES

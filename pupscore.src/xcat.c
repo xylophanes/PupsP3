@@ -9,7 +9,7 @@
              United Kingdom
 
     Version: 2.02 
-    Dated:   18th September 2019 
+    Dated:   4th January 2022
     E-mail:  mao@tumblingdice.co.uk 
 ------------------------------------------------------------------------------*/
 
@@ -77,7 +77,7 @@ _PRIVATE void xcat_slot(int level)
 {   (void)fprintf(stderr,"int app xcat %s: [ANSI C]\n",XCAT_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 2005-2018 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 2005-2022 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
        (void)fprintf(stderr,"Pipeline insertion marker for dynamic pipeline monitors (built %s %s)\n\n",__TIME__,__DATE__);
     }
@@ -306,7 +306,7 @@ _PRIVATE int remove_junk(void)
     checkpoint files) ...
 ------------------------------------------------------------------------------*/
 
-#define VTAG  3293
+#define VTAG  3700
 
 extern int appl_vtag = VTAG;
 
@@ -344,7 +344,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
                   XCAT_VERSION,
                   "M.A. O'Neill",
                   "xcat",
-                  "2019",
+                  "2022",
                   argv);
 
     (void)psrp_init(PSRP_STATUS_ONLY  | PSRP_HOMEOSTATIC_STREAMS,&psrp_process_status);

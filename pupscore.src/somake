@@ -1,26 +1,26 @@
 #!/bin/bash
 #
-#---------------------------------------------------------------
+#-------------------------------------------------------------
 # Make a shared libary module - details from Johnson and Troan
 # LINUX Application Development.
 #
 # $1: name of the shared object 
 # $2: name(s) of the objects to be shared 
 #
-# (C) M.A. O'Neill, Tumbling Dice, 1999-2019
-#---------------------------------------------------------------
+# (C) M.A. O'Neill, Tumbling Dice 2000-2022
+#-------------------------------------------------------------
 
 
 PATH="$PATH:..:."
 echo ""
 echo "    PUPSP3 (SUPUPS) shared object generator"
-echo "    (C) M.A. O'Neill, Tumbling Dice 1999-2019"
+echo "    (C) M.A. O'Neill, Tumbling Dice 2000-2022"
 echo ""
 
 
-#--------------------
+#-------------------
 # Parse command line
-#--------------------
+#-------------------
 
 if [ "$1" = "" ] || [ "$1" = "usage" ] || [ "$1" = "help" ] ; then
         echo ""
@@ -34,9 +34,9 @@ else
 fi
 
 
-#-------
+#------
 # Error
-#-------
+#------
 
 if [ "$2" = "" ] ;  then
 	echo "    somake ERROR: expecting name of [.o, .a] objects to be shared"
@@ -44,10 +44,11 @@ if [ "$2" = "" ] ;  then
 fi
 
 
-#-----------------------------
+#----------------------------
 # Generate the shared library
-#-----------------------------
+#----------------------------
 
+\rm $sharename 2> /dev/null
 gcc -shared -fPIC -Wl,-soname,$sharename -o $sharename $2 -lc
 if [ $? = 0 ] ; then
 	echo "    somake: shared library [$sharename] generated"

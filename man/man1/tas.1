@@ -13,7 +13,7 @@ TAS \- test and set lock directory
 ]
 .I lock directory name
 .I lock pid
-[>& <log file>]
+[2> <log file>]
 .br
 
 .SH DESCRIPTION
@@ -26,7 +26,6 @@ At this point the shell script calling
 .I tas(1)
 will hold the lock.
 .br
-
 
 .SH OPTIONS
 
@@ -48,6 +47,18 @@ to hold the lock on its behalf. If specified
 will remove the lock if it still exists, and the process which
 requested it does not (a situation which may otherwise result in
 deadlock).
+.br
+
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
 .br
 
 .SH ENVIRONMENT VARIABLES

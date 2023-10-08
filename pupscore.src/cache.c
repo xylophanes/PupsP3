@@ -8,8 +8,8 @@
              NE3 4RT
              United Kingdom
 
-    Dated:   30th August 2019
     Version: 3.00 
+    Dated:   7th January 2022 
     E-mail:  mao@tumblingdice.co.uk
 -------------------------------------------------------------------------------------------------------*/
 
@@ -128,7 +128,7 @@ _PRIVATE void cache_slot(int level)
 {   (void)fprintf(stderr,"int app (PSRP) cache %s: [ANSI C, PUPS MTD D]\n",CACHE_VERSION);
  
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 2019 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 2022 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. ONeill\n");
        (void)fprintf(stderr,"(fast) cache test (built %s %s)\n\n",__TIME__,__DATE__);
     }
@@ -183,7 +183,7 @@ _PRIVATE void cache_usage(void)
     (void)fprintf(stderr,"[>& <ASCII log file>]\n\n");
 
     (void)fprintf(stderr,"Signals\n\n");
-    (void)fprintf(stderr,"SIGINIT SIGCHAN SIGPSRP: Process status [PSRP] request (protocol %4.2fF)\n",PSRP_PROTOCOL_VERSION);
+    (void)fprintf(stderr,"SIGINIT SIGCHAN SIGPSRP: Process status [PSRP] request (protocol %5.2fF)\n",PSRP_PROTOCOL_VERSION);
     (void)fprintf(stderr,"SIGCLIENT: tell client server is about to segment\n");
 
 #ifdef CRUI_SUPPORT
@@ -316,7 +316,7 @@ int i;
                   CACHE_VERSION,
                   "M.A. O'Neill",
                   "cache",
-                  "2019",
+                  "2022",
                   argv);
 
 

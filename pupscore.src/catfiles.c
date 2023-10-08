@@ -9,7 +9,7 @@
              United Kingdom
 
     Version: 2.00 
-    Dated:   30th August 2019 
+    Dated:   4th January 2022
     e-mail:  mao@tumblingdice.co.uk
 -------------------------------------------------------------------*/
 
@@ -49,7 +49,7 @@ _PUBLIC int main(int argc, char *argv[])
     char line[SSIZE] = "";
 
     if(argc < 3)
-    {  (void)fprintf(stderr,"\ncatfiles version %s, (C) Tumbling Dice 2003-2019 (built %s %s)\n\n",CATFILES_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\ncatfiles version %s, (C) Tumbling Dice 2003-2022 (built %s %s)\n\n",CATFILES_VERSION,__TIME__,__DATE__);
        (void)fprintf(stderr,"CATFILES is free software, covered by the GNU General Public License, and you are\n");
        (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
        (void)fprintf(stderr,"See the GPL and LGPL licences at www.gnu.org for further details\n");
@@ -57,7 +57,7 @@ _PUBLIC int main(int argc, char *argv[])
        (void)fprintf(stderr,"\nUsage: catfiles <appendor file name> <appendee file name>\n\n");
        (void)fflush(stderr);
 
-       exit(-1);
+       exit(255);
     }
 
 
@@ -69,28 +69,28 @@ _PUBLIC int main(int argc, char *argv[])
     {  (void)fprintf(stderr,"catfiles: cannot find (appendor) file \"%s\"\n",argv[1]);
        (void)fflush(stderr);
 
-       exit(-1);
+       exit(255);
     }
 
     if(access(argv[2],F_OK  | R_OK | W_OK) == (-1))
     {  (void)fprintf(stderr,"catfiles: cannot find (appendee) file \"%s\"\n",argv[2]);
        (void)fflush(stderr);
 
-       exit(-1);
+       exit(255);
     }
 
     if((stream_1 = fopen(argv[1],"a")) == (FILE *)NULL)
     {  (void)fprintf(stderr,"catfiles: cannot open (appendee) file \"%s\"\n",argv[2]);
        (void)fflush(stderr);
 
-       exit(-1);
+       exit(255);
     }
 
     if((stream_2 = fopen(argv[2],"r")) == (FILE *)NULL)
     {  (void)fprintf(stderr,"catfiles: cannot open (appendor) file \"%s\"\n",argv[2]);
        (void)fflush(stderr);
 
-       exit(-1);
+       exit(255);
     }
 
     do {   (void)fgets(line,SSIZE,stream_2);

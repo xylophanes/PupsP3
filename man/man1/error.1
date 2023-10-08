@@ -1,4 +1,4 @@
-.TH ERROR 1 "16 April 2002" "PUPSP3 commands" "PUPSP3 commands"
+.TH ERROR 1 "16th April 2002" "PUPSP3 commands" "PUPSP3 commands"
 
 .SH NAME
 ERROR \- PUPS error number to error string translator.
@@ -7,7 +7,7 @@ ERROR \- PUPS error number to error string translator.
 .SH SYNOPSIS
 .B error 
 .I errno
->& <log file>
+[2> <log file>]
 .br
 
 .SH DESCRIPTION
@@ -20,10 +20,20 @@ call. The resulting error string is printed on
 .I output.
 .br
 
-
 .SH OPTIONS
-
 None.
+.br
+
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
 .br
 
 .SH ENVIRONMENT VARIABLES

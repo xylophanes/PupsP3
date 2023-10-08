@@ -9,7 +9,7 @@
               United Kingdom
 
      Version: 2.00 
-     Dated:   30th August 2019 
+     Dated:   4th January 2022
      e-mail:  mao@tumblingdice.co.uk
 -------------------------------------------------------------------*/
 
@@ -80,7 +80,7 @@ _PUBLIC int main(int argc, char *argv[])
          cmd_index = 1;
 
     if(argc == 1 || (argc != 3 && (strcmp(argv[1],"-help") == 0 || strcmp(argv[1],"-help") == 0)))
-    {  (void)fprintf(stderr,"\nhupter version %s, (C) Tumbling Dice 2003-2019 (built %s %s)\n\n",HUPTER_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nhupter version %s, (C) Tumbling Dice 2003-2022 (built %s %s)\n\n",HUPTER_VERSION,__TIME__,__DATE__);
        (void)fprintf(stderr,"HUPTER is free software, covered by the GNU General Public License, and you are\n");
        (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
        (void)fprintf(stderr,"See the GPL and LGPL licences at www.gnu.org for further details\n");
@@ -88,7 +88,7 @@ _PUBLIC int main(int argc, char *argv[])
        (void)fprintf(stderr,"\nUsage: hupter [-usage | -help] | [-hup | -int | -term] [command]\n\n");
        (void)fflush(stderr);
 
-       exit(-1);
+       exit(255);
     }
 
     if(argc == 2)
@@ -114,7 +114,7 @@ _PUBLIC int main(int argc, char *argv[])
        (void)fprintf(stderr,"\nhupter (%d@%s): expecting \"-hup\", \"-int\" or \"-term\"\n\n",getpid(),hostname);
        (void)fflush(stderr);
 
-       exit(-1);
+       exit(255);
     }
 
 
@@ -138,7 +138,7 @@ _PUBLIC int main(int argc, char *argv[])
    
     if((child_pid = fork()) == 0)
     {  (void)system(payload_cmd);
-       _exit(-1);
+       _exit(255);
     }
 
 

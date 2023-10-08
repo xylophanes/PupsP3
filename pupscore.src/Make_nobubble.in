@@ -1,7 +1,7 @@
-#--------------------------------------------------------------------------------------
+#-------------------------------------------------------------------------
 # Makefile for compatibility library (when bubble memory is not being use) 
-# M.A. O'Neill, Tumbling Dice 23/01/2018
-#--------------------------------------------------------------------------------------
+# M.A. O'Neill, Tumbling Dice 04/01/2022
+#-------------------------------------------------------------------------
 
 CFLAGS  = 	TARGET_CFLAGS TARGET_ARCHDEPCFLAGS -fPIC -finline-functions -c
 CC	=	gcc
@@ -17,15 +17,34 @@ build:		$(ALL)
 nobubble.o:	nobubble.c
 		$(CC) $(CFLAGS) nobubble.c
 
+
+#--------------
+# Clean section
+#--------------
+
+.PHONY:		clean
+clean:		
+		@rm *.o libnobubble.a	1> /dev/null 2> /dev/null
+
+.PHONY:		cleanall
+cleanall:		
+		@rm *.o libnobubble.a	1> /dev/null 2> /dev/null
+
+
+#----------------
+# Install section
+#----------------
+
 .PHONY:		install	
 install:	build
 		@ar rv libnobubble.a *.o
 		@ranlib libnobubble.a
 		@cp -f *.o libnobubble.a ../lib.TARGET_LIBEXT
 
-.PHONY:		clean
-clean:		
-		@rm *.o libnobubble.a
+
+#------------------
+# Uninstall section
+#------------------
 
 .PHONY:		uninstall
 uninstall:      

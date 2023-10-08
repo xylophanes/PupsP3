@@ -23,7 +23,7 @@
     or (US mail) as Mike Haertel c/o Free Software Foundation.
 
     Shared heap modification by Mark O'Neill (mao@tumblingdice.co.uk)
-    (C) 1998-2019 M.A. O'Neill, Tumbling Dice
+    (C) 1998-2022 M.A. O'Neill, Tumbling Dice
 --------------------------------------------------------------------------*/
 
 #include <xtypes.h>

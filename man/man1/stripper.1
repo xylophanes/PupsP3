@@ -14,8 +14,8 @@ STRIPPER \- strip comments (prepended by '#') from a text file
 .B -verbose
 ]
 !< <commented text file>!
-[> <stripped text file>]
-[>& <log file>]
+[1> <stripped text file>]
+[2> <log file>]
 .br
 
 .SH DESCRIPTION
@@ -40,6 +40,18 @@ tells
 .I stripper(1)
 to log error/status information to
 .I standard error.
+.br
+
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
 .br
 
 .SH ENVIRONMENT VARIABLES

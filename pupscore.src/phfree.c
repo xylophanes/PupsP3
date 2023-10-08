@@ -22,7 +22,7 @@
     or (US mail) as Mike Haertel c/o Free Software Foundation.
 
     Persistent heap modifications by Mark O'Neill (mao@tumblingdice.co.uk)
-    (C) 1998-2019 M.A. O'Neill, Tumbling Dice
+    (C) 1998-2022 M.A. O'Neill, Tumbling Dice
 -------------------------------------------------------------------------------------------------------*/
 
 #include <stdio.h>
@@ -47,9 +47,9 @@ _IMPORT __malloc_size_t   *pheapsize;
 _PROTOTYPE _EXTERN int msm_map_object(const unsigned int, const unsigned int, const void *, const char *);
 
 
-/*---------------------------------------------------------------------------*/
-/* Remove a shared object from shared object map within shared meory segment */
-/*---------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------------------------*/
+/* Remove a persistent object persistent object map within persistent memory segment */
+/*-----------------------------------------------------------------------------------*/
 
 _PROTOTYPE _EXTERN int msm_unmap_object(const unsigned int, const unsigned int);
 

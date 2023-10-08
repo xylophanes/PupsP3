@@ -1,19 +1,19 @@
 #!/bin/bash
 #
-#------------------------------------------------------
+#-----------------------------------------------------
 # Restart process which has been checkpointed via Criu
-# M.A. O'Neill, Tumbling Dice, 2018
-#------------------------------------------------------
+# M.A. O'Neill, Tumbling Dice, 2021-2022 
+#-----------------------------------------------------
 
 
 echo ""
 echo "    Restart version 2,00"
-echo "    (C) Tumbling Dice 2019"
+echo "    (C) Tumbling Dice 2016-2022"
 echo ""
 
-#--------------------------
+#-------------------------
 # Parse command tail items
-#--------------------------
+#-------------------------
 
 if [ "$1" = usage ] ||  [ "$1" = help ] ;  then
 	echo ""
@@ -23,16 +23,16 @@ if [ "$1" = usage ] ||  [ "$1" = help ] ;  then
 	exit 1
 
 
-#-------------------------
+#------------------------
 # Process restart request
-#-------------------------
+#------------------------
 
 else
 
 
-	#--------------
+	#-------------
 	# Sanity check
-	#--------------
+	#-------------
 	
 	if [ "$1" == "" ] ; then
 		echo "restart.sh ERROR: checkpoint directory not specified"
@@ -41,16 +41,16 @@ else
 		exit 255
 	fi
 
-	#----------------------------
+	#---------------------------
 	# Does checkpoint file exit?
-	#----------------------------
+	#---------------------------
 
 	if [ ! -d $1 ] ; then
 
 
-		#----------------------------------------
+		#---------------------------------------
 		# See if checkpoint is in /tmp directory
-		#----------------------------------------
+		#---------------------------------------
 
 		absolute_path=$(echo $1 | head -c 1)
 		if [ "$absolute_path" != "/" ] && [ ! -d /tmp/$1 ] ; then
@@ -79,9 +79,9 @@ else
 fi
 
 
-#------------------------------
+#-----------------------------
 # Restart checkpointed process
-#------------------------------
+#-----------------------------
 
 if [ "$2" == detach ] then
 	exec criu --log-file /dev/null --shell-job restore -d -D $checkpoint

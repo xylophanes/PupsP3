@@ -1,4 +1,4 @@
-.TH PUPSUNAME 1 "26 April 2002" "PUPSP3 Scripts" "PUPSP3 Scripts"
+.TH PUPSUNAME 1 "26th April 2002" "PUPSP3 Scripts" "PUPSP3 Scripts"
 
 .SH NAME
 PUPSUNAME \- display CPU and operating system architectures string.
@@ -6,16 +6,16 @@ PUPSUNAME \- display CPU and operating system architectures string.
 .br
 
 .SH SYNOPSIS
-.B pups_uname 
+.B pupsuname 
 .I [usage | --usage] 
 .I !object file name!
->& <log file>
+>[2 <log file>]
 .br
 
 .SH DESCRIPTION
-.I pups_uname(1)
+.I pupsuname(1)
 is a
-.I csh(1)
+.I bash(1)
 shellscript which prints the  CPU and operating system architectures string on standard output.
 It is used by many of the automated scripts which build and maintain the PUPSP3 environment.
 .br
@@ -27,6 +27,22 @@ It is used by many of the automated scripts which build and maintain the PUPSP3 
 .B --usage 
 prints out help information about
 .I pups_uname(1)
+.br
+
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
+.br
+
+.SH ENVIRONMENTAL VARIABLES
+none.
 .br
 
 .SH COPYRIGHT

@@ -8,8 +8,8 @@
              NE3 4RT
              United Kingdom
 
-    Dated:   27th Septemebr 2019 
     Version: 2.00 
+    Dated:   4th January 2022
     E-mail:  mao@tumblingdice.co.uk
 ----------------------------------------------------------------------------*/
 /*-------------------------------------------------------------*/
@@ -75,7 +75,7 @@ _PRIVATE _ROOT_THREAD void tadlib_slot(int level)
 {   (void)fprintf(stderr,"lib threadlib %s: [ANSI C]\n",TADLIB_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 2002-2019 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 2002-2022 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
        (void)fprintf(stderr,"PUPS/P3 thread and DLL support library (built %s %s)\n",__TIME__,__DATE__);
        (void)fflush(stderr);

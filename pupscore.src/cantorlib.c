@@ -8,8 +8,8 @@
              NE3 4RT
              United Kingdom
 
-    Dated:   30th August 2019 
     Version: 3.00 
+    Dated:   4th January 2022
     E-mail:  mao@@tumblingdice.co.uk
 -----------------------------------------------------------------------------*/
 
@@ -51,7 +51,7 @@ _PRIVATE void cantorlib_slot(int level)
 {   (void)fprintf(stderr,"lib cantorlib %s: [ANSI C]\n",CANTOR_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 1994-2019 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 1994-2022 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
        (void)fprintf(stderr,"PUPS/P3 cellular database core library (built %s %s)\n\n",__TIME__,__DATE__);
     }
@@ -2974,7 +2974,7 @@ _PUBLIC int cantor_vhtml_node_info(_BOOLEAN  full_node_info,  // TRUE if full li
           (void)fprintf(stream,"<hr><center><h3>Cantor version %s<br>Node is NULL</h3></center><hr><br><br>\n",CANTOR_VERSION);
 
        (void)fprintf(stream,"<br><hr><br><center><h6>Web page generated automatically by <b>cantor</b> vhtml generator (version 1.00)\n");
-       (void)fprintf(stream,"(C) M.A. O'Neill, Tumbling Dice, 2019 (mao@@tumblingdice.co.uk)</center><br><br>\n");
+       (void)fprintf(stream,"(C) M.A. O'Neill, Tumbling Dice, 2022 (mao@@tumblingdice.co.uk)</center><br><br>\n");
        (void)fprintf(stream,"</body></html>\n");
        (void)fflush(stream);
 
@@ -3102,7 +3102,7 @@ _PUBLIC int cantor_vhtml_node_info(_BOOLEAN  full_node_info,  // TRUE if full li
     }
 
     (void)fprintf(stream,"<br><hr><br><center><h6>Web page generated automatically by <b>cantor</b> vhtml generator (version 1.00)\n");
-    (void)fprintf(stream,"(C) M.A. O'Neill, Tumbling Dice, 2019 (mao@@tumblingdice.co.uk)</center><br><br>\n");
+    (void)fprintf(stream,"(C) M.A. O'Neill, Tumbling Dice, 2022 (mao@@tumblingdice.co.uk)</center><br><br>\n");
     (void)fprintf(stream,"</body></html>\n");
     (void)fflush(stream);
 
@@ -3182,7 +3182,7 @@ _PUBLIC int cantor_vhtml_link_info(char *dir,         // Directory of generated 
 
        (void)fprintf(stream,"<br><hr><br>\n");
        (void)fprintf(stream,"<center><h6>Web page generated automatically by <b>cantor</b> vhtml generator version 1.00<br>\n");
-       (void)fprintf(stream,"(C) M.A. O'Neill, Tumbling Dice, 2019 (mao@@tumblingdice.co.uk)</center><br><br>\n");
+       (void)fprintf(stream,"(C) M.A. O'Neill, Tumbling Dice, 2022 (mao@@tumblingdice.co.uk)</center><br><br>\n");
        (void)fprintf(stream,"</body></html>\n");
        (void)fflush(stream);
 
@@ -3260,7 +3260,7 @@ _PUBLIC int cantor_vhtml_link_info(char *dir,         // Directory of generated 
 
        (void)fprintf(stream,"<br><hr><br>\n");
        (void)fprintf(stream,"<center><h6>Web page generated automatically by <b>cantor</b> vhtml generator version 1.00<br>\n");
-       (void)fprintf(stream,"(C) M.A. O'Neill, Tumbling Dice, 2019 (mao@@tumblingdice.co.uk)</center><br><br>\n");
+       (void)fprintf(stream,"(C) M.A. O'Neill, Tumbling Dice, 2022 (mao@@tumblingdice.co.uk)</center><br><br>\n");
        (void)fprintf(stream,"</body></html>\n");
        (void)fflush(stream);
     }
@@ -3499,7 +3499,7 @@ _PUBLIC int cantor_vhtml_nodelist_browse(_BOOLEAN        full_node_info,  // TRU
 
     (void)fprintf(stream,"<br><hr><br>\n");
     (void)fprintf(stream,"<center><h6>Web page generated automatically by <b>cantor</b> vhtml generator version 1.00<br>\n");
-    (void)fprintf(stream,"(C) M.A. O'Neill, Tumbling Dice, 2019 (mao@@tumblingdice.co.uk)</center><br><br>\n");
+    (void)fprintf(stream,"(C) M.A. O'Neill, Tumbling Dice, 2022 (mao@@tumblingdice.co.uk)</center><br><br>\n");
     (void)fprintf(stream,"</body></html>\n");
     (void)fflush(stream);
 
@@ -3585,7 +3585,7 @@ _PUBLIC int cantor_rulefile_from_clustered_link(char      *filename,  // Filenam
  
    (void)fprintf(stream,"#----------------------------------------------------------------------------------\n");
    (void)fprintf(stream,"#  Rgen (binary) rule file automatically generated from link data by\n");
-   (void)fprintf(stream,"#  Cantor version %s, (C) M.A. O'Neill, Tumbling Dice, 2019\n",CANTOR_VERSION);
+   (void)fprintf(stream,"#  Cantor version %s, (C) M.A. O'Neill, Tumbling Dice, 2022\n",CANTOR_VERSION);
    (void)fprintf(stream,"#-----------------------------------------------------------------------------------\n\n");
    (void)fprintf(stream,"\n\n#  Format is node1, node2, link, link_flux, link_length\n\n");
    (void)fflush(stream);

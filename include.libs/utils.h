@@ -8,8 +8,8 @@
              NE3 4RT
              United Kingdom
 
-    Dated:   27th September 2019 
-    Version: 6.02 
+    Version: 7.17
+    Dated:   3rd November 2022
     E-Mail:  mao@tumblingdice.co.uk
 ------------------------------------------------------------------------------*/
 
@@ -38,6 +38,7 @@
 #include <net/if.h>
 #include <netdb.h>
 #include <arpa/inet.h>
+#include <setjmp.h>
 
 
 #ifdef _OPENMP
@@ -51,7 +52,7 @@
 /* Version */
 /***********/
 
-#define UTILIB_VERSION              "6.02"
+#define UTILIB_VERSION              "7.17"
 
 
 /*-------------*/
@@ -545,7 +546,7 @@ typedef struct {   int      pid;                           // Child pid
 /*-----------------------------------*/
 
 #define STRING_LENGTH      1024 
-#define LONG_LINE          1024
+//#define LONG_LINE          1024
 #define LONG_LONG_LINE     4096
 #define NOT_FOUND          (-1)
 #define INVALID_ARG        (-9999)
@@ -561,6 +562,8 @@ typedef struct {   int      pid;                           // Child pid
 /* External variable declarations */
 /*--------------------------------*/
 
+_IMPORT jmp_buf   appl_resident_restart;  // Restart location (for memory resident application)
+
 #ifdef SSH_SUPPORT
 _EXPORT char     ssh_remote_port[];       // Remote (ssh) port
 _EXPORT char     ssh_remote_uname[];      // Remote (ssh) username
@@ -574,7 +577,6 @@ _EXPORT _BOOLEAN    fs_write_blocked;     // TRUE if filesystem is full
 #ifdef CRIU_SUPPORT
 _EXPORT _BOOLEAN appl_ssave;              // TRUE if (criu) state saving enabled
 #endif /* CRIU_SUPPORT */
-
 
 _EXPORT int sargc,                        // Number of arguments in command tail
             ptr,                          // Pointer to current option
@@ -617,6 +619,8 @@ _EXPORT int sargc,                        // Number of arguments in command tail
 
 
 _EXPORT _BOOLEAN appl_verbose,            // TRUE if verbose mode selected
+                 appl_resident,           // Application is memory resident 
+                 appl_enable_residence,   // Application can be memory resident
                  appl_etrap,              // TRUE if error trapping for gdb analysis
                  appl_proprietary,        // TRUE if application is proprietary
 
@@ -661,7 +665,7 @@ _EXPORT char *version,                    // Version of program
              *appl_ch_name,               // Application PSRP channel name
              *appl_err,                   // Application error string
              *appl_hostpool,              // Application capabilities database
-             *appl_pen_name,              // Application name of process
+             *appl_ben_name,              // Application binary
              *appl_pam_name,              // PUPS authentication module name
              *appl_ttyname,               // Applications controlling terminal
              *appl_uprot_tag,             // Homeostasis (file) revocation tag
@@ -675,8 +679,8 @@ _EXPORT char *version,                    // Version of program
              *appl_state,                 // State of this application
              *arg_f_name,                 // Argument file name
              *appl_tunnel_path,           // Tunnel path (binary for tunnel process
-             *args[256];                  // Secondry argument vectors
-  
+             *args[256],                  // Secondry argument vectors
+             appl_argfifo[];              // Argument FIFO (for memory resident process)
 
 #ifdef CRIU_SUPPORT
 _EXPORT char appl_ssave_dir[];            // Criu checkpoint directory for state saving
@@ -698,7 +702,7 @@ _EXPORT pthread_mutex_t chtab_mutex;      // Thread safe child table mutex
 
 _EXPORT _BOOLEAN    appl_kill_pg;
 _EXPORT _BOOLEAN    appl_secure;
-_EXPORT _BOOLEAN    pups_poisoned;
+_EXPORT _BOOLEAN    pups_process_homeostat;
 _EXPORT _BOOLEAN    ftab_extend;
 _EXPORT ftab_type   *ftab;
 _EXPORT chtab_type  *chtab;
@@ -708,6 +712,7 @@ _EXPORT _BOOLEAN    default_fd_homeostat_action;
 _EXPORT _BOOLEAN    ignore_pups_signals;
 _EXPORT _BOOLEAN    pups_exit_entered;
 _EXPORT _BOOLEAN    in_vt_handler;
+_EXPORT _BOOLEAN    in_jmalloc;
 
 
 #ifdef MAIL_SUPPORT
@@ -750,13 +755,16 @@ _PROTOTYPE _EXPORT struct passwd *pups_getpwnam(const char *);
 _PROTOTYPE _EXPORT struct passwd *pups_getpwuid(const int);
 
 // Set up support child prior to dangerous operation
-_PROTOTYPE _EXPORT int pups_could_be_poisoned(const _BOOLEAN);
+_PROTOTYPE _EXPORT int pups_process_homeostat_enable(const _BOOLEAN);
 
 // Cancel support child (at end of dangerous operation)
-_PROTOTYPE _EXPORT void pups_not_poisoned(const int);
+_PROTOTYPE _EXPORT void pups_process_hoemostat_disable(const int);
 
 // Clear a virtual timer datastructure
 _PROTOTYPE _EXPORT int pups_clear_vitimer(const _BOOLEAN, const unsigned int);
+
+// Get file table index (associated with a file descriptor)
+_PROTOTYPE _EXPORT int pups_get_ftab_index_from_fd(unsigned const int);
 
 // Get file table index (associated with a stream)
 _PROTOTYPE _EXPORT  int pups_get_ftab_index_from_stream(const FILE *);
@@ -766,7 +774,6 @@ _PROTOTYPE _EXPORT int pups_vitrestart(void);
 
 // Find free file table index
 _PROTOTYPE _EXPORT int pups_find_free_ftab_index(void);
-
 
 #ifdef ZLIB_SUPPORT
 // Get file table index (associated with a zstream)
@@ -963,6 +970,9 @@ _PROTOTYPE _EXPORT _BOOLEAN strail(char *, const char);
 // Extract leaf from pathname
 _PROTOTYPE _EXPORT _BOOLEAN strleaf(const char *, char *);
 
+// Extract branch from pathname
+_PROTOTYPE _EXPORT _BOOLEAN strbranch(const char *, char *);
+
 // Strip trailing character string (which begins with digit)
 _PROTOTYPE _EXPORT _BOOLEAN strdigit(char *);
 
@@ -1016,6 +1026,9 @@ _PROTOTYPE _EXPORT int strand(const size_t, char *);
 
 // Find sign of float
 _PROTOTYPE _EXPORT FTYPE fsign(const FTYPE);
+
+// Round a floating point number to N significant figures
+_PROTOTYPE _EXPORT FTYPE sigfig(const FTYPE, const unsigned int);
 
 // Pascal compatable squaring routine
 _PROTOTYPE _EXPORT FTYPE sqr(const FTYPE);
@@ -1402,7 +1415,7 @@ _PROTOTYPE _EXPORT int pups_fifo_relay(const int, const int, const int);
 _PROTOTYPE int pups_get_rdwr_link_file_lock(const int, const int, const char *);
 
 // Get file lock [using link()]
-_PROTOTYPE _EXPORT int pups_get_link_file_lock(const int, const char *);
+_PROTOTYPE _EXPORT int pups_get_link_file_lock(const unsigned int, const char *);
 
 // Release file lock [set using link()]
 _PROTOTYPE _EXPORT int pups_release_link_file_lock(const char *);
@@ -1625,8 +1638,8 @@ _PROTOTYPE _EXPORT int isaconduit(const int);
 // Get system information for current host
 _PROTOTYPE _EXPORT int pups_sysinfo(char *, char *, char *, char *);
 
-// Am I running in a container? 
-_PROTOTYPE _EXPORT _BOOLEAN pups_is_in_container(char *);
+// Am I running in virtual enviroment? 
+_PROTOTYPE _EXPORT _BOOLEAN pups_os_is_virtual(char *);
 
 // Is character first one in string? 
 _PROTOTYPE _EXPORT _BOOLEAN ch_is_first(const char *, const char); 
@@ -1667,6 +1680,12 @@ _PROTOTYPE _EXPORT size_t strlcpy(char *, const char *, size_t dsize);
 
 // Can we run command? */
 _PROTOTYPE _EXPORT _BOOLEAN pups_can_run_command(const char *);
+
+// Enable (memory) residency
+_PROTOTYPE _EXPORT void pups_enable_resident(void);
+
+// Get size of directory in bytes
+_PROTOTYPE _EXPORT off_t pups_dsize(const char *);
 
 
 #ifdef _CPLUSPLUS

@@ -1,5 +1,5 @@
 /*----------------------------------------------------------------------------
-     Purpose: Saves state of argument command (via Criu) 
+     Purpose: Saves command state (via Criu) 
 
      Author:  M.A. O'Neill
               Tumbling Dice Ltd
@@ -8,13 +8,14 @@
               NE3 4RT
               United Kingdom
 
-     Version: 2.00 
-     Dated:   27th September 2019 
+     Version: 2.01 
+     Dated:   24th May 2022
      E-mail:  mao@tumblingdice.co.uk
 -----------------------------------------------------------------------------*/
 
 #include <stdio.h>
 #include <string.h>
+#include <bsd/string.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/stat.h>
@@ -37,7 +38,7 @@
 /* Version */
 /*---------*/
 
-#define SSAVE_VERSION        "2.00"
+#define SSAVE_VERSION        "2.01"
 
 
 /*-------------*/
@@ -87,102 +88,6 @@
 
 _PRIVATE int  child_pid       = (-1);
 _PRIVATE char buildStr[SSIZE] = "";
-
-
-
-
-#ifdef BSD_FUNCTION_SUPPORT
-/*-----------------------------------------------------------------------------
-    Strlcpy and stlcat function based on OpenBSD functions ...
------------------------------------------------------------------------------*/
-/*------------------*/
-/* Open BSD Strlcat */
-/*------------------*/
-_PRIVATE size_t strlcat(char *dst, const char *src, size_t dsize)
-{
-	const char *odst = dst;
-	const char *osrc = src;
-	size_t      n    = dsize;
-	size_t      dlen;
-
-
-        /*------------------------------------------------------------------*/
-	/* Find the end of dst and adjust bytes left but don't go past end. */
-        /*------------------------------------------------------------------*/
-
-	while (n-- != 0 && *dst != '\0')
-		dst++;
-	dlen = dst - odst;
-	n = dsize - dlen;
-
-	if (n-- == 0)
-		return(dlen + strlen(src));
-	while (*src != '\0') {
-		if (n != 0) {
-			*dst++ = *src;
-			n--;
-		}
-		src++;
-	}
-	*dst = '\0';
-
-
-        /*----------------------------*/
-        /* count does not include NUL */
-        /*----------------------------*/
-
-	return(dlen + (src - osrc));
-}
-
-
-
-
-/*------------------*/
-/* Open BSD strlcpy */
-/*------------------*/
-
-_PRIVATE size_t strlcpy(char *dst, const char *src, size_t dsize)
-{
-	const char   *osrc = src;
-	size_t nleft       = dsize;
-
-
-        /*---------------------------------*/
-	/* Copy as many bytes as will fit. */
-        /*---------------------------------*/
-
-	if (nleft != 0) {
-		while (--nleft != 0) {
-			if ((*dst++ = *src++) == '\0')
-				break;
-		}
-	}
-
-
-        /*-----------------------------------------------------------*/
-	/* Not enough room in dst, add NUL and traverse rest of src. */
-        /*-----------------------------------------------------------*/
-
-	if (nleft == 0) {
-		if (dsize != 0)
-
-                        /*-------------------*/
-                        /* NUL-terminate dst */
-                        /*-------------------*/
-
-			*dst = '\0';
-		while (*src++)
-			;
-	}
-
-
-        /*----------------------------*/
-        /* count does not include NUL */
-        /*----------------------------*/
-
-	return(src - osrc - 1);
-}
-#endif /* BSD_FUNCTION_SUPPORT */
 
 
 
@@ -241,7 +146,7 @@ _PUBLIC int main(int argc, char *argv[])
 
     if(argc == 1)
     {  (void)fprintf(stderr,"\n   ssave version %s (built %s %s)\n",SSAVE_VERSION,__TIME__,__DATE__);
-       (void)fprintf(stderr,"   (C) Tumbling Dice, 2018\n\n");
+       (void)fprintf(stderr,"   (C) Tumbling Dice, 2016-2022\n\n");
        (void)fprintf(stderr,"   Usage: ssave [-usage | -help] |\n");
        (void)fprintf(stderr,"                [-t <poll time:%d>]\n",DEFAULT_POLL_TIME);
        (void)fprintf(stderr,"                [-cd <criu directory:/tmp>]\n");
@@ -261,7 +166,7 @@ _PUBLIC int main(int argc, char *argv[])
 
        if(strcmp(argv[i],"-usage") == 0 || strcmp(argv[i],"-help") == 0)
        {  (void)fprintf(stderr,"\n   ssave version %s (built %s %s)\n",SSAVE_VERSION,__TIME__,__DATE__);
-          (void)fprintf(stderr,"   (C) Tumbling Dice, 2018\n\n");
+          (void)fprintf(stderr,"   (C) Tumbling Dice, 2016-2022\n\n");
           (void)fprintf(stderr,"   Usage: ssave [-usage | -help] |\n");
           (void)fprintf(stderr,"                [-t <poll time:%d>]\n",DEFAULT_POLL_TIME);
           (void)fprintf(stderr,"                [-cd <criu directory:/tmp>\n");
@@ -294,7 +199,7 @@ _PUBLIC int main(int argc, char *argv[])
                 (void)fflush(stderr);
              }
 
-             exit(-1);
+             exit(255);
           }
 
 
@@ -308,7 +213,7 @@ _PUBLIC int main(int argc, char *argv[])
                 (void)fflush(stderr);
              }
 
-             exit(-1);
+             exit(255);
           }
 
           ++i;
@@ -327,7 +232,7 @@ _PUBLIC int main(int argc, char *argv[])
                 (void)fflush(stderr);
              }
 
-             exit(-1);
+             exit(255);
           }
           else
              (void)strlcpy(payload_cmd,argv[i+1],SSIZE);
@@ -348,7 +253,7 @@ _PUBLIC int main(int argc, char *argv[])
                 (void)fflush(stderr);
              }
 
-             exit(-1);
+             exit(255);
           }
           else
              (void)strlcpy(criu_dir,argv[i+1],SSIZE);
@@ -369,7 +274,7 @@ _PUBLIC int main(int argc, char *argv[])
           (void)fflush(stderr);
        }
 
-       exit(-1);
+       exit(255);
     }
 
 
@@ -404,7 +309,7 @@ _PUBLIC int main(int argc, char *argv[])
           (void)fflush(stderr);
        }
 
-       exit(-1);
+       exit(255);
     }
 
 
@@ -443,7 +348,7 @@ _PUBLIC int main(int argc, char *argv[])
           (void)fflush(stderr);
        }
 
-       _exit(-1);
+       _exit(255);
     }
 
 
@@ -488,7 +393,7 @@ _PUBLIC int main(int argc, char *argv[])
               (void)fflush(stderr); 
            }
 
-           exit(-1);
+           exit(255);
         }
 
 
@@ -571,7 +476,7 @@ _PUBLIC int main(int argc, char *argv[])
                   (void)fflush(stderr); 
                }
 
-               exit(-1);
+               exit(255);
             }              
 
 

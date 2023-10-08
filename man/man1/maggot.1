@@ -1,4 +1,4 @@
-.TH MAGGOT 1 "16th April 2015" "PUPSP3 commands" "PUPSP3 commands"
+.TH MAGGOT 1 "6th October 2023" "PUPSP3 commands" "PUPSP3 commands"
 .SH NAME
 .br
 
@@ -24,14 +24,20 @@ maggot \ PSRP stale resource removal process
 ][
 .B -slotinfo
 ][
+.B -search
+.I list of (space separated) directories to be seached
+][ -parse
+.I list of (space separated) file keys
+][
 .B -delay_period
 .I minutes
 ][
-.B -search
-.I list of directories to be seached
+.B -global
+][
+.B -parse_pid
 ]
 ]
->& <log file>
+[2> <log file>]
 .br
 
 .SH DESCRIPTION
@@ -137,12 +143,8 @@ must be a cardinal between 0 and 20. The default niceness for
 is 4.
 .br
 
-.B -delay_period
-specifies the delay period (in minutes) between file system scans.
-The delay period defaults to 60 minutes.
-.br
-
 .B -search
+.I list of (space separeted) directory names
 is used to specify a list of directories that will be searched in addition to
 the
 .B patchboard
@@ -151,15 +153,78 @@ and
 directories.
 .br
 
+.B -parse
+.I list of (space sperated) file keys
+is used to specifly a (space separated) list of file keys. Files of the form <filename>-<pid>
+will be deleted if any of the key interects with <filename> and <pid> is not alive
+.br
+
+.B -delay_period
+specifies the delay period (in minutes) between file system scans.
+The delay period defaults to 60 minutes.
+.br
+
+.B -global
+tells
+.I maggot(1)
+to delete stale global PUP/P3 log files in specified directories
+.br
+
 .SH PSRP INTERACTIVITY
 Supports interactive querying while running using Process Status Request Protocol [PSRP], see
 .I psrp(1).
-.br         
+.br
+
+.B status
+displays current status of
+.I maggot(1)
+.br
+
+.B delay_period
+.I seconds
+sets scan delay period.
+.br
+
+.B add_directory
+.I directory name
+add specified directory to list of scanned directories.
+.br
+
+.B remove_directory
+.I directory name
+removes specified directory from list of scanned directories.
+.br
+
+.B add_
+.I key name
+add specified key to key list.
+.br
+
+.B remove_key
+.I key name
+Remove key from key list.
+.br
 
 .SH LIBRARIES
 .I maggot(1)
 uses the PUPS libraries, see
 .I pups(3)
+.br
+
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
+.br
+
+.SH ENVIRONMNENTAL VARIABLES
+none.
 .br
 
 .SH COPYRIGHT

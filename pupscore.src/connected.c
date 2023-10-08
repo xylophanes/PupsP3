@@ -10,8 +10,8 @@
              NE3 4RT
              United Kingdom
 
-   Version: 2.00
-   Dated:   30th August 2019 
+   Version: 2.02
+   Dated:   24th May 2022
    E-mail:  mao@tumblingdice.co.uk
 -----------------------------------------------------------------------*/
 
@@ -24,6 +24,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <string.h>
+#include <bsd/string.h>
 #include <stdlib.h>
 
 
@@ -33,7 +34,7 @@
 /*----------------------*/
 /* Version of connected */
 /*----------------------*/
-#define CONNECTED_VERSION    "2.00" 
+#define CONNECTED_VERSION    "2.02" 
 
 
 /*-------------*/
@@ -71,103 +72,6 @@
 -----------------------------------------------------------------------*/
 
 _PRIVATE sigjmp_buf env;
-
-
-
-
-#ifdef BSD_FUNCTION_SUPPORT
-/*-----------------------------------------------------------------------------
-    Strlcpy and stlcat function based on OpenBSD functions ...
------------------------------------------------------------------------------*/
-/*------------------*/
-/* Open BSD Strlcat */
-/*------------------*/
-_PRIVATE size_t strlcat(char *dst, const char *src, size_t dsize)
-{
-	const char *odst = dst;
-	const char *osrc = src;
-	size_t      n    = dsize;
-	size_t      dlen;
-
-
-        /*------------------------------------------------------------------*/
-	/* Find the end of dst and adjust bytes left but don't go past end. */
-        /*------------------------------------------------------------------*/
-
-	while (n-- != 0 && *dst != '\0')
-		dst++;
-	dlen = dst - odst;
-	n = dsize - dlen;
-
-	if (n-- == 0)
-		return(dlen + strlen(src));
-	while (*src != '\0') {
-		if (n != 0) {
-			*dst++ = *src;
-			n--;
-		}
-		src++;
-	}
-	*dst = '\0';
-
-
-        /*----------------------------*/
-        /* count does not include NUL */
-        /*----------------------------*/
-
-	return(dlen + (src - osrc));
-}
-
-
-
-
-/*------------------*/
-/* Open BSD strlcpy */
-/*------------------*/
-
-_PRIVATE size_t strlcpy(char *dst, const char *src, size_t dsize)
-{
-	const char   *osrc = src;
-	size_t nleft       = dsize;
-
-
-        /*---------------------------------*/
-	/* Copy as many bytes as will fit. */
-        /*---------------------------------*/
-
-	if (nleft != 0) {
-		while (--nleft != 0) {
-			if ((*dst++ = *src++) == '\0')
-				break;
-		}
-	}
-
-
-        /*-----------------------------------------------------------*/
-	/* Not enough room in dst, add NUL and traverse rest of src. */
-        /*-----------------------------------------------------------*/
-
-	if (nleft == 0) {
-		if (dsize != 0)
-
-                        /*-------------------*/
-                        /* NUL-terminate dst */
-                        /*-------------------*/
-
-			*dst = '\0';
-		while (*src++)
-			;
-	}
-
-
-        /*----------------------------*/
-        /* count does not include NUL */
-        /*----------------------------*/
-
-	return(src - osrc - 1);
-}
-#endif /* BSD_FUNCTION_SUPPORT */
-
 
 
 
@@ -221,7 +125,7 @@ _PUBLIC int main(int argc, char *argv[])
     {  (void)fprintf(stderr,"connected: cannot find \"/etc/resolv.up\" or \"/etc/resolv.down\" -- aborting\n");
        (void)fflush(stderr);
 
-       exit(-1);
+       exit(255);
     }
 
 
@@ -231,7 +135,7 @@ _PUBLIC int main(int argc, char *argv[])
     /*------------------------------------------------------*/
 
     if(argc != 4)
-    {  (void)fprintf(stderr,"\nConnected version %s, (C) Tumbling Dice, 2002-2019 (built %s %s)\n",CONNECTED_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nConnected version %s, (C) Tumbling Dice, 2002-2022 (built %s %s)\n",CONNECTED_VERSION,__TIME__,__DATE__);
        (void)fprintf(stderr,"\nUsage: connected <nameserver> <upscript> <downscript> [<ping timeout>]\n\n");
        (void)fprintf(stderr,"CONNECTED is free software, covered by the GNU General Public License, and you are\n");
        (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
@@ -241,7 +145,7 @@ _PUBLIC int main(int argc, char *argv[])
 
        (void)fflush(stderr);
 
-       exit(-1);
+       exit(255);
     }
     else
     {  char netname[SSIZE] = "";
@@ -265,7 +169,7 @@ _PUBLIC int main(int argc, char *argv[])
        {  (void)fprintf(stderr,"connected: address is not in I.P. format\n");
           (void)fflush(stderr);
 
-          exit(-1);
+          exit(255);
        }
 
 
@@ -278,14 +182,14 @@ _PUBLIC int main(int argc, char *argv[])
        {  (void)fprintf(stderr,"connected: could not get local network number\n");
           (void)fflush(stderr);
 
-          exit(-1);
+          exit(255);
        }
        else
        {  if((host_netent = getnetbyname(netname)) == (struct netent *)NULL)
           {  (void)fprintf(stderr,"connected: could not get network number for local host\n");
              (void)fflush(stderr);
 
-            exit(-1);
+            exit(255);
           }
        }
 
@@ -298,7 +202,7 @@ _PUBLIC int main(int argc, char *argv[])
        {  (void)fprintf(stderr,"connected: nameserver I.P. address is local\n");
           (void)fflush(stderr);
 
-          exit(-1);
+          exit(255);
        }
 
        (void)strlcpy(upscript,argv[2],SSIZE);
@@ -309,7 +213,7 @@ _PUBLIC int main(int argc, char *argv[])
           {  (void)fprintf(stderr,"connected: cannot find script to run when gateway comes up\n");
              (void)fflush(stderr);
 
-             exit(-1);
+             exit(255);
           }
           else
              (void)strlcpy(upscript,"/etc/connected.d/connected.upscript",SSIZE);
@@ -320,7 +224,7 @@ _PUBLIC int main(int argc, char *argv[])
           {  (void)fprintf(stderr,"connected: cannot find script to run when gateway goes down\n");
              (void)fflush(stderr);
 
-             exit(-1);
+             exit(255);
           }
           else
              (void)strlcpy(upscript,"/etc/connected.d/connected.downscript",SSIZE);
@@ -337,7 +241,7 @@ _PUBLIC int main(int argc, char *argv[])
        {  (void)fprintf(stderr,"connected: expecting ping timeout (in seconds)\n");
           (void)fflush(stderr);
 
-          exit(-1);
+          exit(255);
        }
     }
 
@@ -364,7 +268,7 @@ _PUBLIC int main(int argc, char *argv[])
     {  (void)fprintf(stderr,"connected: failed to start \"ping\" command\n");
        (void)fflush(stderr);
 
-       exit(-1);
+       exit(255);
     }
 
 
@@ -409,7 +313,7 @@ _PUBLIC int main(int argc, char *argv[])
                   (void)fprintf(stderr,"connected: unknown host (%s)\n",nameserver);
                   (void)fflush(stderr);
 
-                  exit(-1);
+                  exit(255);
                }
  
                (void)usleep(100);

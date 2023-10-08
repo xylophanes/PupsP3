@@ -9,7 +9,7 @@ CLEAN \- clean a PUPSP3 distribution tree.
 .B clean 
 .I [usage | --usage] 
 .I [PUPSP3 source directory]
->& <log file>
+[2> <log file>]
 .br
 
 .SH DESCRIPTION
@@ -35,6 +35,22 @@ prints out help information about
 .I clean(1)
 .B [PUPSP3 source directory]
 specifies the root of the PUPSP3 source directory which is to be cleaned
+.br
+
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
+.br
+
+.SH ENVIRONMENTAL VARIABLES
+none.
 .br
 
 .SH COPYRIGHT

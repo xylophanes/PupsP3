@@ -107,16 +107,22 @@ _PRIVATE void @APPNAME_usage(void)
     /* CKPT and PSRP protocols                              */ 
     /*------------------------------------------------------*/ 
 
-    (void)fprintf(stderr,"\n\nSignals\n\n");
-    (void)fprintf(stderr,"SIGINIT SIGCHAN SIGPSRP: Process status [PSRP] request (protocol %4.2F)\n",PSRP_PROTOCOL_VERSION);
-    (void)fprintf(stderr,"SIGCLIENT: tell client server is about to segment\n");
+    (void)fprintf(stderr,"Signals\n");
+    (void)fprintf(stderr,"=======\n\n");
+    (void)fprintf(stderr,"SIGINIT SIGCHAN SIGPSRP: Process status [PSRP] request (protocol %5.2f)\n",PSRP_PROTOCOL_VERSION);
+    (void)fprintf(stderr,"SICLIENT:                tell client server is about to segment\n");
+    (void)fprintf(stderr,"SIGALIVE:                check for existence of client on signal dispatch host\n");
 
-    #ifdef CRUI_SUPPORT
-    (void)fprintf(stderr,"SIGCHECK SIGRESTART:      checkpoint and restart signals\n");
-    #endif /* CRIU_SUPPORT */
+#ifdef FLOAT
+    (void)fprintf(stderr,"\nFloating point representation is \"float\" (%d bytes)\n",sizeof(FTYPE));
+#else
+    (void)fprintf(stderr,"\nFloating point representation is \"double\" (%d bytes)\n",sizeof(FTYPE));
+#endif /* FLOAT */
 
-    (void)fprintf(stderr,"SIGALIVE: check for existence of client on signal dispatch host\n");
-    (void)fflush(stderr);
+#ifdef _OPENMP
+    (void)fprintf(stderr,"%d parallel (OMP) threads available\n",omp_get_max_threads());
+#endif /* _OPENMP */
+
 }
 
 

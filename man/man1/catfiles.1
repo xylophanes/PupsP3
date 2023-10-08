@@ -1,4 +1,4 @@
-.TH CATFILES 1 "17 January 2003" "PUPSP3 commands" "PUPSP3 commands"
+.TH CATFILES 1 "17th January 2003" "PUPSP3 commands" "PUPSP3 commands"
 
 .SH NAME
 CATFILES \- catenate a pair of files preserving inode of first file 
@@ -8,7 +8,7 @@ CATFILES \- catenate a pair of files preserving inode of first file
 .B catfiles 
 .I appendor file
 .I appendee file
->& <log file>
+[2> <log file>]
 .br
 
 .SH DESCRIPTION
@@ -24,8 +24,19 @@ files on the exporting host.
 .br
 
 .SH OPTIONS
-
 None
+.br
+
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
 .br
 
 .SH ENVIRONMENT VARIABLES
