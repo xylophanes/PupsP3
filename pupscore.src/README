@@ -1,23 +1,23 @@
 Standard PUPS libraries - Note that this version of the PUPS libraries
 are supported by ANSI compilers only
 
-To build in production mode
-===========================
+To build/install in production mode
+===================================
 
 Type:
 
-build_pups_services.csh cluster tty force default
+installpupsP3.csh cluster tty force default
 
 Programs can be built by typing:
 configure cluster <makefile template> followed by make.
 
 
-To build in debug mode
-======================
+To build/install in debug mode
+===============================
 
 Type:
 
-build_pups_services.csh cluster tty force default debug
+installpupsP3.csh cluster tty force default debug
 
 Programs which make use of the PUPS/P3 libraries can then be debugged
 by typing:
@@ -26,6 +26,28 @@ testconfigure <make template> - to generate debug makefile
 followed by make. The resulting binary can then be debugged
 using (for example gdb).
 
-There is an example program, test.c and associated makefile template
-Make_test.in included in the distribution.
+To clean source tree
+====================
 
+Type:
+
+installpupsP3 clean
+
+
+To delete production installation
+=================================
+
+Type:
+
+uninstallpupsP3.csh
+
+
+Important locations (for root install)
+======================================
+
+/p3: Templates and signal mappings (for bash and csh/tcsh shells)
+/usr/include/p3: PupsP3 header files (C code)
+/usr/lib/libpups.a: static PupsP3 library
+/usr/lib/libpups.so: dynamic PupsP3 library
+/usr/lib64/libpups.a: static PupsP3 library (X86_64 architecture)
+/usr/lib64/libpups.so: dynamoc pupsP3 library (X86_64 architectures)
