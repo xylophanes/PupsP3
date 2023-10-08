@@ -51,3 +51,4 @@ Important locations (for root install)
 /usr/lib/libpups.so: dynamic PupsP3 library
 /usr/lib64/libpups.a: static PupsP3 library (X86_64 architecture)
 /usr/lib64/libpups.so: dynamoc pupsP3 library (X86_64 architectures)
+/bin: PupsP3 application binaries
