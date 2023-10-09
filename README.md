@@ -655,6 +655,9 @@ Schematic of PUPS/P3 Ecosystem
 
 History
 -------
+
+      ![image](https://github.com/xylophanes/PupsP3/assets/40770847/39e22a68-4cd9-4695-b5bf-3ed81ae4eeb8)
+
  
 PUPS/P3 began life as the MSPS operating environment, written in AcornSoft ISO-Pascal on the legendary BBC Model B Microcomputer in 1983.
 It migrated to C (and UNIX) in 1987, the first UNIX implementations being for SunOS and 4.3 BSD. The Linux PUPS/P3 implementation was begun
