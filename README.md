@@ -266,15 +266,180 @@ installation, running under Linux on an i686 would be specified as IX86.linux.cl
 Solaris on a SPARC would be SPARC.solaris.cluster. The project command creates a directory called src in root tree, and installs an
 example Makefile, skeleton application and DLL development library file in it.
 
-  Once the PUPS/P3 project directory is installed and assuming that the implentor is in the directory src, the PUPS/P3 application builder
-   may be used to generate an application template using skelpapp.c and Make_skelpapp.in by default. The application template is built by
-   invoking the application command (if no arguments are given the default skeleton templates in the current directory are used). The
-   application builder will prompt (interactively) for the following:
-     Application name.
-     * Author of application.
-     * Authors E-mail.
-     * Authors institution
-     * A string describing the purpose of the application
-     * The date (year).
+Once the PUPS/P3 project directory is installed and assuming that the implentor is in the directory src, the PUPS/P3 application builder
+may be used to generate an application template using skelpapp.c and Make_skelpapp.in by default. The application template is built by
+invoking the application command (if no arguments are given the default skeleton templates in the current directory are used). The
+application builder will prompt (interactively) for the following:
 
-   The resulting application template and associated makefile may then be used as a basis for the application which is being implemented.
+   * Application name.
+   * Author of application.
+   * Authors E-mail.
+   * Authors institution
+   * A string describing the purpose of the application
+   * The date (year).
+
+The resulting application template and associated makefile may then be used as a basis for the application which is being implemented.
+
+
+PSRP client command summary
+---------------------------
+
+The PSRP client, psrp has its own language, PML (PSRP Macro Language) and a large number of builtin commands. PML and its associated
+builtin commands are documented below:
+
+1. if cond cmd: execute cmd if condition cond is TRUE.
+
+2. %label: target label for resume command.
+
+3. resume %label: resume macro execution at label %label.
+
+4. errorabort on|off: PML script aborted if on and error code for last command != "ok"
+
+5. exit: exit macro that is currently executing.
+
+6. abort: abort current PML script.
+
+7. atomic cmd: do not attempt to expand cmd as macro.
+
+8. body cmd: show body (if cmd is a macro).
+
+9. repeat cnt : repeat command (which can be a macro) cnt times.
+
+10. rperiod seconds: set repeat command repeat interval (in seconds).
+
+11. repeat command>: repeat command infinitely.
+
+12. raise : raise condition (pups_mainly used for testing PML scripts)
+
+13. cinit: enter curses mode. This is mainly used prior to executing commands or macros which require curses style screen access.
+
+14. cend: exit curses mode (returns to normal "glass tty" screen).
+
+15. segaction [action]: specify/display request the action which is to be taken when a server segments (e.g. saves its state and then executes a child
+which inherits that state). In modern PUPS/P3 applications segmentation has been rendered obsolete. It was developed as an ad hoc
+way of working around malloc bugs which caused memory leaks but PUPS/P3 now has its own memory efficient (bubble) memory allocation
+package based on the memory allocator shipped with The Tennessee Checkpointing Libraries.
+
+17. thandler [handler]: Specify/display thread handler.
+
+18. cls: clear screen (this is usually called just after a cinit command to prepare the screen for curses I/O.
+
+19. sleep secs: Delay PML script execution for secs seconds.
+
+20. retry on | off: enable on or disable off automatic request repetition (if PSRP server busy).
+
+21. wait: Make PSRP client wait for PSRP server to start (and then connect to it).
+
+22. nowait: Make PSRP client abort connection attempt (if target PSRP server is not running).
+
+23. linktype: show type of PSRP channel linkage.
+
+24. linktype hard | soft: set type of PSRP channel link to hard or soft. If the PSRP client is soft linked to the PSRP server it will
+abort its connection if the server is stopped. A PSRP client which is hard linked to a PSRP server will stay connected to the server
+even if the server stops. This option has two uses:
+
+    + in the debugging of PUP/PSRP based VDM's.
+    + in peer-to-peer PSRP connections between PSRP servers mediated by Slaved Interaction Clients SICs).
+      
+26. version: display version of this PSRP interaction client
+
+27. id: print owner, uid, gid and controlling tty for this [psrp] process.
+
+28. chanstat directory: show active PSRP channels in directory. If directory is ommitted, the default PSRP channel directory, /tmp is
+assumed.
+
+29. dllstat DLL pathname: show orifices (pointers to exportable objects) associated with Dynamic Link Library DLL name.
+
+30. quit | exit | bye: terminates psrp client.
+
+31. trys number: set number of attempts to open connection to PSRP server to number trys.
+
+32. lcwd path: set current (local) working directory for PSRP client to path.
+
+33. open PSRP server[@host]: open connection to PSRP server process PSRP server [on host]. If host is not specified, it is assumed that
+the required server is running on the local host. The PSRP server may be specified by either name or PID.
+
+34. close: close connection to PSRP server process.
+
+35. chelp: display help on builtin commands for PSRP client.
+
+36. pager: toggles paging mode (via less filter) on and off.
+
+37. quiet: do not display output from builtin PSRP client commands
+
+38. squiet: do not display output from PSRP server dispatch functions.
+
+39. noisy: display output from builtin PSRP client commands
+
+40. snoisy: display output from builtin PSRP server dispatch functions.
+
+41. perror: print error handler status.
+
+42. segcnt: display number of segmentations (for segmented server).
+
+43. medit file: update/edit PML (PSRP Macro Language) definition file, file.
+
+44. mload file: load (macro file (overwriting currently loaded list of macros).
+
+45. mappend : append macro file to currently loaded list of macros.
+
+46. mpurge all | file: delete all PML macros or those in file respectively.
+
+47. macros: show tags for all loaded PML macros.
+
+48. user username: change session owner for PSRP client to username.
+
+49. password: set remote PSRP services authentication token. If this token is set it will be used for authentication when connecting to
+PSRP servers running on remote hosts.
+
+50. diapause: generate restartable PSRP server checkpoint file and exit (via Criu Checkpointing Library).
+
+51. checkpoint: generate restartable PSRP server checkpoint file (via Criu Checkpointing Library).
+
+52. !command: send command to users default shell.
+    
+53. relay slave process: relay data to/from slave process via psuedotty
+
+54. server: request: send request (server builtin or dispatch function) request to PSRP server server.
+
+55. server@<>host>: request: send (server builtin or dispatch function) request to PSRP server server running on node host.
+
+56. c1; c2; c3: process multiple PSRP requests
+
+57. "a1 a2": glob argument "a1 a2" to a1a2
+
+
+PSRP Server Builtin Commands
+-----------------------------
+   
+In addition to the set of static and dynamic dispatch functions which are built into a PSRP server application by the implementor, any
+PSRP server (that is any program linked to the static library psrplib.o or the dynamic library psrplib.so) inherits a number of builtin
+functions which can be accessed via the PSRP client. A list of these builtin functions is given below:
+
+1. log on | off: switch server transaction logging on or off
+
+2. appl_verbose on | off: switch server error logging on or off
+
+3. show: display PSRP handler status showing all dispatch functions, databags an other objects attached to the server and server status
+information.
+
+4. clients: display clients connected to this server. Currently up to 256 clients may be concurrently bound to a given PSRP server. In
+the present implementation, only one client at a time may actually transact with the server (the channels to the other attached
+clients are temporarily blocked). In the future, if concurent PSRP server applications are implemented via the pthreads interface,
+it will be possible to provide non-blocking concurrent access to such a PSRP server.
+
+5. bindtype: display the binding type for the current PSRP server. Object binding may be either static or (static and) dynamic.
+
+6. help: display on-line help information for builtin (PSRP server) commands.
+
+7. atentrance: display list of (PUPS/P3) application entry functions (these functions are executed once at startup by the PSRP server).
+
+8. atexit: display list of (PUPS/P3) application exit functions (these functions are executed once at exit by the PSRP server).
+
+9. retrys retrys: set number of times PSRP server retrys operation (before aborting).
+
+10. atrestart: display list of (PUPS/P3) application (checkpoint) restart functions. These functions are executed after a checkpointed
+process has restored its state. Typically this functionality is used to re-attach dynamic objects which where detached by the
+process prior to the checkpoint being taked.
+
+11. atckpt: display list of (PUPS/P3) application (checkpoint) check- point functions. These functions are executed just before a
