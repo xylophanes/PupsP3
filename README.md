@@ -650,8 +650,9 @@ copies of these examples and use them as a basis for their own applications.
 Schematic of PUPS/P3 Ecosystem
 ------------------------------
 
+<div align=”center”>
 ![image](https://github.com/xylophanes/PupsP3/assets/40770847/5a47789a-c7a0-424b-84d3-0fe86465ddd4)
-
+</div>
 
 History
 -------
