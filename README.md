@@ -1,8 +1,6 @@
 
 ![image](https://github.com/xylophanes/PupsP3/assets/40770847/7d67f8db-209d-442b-8787-192240213e9a)
 
-
-# PupsP3
 PupsP3 Organic Computing Environment
 ====================================
 
