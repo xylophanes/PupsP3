@@ -671,17 +671,30 @@ Acknowlegements
 The PUPS/P3 system has been developed by Mark O'Neill, and many people have contributed ideas (and/or code) over the last two decades which
 If I have left anyone out, I humbly apologise.
 
-Claus Hilgetag (University of Hamburg)
-Gully Burns (Chan Zuckerburg Initiative, USA).
-Igancio Solis (Tech Lead Meta, USA).
-J. Andrew Derbyshire (National Institutes of Health, Baltimore MD, USA).
-Mike Roe (Department of Computer Scinece & Technology, Cambridge, UK).
-David Flitney (formerly at Department of Statistics, University of Oxford, UK).
-Malcolm Beattie (Computer Services, University of Oxford, UK).
-Peter Rounce (formerly at Department of Computer Science, UCL, UK).
-Dom Layfield (Insite Systems, California USA)
-Peter Kyberd (University of Derby)
-Sean Taffler (CEO at Acoustiic, Washington USA)
-Neil Davis (Sheffield, UK).
-Mark Boddington (formerly at Oxford University, UK).
-Lee Ward (US Department of Energy).
+* Claus Hilgetag (University of Hamburg)
+
+* Gully Burns (Chan Zuckerburg Initiative, USA).
+
+* Igancio Solis (Tech Lead Meta, USA).
+
+* J. Andrew Derbyshire (National Institutes of Health, Baltimore MD, USA).
+
+* Mike Roe (Department of Computer Scinece & Technology, Cambridge, UK).
+
+* David Flitney (formerly at Department of Statistics, University of Oxford, UK).
+
+* Malcolm Beattie (Computer Services, University of Oxford, UK).
+
+* Peter Rounce (formerly at Department of Computer Science, UCL, UK).
+
+* Dom Layfield (Insite Systems, California USA)
+
+* Peter Kyberd (University of Derby)
+
+* Sean Taffler (CEO at Acoustiic, Washington USA)
+
+* Neil Davis (Sheffield, UK).
+
+* Mark Boddington (formerly at Oxford University, UK).
+
+* Lee Ward (US Department of Energy).
