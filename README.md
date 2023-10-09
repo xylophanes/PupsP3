@@ -77,6 +77,7 @@ To clean the build tree type:
 To uninstall the environment type:
 ./uninstall_pupsP3.csh
 
+
 PUPS/P3 libraries
 -----------------
 
@@ -129,6 +130,7 @@ address spaces of multiple process.
 
 12. dllib: supports dynamically pluggable (C) functions with strong typing.
 
+
 PUPS/P3 build tools
 -------------------
 
@@ -180,6 +182,7 @@ put binaries and libraries in appropriate places.
 8. unset_pupsp3_sig.sh: unexport (source) PUPSP3 extended signal names for bash shell.
 
 9. restart.sh: restart (PUPS/P3) process which has been checkpointed via criu.
+
 
 Service Functions
 -----------------
@@ -449,15 +452,20 @@ process prior to the checkpoint being taked.
 13. ckstat: show current checkpointing parameters.
 
 14. ckset ... ctail ... : set checkpoint parameters. Currently the following checkpointing parameters can be set:
+    
     + [-ckpt_dir directory name | default]: sets name of the directory used to store checkpoints for this PSRP server. Defaults to
     "." (the current directory).
+
     + [-ckpt_bname ckpt basebame | default]: sets the basename for individual checkpoint files for this PSRP server. Defaults to
     appl_name.appl_pid.appl_hostname.ckpt.
+
     + [-ckpt_mode mode | default]: sets the default file protection bits for individual checkpoint files owned by this PSRP server.
     Defaults to "-rw-r--r--" (e.g. 0644 octal).
+
     + [-ckpt_fork | -ckpt_nofork]: tells the PSRP server to fork off a child which actually saves the checkpoint. This means that the
     parent process continues to execute its payload without having to wait for slow resources like disks and network connections.
-    + [-ckpt | -no_ckpt]: enable of disable checkpointing. If checkpointing is NOT enabled, none of the above checkpointing commands
+
+     + [-ckpt | -no_ckpt]: enable of disable checkpointing. If checkpointing is NOT enabled, none of the above checkpointing commands
     are available (to the PSRP client).
 
 15. mstat: show memory allocation statistics. The PUPS/P3 libraries have their own memory allocation scheme. Memory bubbles are mapped
@@ -635,3 +643,23 @@ then built by typing share object name shared object name.
 
 The files in the examples directory of the PUPS/P3 source tree are self documenting examples of these file types: implementors can make
 copies of these examples and use them as a basis for their own applications.
+
+
+History
+-------
+ 
+PUPS/P3 began life as the MSPS operating environment, written in AcornSoft ISO-Pascal on the legendary BBC Model B Microcomputer in 1983.
+It migrated to C (and UNIX) in 1987, the first UNIX implementations being for SunOS and 4.3 BSD. The Linux PUPS/P3 implementation was begun
+in 1992, but most of the biologically inspired functionality was added between 1995 and the present date: the result of an ongoing and inspired
+collaboration between neuroscientists, biologists and computer scientists. Although PUPS/P3 is an organic computing environment its underlying
+philosophy draws on the goals of the influential Multiplexed Information and Computing Service, Multics.
+
+
+References
+----------
+
+O'Neill M.A and Hilgetag C-C, 2001: The Portable UNIX Programming System (PUPS) and Cantor: A computational environment for the
+dynamical representation and analysis of complex neurobiological data. Proc Phil. Roy. Soc. Lond B 356(1412):1259-1276
+
+O'Neill M.A, Burns A.P.C. and Hilgetag C-C, 2003: The PUPS-MOSIX Environment: A Homeostatic Environment for Neuro- and Bio-Informatic
+Applications. In Neuroscience Databases: A practical guide Kotter R. (Ed.), Blackwell ISBN 140207 1655
