@@ -647,7 +647,7 @@ copies of these examples and use them as a basis for their own applications.
 PUPS/PSRP Ecosystem
 -------------------
 
-![image](https://github.com/xylophanes/PupsP3/assets/40770847/7f3f7962-bc26-4c2d-b80c-0acd5070a769)
+![image](https://github.com/xylophanes/PupsP3/assets/40770847/5a47789a-c7a0-424b-84d3-0fe86465ddd4)
 
 
 History
