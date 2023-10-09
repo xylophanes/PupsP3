@@ -443,3 +443,195 @@ process has restored its state. Typically this functionality is used to re-attac
 process prior to the checkpoint being taked.
 
 11. atckpt: display list of (PUPS/P3) application (checkpoint) check- point functions. These functions are executed just before a
+
+12. auto_ckpt [ on | off]: toggle automatic checkpointing on or off (or get automatic checkpointing status if no argument supplied).
+
+13. ckstat: show current checkpointing parameters.
+
+14. ckset ... ctail ... : set checkpoint parameters. Currently the following checkpointing parameters can be set:
+    + [-ckpt_dir directory name | default]: sets name of the directory used to store checkpoints for this PSRP server. Defaults to
+    "." (the current directory).
+    + [-ckpt_bname ckpt basebame | default]: sets the basename for individual checkpoint files for this PSRP server. Defaults to
+    appl_name.appl_pid.appl_hostname.ckpt.
+    + [-ckpt_mode mode | default]: sets the default file protection bits for individual checkpoint files owned by this PSRP server.
+    Defaults to "-rw-r--r--" (e.g. 0644 octal).
+    + [-ckpt_fork | -ckpt_nofork]: tells the PSRP server to fork off a child which actually saves the checkpoint. This means that the
+    parent process continues to execute its payload without having to wait for slow resources like disks and network connections.
+    + [-ckpt | -no_ckpt]: enable of disable checkpointing. If checkpointing is NOT enabled, none of the above checkpointing commands
+    are available (to the PSRP client).
+
+15. mstat: show memory allocation statistics. The PUPS/P3 libraries have their own memory allocation scheme. Memory bubbles are mapped
+into the address space of a requesting process using mmap. Unlike a typical malloc based allocation scheme, this memory can also be
+unmapped from the process address space using munmap when it is no longer required and returned to the OS free pool. This model of
+memory allocation is much more efficient in a global sense than the malloc scheme, especially when the memory requirements of a
+given process are very variable, and the process is long lived. In biological terms this memory paradigm is a tropical forest as
+opposed to a temperate woodland!
+
+16. mset : set memory bubble utilisation threshold percent. If the utilisation falls below the specified thresholds, the process mapping
+the bubble call munmap to unmap it from its address space.
+
+17. migratory: enable MOSIX (compute context) process migration.
+
+18. sedentary: disable MOSIX (compute context) process migration.
+
+19. pstat: display /proc filesystem status entry (for PSRP server).
+
+20. tunnel remote host: force PSRP server process to tunnel to named remote host. If checkpointing is enabled, then an attempt is made
+to migrate the process context to the remote host.
+
+21. shy [default | cmd list]: set commands to be avoided by this process (default is top). If any of the commands specified are detected
+by the PSRP server, it will go into hiding (e.g. it will enter a wait state). While in the wait state, the PSRP server will continue
+to scan for the command or commands to be avoided but will not run its payload compuation. It leaves the wait state once this
+command or commands are no longer detectable. This directive is used to steal time on systems where the PSRP server is not supposed
+to be running in a manner which prevents easy detection of the incursion by the rightful owner of the system (in any biological
+system there is a good living to be made as a parasite)!
+
+22. cwd path: set PSRP server current working directory to path.
+
+23. vitstat: display status of PUPS/P3 virtual interval timers. PUPS/P3 has up to 32 virtual interval timers. Typically, these are used
+to launch homeostatic functions at regular intervals. For example the PUPS/P3 file homeostat is a function run by the PUPS/P3
+virtual timer subsystem every 0.01 seconds in a vanilla PUPS/P3 installation which undeletes files owned by the PSRP server which
+have been deleted either by a user or another process without the acquiesence of the PSRP server providing (homeostatic) protection
+for it.
+
+24. lstat: show concurrently held (link) file locks. Each PSRP server can hold up 16 concurrent locks by default.
+
+25. sigstat: display non default signal handlers.
+
+26. sigstat signal list>: display detailed data for the signal handlers which correspond to signals in signal list. For each of these
+signals the name of the signal handler, whether the signal handler automatically stays installed, and the signals (other than the
+signal itself) which are blocked while the signal handler is running are displayed.
+
+27. maskstat: display signal mask and pending signals for this PSRP server.
+
+28. dstat: display open file descriptors (name of file, whether the file is homeostatically protected live or not dead, file type,
+underlying file descriptor and the handle of the file are displayed).
+
+29. schedule start finish [function]: schedule function to run between times start and finish This is effectively a per process version
+of the POSIX cron facility. if function is omitted the PSRP server itself sleeps between times start and finish.
+
+30. unschedule : unschedule (e.g. remove) previously scheduled crontab function.
+
+31. crontstat: display the contents of the PSRP server crontab table.
+
+32. rusage: show current resource usage status. This is a wrapper function to the getrusage system call.
+
+33. rset arg1, arg2, ...: set resource usage limits. This is a wrapper function to the setrusage system call. The following arguments
+are supported:
+
+   + cpu minutes: set maximum CPU time for PSRP server process to minutes.
+     
+   + core megabytes: set maximum size for coredump file to megabytes. A size of 0 means no core dumps are produced by this PSRP
+   server.
+
+   + data megabytes: set maximum data segment size (for heap and stack) to megabytes. This is virtual memory which may not be mapped
+   into the PSRP server process address space in its entirety.
+
+   + rss megabyes: set maximum resident set size to megabytes. This is the maximum amount of real memory the PSRP server is allowed
+   to have.
+
+   + vmsize megabytes: sets maximum virtual memory size to megabytes. This is the maximum amount of virtual memory the PSRP server
+   is allowed to have.
+
+   + fsize megabytes: sets maximum file size for for files created by the PSRP server process to megabytes.
+
+   + nfiles files: set maximum number of open files for this server process to files.
+     
+   + nproc children: sets the maximum number of children this PSRP server is allowed to create.
+
+34. cstat: display active children of this PSRP server.
+
+35. sicstat: display open slaved interaction client channels for this PSRP server.
+
+36. showaliases object: show aliases of PSRP object (dispatch function or databag).
+
+37. alias oldname newname: alias (PSRP dispatch object or databag) oldname to newname.
+
+38. unalias newname: remove alias newname. Note the root tag of the object (the initial name of the object is determined by the objects
+implementor cannot be removed).
+
+39. rooted: set process to rooted mode (system context cannot migrate).
+
+40. unrooted: set process to unrooted mode (system context can migrate).
+
+41. parent name | PID: set name/PID of effective parent process for this PSRP server.
+
+42. pexit: This PSRP server exits if its effective parent is terminated.
+
+43. unpexit: This PSRP server does not exit if effective parent is terminated.
+
+44. proclive: protects PSRP server process thread (using herpes algorithm which changes process PID many times a second, thus commands
+like kill will be targetting a process which no longer exists).
+
+45. procdead: unprotects PSRP process thread of execution.
+
+46. live f1 f2 ...: protects list of (open) file system objects (e.g. files, FIFOs and sockets) against damage or deletion via PUPS/P3
+homeostatic protection mechanisms.
+
+47. dead f1 f2 ...: unprotects list of (open) file system objects (homeostatic protection for these objects is revoked).
+
+48. vitab [size | shrink]: display [or set to size or Procrustes shrink] number of virtal timer table slots.
+
+49. chtab [size | shrink]: display [or set to size or Procrustes shrink] number of child table slots.
+
+50. ftab [size | shrink]: display [or set to size or Procrustes shrink] number of file table slots.
+
+51. new newname host terminate: create instance (newname) of PSRP server on host. If terminate is specified, the intial instance of the
+server is terminated. An ant pheromone trail algorithm ensures that any PSRP clients connected to the original instance of the PSRP
+server can find the new instance (if the original instance has been marked for termination).
+
+52. overlay command: Overlay PSRP server process with command. This is essentially a wrapper for a simple fork followed by execv of the
+specified command.
+
+53. overfork command: Overfork server process with command. In this case the PSRP server lends its thread of execution to command (and
+remains suspended while command is running. This is (typically) used to permit place markers such as xtee to be temporarly replaced by
+processes which require specific facilities (e.g. a X based graphical application which needs interactive facilties (e..g. a display) in
+order to run).
+
+55. autosave on | off: switch automatic saving of dipatch table (at exit) on or off. If autosave is on, a file containing locations of
+any dynamic objects (and the alias status of all dispatch table objects), will be saved to .appl_name.psrp (in home directory of
+user who owns the PSRP server) when server exists. With no arguments simply report autosave status.
+
+56. save file: save dispatch table (to PSRP resource file) immediately.
+
+57. load file: load PSRP resource file (possibly modifying current dispatch table).
+
+58. reset: reset dispatch table (returning it to its default state)
+
+59. terminate: terminate (this) PSRP server process
+
+60. detach name: detaches specified dynamic object (dynamic function, dynamic databag or persistent heap) from PSRP server.
+
+61. dll fname object DLL: bind dynamic function fname in object DLL to PSRP servers handler loop with dispatch name fname. An example of
+the source code for a PUPS/P3 DLL is given here
+
+62. bag bagname bagfile [live | dead]: bind dynamic databag in file bagfile to PSRP servers handler loop with dispatch name bagname. The
+specifiers live and dead indicate whether or not the PSRP server should extend homeostatic protection to the newly attached dynamic
+databag.
+
+63. heap heapname heapfile [live | dead]: map persistent heap in file heapfile to PSRP server handler loop with dispatch name hepersistent heap.
+
+64. hstat [heap]: show persistent heaps mapped into PSRP server process address space or display objects and clients associated with
+pecified heap.
+
+65. htab [size | shrink]: display [or set to size or Procrustes shrink] number of persistent heap table slots.
+
+66. hostat [o1 o2 ...] : Show statistics for tracked heap objects o1, o2 ... Without arguments shows statistics for all tracked heap
+objects.
+
+
+Special Files
+-------------
+
+The PUPS/P3 system includes a number standard file formats. These include:
+
+1. The skeleton application source file format (examples/skelpapp.c). This is a prototypical main function for a typical PUPS/P3 server
+application.
+
+2. Orifice file format (examples/testdll.c). This file is an example of the source for a PUPS/P3 dynamic link libary. To build a dynamic link
+library, the functions which are dynamically exported by the library are coded in the manner documented in testdll.c. The shared
+object is then built by compiling the DLL source code normally (using gcc) producing a linkable object name. The shared object is
+then built by typing share object name shared object name.
+
+The files in the examples directory of the PUPS/P3 source tree are self documenting examples of these file types: implementors can make
+copies of these examples and use them as a basis for their own applications.
