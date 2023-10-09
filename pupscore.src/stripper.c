@@ -8,7 +8,7 @@
               NE3 4RT
 
      Version: 2.00 
-     Dated:   4th January 2022
+     Dated:   9th October 2022
      E-mail:  mao@tumblingdice.co.uk
 -------------------------------------------------------------------*/
 
@@ -23,7 +23,7 @@
 /* Version of stripper */
 /*---------------------*/
 
-#define STRIPPER_VERSION    "1.05"
+#define STRIPPER_VERSION    "2.00"
 
 
 /*-------------*/
