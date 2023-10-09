@@ -644,8 +644,9 @@ then built by typing share object name shared object name.
 The files in the examples directory of the PUPS/P3 source tree are self documenting examples of these file types: implementors can make
 copies of these examples and use them as a basis for their own applications.
 
-PUPS/PSRP Ecosystem
--------------------
+
+Schematic of PUPS/P3 Ecosystem
+------------------------------
 
 ![image](https://github.com/xylophanes/PupsP3/assets/40770847/5a47789a-c7a0-424b-84d3-0fe86465ddd4)
 
