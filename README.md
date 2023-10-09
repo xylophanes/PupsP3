@@ -652,9 +652,6 @@ Schematic of PUPS/P3 Ecosystem
 
 ![image](https://github.com/xylophanes/PupsP3/assets/40770847/c5bc6316-dcb2-411b-bb2f-78802cbb8109)
 
-<p align="center">
-  <img src="https://https://github.com/xylophanes/PupsP3/assets/40770847/c5bc6316-dcb2-411b-bb2f-78802cbb8109>
-</p>
 
 History
 -------
