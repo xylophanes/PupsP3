@@ -1,0 +1,232 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.5.1.src.git/include.libs/nfo.h.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="cpp">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Header file for numerical operations libraries,</span>
+
+<span class="Comment">    Author:  M.A. O'Neill</span>
+<span class="Comment">             Tumbling Dice Ltd</span>
+<span class="Comment">             Gosforth</span>
+<span class="Comment">             Newcastle upon Tyne</span>
+<span class="Comment">             NE3 4RT</span>
+<span class="Comment">             United Kingdom</span>
+
+<span class="Comment">    Version: 3.00 </span>
+<span class="Comment">    Dated:   4th January 2022 </span>
+<span class="Comment">    E-Mail:  mao@tumblingdice.co.uk </span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifndef NFO</span>
+<span class="PreProc">#define NFO</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Keep c2man happy </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;c2man.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">*********</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Version </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">*********</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define NFO_VERSION    </span><span class="Constant">&quot;3.00&quot;</span>
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Floating point representation </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;ftype.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Standard definitions </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define MAX_D      </span><span class="Constant">32</span><span class="PreProc">           </span><span class="Comment">// Max minimisation dimensions</span>
+<span class="PreProc">#define LINFIT     (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">0</span><span class="PreProc">)     </span><span class="Comment">// linear regression</span>
+<span class="PreProc">#define INVSFIT    (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">1</span><span class="PreProc">)     </span><span class="Comment">// Do inverse regression</span>
+<span class="PreProc">#define LOGFIT     (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">2</span><span class="PreProc">)     </span><span class="Comment">// Do logarithmic regression </span>
+<span class="PreProc">#define PWRFIT     (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">3</span><span class="PreProc">)     </span><span class="Comment">// Do power regression</span>
+<span class="PreProc">#define EXPNFIT    (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">4</span><span class="PreProc">)     </span><span class="Comment">// Do exponential regression</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Constant definitions used by least squares regression </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef __NOT_LIB_SOURCE__</span>
+
+_EXPORT _CONST FTYPE NATURAL;   <span class="Comment">// Natural boundry conditions for spline</span>
+_EXPORT FTYPE  sqrarg;          <span class="Comment">// Used by the SQR macro</span>
+_EXPORT FTYPE  lower_limit;     <span class="Comment">// Lower limit for mnbrak</span>
+_EXPORT FTYPE  upper_limit;     <span class="Comment">// Upper limit for mnbrak</span>
+
+
+      <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+<span class="PreProc">#else</span> <span class="Comment">/*</span><span class="Comment"> External variable declarations </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#   undef  _EXPORT</span>
+<span class="PreProc">#   define _EXPORT</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> _NOT_LIB_SOURCE_ </span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Standard function/procedure prototype definitions </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Comment">// Least squares fitting</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> least_squares(<span class="Type">int</span>,        \
+                                      <span class="Type">int</span>,        \
+                                      FTYPE [],   \
+                                      FTYPE [],   \
+                                      FTYPE *,    \
+                                      FTYPE *,    \
+                                      FTYPE []);
+
+<span class="Comment">// Cubic spline initialisation</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> spline(FTYPE [],  \
+                               FTYPE [],  \
+                               <span class="Type">int</span>,       \
+                               FTYPE,     \
+                               FTYPE,     \
+                               FTYPE []);
+
+<span class="Comment">// Standard statistical moments of a distribution</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> moment(FTYPE [], \
+                               <span class="Type">int</span>,      \
+                               FTYPE *,  \
+                               FTYPE *,  \
+                               FTYPE *,  \
+                               FTYPE *,  \
+                               FTYPE *,  \
+                               FTYPE *,  \
+                               FTYPE *);
+
+<span class="Comment">// Parabolic bracketer for minimia</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> mnbrak(FTYPE *,                    \
+                               FTYPE *,                    \
+                               FTYPE *,                    \
+                               FTYPE *,                    \
+                               FTYPE *,                    \
+                               FTYPE *,                    \
+                               FTYPE (* )(__UDEF_ARGS__));
+
+<span class="Comment">// Multidimensional minimisation</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> Powell(FTYPE [],                   \
+                               FTYPE [][MAX_D],            \
+                               <span class="Type">int</span>,                        \
+                               <span class="Type">int</span>,                        \
+                               FTYPE,                      \
+                               <span class="Type">int</span> *,                      \
+                               FTYPE *,                    \
+                               FTYPE (* )(__UDEF_ARGS__),  \
+                               FTYPE (* )(__UDEF_ARGS__),  \
+                               FTYPE (* )(__UDEF_ARGS__));
+
+<span class="Comment">// Multidimensional annealer</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> anneal(FTYPE [],                   \
+                               FTYPE,                      \
+                               <span class="Type">int</span>,                        \
+                               FTYPE,                      \
+                               <span class="Type">int</span> *,                      \
+                               FTYPE *,                    \
+                               FTYPE (* )(__UDEF_ARGS__),  \
+                               FTYPE (* )(__UDEF_ARGS__),  \
+                               FTYPE (* )(__UDEF_ARGS__));
+
+
+
+<span class="Comment">// Fit function using least squares parameters</span>
+_PROTOTYPE _EXPORT FTYPE lsq_fgen(FTYPE, <span class="Type">int</span>, FTYPE []);
+
+<span class="Comment">// Linear interpolator</span>
+_PROTOTYPE _EXPORT FTYPE lint(FTYPE [], FTYPE [], <span class="Type">int</span>, FTYPE);
+
+<span class="Comment">// Spline interpolator</span>
+_PROTOTYPE _EXPORT FTYPE splint(FTYPE [], FTYPE [], FTYPE [], <span class="Type">int</span>, FTYPE);
+
+<span class="Comment">// Trapezoidal integration</span>
+_PROTOTYPE _EXPORT FTYPE trapspl(FTYPE,     \
+                                 FTYPE,     \
+                                 FTYPE,     \
+                                 FTYPE [],  \
+                                 FTYPE [],  \
+                                 FTYPE [],  \
+                                 <span class="Type">int</span>);
+
+<span class="Comment">// Integration using Simpsons' rule </span>
+_PROTOTYPE _EXPORT FTYPE Simpson_spl(FTYPE,    \
+                                     FTYPE,    \
+                                     FTYPE,    \
+                                     FTYPE [], \
+                                     FTYPE [], \
+                                     FTYPE [], \
+                                     <span class="Type">int</span>);
+
+<span class="Comment">// Differentiation using Milnes method</span>
+_PROTOTYPE _EXPORT FTYPE Milne_diff(<span class="Type">int</span>, FTYPE, FTYPE []);
+
+<span class="Comment">// Linear minimisation using Brents' method</span>
+_PROTOTYPE _EXPORT FTYPE Brent(FTYPE,                      \
+                               FTYPE,                      \
+                               FTYPE,                      \
+                               FTYPE (* )(__UDEF_ARGS__),  \
+                               FTYPE,                      \
+                               FTYPE *);
+
+<span class="Comment">// 1 dimensional minimisation by Golden Search</span>
+_PROTOTYPE _EXPORT FTYPE golden(FTYPE,                      \
+                                FTYPE,                      \
+                                FTYPE,                      \
+                                FTYPE (* )(__UDEF_ARGS__),  \
+                                FTYPE,                      \
+                                FTYPE *);
+
+<span class="PreProc">#ifdef _CPLUSPLUS</span>
+<span class="PreProc">#   undef  _EXPORT</span>
+<span class="PreProc">#   define _EXPORT </span><span class="Type">extern</span><span class="PreProc"> C</span>
+<span class="PreProc">#else</span>
+<span class="PreProc">#   undef  _EXPORT</span>
+<span class="PreProc">#   define _EXPORT </span><span class="Type">extern</span>
+<span class="PreProc">#endif</span>
+
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> NFO.H  </span><span class="Comment">*/</span>
+
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

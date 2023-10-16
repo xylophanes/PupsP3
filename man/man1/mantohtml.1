@@ -1,9 +1,7 @@
-.TH MANTOHTML 1 "26 April 2002" "PUPSP3 Scripts" "PUPSP3 Scripts"
+.TH MANTOHTML 1 "26th April 2002" "PUPSP3 Scripts" "PUPSP3 Scripts"
 
 .SH NAME
 MANTOHTML \- generate HTML from man pages.
-
-
 .br
 
 .SH SYNOPSIS
@@ -11,7 +9,7 @@ MANTOHTML \- generate HTML from man pages.
 .I [usage | --usage] 
 .I man root directory
 .I HTML directory
->& <log file>
+[2> <log file>]
 .br
 
 .SH DESCRIPTION
@@ -37,6 +35,22 @@ specifies the root directory for the man pages (containing man1, man2, ... man8 
 .br
 .I HTML directory
 specifies the name of the directory to which HTML is written
+.br
+
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
+.br
+
+.SH ENVIRONMENTAL VARIABLES
+none.
 .br
 
 .SH COPYRIGHT

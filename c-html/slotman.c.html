@@ -1,0 +1,569 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/slotman.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Purpose: Library slot manager.</span>
+
+<span class="Comment">    Author:  M.A. O'Neill</span>
+<span class="Comment">             Tumbling Dice Ltd</span>
+<span class="Comment">             Gosforth</span>
+<span class="Comment">             Newcastle upon Tyne</span>
+<span class="Comment">             NE3 4RT</span>
+<span class="Comment">             United Kingdom</span>
+
+<span class="Comment">    Version: 2.00 </span>
+<span class="Comment">    Dated:   4th January 2022</span>
+<span class="Comment">    E-Mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;me.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;dlfcn.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;utils.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stdlib.h&gt;</span>
+
+<span class="PreProc">#undef   __NOT_LIB_SOURCE__</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;slotman.h&gt;</span>
+<span class="PreProc">#define  __NOT_LIB_SOURCE__</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Slot manager build date ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">char</span> appl_build_time[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+_PUBLIC <span class="Type">char</span> appl_build_date[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Variables which are private to this library ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">unsigned</span> <span class="Type">int</span> max_slots     = <span class="Constant">0</span>;  <span class="Comment">// Slots used </span>
+_PRIVATE <span class="Type">unsigned</span> <span class="Type">int</span> max_use_slots = <span class="Constant">0</span>;  <span class="Comment">// Usage slots used </span>
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Public variables exported by this library ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Comment">// Segment slot identifier functions -- initialised to NULL</span>
+_PUBLIC <span class="Type">void</span> (*seg_slot[MAX_SLOTS])(<span class="Type">int</span>);
+
+
+<span class="Comment">// Usage functions -- initialised to NULL </span>
+_PUBLIC <span class="Type">void</span> (*usage_slot[MAX_SLOTS])(<span class="Type">void</span>);
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Segment slot function pointers -- initialised to NULL </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span>  (*seg_slot_1)(<span class="Type">int</span>)  ,
+              (*seg_slot_2)(<span class="Type">int</span>)  ,
+              (*seg_slot_3)(<span class="Type">int</span>)  ,
+              (*seg_slot_4)(<span class="Type">int</span>)  ,
+              (*seg_slot_5)(<span class="Type">int</span>)  ,
+              (*seg_slot_6)(<span class="Type">int</span>)  ,
+              (*seg_slot_7)(<span class="Type">int</span>)  ,
+              (*seg_slot_8)(<span class="Type">int</span>)  ,
+              (*seg_slot_9)(<span class="Type">int</span>)  ,
+              (*seg_slot_10)(<span class="Type">int</span>) ,
+              (*seg_slot_11)(<span class="Type">int</span>) ,
+              (*seg_slot_12)(<span class="Type">int</span>) ,
+              (*seg_slot_13)(<span class="Type">int</span>) ,
+              (*seg_slot_14)(<span class="Type">int</span>) ,
+              (*seg_slot_15)(<span class="Type">int</span>) ,
+              (*seg_slot_16)(<span class="Type">int</span>) ,
+              (*seg_slot_17)(<span class="Type">int</span>) ,
+              (*seg_slot_18)(<span class="Type">int</span>) ,
+              (*seg_slot_19)(<span class="Type">int</span>) ,
+              (*seg_slot_20)(<span class="Type">int</span>) ,
+              (*seg_slot_21)(<span class="Type">int</span>) ,
+              (*seg_slot_22)(<span class="Type">int</span>) ,
+              (*seg_slot_23)(<span class="Type">int</span>) ,
+              (*seg_slot_24)(<span class="Type">int</span>) ,
+              (*seg_slot_25)(<span class="Type">int</span>) ,
+              (*seg_slot_26)(<span class="Type">int</span>) ,
+              (*seg_slot_27)(<span class="Type">int</span>) ,
+              (*seg_slot_28)(<span class="Type">int</span>) ,
+              (*seg_slot_29)(<span class="Type">int</span>) ,
+              (*seg_slot_30)(<span class="Type">int</span>) ,
+              (*seg_slot_31)(<span class="Type">int</span>) ,
+              (*seg_slot_32)(<span class="Type">int</span>) ;
+              (*seg_slot_33)(<span class="Type">int</span>) ;
+              (*seg_slot_34)(<span class="Type">int</span>) ;
+              (*seg_slot_35)(<span class="Type">int</span>) ;
+              (*seg_slot_36)(<span class="Type">int</span>) ;
+              (*seg_slot_37)(<span class="Type">int</span>) ;
+              (*seg_slot_38)(<span class="Type">int</span>) ;
+              (*seg_slot_39)(<span class="Type">int</span>) ;
+              (*seg_slot_40)(<span class="Type">int</span>) ;
+              (*seg_slot_41)(<span class="Type">int</span>) ;
+              (*seg_slot_42)(<span class="Type">int</span>) ;
+              (*seg_slot_43)(<span class="Type">int</span>) ;
+              (*seg_slot_44)(<span class="Type">int</span>) ;
+              (*seg_slot_45)(<span class="Type">int</span>) ;
+              (*seg_slot_46)(<span class="Type">int</span>) ;
+              (*seg_slot_47)(<span class="Type">int</span>) ;
+              (*seg_slot_48)(<span class="Type">int</span>) ;
+              (*seg_slot_49)(<span class="Type">int</span>) ;
+              (*seg_slot_50)(<span class="Type">int</span>) ;
+              (*seg_slot_51)(<span class="Type">int</span>) ;
+              (*seg_slot_52)(<span class="Type">int</span>) ;
+              (*seg_slot_53)(<span class="Type">int</span>) ;
+              (*seg_slot_54)(<span class="Type">int</span>) ;
+              (*seg_slot_55)(<span class="Type">int</span>) ;
+              (*seg_slot_56)(<span class="Type">int</span>) ;
+              (*seg_slot_57)(<span class="Type">int</span>) ;
+              (*seg_slot_58)(<span class="Type">int</span>) ;
+              (*seg_slot_59)(<span class="Type">int</span>) ;
+              (*seg_slot_60)(<span class="Type">int</span>) ;
+              (*seg_slot_61)(<span class="Type">int</span>) ;
+              (*seg_slot_62)(<span class="Type">int</span>) ;
+              (*seg_slot_63)(<span class="Type">int</span>) ;
+              (*seg_slot_64)(<span class="Type">int</span>) ;
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Segment slot identifier functions -- initialised to NULL </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span>  (*usage_slot_1)(<span class="Type">void</span>)  ,
+              (*usage_slot_2)(<span class="Type">void</span>)  ,
+              (*usage_slot_3)(<span class="Type">void</span>)  ,
+              (*usage_slot_4)(<span class="Type">void</span>)  ,
+              (*usage_slot_5)(<span class="Type">void</span>)  ,
+              (*usage_slot_6)(<span class="Type">void</span>)  ,
+              (*usage_slot_7)(<span class="Type">void</span>)  ,
+              (*usage_slot_8)(<span class="Type">void</span>)  ,
+              (*usage_slot_9)(<span class="Type">void</span>)  ,
+              (*usage_slot_10)(<span class="Type">void</span>) ,
+              (*usage_slot_11)(<span class="Type">void</span>) ,
+              (*usage_slot_12)(<span class="Type">void</span>) ,
+              (*usage_slot_13)(<span class="Type">void</span>) ,
+              (*usage_slot_14)(<span class="Type">void</span>) ,
+              (*usage_slot_15)(<span class="Type">void</span>) ,
+              (*usage_slot_16)(<span class="Type">void</span>) ,
+              (*usage_slot_17)(<span class="Type">void</span>) ,
+              (*usage_slot_18)(<span class="Type">void</span>) ,
+              (*usage_slot_19)(<span class="Type">void</span>) ,
+              (*usage_slot_20)(<span class="Type">void</span>) ,
+              (*usage_slot_21)(<span class="Type">void</span>) ,
+              (*usage_slot_22)(<span class="Type">void</span>) ,
+              (*usage_slot_23)(<span class="Type">void</span>) ,
+              (*usage_slot_24)(<span class="Type">void</span>) ,
+              (*usage_slot_25)(<span class="Type">void</span>) ,
+              (*usage_slot_26)(<span class="Type">void</span>) ,
+              (*usage_slot_27)(<span class="Type">void</span>) ,
+              (*usage_slot_28)(<span class="Type">void</span>) ,
+              (*usage_slot_29)(<span class="Type">void</span>) ,
+              (*usage_slot_30)(<span class="Type">void</span>) ,
+              (*usage_slot_31)(<span class="Type">void</span>) ,
+              (*usage_slot_32)(<span class="Type">void</span>) ;
+              (*usage_slot_33)(<span class="Type">void</span>) ;
+              (*usage_slot_34)(<span class="Type">void</span>) ;
+              (*usage_slot_35)(<span class="Type">void</span>) ;
+              (*usage_slot_36)(<span class="Type">void</span>) ;
+              (*usage_slot_37)(<span class="Type">void</span>) ;
+              (*usage_slot_38)(<span class="Type">void</span>) ;
+              (*usage_slot_39)(<span class="Type">void</span>) ;
+              (*usage_slot_40)(<span class="Type">void</span>) ;
+              (*usage_slot_41)(<span class="Type">void</span>) ;
+              (*usage_slot_42)(<span class="Type">void</span>) ;
+              (*usage_slot_43)(<span class="Type">void</span>) ;
+              (*usage_slot_44)(<span class="Type">void</span>) ;
+              (*usage_slot_45)(<span class="Type">void</span>) ;
+              (*usage_slot_46)(<span class="Type">void</span>) ;
+              (*usage_slot_47)(<span class="Type">void</span>) ;
+              (*usage_slot_48)(<span class="Type">void</span>) ;
+              (*usage_slot_49)(<span class="Type">void</span>) ;
+              (*usage_slot_50)(<span class="Type">void</span>) ;
+              (*usage_slot_51)(<span class="Type">void</span>) ;
+              (*usage_slot_52)(<span class="Type">void</span>) ;
+              (*usage_slot_53)(<span class="Type">void</span>) ;
+              (*usage_slot_54)(<span class="Type">void</span>) ;
+              (*usage_slot_55)(<span class="Type">void</span>) ;
+              (*usage_slot_57)(<span class="Type">void</span>) ;
+              (*usage_slot_58)(<span class="Type">void</span>) ;
+              (*usage_slot_59)(<span class="Type">void</span>) ;
+              (*usage_slot_60)(<span class="Type">void</span>) ;
+              (*usage_slot_61)(<span class="Type">void</span>) ;
+              (*usage_slot_62)(<span class="Type">void</span>) ;
+              (*usage_slot_63)(<span class="Type">void</span>) ;
+              (*usage_slot_64)(<span class="Type">void</span>) ;
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Initialise the slot manager ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> slot_manager_init(<span class="Type">void</span>)
+
+{   <span class="Type">int</span> i;
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;MAX_SLOTS; ++i)
+    {   seg_slot[i]   = (<span class="Type">void</span> *)<span class="Constant">NULL</span>;
+        usage_slot[i] = (<span class="Type">void</span> *)<span class="Constant">NULL</span>;
+
+        <span class="Statement">switch</span>(i)
+        {     <span class="Statement">case</span> <span class="Constant">0</span>:    seg_slot[i]   = seg_slot_1;
+                         usage_slot[i] =  usage_slot_1;
+                         <span class="Statement">break</span>;
+
+              <span class="Statement">case</span> <span class="Constant">1</span>:    seg_slot[i]   = seg_slot_2;
+                         usage_slot[i] =usage_slot_2;
+                         <span class="Statement">break</span>;
+
+              <span class="Statement">case</span> <span class="Constant">2</span>:    seg_slot[i]   = seg_slot_3;
+                         usage_slot[i] = usage_slot_3;
+                         <span class="Statement">break</span>;
+
+              <span class="Statement">case</span> <span class="Constant">3</span>:    seg_slot[i]   = seg_slot_4;
+                         usage_slot[i] = usage_slot_4;
+                         <span class="Statement">break</span>;
+
+              <span class="Statement">case</span> <span class="Constant">4</span>:    seg_slot[i]   = seg_slot_5;
+                         usage_slot[i] = usage_slot_5;
+                         <span class="Statement">break</span>;
+
+              <span class="Statement">case</span> <span class="Constant">5</span>:    seg_slot[i]   = seg_slot_6;
+                         usage_slot[i] = usage_slot_6;
+                         <span class="Statement">break</span>;
+
+              <span class="Statement">case</span> <span class="Constant">6</span>:    seg_slot[i]   = seg_slot_7;
+                         usage_slot[i] = usage_slot_7;
+                         <span class="Statement">break</span>;
+
+              <span class="Statement">case</span> <span class="Constant">7</span>:    seg_slot[i]   = seg_slot_8;
+                         usage_slot[i] = usage_slot_8;
+                         <span class="Statement">break</span>;
+
+              <span class="Statement">case</span> <span class="Constant">8</span>:    seg_slot[i]   = seg_slot_9;
+                         usage_slot[i] = usage_slot_9;
+                         <span class="Statement">break</span>;
+
+              <span class="Statement">case</span> <span class="Constant">9</span>:    seg_slot[i]   = seg_slot_10;
+                         usage_slot[i] = usage_slot_10;
+                         <span class="Statement">break</span>;
+
+              <span class="Statement">case</span> <span class="Constant">10</span>:   seg_slot[i]    = seg_slot_11;
+                         usage_slot[i]  = usage_slot_11;
+                         <span class="Statement">break</span>;
+
+              <span class="Statement">case</span> <span class="Constant">11</span>:   seg_slot[i]    = seg_slot_12;
+                         usage_slot[i]  = usage_slot_12;
+                         <span class="Statement">break</span>;
+
+              <span class="Statement">case</span> <span class="Constant">12</span>:   seg_slot[i]    = seg_slot_13;
+                         usage_slot[i]  = usage_slot_13;
+                         <span class="Statement">break</span>;
+
+              <span class="Statement">case</span> <span class="Constant">13</span>:   seg_slot[i]    = seg_slot_14;
+                         usage_slot[i]  = usage_slot_14;
+                         <span class="Statement">break</span>;
+
+              <span class="Statement">case</span> <span class="Constant">14</span>:   seg_slot[i]    = seg_slot_15;
+                         usage_slot[i]  = usage_slot_15;
+                         <span class="Statement">break</span>;
+
+              <span class="Statement">case</span> <span class="Constant">15</span>:   seg_slot[i]    = seg_slot_16;
+                         usage_slot[i]  = usage_slot_16;
+                         <span class="Statement">break</span>;
+
+              <span class="Statement">case</span> <span class="Constant">16</span>:   seg_slot[i]    = seg_slot_17;
+                         usage_slot[i]  = usage_slot_17;
+                         <span class="Statement">break</span>;
+
+              <span class="Statement">case</span> <span class="Constant">17</span>:   seg_slot[i]    = seg_slot_18;
+                         usage_slot[i]  = usage_slot_18;
+                         <span class="Statement">break</span>;
+
+              <span class="Statement">case</span> <span class="Constant">18</span>:   seg_slot[i]    = seg_slot_19;
+                         usage_slot[i]  = usage_slot_19;
+                         <span class="Statement">break</span>;
+
+              <span class="Statement">case</span> <span class="Constant">19</span>:   seg_slot[i]    = seg_slot_20;
+                         usage_slot[i]  = usage_slot_20;
+                         <span class="Statement">break</span>;
+
+              <span class="Statement">case</span> <span class="Constant">20</span>:   seg_slot[i]    = seg_slot_21;
+                         usage_slot[i]  = usage_slot_21;
+                         <span class="Statement">break</span>;
+
+              <span class="Statement">case</span> <span class="Constant">21</span>:   seg_slot[i]    = seg_slot_22;
+                         usage_slot[i]  = usage_slot_22;
+                         <span class="Statement">break</span>;
+
+              <span class="Statement">case</span> <span class="Constant">22</span>:   seg_slot[i]    = seg_slot_23;
+                         usage_slot[i]  = usage_slot_23;
+                         <span class="Statement">break</span>;
+
+              <span class="Statement">case</span> <span class="Constant">23</span>:   seg_slot[i]    = seg_slot_24;
+                         usage_slot[i]  = usage_slot_24;
+                         <span class="Statement">break</span>;
+
+              <span class="Statement">case</span> <span class="Constant">24</span>:   seg_slot[i]    = seg_slot_25;
+                         usage_slot[i]  = usage_slot_25;
+                         <span class="Statement">break</span>;
+
+              <span class="Statement">case</span> <span class="Constant">25</span>:   seg_slot[i]    = seg_slot_26;;
+                         usage_slot[i]  = usage_slot_26;
+                         <span class="Statement">break</span>;
+
+              <span class="Statement">case</span> <span class="Constant">26</span>:   seg_slot[i]    = seg_slot_27;
+                         usage_slot[i]  = usage_slot_27;
+                         <span class="Statement">break</span>;
+
+              <span class="Statement">case</span> <span class="Constant">27</span>:   seg_slot[i]    = seg_slot_28;
+                         usage_slot[i]  = usage_slot_28;
+                         <span class="Statement">break</span>;
+
+              <span class="Statement">case</span> <span class="Constant">28</span>:   seg_slot[i]    = seg_slot_29;
+                         usage_slot[i]  = usage_slot_29;
+                         <span class="Statement">break</span>;
+
+              <span class="Statement">case</span> <span class="Constant">29</span>:   seg_slot[i]    = seg_slot_30;
+                         usage_slot[i]  = usage_slot_30;
+                         <span class="Statement">break</span>;
+
+              <span class="Statement">case</span> <span class="Constant">30</span>:   seg_slot[i]    = seg_slot_31;
+                         usage_slot[i]  = usage_slot_31;
+                         <span class="Statement">break</span>;
+
+              <span class="Statement">case</span> <span class="Constant">31</span>:   seg_slot[i]    = seg_slot_32;
+                         usage_slot[i]  = usage_slot_32;
+                         <span class="Statement">break</span>;
+         }
+    }
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Display current slot usage ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> slot_usage(<span class="Type">const</span> <span class="Type">int</span> level)
+
+{   <span class="Type">int</span> i;
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    slot manager </span><span class="Special">%s</span><span class="Constant">, (C) Tumbling Dice, 1999-2022 (built </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,SLOTMAN_VERSION,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;MAX_SLOTS; ++i)
+    {   <span class="Statement">if</span>(seg_slot[i] != <span class="Constant">NULL</span>)
+        {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    slot:</span><span class="Special">%d</span><span class="Constant"> &quot;</span>,i);
+           (*seg_slot[i])(level);
+        }
+   }
+
+
+   (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+   (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+   (<span class="Type">void</span>)exit(<span class="Constant">1</span>);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Display application usage ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> usage(<span class="Type">void</span>)
+
+{   <span class="Type">int</span> i;
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Slot manager </span><span class="Special">%s</span><span class="Constant"> (C) Tumbling Dice, 1999-2022 (built </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">), usage:</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,SLOTMAN_VERSION,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+
+<span class="PreProc">    #ifdef SECURE</span>
+<span class="PreProc">    #ifdef SINGLE_HOST_LICENSE</span>
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    Single copy single host licence</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+<span class="PreProc">    #else</span>
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    Single copy multi host licence</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> SINGLE_HOST_LICENSE </span><span class="Comment">*/</span>
+<span class="PreProc">    #else</span> <span class="Comment">/*</span><span class="Comment"> SECURE </span><span class="Comment">*/</span>
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    Multi copy multi host (unrestricted) licence</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> SECURE </span><span class="Comment">*/</span>
+
+
+<span class="PreProc">    #ifdef FLOAT</span>
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    Floating point representation is single precision (</span><span class="Special">%d</span><span class="Constant"> bytes)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,<span class="Statement">sizeof</span>(FTYPE));
+<span class="PreProc">    #else</span>
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    Floating point representation is double precision (</span><span class="Special">%d</span><span class="Constant"> bytes)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,<span class="Statement">sizeof</span>(FTYPE));
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> FLOAT </span><span class="Comment">*/</span>
+
+<span class="PreProc">    #ifdef _OPENMP</span>
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    </span><span class="Special">%d</span><span class="Constant"> parallel (OMP) threads available</span><span class="Special">\n</span><span class="Constant">&quot;</span>,omp_get_max_threads());
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> _OPENMP </span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+
+<span class="PreProc">    #ifdef SHADOW_SUPPORT</span>
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    [with shadow support                  ]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> SHADOW_SUPPORT </span><span class="Comment">*/</span>
+
+
+<span class="PreProc">    #ifdef NIS_SUPPORT</span>
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    [with NIS support                     ]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> NIS_SUPPORT </span><span class="Comment">*/</span>
+
+
+<span class="PreProc">    #ifdef SSH_SUPPORT</span>
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    [with ssh support                     ]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> SSH_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="PreProc">    #ifdef IPV6_SUPPORT</span>
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    [with IPV6 support                    ]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> IPV6_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="PreProc">    #ifdef DLL_SUPPORT</span>
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    [with DLL support                     ]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> DLL_SUPPORT </span><span class="Comment">*/</span>
+
+
+<span class="PreProc">    #ifdef PTHREAD_SUPPORT</span>
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;    [with thread support                  ]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+
+<span class="PreProc">    #ifdef PERSISTENT_HEAP_SUPPORT</span>
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    [with persistent heap support         ]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> PERSISTENT_HEAP_SUPPORT </span><span class="Comment">*/</span>
+
+
+<span class="PreProc">    #ifdef BUBBLE_MEMORY_SUPPORT</span>
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    [with dynamic bubble memory support   ]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> BUBBLE_MEMORY_SUPPORT </span><span class="Comment">*/</span>
+
+
+<span class="PreProc">    #ifdef CRIU_SUPPORT</span>
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    [with criu support                    ]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> CRUI_SUPPORT </span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">    Application build date is </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,appl_build_time,appl_build_date);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;MAX_SLOTS; ++i)
+    {   <span class="Statement">if</span>(usage_slot[i] != <span class="Constant">NULL</span>)
+           (*usage_slot[i])();
+    }
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    (<span class="Type">void</span>)exit(<span class="Constant">1</span>);
+}
+
+
+
+
+<span class="PreProc">#ifdef DLL_SUPPORT</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to add a slot to the slot manager - this is generally done by</span>
+<span class="Comment">    a DLL after it has loaded itself ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> add_dll_slot(<span class="Type">const</span> <span class="Type">void</span> *d_l_handle, <span class="Type">const</span> <span class="Type">char</span> *dll_name)
+
+{    <span class="Type">char</span> slot_name[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+
+     <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> Sanity check </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+
+     <span class="Statement">if</span>(d_l_handle == (<span class="Type">const</span> <span class="Type">void</span> *)<span class="Constant">NULL</span> || dll_name == (<span class="Type">const</span> <span class="Type">char</span> *)<span class="Constant">NULL</span>)
+        error(<span class="Constant">&quot;[add dll slot] incorrect parameter(s)&quot;</span>);
+
+     <span class="Statement">if</span>(max_slots &gt; MAX_SLOTS)
+        error(<span class="Constant">&quot;[add_dll_slot] slot manager has no free slots&quot;</span>);
+
+     (<span class="Type">void</span>)snprintf((<span class="Type">char</span> *)&amp;slot_name[<span class="Constant">0</span>],SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">_slot&quot;</span>,dll_name);
+     <span class="Statement">if</span>((seg_slot[max_slots++] = (<span class="Type">void</span> *)dlsym(d_l_handle,slot_name)) == <span class="Constant">NULL</span>)
+        error(<span class="Constant">&quot;add_dll_slot: no slot supplied by DLL&quot;</span>);
+
+     (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    </span><span class="Special">%-24s</span><span class="Constant"> [at 0x</span><span class="Special">%010x</span><span class="Constant">] registered with slot manager at slot </span><span class="Special">%04d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                                      dll_name,
+                                                                                    d_l_handle,
+                                                                                   max_slots-<span class="Constant">1</span>);
+     (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to add a usage slot to the slot manager - this is generally done</span>
+<span class="Comment">    by a DLL after it has been loaded ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> add_dll_usage_slot(<span class="Type">const</span> <span class="Type">void</span> *d_l_handle, <span class="Type">const</span> <span class="Type">char</span> *dll_usage_name)
+
+{    <span class="Type">char</span> usage_slot_name[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+     <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> Sanity check </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+
+     <span class="Statement">if</span>(d_l_handle == (<span class="Type">const</span> <span class="Type">void</span> *)<span class="Constant">NULL</span> || dll_usage_name == (<span class="Type">const</span> <span class="Type">char</span> *)<span class="Constant">NULL</span>)
+        error(<span class="Constant">&quot;[add dll slot] incorrect parameter(s)&quot;</span>);
+
+     <span class="Statement">if</span>(max_use_slots &gt; MAX_SLOTS)
+        error(<span class="Constant">&quot;[add_dll_usage_slot] slot manager has no free usage slots&quot;</span>);
+
+     (<span class="Type">void</span>)snprintf(usage_slot_name,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">_use_slot&quot;</span>,dll_usage_name);
+     <span class="Statement">if</span>((usage_slot[max_slots] = (<span class="Type">void</span> *)dlsym(d_l_handle,
+                                               dll_usage_name)) != <span class="Constant">NULL</span>)
+     {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;   </span><span class="Special">%s</span><span class="Constant"> registered with slot manager at usage slot </span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                      dll_usage_name,
+                                                                         max_slots-<span class="Constant">1</span>);
+        (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+     }
+}
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> DLL_SUPPORT </span><span class="Comment">*/</span>
+
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

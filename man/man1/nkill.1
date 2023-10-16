@@ -22,7 +22,7 @@ NKILL \- distribute signal to process on remote host.
 .B +binname | +status
 ]
 .I !pname-1, ... pname-i, ... pname-n! 
-.I >& <log file>
+[2> <log file>]
 .br
 
 .SH DESCRIPTION
@@ -189,16 +189,19 @@ the host pool databased referenced via the environment variable HOSTPOOL.
 /etc/passwd
 .br
 
-.SH ENVIRONMENT VARIABLES
-HOSTPOOL - points to host pool file, e.g.
-.B setenv HOSTPOOL
-.I hostpool
-tells
-.I nkill(1)
-to read host pool data from the file
-.I hostpool
-(if it exists).
+.SH EXIT STATUS
+
+255: error
 .br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
+.br
+
+.SH ENVIRONMENT VARIABLES
 
 NKILL_VERBOSE
 tells
@@ -215,7 +218,6 @@ to bevae as if
 .B +all
 has been specified prior to processing pidname list.
 .br
-
 
 .SH BUGS
 When using PSRP connection protocols, the authentication mechanism while stronger than that of
@@ -234,5 +236,5 @@ security in certain situations.
 M.A. O'Neill.
  
 .SH SEE ALSO
-ssh(1), ps(1), kill(1), freeze(1)
+rsh(1), ssh(1), ps(1), kill(1), freeze(1)
 .br

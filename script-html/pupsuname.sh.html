@@ -1,0 +1,117 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.5.1.src.git/pupscore.src/pupsuname.sh.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="bash">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Identifier { color: #008080; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">#!/bin/bash</span>
+<span class="Comment">#</span>
+<span class="Comment">#--------------------------------------------------</span>
+<span class="Comment"># Get PUPS/P3 system architecture</span>
+<span class="Comment"># (C) M.A. O'Neill, Tumbling Dice, 4th January 2022 </span>
+<span class="Comment">#-------------------------------------------------- </span>
+<span class="Comment">#--------------------</span>
+<span class="Comment"># Parse command line</span>
+<span class="Comment">#--------------------</span>
+
+<span class="Identifier">do_upcase</span>=FALSE
+<span class="Statement">if </span><span class="Statement">[</span> <span class="Statement">&quot;</span><span class="PreProc">$#</span><span class="Statement">&quot;</span> <span class="Statement">-gt</span> <span class="Constant">0</span> <span class="Statement">]</span> ; <span class="Statement">then</span>
+
+
+	<span class="Comment">#--------</span>
+	<span class="Comment"># Upcase</span>
+	<span class="Comment">#--------</span>
+
+	<span class="Statement">if </span><span class="Statement">[</span> <span class="Statement">&quot;</span><span class="PreProc">$1</span><span class="Statement">&quot;</span> <span class="Statement">=</span> <span class="Constant">upcase</span> <span class="Statement">]</span> ; <span class="Statement">then</span>
+		<span class="Identifier">do_upcase</span>=TRUE
+
+
+	<span class="Comment">#--------------------</span>
+	<span class="Comment"># Error - show usage</span>
+	<span class="Comment">#--------------------</span>
+
+	<span class="Statement">else</span>
+		<span class="Statement">echo</span><span class="Constant"> </span><span class="Statement">&quot;&quot;</span>
+		<span class="Statement">echo</span><span class="Constant"> </span><span class="Statement">&quot;</span><span class="Constant">    PUPS-2000 (SUPUPS) system architecture identifier script (c) M.A. O'Neill, Tumbling Dice 2002-2022</span><span class="Statement">&quot;</span>
+		<span class="Statement">echo</span><span class="Constant"> </span><span class="Statement">&quot;&quot;</span>
+
+        	<span class="Statement">echo</span><span class="Constant"> </span><span class="Statement">&quot;</span><span class="Constant">Usage: pupsuname [upcase]</span><span class="Statement">&quot;</span>
+        	<span class="Statement">echo</span><span class="Constant"> </span><span class="Statement">&quot;&quot;</span>
+
+        	<span class="Statement">exit</span> <span class="Constant">255</span>
+	<span class="Statement">fi</span>
+<span class="Statement">fi</span>
+
+
+<span class="Comment">#--------------------</span>
+<span class="Comment"># PUPS/P3 build type</span>
+<span class="Comment">#--------------------</span>
+
+<span class="Identifier">BTYPE</span>=unknown
+<span class="Statement">if </span><span class="Statement">[</span> <span class="Statement">-e</span> ~/p3 <span class="Statement">]</span> ; <span class="Statement">then</span>
+
+	<span class="Statement">if </span><span class="Statement">[</span>  <span class="Statement">&quot;</span><span class="PreProc">$(</span><span class="Statement">ls</span><span class="Special"> ~/p3 | </span><span class="Statement">grep</span><span class="Special"> cluster</span><span class="PreProc">)</span><span class="Statement">&quot;</span> <span class="Statement">!=</span> <span class="Statement">&quot;&quot;</span>  <span class="Statement">]</span> ; <span class="Statement">then</span>
+		<span class="Identifier">BTYPE</span>=cluster
+	<span class="Statement">elif</span> <span class="Statement">[</span> <span class="Statement">&quot;</span><span class="PreProc">$(</span><span class="Statement">ls</span><span class="Special"> ~/p3 | </span><span class="Statement">grep</span><span class="Special"> vanilla</span><span class="PreProc">)</span><span class="Statement">&quot;</span> <span class="Statement">!=</span> <span class="Statement">&quot;&quot;</span> <span class="Statement">]</span> ;  <span class="Statement">then</span>
+                <span class="Identifier">BTYPE</span>=vanilla
+	<span class="Statement">else</span>
+		<span class="Identifier">BTYPE</span>=unknown
+	<span class="Statement">fi</span>
+<span class="Statement">fi</span>
+
+
+<span class="Comment">#--------------------------</span>
+<span class="Comment"># Upcase if asked to do so</span>
+<span class="Comment">#--------------------------</span>
+
+<span class="Statement">if </span><span class="Statement">[</span> <span class="Statement">&quot;</span><span class="PreProc">$do_upcase</span><span class="Statement">&quot;</span> <span class="Statement">=</span> <span class="Constant">TRUE</span> <span class="Statement">]</span> ; <span class="Statement">then</span>
+
+	<span class="PreProc">MACHTYPE</span><span class="Statement">=</span><span class="PreProc">$(</span><span class="Special">upcase </span><span class="PreProc">$MACHTYPE</span><span class="PreProc">)</span>
+	<span class="PreProc">OSTYPE</span><span class="Statement">=</span><span class="PreProc">$(</span><span class="Special">upcase </span><span class="PreProc">$OSTYPE</span><span class="PreProc">)</span>
+	<span class="Identifier">BTYPE</span>=<span class="PreProc">$(</span><span class="Special">upcase </span><span class="PreProc">$BTYPE</span><span class="PreProc">)</span>
+
+<span class="Statement">fi</span>
+
+
+<span class="Comment">#--------------------------------------</span>
+<span class="Comment"># PUPS/P3 archecture identifier string</span>
+<span class="Comment">#--------------------------------------</span>
+
+<span class="Statement">echo</span><span class="Constant"> </span><span class="PreProc">$MACHTYPE.$OSTYPE.$BTYPE</span><span class="Constant"> </span>
+
+
+<span class="Comment">#------</span>
+<span class="Comment"># Done</span>
+<span class="Comment">#------</span>
+
+<span class="Statement">exit</span> <span class="Constant">0</span>
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

@@ -1,0 +1,590 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.5.1.src.git/include.libs/phmalloc.h.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="cpp">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Statement { color: #af5f00; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Error { color: #ffffff; background-color: #ff6060; padding-bottom: 1px; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------------------</span>
+<span class="Comment">   Copyright 1990, 1991, 1992, 1993, 1995 Free Software Foundation, Inc.</span>
+<span class="Comment">		  Written May 1989 by Mike Haertel.</span>
+
+<span class="Comment">   This library is free software; you can redistribute it and/or</span>
+<span class="Comment">   modify it under the terms of the GNU Library General Public License as</span>
+<span class="Comment">   published by the Free Software Foundation; either version 2 of the</span>
+<span class="Comment">   License, or (at your option) any later version.</span>
+
+<span class="Comment">   This library is distributed in the hope that it will be useful,</span>
+<span class="Comment">   but WITHOUT ANY WARRANTY; without even the implied warranty of</span>
+<span class="Comment">   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU</span>
+<span class="Comment">   Library General Public License for more details.</span>
+
+<span class="Comment">   You should have received a copy of the GNU Library General Public</span>
+<span class="Comment">   License along with this library; see the file COPYING.LIB.  If</span>
+<span class="Comment">   not, write to the Free Software Foundation, Inc., 675 Mass Ave,</span>
+<span class="Comment">   Cambridge, MA 02139, USA.</span>
+
+<span class="Comment">   The author may be reached (Email) at the address mike@ai.mit.edu,</span>
+<span class="Comment">   or (US mail) as Mike Haertel c/o Free Software Foundation.</span>
+
+<span class="Comment">   Shared heap modifications by Mark O'Neill, Tumbling DIce  &lt;mao@tumblingdice.co.uk&gt;</span>
+<span class="Comment">   (C) M.A. O'Neill. Tumbling Dice 2005-2022</span>
+<span class="Comment">--------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifndef _PHMALLOC_H</span>
+<span class="PreProc">#define _PHMALLOC_H	</span><span class="Constant">1</span>
+
+<span class="PreProc">#ifdef _PHMALLOC_INTERNAL</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;pheap.h&gt;</span>
+
+<span class="PreProc">#ifdef	HAVE_CONFIG_H</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;config.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> HAVE_CONFIG_H </span><span class="Comment">*/</span>
+
+<span class="PreProc">#if defined(_LIBC) || defined(STDC_HEADERS)</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+
+<span class="PreProc">#else</span>
+
+<span class="PreProc">#ifndef memset</span>
+<span class="PreProc">#define	memset(s, zero, n)	bzero ((s), (n))</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> memset </span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifndef memcpy</span>
+<span class="PreProc">#define	memcpy(d, s, n)		bcopy ((s), (d), (n))</span>
+
+       <span class="Comment">/*</span><span class="Comment">--------</span><span class="Comment">*/</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> memcpy </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">--------*</span>
+
+<span class="Comment">       </span><span class="Error">/</span><span class="Comment">*--------</span><span class="Comment">*/</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> memset </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">--------</span><span class="Comment">*/</span>
+
+
+
+<span class="PreProc">#if defined (__GNU_LIBRARY__) || (defined (</span><span class="Constant">__STDC__</span><span class="PreProc">) &amp;&amp; </span><span class="Constant">__STDC__</span><span class="PreProc">)</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;limits.h&gt;</span>
+<span class="PreProc">#else</span>
+<span class="PreProc">#ifndef CHAR_BIT</span>
+<span class="PreProc">#define	</span><span class="Constant">CHAR_BIT</span><span class="PreProc">	</span><span class="Constant">8</span>
+
+       <span class="Comment">/*</span><span class="Comment">----------</span><span class="Comment">*/</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> CHAR_BIT </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------</span><span class="Comment">*/</span>
+
+       <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> __GNU_LIBRARY__) || (defined (__STDC__) &amp;&amp; __STDC__) </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef	HAVE_UNISTD_H</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+
+       <span class="Comment">/*</span><span class="Comment">---------------</span><span class="Comment">*/</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> HAVE_UNISTD_H </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">---------------</span><span class="Comment">*/</span>
+
+       <span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> _MALLOC_INTERNAL </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+
+<span class="PreProc">#ifdef	__cplusplus</span>
+<span class="Type">extern</span> <span class="Constant">&quot;C&quot;</span>
+{
+
+       <span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> __cplusplus </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#if defined (</span><span class="Constant">__cplusplus</span><span class="PreProc">) || (defined (</span><span class="Constant">__STDC__</span><span class="PreProc">) &amp;&amp; </span><span class="Constant">__STDC__</span><span class="PreProc">)</span>
+<span class="PreProc">#undef	__P</span>
+<span class="PreProc">#define	__P(args)	args</span>
+<span class="PreProc">#undef	__ptr_t</span>
+<span class="PreProc">#define	__ptr_t		</span><span class="Type">void</span><span class="PreProc"> *</span>
+<span class="PreProc">#else</span> <span class="Comment">/*</span><span class="Comment"> Not C++ or ANSI C.  </span><span class="Comment">*/</span>
+<span class="PreProc">#undef	__P</span>
+<span class="PreProc">#define	__P(args)	()</span>
+<span class="PreProc">#undef	</span><span class="Type">const</span>
+<span class="PreProc">#define	</span><span class="Type">const</span>
+<span class="PreProc">#undef	__ptr_t</span>
+<span class="PreProc">#define	__ptr_t		</span><span class="Type">char</span><span class="PreProc"> *</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> C++ or ANSI C.  </span><span class="Comment">*/</span>
+
+<span class="PreProc">#if defined (</span><span class="Constant">__STDC__</span><span class="PreProc">) &amp;&amp; __STDC__</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stddef.h&gt;</span>
+<span class="PreProc">#define	__malloc_size_t		</span><span class="Type">size_t</span>
+<span class="PreProc">#define	__malloc_ptrdiff_t	</span><span class="Type">ptrdiff_t</span>
+<span class="PreProc">#else</span>
+<span class="PreProc">#define	__malloc_size_t		</span><span class="Type">unsigned</span><span class="PreProc"> </span><span class="Type">long</span><span class="PreProc"> </span>
+<span class="PreProc">#define	__malloc_ptrdiff_t	</span><span class="Type">long</span><span class="PreProc">	</span>
+<span class="PreProc">#endif</span>
+
+<span class="PreProc">#ifndef	NULL</span>
+<span class="PreProc">#define	</span><span class="Constant">NULL</span><span class="PreProc">	</span><span class="Constant">0</span>
+<span class="PreProc">#endif</span>
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Allocate SIZE bytes of memory. </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">extern</span> __ptr_t phmalloc __P ((<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, __malloc_size_t __size, <span class="Type">const</span> <span class="Type">char</span> *));
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Re-allocate the previously allocated block       </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> in __ptr_t, making the new block SIZE bytes long </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">extern</span> __ptr_t phrealloc __P ((<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> __ptr_t __ptr, __malloc_size_t __size, <span class="Type">const</span> <span class="Type">char</span> *));
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Allocate NMEMB elements of SIZE bytes each, all initialized to 0 </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">extern</span> __ptr_t phcalloc __P ((<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> __malloc_size_t __nmemb, <span class="Type">const</span> __malloc_size_t __size, <span class="Type">const</span> <span class="Type">char</span> *));
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Free a block allocated by `malloc', `realloc' or `calloc' </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">extern</span> <span class="Type">void</span> *phfree __P ((<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> __ptr_t __ptr));
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Allocate SIZE bytes allocated to ALIGNMENT bytes </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">extern</span> __ptr_t phmemalign __P ((<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> __malloc_size_t __alignment, __malloc_size_t __size, <span class="Type">const</span> <span class="Type">char</span> *));
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Allocate SIZE bytes on a page boundary </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">extern</span> __ptr_t phvalloc __P ((<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, __malloc_size_t __size, <span class="Type">const</span> <span class="Type">char</span> *));
+
+
+<span class="PreProc">#ifdef _PHMALLOC_INTERNAL</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> The allocator divides the heap into blocks of fixed size; large   </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> requests receive one or more whole blocks, and small requests     </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> receive a fragment of a block.  Fragment sizes are powers of two  </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> and all fragments of a block are the same size.  When all the     </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> fragments in a block have been freed, the block itself is freed.  </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="PreProc">#define INT_BIT		(</span><span class="Constant">CHAR_BIT</span><span class="PreProc"> * </span><span class="Statement">sizeof</span><span class="PreProc">(</span><span class="Type">int</span><span class="PreProc">))</span>
+<span class="PreProc">#define BLOCKLOG	(INT_BIT &gt; </span><span class="Constant">16</span><span class="PreProc"> ? </span><span class="Constant">12</span><span class="PreProc"> : </span><span class="Constant">9</span><span class="PreProc">)</span>
+<span class="PreProc">#define BLOCKSIZE	(</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; BLOCKLOG)</span>
+<span class="PreProc">#define BLOCKIFY(SIZE)	(((SIZE) + BLOCKSIZE - </span><span class="Constant">1</span><span class="PreProc">) / BLOCKSIZE)</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Determine the amount of memory spanned by the initial heap table </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> (not an absolute limit)                                          </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define HEAP		(INT_BIT &gt; </span><span class="Constant">16</span><span class="PreProc"> ? </span><span class="Constant">4194304</span><span class="PreProc"> : </span><span class="Constant">65536</span><span class="PreProc">)</span>
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Number of contiguous free blocks allowed to build up at the end of </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> memory before they will be returned to the system                  </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define FINAL_FREE_BLOCKS	</span><span class="Constant">8</span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Data structure giving per-block information </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">typedef</span> <span class="Type">union</span>
+  {
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Heap information for a busy block.  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Type">struct</span>
+      {
+
+        <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------</span><span class="Comment">*/</span>
+	<span class="Comment">/*</span><span class="Comment"> Zero for a large (multiblock) object, or positive giving the </span><span class="Comment">*/</span>
+	<span class="Comment">/*</span><span class="Comment"> logarithm to the base two of the fragment size               </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------</span><span class="Comment">*/</span>
+
+	<span class="Type">int</span> type;
+	<span class="Type">union</span>
+	  {
+	    <span class="Type">struct</span>
+	      {
+		__malloc_size_t nfree; <span class="Comment">// Free frags in a fragmented block</span>
+		__malloc_size_t first; <span class="Comment">// First free fragment of the block</span>
+	      } frag;
+
+            <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+	    <span class="Comment">/*</span><span class="Comment"> For a large object, in its first block, this has the number </span><span class="Comment">*/</span>
+	    <span class="Comment">/*</span><span class="Comment"> of blocks in the object.  In the other blocks, this has a   </span><span class="Comment">*/</span>
+	    <span class="Comment">/*</span><span class="Comment"> negative number which says how far back the first block is  </span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+
+	    __malloc_ptrdiff_t size;
+	  } info;
+      } busy;
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Heap information for a free block         </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> (that may be the first of a free cluster) </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Type">struct</span>
+      {
+	__malloc_size_t size;	<span class="Comment">// Size (in blocks) of a free cluster</span>
+	__malloc_size_t next;	<span class="Comment">// Index of next free cluster</span>
+	__malloc_size_t prev;	<span class="Comment">// Index of previous free cluster</span>
+      } free;
+  } malloc_info;
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Pointer to persistent heap object tables </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">extern</span> phobmap_type ***_shobjectmap;
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Pointer to heap parameter table on persistent heap </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">extern</span> <span class="Type">int</span> **pheap_parameters;
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Pointer to first block of the heap </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">extern</span> <span class="Type">char</span> **_pheapbase;
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Table indexed by block number giving per-block information </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">extern</span> malloc_info **_pheapinfo;
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Address to block number and vice versa </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define BLOCK(H, A)	(((</span><span class="Type">char</span><span class="PreProc"> *) (A) - _pheapbase[H]) / BLOCKSIZE + </span><span class="Constant">1</span><span class="PreProc">)</span>
+<span class="PreProc">#define ADDRESS(H, B)	((__ptr_t) (((B) - </span><span class="Constant">1</span><span class="PreProc">) * BLOCKSIZE + _pheapbase[H]))</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Current search index for the heap table </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">extern</span> __malloc_size_t *_pheapindex;
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Limit of valid info table indices </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">extern</span> __malloc_size_t *_pheaplimit;
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Doubly linked lists of free fragments </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">struct</span> list
+  {
+    <span class="Type">struct</span> list *next;
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Spill for upper 4 bytes of pointer allows 32/64 bit compability </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Type">void</span>        *spill_next;
+    <span class="Type">struct</span> list *prev;
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Spill for upper 4 bytes of pointer allows 32/64 bit compability </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Type">void</span>        *spill_prev;
+
+  };
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Free list headers for each fragment size </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">extern</span> <span class="Type">struct</span> list **_phfraghead;
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> List of blocks allocated with `memalign' (or `valloc') </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">struct</span> alignlist
+  {
+    <span class="Type">struct</span> alignlist *next;
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Spill for upper 4 bytes of pointer allows 32/64 bit compability </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Type">void</span>    *spill_next;       <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+    __ptr_t aligned;           <span class="Comment">/*</span><span class="Comment"> The address that memaligned returned </span><span class="Comment">*/</span>
+                               <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Spill for upper 4 bytes of pointer allows 32/64 bit compability </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Type">void</span>        *spill_aligned;    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+    __ptr_t     exact;             <span class="Comment">/*</span><span class="Comment"> The address that malloc returned </span><span class="Comment">*/</span>
+                                   <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Spill for upper 4 bytes of pointer allows 32/64 bit compability </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Type">void</span>        *spill_exact;
+
+  };
+
+<span class="Type">extern</span> <span class="Type">struct</span> alignlist *_aligned_blocks;
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Instrumentation </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+
+<span class="Type">extern</span> __malloc_size_t *_pheap_chunks_used;
+<span class="Type">extern</span> __malloc_size_t *_pheap_bytes_used;
+<span class="Type">extern</span> __malloc_size_t *_pheap_chunks_free;
+<span class="Type">extern</span> __malloc_size_t *_pheap_bytes_free;
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Internal version of `free' used in `shmorecore' (malloc.c). </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">extern</span> <span class="Type">void</span> _phfree_internal __P ((<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> __ptr_t __ptr));
+
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> _MALLOC_INTERNAL.  </span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Given an address in the middle of a malloc'd object </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> return the address of the beginning of the object   </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">extern</span> __ptr_t phmalloc_find_object_address __P ((<span class="Type">int</span>, __ptr_t __ptr));
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Underlying allocation function; successive calls should </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> return contiguous pieces of memory                      </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">extern</span> __ptr_t (*__phmorecore) __P ((<span class="Type">int</span>, __malloc_ptrdiff_t __size));
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Default value of `__phmorecore' </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">extern</span> __ptr_t __default_phmorecore __P ((<span class="Type">int</span>, __malloc_ptrdiff_t __size));
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> If not NULL, this function is called after each time </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> `__shmorecore' is called to increase the data size.  </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">extern</span> <span class="Type">void</span> (*__after_phmorecore_hook) __P ((<span class="Type">void</span>));
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Nonzero if `malloc' has been called and done its initialization </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">extern</span> <span class="Type">int</span> *__phmalloc_initialized;
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Hooks for debugging versions </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">extern</span> <span class="Type">void</span> (*__phmalloc_initialize_hook) __P ((<span class="Type">int</span>));
+<span class="Type">extern</span> <span class="Type">void</span> (*__phfree_hook) __P ((<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> __ptr_t __ptr));
+<span class="Type">extern</span> __ptr_t (*__phmalloc_hook) __P ((<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, __malloc_size_t __size, <span class="Type">const</span> <span class="Type">char</span> *));
+<span class="Type">extern</span> __ptr_t (*__phrealloc_hook) __P ((<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> __ptr_t __ptr, __malloc_size_t __size, <span class="Type">const</span> <span class="Type">char</span> *));
+<span class="Type">extern</span> __ptr_t (*__phmemalign_hook) __P ((<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, __malloc_size_t __size, <span class="Type">const</span> __malloc_size_t __alignment, <span class="Type">const</span> <span class="Type">char</span> *));
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Return values for `mprobe': these are the kinds of inconsistencies that </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> `mcheck' enables detection of                                           </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">enum</span> mcheck_status
+  {
+
+                                <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+    MCHECK_DISABLED = -<span class="Constant">1</span>,	<span class="Comment">/*</span><span class="Comment"> Consistency checking is not turned on.  </span><span class="Comment">*/</span>
+    MCHECK_OK,			<span class="Comment">/*</span><span class="Comment"> Block is fine                           </span><span class="Comment">*/</span>
+    MCHECK_FREE,		<span class="Comment">/*</span><span class="Comment"> Block freed twice                       </span><span class="Comment">*/</span>
+    MCHECK_HEAD,		<span class="Comment">/*</span><span class="Comment"> Memory before the block was clobbered.  </span><span class="Comment">*/</span>
+    MCHECK_TAIL			<span class="Comment">/*</span><span class="Comment"> Memory after the block was clobbered.   </span><span class="Comment">*/</span>
+                                <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+
+  };
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Activate a standard collection of debugging hooks.  This must be called </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> before `malloc' is ever called.  ABORTFUNC is called with an error code </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> (see enum above) when an inconsistency is detected.  If ABORTFUNC is    </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> null, the standard function prints on stderr and then calls `abort'     </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">extern</span> <span class="Type">int</span> mcheck __P ((<span class="Type">void</span> (*__abortfunc) __P ((<span class="Type">enum</span> mcheck_status))));
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Check for aberrations in a particular malloc'd block.  You must have    </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> called `mcheck' already.  These are the same checks that `mcheck' does  </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> when you free or reallocate a block                                     </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">extern</span> <span class="Type">enum</span> mcheck_status mprobe __P ((__ptr_t __ptr));
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Activate a standard collection of tracing hooks </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">extern</span> <span class="Type">void</span> mtrace __P ((<span class="Type">void</span>));
+<span class="Type">extern</span> <span class="Type">void</span> muntrace __P ((<span class="Type">void</span>));
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Statistics available to the user </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">struct</span> mstats
+  {
+
+                                 <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+    __malloc_size_t bytes_total; <span class="Comment">/*</span><span class="Comment"> Total size of the heap                </span><span class="Comment">*/</span>
+    __malloc_size_t chunks_used; <span class="Comment">/*</span><span class="Comment"> Chunks allocated by the user          </span><span class="Comment">*/</span>
+    __malloc_size_t bytes_used;	 <span class="Comment">/*</span><span class="Comment"> Byte total of user-allocated chunks   </span><span class="Comment">*/</span>
+    __malloc_size_t chunks_free; <span class="Comment">/*</span><span class="Comment"> Chunks in the free list               </span><span class="Comment">*/</span>
+    __malloc_size_t bytes_free;	 <span class="Comment">/*</span><span class="Comment"> Byte total of chunks in the free list </span><span class="Comment">*/</span>
+                                 <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+  };
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Pick up the current statistics </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">extern</span> <span class="Type">struct</span> mstats phmstats __P ((<span class="Type">int</span>));
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Call WARNFUN with a warning message when memory usage is high </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">extern</span> <span class="Type">void</span> memory_warnings __P ((__ptr_t __start,
+				  <span class="Type">void</span> (*__warnfun) __P ((<span class="Type">const</span> <span class="Type">char</span> *))));
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Relocating allocator </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Allocate SIZE bytes, and store the address in *HANDLEPTR  </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">extern</span> __ptr_t phr_alloc __P ((<span class="Type">int</span>, __ptr_t *__handleptr, __malloc_size_t __size));
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Free the storage allocated in HANDLEPTR </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">extern</span> <span class="Type">void</span> phr_alloc_free __P ((<span class="Type">int</span>, __ptr_t *__handleptr));
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Adjust the block at HANDLEPTR to be SIZE bytes long </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">extern</span> __ptr_t phr_re_alloc __P ((__ptr_t *__handleptr, __malloc_size_t __size));
+
+
+<span class="PreProc">#ifdef	__cplusplus</span>
+}
+
+       <span class="Comment">/*</span><span class="Comment">------------</span><span class="Comment">*/</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment">__cplusplus </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">------------</span><span class="Comment">*/</span>
+
+
+       <span class="Comment">/*</span><span class="Comment">-----------</span><span class="Comment">*/</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> malloc.h  </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-----------</span><span class="Comment">*/</span>
+
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

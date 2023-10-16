@@ -1,0 +1,159 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.5.1.src.git/include.libs/fht.h.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="cpp">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------- </span>
+<span class="Comment">    Purpose: Header for the Fast Hartley Transform library.</span>
+
+<span class="Comment">    Author:  M.A. O'Neill</span>
+<span class="Comment">             Tumbling Dice Ltd</span>
+<span class="Comment">             Gosforth</span>
+<span class="Comment">             Newcastle upon Tyne</span>
+<span class="Comment">             NE3 4RT</span>
+<span class="Comment">             United Kingdom</span>
+
+<span class="Comment">    Version: 2.02 </span>
+<span class="Comment">    Dated:   4th January 2022</span>
+<span class="Comment">    E-Mail:  mao@tumblingdice.co.uk </span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="PreProc">#ifndef FHT_H</span>
+<span class="PreProc">#define FHT_H</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Keep c2man happy </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;c2man.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">*********</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Version </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">*********</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define FHT_VERSION    </span><span class="Constant">&quot;3.00&quot;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Floating point representation </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;ftype.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Flags (for Fourier routine) </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define RESET         </span><span class="Constant">1</span><span class="PreProc">     </span><span class="Comment">// Reset (clear storage for butterfly transform)</span>
+<span class="PreProc">#define RESTART       </span><span class="Constant">2</span><span class="PreProc">     </span><span class="Comment">// Restat (re-allocate storage for butterfly transform)</span>
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Transform directions </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define FORWARD        </span><span class="Constant">1</span><span class="PreProc">    </span><span class="Comment">// Forward transform flag</span>
+<span class="PreProc">#define REVERSE        </span><span class="Constant">2</span><span class="PreProc">    </span><span class="Comment">// Reverse transform flag</span>
+<span class="PreProc">#define NOT_PWR_OF_TWO </span><span class="Constant">0</span><span class="PreProc">    </span><span class="Comment">// Not a power of two </span>
+
+
+
+<span class="PreProc">#ifdef __NOT_LIB_SOURCE__</span>
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Public constants exported by this library </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#else</span>
+<span class="PreProc">#    undef  _EXPORT</span>
+<span class="PreProc">#    define _EXPORT</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> __NOT_LIB_SOURCE__ </span><span class="Comment">*/</span>
+
+
+<span class="Comment">// Get real part of Fourier transform</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> get_fft_R(<span class="Type">int</span>, FTYPE [], FTYPE []);
+
+<span class="Comment">// Get imaginary part of Fourier transform</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> get_fft_IM(<span class="Type">int</span>, FTYPE [], FTYPE []);
+
+<span class="Comment">// Get power spectral density function</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> get_pwr_S(<span class="Type">int</span>, FTYPE [], FTYPE []);
+
+<span class="Comment">// Perform Fast Hartley Transform</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> fht(<span class="Type">int</span>, <span class="Type">int</span>, FTYPE []);
+
+<span class="Comment">// Set up band pass filter</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> band_pass(<span class="Type">int</span>, FTYPE, FTYPE, FTYPE, FTYPE *);
+
+<span class="Comment">// Get Power Spectral Density Function from FFT</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> get_FFT_pwr_S(<span class="Type">int</span>, FTYPE [], FTYPE [], FTYPE []);
+
+<span class="Comment">// Resample data [so that the number of data points is a power of two]</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> resample(<span class="Type">int</span>, <span class="Type">int</span>, FTYPE [], FTYPE []);
+
+<span class="Comment">// Perform Fast Fourier Transform on complex array of data</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> Fourier(<span class="Type">int</span>, <span class="Type">int</span>, <span class="Type">int</span>, FTYPE [], FTYPE []);
+
+<span class="Comment">// Compute linear predictive coefficients</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> memcof(FTYPE [], <span class="Type">int</span>, <span class="Type">int</span>, FTYPE *, FTYPE [], <span class="Type">int</span>);
+
+<span class="Comment">// Compute power spectrum using maximum entropy [all poles] algorithm</span>
+_PROTOTYPE _EXPORT FTYPE evlmem(FTYPE, FTYPE [], <span class="Type">int</span>, FTYPE);
+
+<span class="Comment">// Set up Daub wavelet coeffiecients for n=4, n=1 or n = 20</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pwtset(<span class="Type">int</span>);
+
+<span class="Comment">// Partial wavelet transform</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pwt(FTYPE [], <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>, <span class="Type">int</span>);
+
+<span class="Comment">// Compute discrete wavelet transform of input vector</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> wt1(FTYPE [], <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>, <span class="Type">int</span>, <span class="Type">void</span> (*)(<span class="Type">float</span> [], <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>, <span class="Type">int</span>));
+
+<span class="Comment">// Transform filter for daub4 [Daubechies 4 coeffiecient wavelets]</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> daub4(FTYPE [], <span class="Type">unsigned</span> <span class="Type">long</span>, <span class="Type">int</span>);
+
+<span class="Comment">// Compute N dimensional wavelet transform of N dimensional dataset</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> wtn(FTYPE [], <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span> [], <span class="Type">int</span>, <span class="Type">int</span>, <span class="Type">void</span> (*)(<span class="Type">float</span> [], <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>, <span class="Type">int</span>));
+
+<span class="PreProc">#ifdef _CPLUSPLUS</span>
+<span class="PreProc">#   undef  _EXPORT</span>
+<span class="PreProc">#   define _EXPORT </span><span class="Type">extern</span><span class="PreProc"> C</span>
+<span class="PreProc">#else</span>
+<span class="PreProc">#   undef  _EXPORT</span>
+<span class="PreProc">#   define _EXPORT </span><span class="Type">extern</span>
+<span class="PreProc">#endif</span>
+
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> FHT_H </span><span class="Comment">*/</span>
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

@@ -1,11 +1,11 @@
 #-----------------------------------------------------------------------
 # Makefile for fsw - utility to perform intelligent write to fs (Linux)
-# M.A. O'Neill Tumbling Dice 23/01/2018
+# M.A. O'Neill Tumbling Dice 04/01/2022
 #-----------------------------------------------------------------------
 
-CFLAGS 		=	TARGET_CFLAGS TARGET_ARCHDEPCFLAGS -finline-functions -fopenmp -ffast-math
-LDFLAGS 	=	TARGET_LDFLAGS TARGET_ARCHDEPLDFLAGS -lgomp
-CC		=	gcc
+CFLAGS 		= TARGET_CFLAGS TARGET_ARCHDEPCFLAGS -finline-functions -fopenmp -ffast-math
+LDFLAGS 	= TARGET_LDFLAGS TARGET_ARCHDEPLDFLAGS -lgomp
+CC		= gcc
 LIBS		=
 
 
@@ -22,9 +22,24 @@ fsw.c:		../include.libs/utils.h    ../include.libs/slotman.h		\
                 ../include.libs/netlib.h   ../include.libs/psrp.h		\
                 ../include.libs/dll.h 
 
+
+#--------------
+# CLean section
+#--------------
+
 .PHONY:		clean
 clean:
+		@rm *.o
+
+
+.PHONY:		cleanall
+cleanall:
 		@rm *.o fsw
+
+
+#----------------
+# Install section
+#----------------
 
 .PHONY:		install
 install:
@@ -34,6 +49,11 @@ install:
 .PHONY:         unstripped
 unstripped:
 		@cp -f fsw TARGET_INSTALL_DIR
+
+
+#------------------
+# Uninstall section
+#------------------
 
 .PHONY:		uninstall
 uninstall:      

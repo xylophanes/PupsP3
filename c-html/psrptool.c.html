@@ -1,0 +1,255 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/psrptool.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Purpose: starts PSRP client in new window.</span>
+
+<span class="Comment">    Author:  M.A. O'Neill</span>
+<span class="Comment">             Tumbling Dice Ltd</span>
+<span class="Comment">             Gosforth</span>
+<span class="Comment">             Newcastle upon Tyne</span>
+<span class="Comment">             NE3 4RT</span>
+<span class="Comment">             United Kingdom</span>
+
+<span class="Comment">    Version: 2.01 </span>
+<span class="Comment">    Dated:   24th May 2022</span>
+<span class="Comment">    E-mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">----------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;stdio.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stdlib.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;bsd/string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;xtypes.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Version of psrptool </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define PSRPTOOL_VERSION    </span><span class="Constant">&quot;2.01&quot;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> String size </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define SSIZE               </span><span class="Constant">2048</span><span class="PreProc"> </span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Default font size </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define DEFAULT_FONT_SIZE   </span><span class="Constant">7</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Main entry point </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> main(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   <span class="Type">int</span> i,
+        fsize                 = DEFAULT_FONT_SIZE,
+        decoded               = <span class="Constant">0</span>;
+
+    <span class="Type">char</span> hdir[SSIZE]          = <span class="Constant">&quot;&quot;</span>,
+         client_name[SSIZE]   = <span class="Constant">&quot;&quot;</span>,
+         host_name[SSIZE]     = <span class="Constant">&quot;&quot;</span>,
+         soft_dongle[SSIZE]   = <span class="Constant">&quot;notset&quot;</span>,
+         psrp_command[SSIZE]  = <span class="Constant">&quot;&quot;</span>,
+         xterm_command[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Display help information if &quot;-help&quot; or &quot;-usage&quot; flagged </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(argc == <span class="Constant">2</span> &amp;&amp; (strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;-usage&quot;</span>) == <span class="Constant">0</span> || strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;-help&quot;</span>) == <span class="Constant">0</span>))
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">psrptool version </span><span class="Special">%s</span><span class="Constant">, (C) 2003-2022 Tumbling Dice (built </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,PSRPTOOL_VERSION,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">Usage: psrptool [-help | -usage] [psrp client argument list] [-fsize &lt;font size:</span><span class="Special">%d</span><span class="Constant">&gt;] [-sdongle &lt;soft dongle file name | default&gt;]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,
+                                                                                                                                                    DEFAULT_FONT_SIZE);
+
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;PSRPTOOL is free software, covered by the GNU General Public License, and you are</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;welcome to change it and/or distribute copies of it under certain conditions.</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;See the GPL and LGPL licences at www.gnu.org for further details</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;PSRPTOOL comes with ABSOLUTELY NO WARRANTY</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+
+       exit(<span class="Constant">255</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set client and host names </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)gethostname(host_name,SSIZE);
+    (<span class="Type">void</span>)snprintf(client_name,SSIZE,<span class="Constant">&quot;psrp@</span><span class="Special">%s</span><span class="Constant">&quot;</span>,host_name);
+
+    <span class="Statement">for</span>(i=<span class="Constant">1</span>; i&lt;argc; ++i)
+    {  <span class="Comment">/*</span><span class="Comment"> Note remote host to connect to (if any) </span><span class="Comment">*/</span>
+       <span class="Statement">if</span>(strcmp(argv[i],<span class="Constant">&quot;-on&quot;</span>) == <span class="Constant">0</span>)
+       {  <span class="Statement">if</span>(argv[i+<span class="Constant">1</span>][<span class="Constant">0</span>] == <span class="Constant">'-'</span>)
+          {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">psrptool: illegal command tail syntax</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+             exit(<span class="Constant">255</span>);
+          }
+          (<span class="Type">void</span>)snprintf(host_name,SSIZE,argv[i+<span class="Constant">1</span>]);
+       }
+    }
+
+    <span class="Statement">for</span>(i=<span class="Constant">1</span>; i&lt;argc; ++i)
+    {
+
+       <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Note pen (if any) </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(strcmp(argv[i],<span class="Constant">&quot;-pen&quot;</span>) == <span class="Constant">0</span>)
+       {  <span class="Statement">if</span>(argv[i+<span class="Constant">1</span>][<span class="Constant">0</span>] == <span class="Constant">'-'</span>)
+          {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">psrptool: illegal command tail syntax</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+             exit(<span class="Constant">255</span>);
+          }
+          (<span class="Type">void</span>)snprintf(client_name,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">&quot;</span>,argv[i+<span class="Constant">1</span>],host_name);
+          ++i;
+          ++decoded;
+       }
+       <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(argv[i],<span class="Constant">&quot;-sdongle&quot;</span>) == <span class="Constant">0</span>)
+       {  <span class="Statement">if</span>(getenv(<span class="Constant">&quot;HOME&quot;</span>) == (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+          {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">psrptool: cannot get home directory (from environment)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+             exit(<span class="Constant">255</span>);
+          }
+
+          (<span class="Type">void</span>)strlcpy(hdir,getenv(<span class="Constant">&quot;HOME&quot;</span>),SSIZE);
+
+          <span class="Statement">if</span>(i == argc - <span class="Constant">1</span> || argv[i+<span class="Constant">1</span>][<span class="Constant">0</span>] == <span class="Constant">'-'</span>)
+          {  (<span class="Type">void</span>)snprintf(soft_dongle,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/.sdongles/pups.dongle&quot;</span>,hdir);
+             ++decoded;
+          }
+          <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(argv[i+<span class="Constant">1</span>],<span class="Constant">&quot;default&quot;</span>) == <span class="Constant">0</span>)
+          {  (<span class="Type">void</span>)snprintf(soft_dongle,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/.sdongles/pups.dongle&quot;</span>,hdir);
+             ++decoded;
+          }
+          <span class="Statement">else</span>
+          {  (<span class="Type">void</span>)snprintf(soft_dongle,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/.sdongles/</span><span class="Special">%s</span><span class="Constant">&quot;</span>,hdir,argv[i+<span class="Constant">1</span>]);
+             ++i;
+            decoded += <span class="Constant">2</span>;
+          }
+       }
+       <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(argv[i],<span class="Constant">&quot;-fsize&quot;</span>) == <span class="Constant">0</span>)
+       {  <span class="Statement">if</span>(i == argc - <span class="Constant">1</span> || argv[i+<span class="Constant">1</span>][<span class="Constant">0</span>] == <span class="Constant">'-'</span>)
+          {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">psrptool: expecting font size</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+
+             exit(<span class="Constant">255</span>);
+          }
+          <span class="Statement">else</span>
+          {  <span class="Statement">if</span>(sscanf(argv[i+<span class="Constant">1</span>],<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">&quot;</span>,&amp;fsize) != <span class="Constant">1</span> || fsize &lt; <span class="Constant">6</span> || fsize &gt; <span class="Constant">16</span>)
+             {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">psrptool: ridiculous font size specification (</span><span class="Special">%d</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,fsize);
+                (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+                exit(<span class="Constant">255</span>);
+             }
+
+             ++i;
+             decoded += <span class="Constant">2</span>;
+          }
+       }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Get argument list for xterm </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(getuid() == <span class="Constant">0</span>)
+       (<span class="Type">void</span>)snprintf(psrp_command,SSIZE,<span class="Constant">&quot;/usr/bin/psrp&quot;</span>);
+    <span class="Statement">else</span>
+    {  (<span class="Type">void</span>)strlcpy(hdir,getenv(<span class="Constant">&quot;HOME&quot;</span>),SSIZE);
+       (<span class="Type">void</span>)snprintf(psrp_command,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/bin/psrp&quot;</span>,hdir);
+    }
+
+    <span class="Statement">if</span>(strcmp(soft_dongle,<span class="Constant">&quot;notset&quot;</span>) != <span class="Constant">0</span>)
+    {
+
+       <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Set up path to authentication dongle (via environmental variable USE_SOFT_DONGLE) </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+       (<span class="Type">void</span>)snprintf(xterm_command,SSIZE,<span class="Constant">&quot;csh -c </span><span class="Special">\'</span><span class="Constant">setenv USE_SOFT_DONGLE </span><span class="Special">%s</span><span class="Constant">; exec xterm --geometry 132x20 -rightbar -fa Monospace -fs </span><span class="Special">%d</span><span class="Constant">  -title </span><span class="Special">\&quot;</span><span class="Constant">psrp client: </span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> -e </span><span class="Special">%s</span><span class="Constant">&quot;</span>,
+                                                                                                                            soft_dongle,fsize,client_name,psrp_command);
+    }
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)snprintf(xterm_command,SSIZE,<span class="Constant">&quot;xterm --geometry 132x20 -rightbar -fa Monospace -fs </span><span class="Special">%s</span><span class="Constant"> -title </span><span class="Special">\&quot;</span><span class="Constant">psrp client: </span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> -c </span><span class="Special">%s</span><span class="Constant">&quot;</span>,
+                                                                                              fsize,client_name,psrp_command);
+
+    <span class="Statement">for</span>(i=decoded + <span class="Constant">1</span>; i&lt;argc; ++i)
+    {  <span class="Statement">if</span>(strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;-usage&quot;</span>) != <span class="Constant">0</span> &amp;&amp; strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;-help&quot;</span>) != <span class="Constant">0</span>)
+       {  (<span class="Type">void</span>)strlcat(xterm_command,<span class="Constant">&quot; &quot;</span>,    SSIZE);
+          (<span class="Type">void</span>)strlcat(xterm_command,argv[i],SSIZE);
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Note pen (if any) </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(strcmp(argv[i],<span class="Constant">&quot;-pen&quot;</span>) == <span class="Constant">0</span>)
+          (<span class="Type">void</span>)strlcpy(client_name,argv[i+<span class="Constant">1</span>],SSIZE);
+    }
+
+    <span class="Statement">if</span>(strcmp(soft_dongle,<span class="Constant">&quot;notset&quot;</span>) != <span class="Constant">0</span>)
+       (<span class="Type">void</span>)strlcat(xterm_command,<span class="Constant">&quot;'&quot;</span>,SSIZE);
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Run psrp client in new xterm </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)system(xterm_command);
+
+    exit(<span class="Constant">0</span>);
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

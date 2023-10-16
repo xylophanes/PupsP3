@@ -41,9 +41,9 @@ xtee \ extended tee command
 .B -tee_file
 .I name
 ]
-< stdin
-1> stdout
-2> <log file>
+!< <stdin>!
+[1> <stdout>]
+[2> <log file>]
 .br
 
 .SH DESCRIPTION
@@ -197,6 +197,22 @@ or a
 .I xtee(1)
 makes use of PUPS libraries [Portable UNIX Programming System], see
 .I pups(3)
+.br
+
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
+.br
+
+.SH ENVIRONMENTAL VARIABLES
+none.
 .br
 
 .SH COPYRIGHT

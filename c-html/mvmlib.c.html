@@ -1,0 +1,1167 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/mvmlib.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Error { color: #ffffff; background-color: #ff6060; padding-bottom: 1px; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Purpose: Meta virtual page demand dynamic object support library.</span>
+
+<span class="Comment">    Author:  M.A. O'Neill</span>
+<span class="Comment">              Tumbling Dice Ltd</span>
+<span class="Comment">              Gosforth</span>
+<span class="Comment">              Newcastle upon Tyne</span>
+<span class="Comment">              NE3 4RT</span>
+<span class="Comment">              United Kingdom</span>
+
+<span class="Comment">    Version: 2.02 </span>
+<span class="Comment">    Dated:   4th January 2022</span>
+<span class="Comment">    E-mail:  mao@tumblingdice.co..uk</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;me.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;utils.h&gt;</span>
+
+<span class="PreProc">#undef  __NOT_LIB_SOURCE__</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;mvm.h&gt;</span>
+<span class="PreProc">#define __NOT_LIB_SOURCE__</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/types.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/file.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;errno.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Get application information for slot manager </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Slot information function </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> mvm_slot(<span class="Type">int</span> level)
+{   (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;lib mvmlib </span><span class="Special">%s</span><span class="Constant">: [ANSI C]</span><span class="Special">\n</span><span class="Constant">&quot;</span>,MVMLIB_VERSION);
+
+    <span class="Statement">if</span>(level &gt; <span class="Constant">1</span>)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;(c) 1995-2022 Tumbling Dice</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Author: M.A. O'Neill</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Meta virtual paged object library (built </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    }
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+}
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Segment identification for mvm library </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef SLOT</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;slotman.h&gt;</span>
+_EXTERN <span class="Type">void</span> (* SLOT ) = mvm_slot;
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> SLOT </span><span class="Comment">*/</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Variables which are private to this module </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE mvm_type *mvmtab[MVM_TABLE_SIZE] = { (mvm_type *)<span class="Constant">NULL</span> };
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Functions which are private to this module ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Comment">// Lock list updater</span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> mvm_update_lock_map(<span class="Type">int</span>, mvm_type *);
+
+<span class="Comment">// Create a usage keyed index table for a meta virtual memory structure</span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> mvm_index_phys_pages(mvm_type *);
+
+<span class="Comment">// Read a page from backing store</span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> mvm_read_page_from_backing_store(mvm_type *, <span class="Type">int</span>);
+
+<span class="Comment">// Read a page from backing store</span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> mvm_write_page_to_backing_store(mvm_type *, <span class="Type">int</span>);
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Get a line from image file on disk - this is a modeified version </span>
+<span class="Comment">    of the algorithm used in the Alvey MMI-137 version of the cached</span>
+<span class="Comment">    stereomatcher code ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+_PUBLIC <span class="Type">int</span> mvm_page(<span class="Type">int</span>      v_page,   <span class="Comment">// Page to cache</span>
+	             mvm_type   *mvm)   <span class="Comment">// Meta virtual memory mapper</span>
+
+{   <span class="Type">int</span> i,
+        phys_page;
+
+    <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span> bytes_read,
+                      v_page_offset;
+
+    <span class="Statement">if</span>(v_page &lt; <span class="Constant">0</span> || mvm == (mvm_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Do we already have the line we need &quot;paged&quot; into the image cache </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> buffer                                                           </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((phys_page = mvm-&gt;v_page_map[v_page]) != PAGE_NOT_USED)
+    {  ++mvm-&gt;page_status[phys_page].v_page_usage;
+       mvm_update_lock_map(phys_page,mvm);
+
+       pups_set_errno(OK);
+       <span class="Statement">return</span>;
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> We have not got the required line &quot;paged&quot; into the image cache buffer. </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> There are two possibilities here (a) There may still be space to       </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> &quot;page&quot; the line directly into the cache buffer or (b) we may need      </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> to remove data from the cache buffer to make space for the new item.   </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">                                                                        </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> If the second case pertains then we will expell that item of date      </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> which has currently been accessed the least - before this is done      </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> we will have to sort the list of pages ...                             </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> -----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(mvm-&gt;page_slots == mvm-&gt;max_page_slots)
+    {  <span class="Statement">if</span>(mvm-&gt;sched_policy == MVM_AGED_AND_ORDERED)
+       {  <span class="Statement">if</span>(mvm-&gt;aged_and_ordered == FALSE)
+             mvm_age_and_order(mvm);
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Find page which is not currently locked and in use </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(mvm-&gt;clock_ptr &gt;= mvm-&gt;max_page_slots)
+          mvm-&gt;clock_ptr = <span class="Constant">0</span>;
+
+       <span class="Statement">while</span>(mvm-&gt;ulist_ptr &lt; mvm-&gt;max_page_slots                                             &amp;&amp;
+             mvm-&gt;page_status[mvm-&gt;usage_map[mvm-&gt;clock_ptr]].locked == mvm-&gt;current_lock_state)
+       {     ++mvm-&gt;clock_ptr;
+             ++mvm-&gt;ulist_ptr;
+
+             <span class="Statement">if</span>(mvm-&gt;clock_ptr &gt;= mvm-&gt;max_page_slots)
+                mvm-&gt;clock_ptr = <span class="Constant">0</span>;
+       }
+
+       <span class="Statement">if</span>(mvm-&gt;ulist_ptr == mvm-&gt;max_page_slots)
+       {
+
+<span class="PreProc">          #ifdef DEBUG</span>
+          <span class="Statement">if</span>(appl_verbose == TRUE)
+          {  (<span class="Type">void</span>)strdate(date);
+             (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): all pages locked and in use for mvm </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                        date,appl_name,appl_pid,appl_host,appl_owner,mvm-&gt;name);
+
+             (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): Increasing number of physical pages</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                     date,appl_name,appl_pid,appl_host,appl_owner,mvm-&gt;name);
+
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+          }
+<span class="PreProc">          #endif</span> <span class="Comment">/*</span><span class="Comment"> DEBUG </span><span class="Comment">*/</span>
+
+          ++mvm-&gt;max_page_slots;
+          <span class="Statement">goto</span> allocate_more_resources;
+       }
+
+       phys_page = mvm-&gt;usage_map[mvm-&gt;clock_ptr];
+
+
+       <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> The buffer is fully allocated - throw out the &quot;page&quot; of image data </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">  which is currently the least accessed and use the data buffer     </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> currently allocated to it for the incoming line of data which      </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> actually needs it                                                  </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">       #ifdef DEBUG</span>
+       <span class="Statement">if</span>(appl_verbose == TRUE)
+       {  (<span class="Type">void</span>)strdate(date);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): page </span><span class="Special">%d</span><span class="Constant"> in mvm </span><span class="Special">%s</span><span class="Constant"> swapped for </span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                                 date,
+                                                                            appl_name,
+                                                                             appl_pid,
+                                                                            appl_host,
+                                                                           appl_owner,
+                                                   mvm-&gt;page_status[phys_page].v_page,
+                                                                            mvm-&gt;name,
+                                                                               v_page);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+<span class="PreProc">       #endif</span> <span class="Comment">/*</span><span class="Comment"> DEBUG </span><span class="Comment">*/</span>
+
+        <span class="Statement">if</span>(mvm-&gt;r_w_state == MVM_READ_WRITE)
+           mvm_write_page_to_backing_store(mvm,mvm-&gt;page_status[phys_page].v_page);
+
+        mvm-&gt;vmem[mvm-&gt;page_status[phys_page].v_page]       = (<span class="Type">void</span> *)<span class="Constant">NULL</span>;
+        mvm-&gt;v_page_map[mvm-&gt;page_status[phys_page].v_page] = PAGE_NOT_USED;
+        mvm-&gt;vmem[v_page]                                   = mvm-&gt;page_status[phys_page].v_page_location;
+        mvm-&gt;v_page_map[v_page]                             = phys_page;
+        mvm-&gt;page_status[phys_page].v_page                  = v_page;
+        mvm-&gt;page_status[phys_page].v_page_usage            = <span class="Constant">1</span>;
+        mvm_update_lock_map(phys_page,mvm);
+
+        <span class="Statement">if</span>(mvm-&gt;clock_ptr &lt; mvm-&gt;max_page_slots)
+           ++mvm-&gt;clock_ptr;
+
+        <span class="Statement">goto</span> page_in;
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Allocate more memory so we can read the line into the virtual image </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> buffer                                                              </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Statement">allocate_more_resources</span>:
+
+    phys_page           = mvm-&gt;page_slots;
+    mvm-&gt;vmem[v_page]   = (_BYTE *)pups_malloc(mvm-&gt;v_page_size*<span class="Statement">sizeof</span>(_BYTE));
+
+    <span class="Statement">if</span>(phys_page == <span class="Constant">0</span>)
+    {  mvm-&gt;page_status = (page_status_type *)pups_malloc(<span class="Statement">sizeof</span>(page_status_type));
+       mvm-&gt;usage_map   = (<span class="Type">int</span> *)             pups_malloc(<span class="Statement">sizeof</span>(<span class="Type">int</span>));
+    }
+    <span class="Statement">else</span>
+    {  mvm-&gt;page_status = (page_status_type *)pups_realloc((<span class="Type">void</span> *)mvm-&gt;page_status,
+                                                       (phys_page + <span class="Constant">1</span>)*<span class="Statement">sizeof</span>(page_status_type));
+
+       mvm-&gt;usage_map   = (<span class="Type">int</span> *)             pups_realloc((<span class="Type">void</span> *)mvm-&gt;usage_map,
+                                                       (phys_page + <span class="Constant">1</span>)*<span class="Statement">sizeof</span>(<span class="Type">int</span>));
+    }
+
+<span class="PreProc">    #ifdef DEBUG</span>
+    <span class="Statement">if</span>(appl_verbose == TRUE)
+    {  (<span class="Type">void</span>)strdate(date);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): virtual data cache extended (</span><span class="Special">%d</span><span class="Constant"> resident pages) in mvm </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                                                       date,
+                                                                                                  appl_name,
+                                                                                                   appl_pid,
+                                                                                                  appl_host,
+                                                                                                 appl_owner,
+                                                                                                  phys_page,
+                                                                                                  mvm-&gt;name);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    }
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> DEBUG </span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(mvm-&gt;page_slots == mvm-&gt;max_page_slots &amp;&amp; appl_verbose == TRUE)
+    {  (<span class="Type">void</span>)strdate(date);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">: cache now full (</span><span class="Special">%d</span><span class="Constant"> resident pages) in mvm </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                                         date,
+                                                                                    appl_name,
+                                                                                     appl_pid,
+                                                                                    appl_host,
+                                                                                   appl_owner,
+                                                                          mvm-&gt;max_page_slots,
+                                                                                    mvm-&gt;name);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Adjust the cache buffer to reflect the new allocation </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------</span><span class="Comment">*/</span>
+
+    mvm-&gt;page_status[phys_page].v_page_location = mvm-&gt;vmem[v_page];
+    mvm-&gt;page_status[phys_page].v_page          = v_page;
+    mvm-&gt;page_status[phys_page].v_page_usage    = <span class="Constant">1</span>;
+    mvm-&gt;v_page_map[v_page]                     = phys_page;
+    mvm-&gt;usage_map[phys_page]                   = phys_page;
+    mvm_update_lock_map(phys_page,mvm);
+    ++mvm-&gt;page_slots;
+
+
+<span class="Statement">page_in</span>:
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Now we are acutally in a position to &quot;page in&quot; the page of memory from </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> backing store - note for caching to work the backing store MUST be     </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> located on a seekable device                                           </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    mvm_read_page_from_backing_store(mvm,v_page);
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to age the pages in the mapper structure and sort them into to</span>
+<span class="Comment">    age order starting with the least used [youngest] page ...</span>
+<span class="Comment">--------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> mvm_age_and_order(mvm_type *mvm)
+
+{   <span class="Type">int</span> i;
+
+    <span class="Statement">if</span>(mvm == (mvm_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------------</span>
+<span class="Comment">    </span><span class="Error">/</span><span class="Comment">* Make sure that we do not try to age and order on subsequent calls to the</span>
+<span class="Comment">    </span><span class="Error">/</span><span class="Comment">* pager until we have called mvm_init again ...</span>
+<span class="Comment">    </span><span class="Error">/</span><span class="Comment">*--------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    mvm-&gt;aged_and_ordered = TRUE;
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Sort the pages - at the end of the sort the least used pages will be       </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> at the top of the cache status usage index array - note we cannot actually </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> sort the pages as they must remain at fixed (and known) locations so we    </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> can memory map efficiently                                                 </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    mvm_index_phys_pages(mvm);
+
+
+<span class="PreProc">    #ifdef AGE_MV_CACHE</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Then &quot;age&quot; the pages in the cache - decrement the usage count of all </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> cache pages by one - note if the first page has a usage count of 1   </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> there is no need to age the pages as it will be used anyway          </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+   <span class="Statement">if</span>(mvm-&gt;page_status[mvm-&gt;usage_map[<span class="Constant">1</span>]].v_page_usage &gt; <span class="Constant">1</span>)
+   {  <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;mvm-&gt;max_page_slots; ++i)
+	 <span class="Statement">if</span>(mvm-&gt;page_status[i].v_page_usage &gt; <span class="Constant">1</span>)
+	    --mvm-&gt;page_status[i].v_page_usage[i];
+   }
+<span class="PreProc">   #endif</span> <span class="Comment">/*</span><span class="Comment"> AGE_MV_CACHE </span><span class="Comment">*/</span>
+
+   pups_set_errno(OK);
+   <span class="Statement">return</span>(<span class="Constant">0</span>);
+
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------------</span>
+<span class="Comment">    Initialise an image cache ...</span>
+<span class="Comment">--------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> **mvm_init(<span class="Type">char</span>             *name,  <span class="Comment">// Name of virtual memory </span>
+                        _BOOLEAN   initialised,  <span class="Comment">// TRUE if swap initialised</span>
+                        <span class="Type">int</span>          r_w_state,  <span class="Comment">// Read write access state</span>
+                        <span class="Type">int</span>       sched_policy,  <span class="Comment">// Scheduling policy</span>
+                        <span class="Type">int</span>       v_page_slots,  <span class="Comment">// Pages in virtual memory</span>
+                        <span class="Type">int</span>     max_page_slots,  <span class="Comment">// Pages in physical memory</span>
+                        <span class="Type">int</span>                 fd,  <span class="Comment">// Backing store descriptor</span>
+                        <span class="Type">long</span>       v_page_size,  <span class="Comment">// Page size in virtual memory</span>
+                        mvm_type          *mvm)  <span class="Comment">// Virtual memory structure</span>
+
+{   <span class="Type">int</span>  i;
+    <span class="Type">char</span> errstr[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+    <span class="Statement">if</span>(mvm            ==  (mvm_type *)<span class="Constant">NULL</span>    ||
+       name           ==  (<span class="Type">char</span> *)<span class="Constant">NULL</span>        ||
+       v_page_slots   &lt;   <span class="Constant">0</span>                   ||
+       max_page_slots &lt;   <span class="Constant">0</span>                   ||
+       fd             &lt;   <span class="Constant">0</span>                   ||
+       v_page_size    &lt;   <span class="Constant">0</span>                    )
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>((<span class="Type">void</span> **)<span class="Constant">NULL</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Initialise meta virtual memory structure </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)strlcpy(mvm-&gt;name,name,SSIZE);
+    mvm-&gt;v_page_slots       = v_page_slots;
+    mvm-&gt;max_page_slots     = max_page_slots;
+    mvm-&gt;page_slots         = <span class="Constant">0</span>;
+    mvm-&gt;ulist_ptr          = <span class="Constant">0</span>;
+    mvm-&gt;clock_ptr          = <span class="Constant">0</span>;
+    mvm-&gt;fd                 = fd;
+    mvm-&gt;v_page_base        = pups_lseek(fd,<span class="Constant">0</span>,<span class="Constant">SEEK_CUR</span>);
+    mvm-&gt;v_page_size        = v_page_size;
+    mvm-&gt;aged_and_ordered   = FALSE;
+    mvm-&gt;initialised        = initialised;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Allocate the first set of item locks </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+
+    mvm-&gt;next_lock = <span class="Constant">0</span>;
+    mvm-&gt;max_lock  = MVM_QUANTUM;
+    mvm-&gt;lock_map  = (<span class="Type">int</span> *)pups_malloc(MVM_QUANTUM*<span class="Statement">sizeof</span>(<span class="Type">int</span>));
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set scheduling policy </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+
+    mvm-&gt;sched_policy = sched_policy;
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Read/write access state </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+
+    mvm-&gt;r_w_state  = r_w_state;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Allocate associated virtual memory map and associated page mapping array </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((mvm-&gt;vmem = (<span class="Type">void</span> **)pups_malloc(mvm-&gt;v_page_slots*<span class="Statement">sizeof</span>(<span class="Type">void</span> *))) == (<span class="Type">void</span> **)<span class="Constant">NULL</span>)
+    {   pups_set_errno(<span class="Constant">ENOMEM</span>);
+        <span class="Statement">return</span>((<span class="Type">void</span> **)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>((mvm-&gt;v_page_map = (<span class="Type">int</span> *)pups_malloc(mvm-&gt;v_page_slots*<span class="Statement">sizeof</span>(<span class="Type">int</span>))) == (<span class="Type">int</span> *)<span class="Constant">NULL</span>)
+    {   pups_set_errno(<span class="Constant">ENOMEM</span>);
+        <span class="Statement">return</span>((<span class="Type">void</span> **)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;mvm-&gt;v_page_slots; ++i)
+       mvm-&gt;v_page_map[i] = PAGE_NOT_USED;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Add MVM to table of open MVM's </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;MVM_TABLE_SIZE; ++i)
+    {  <span class="Statement">if</span>(mvmtab[i] == (mvm_type *)<span class="Constant">NULL</span>)
+       {  mvmtab[i] = mvm;
+
+          pups_set_errno(OK);
+          <span class="Statement">return</span>(mvm-&gt;vmem);
+       }
+    }
+
+    (<span class="Type">void</span>)snprintf(errstr,SSIZE,<span class="Constant">&quot;mvm_init: too many metata virtual memory objects (max per process </span><span class="Special">%d</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,MVM_TABLE_SIZE);
+    error(errstr);
+
+    pups_exit(<span class="Constant">255</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------</span>
+<span class="Comment">    Destroy meta virtual memory structure ...</span>
+<span class="Comment">---------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> mvm_destroy(mvm_type *mvm)
+
+{   <span class="Type">int</span> i;
+
+    <span class="Statement">if</span>(mvm == (mvm_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Remove MVM from MVM table </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;MVM_TABLE_SIZE; ++i)
+    {  <span class="Statement">if</span>(mvmtab[i] == mvm)
+          mvmtab[i] = (mvm_type *)<span class="Constant">NULL</span>;
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Write any pages in mvm object to backing store </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> if it has been marked read/write               </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(mvm-&gt;r_w_state == MVM_READ_WRITE)
+    {  <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;mvm-&gt;v_page_slots; ++i)
+          <span class="Statement">if</span>(mvm-&gt;v_page_map[i] != PAGE_NOT_USED)
+             mvm_write_page_to_backing_store(mvm,mvm-&gt;page_status[i].v_page);
+    }
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;mvm-&gt;v_page_slots; ++i)
+    {  <span class="Statement">if</span>(mvm-&gt;v_page_map[i] != PAGE_NOT_USED)
+          (<span class="Type">void</span> *)pups_free((<span class="Type">void</span> *)mvm-&gt;vmem[i]);
+    }
+
+    (<span class="Type">void</span> *)pups_free((<span class="Type">void</span> *)mvm-&gt;lock_map);
+    (<span class="Type">void</span> *)pups_free((<span class="Type">void</span> *)mvm-&gt;v_page_map);
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------</span>
+<span class="Comment">    Reset image cache usage list pointer ...</span>
+<span class="Comment">---------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> mvm_reset_pager(mvm_type *mvm)
+
+{   <span class="Type">int</span> i;
+
+    <span class="Statement">if</span>(mvm == (mvm_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    mvm-&gt;ulist_ptr        = <span class="Constant">0</span>;
+    mvm-&gt;aged_and_ordered = FALSE;
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Release all locked pages and reset the lock map counter </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+
+    ++mvm-&gt;current_lock_state;
+    mvm-&gt;next_lock = <span class="Constant">0</span>;
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------</span>
+<span class="Comment">    Update the lock map of current meta virtual object ...</span>
+<span class="Comment">---------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> mvm_update_lock_map(<span class="Type">int</span> phys_page, mvm_type *mvm)
+
+{   <span class="Type">int</span> i;
+
+    <span class="Statement">if</span>(phys_page &lt; <span class="Constant">0</span> || mvm == (mvm_type *)<span class="Constant">NULL</span>)
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Is the page already locked - if it is simply return </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;mvm-&gt;next_lock; ++i)
+    {  <span class="Statement">if</span>(mvm-&gt;lock_map[i] == phys_page)
+          <span class="Statement">return</span>(<span class="Constant">0</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Add the page to the table of locked pages, extending the table if </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> necessary                                                         </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(mvm-&gt;next_lock == mvm-&gt;max_lock)
+    {  mvm-&gt;max_lock += MVM_QUANTUM;
+       <span class="Statement">if</span>((mvm-&gt;lock_map = (<span class="Type">int</span> *)pups_realloc((<span class="Type">void</span> *)mvm-&gt;lock_map,mvm-&gt;max_lock*<span class="Statement">sizeof</span>(<span class="Type">int</span>))) == (<span class="Type">int</span> *)<span class="Constant">NULL</span>)
+           <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    mvm-&gt;page_status[phys_page].locked = mvm-&gt;current_lock_state;
+    mvm-&gt;lock_map[mvm-&gt;next_lock] = phys_page;
+    ++mvm-&gt;next_lock;
+
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------</span>
+<span class="Comment">    Build index table of current page usage levels ...</span>
+<span class="Comment">---------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> mvm_index_phys_pages(mvm_type *mvm)
+
+{   <span class="Type">int</span> i,
+        j,
+        l,
+        ir,
+        indxt,
+        q;
+
+    <span class="Statement">if</span>(mvm == (mvm_type *)<span class="Constant">NULL</span>)
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+
+    <span class="Statement">for</span>(j=<span class="Constant">1</span>; j&lt;mvm-&gt;page_slots; ++j)
+       mvm-&gt;usage_map[j] = j;
+
+    l  = ((mvm-&gt;page_slots - <span class="Constant">1</span>) &gt;&gt; <span class="Constant">1</span>) + <span class="Constant">1</span>;
+    ir = mvm-&gt;page_slots - <span class="Constant">1</span>;
+
+    <span class="Statement">for</span>(;;)
+    {  <span class="Statement">if</span>(l &gt; <span class="Constant">1</span>)
+          q = mvm-&gt;page_status[(indxt = mvm-&gt;usage_map[--l])].v_page_usage;
+       <span class="Statement">else</span>
+       {  q = mvm-&gt;page_status[(indxt = mvm-&gt;usage_map[ir])].v_page_usage;
+          mvm-&gt;usage_map[ir] = mvm-&gt;usage_map[<span class="Constant">1</span>];
+
+          <span class="Statement">if</span>(--ir == <span class="Constant">1</span>)
+          {  mvm-&gt;usage_map[<span class="Constant">1</span>] = indxt;
+             <span class="Statement">return</span>;
+          }
+       }
+
+       i = l;
+       j = l &lt;&lt; <span class="Constant">1</span>;
+
+       <span class="Statement">while</span>(j &lt;= ir)
+       {  <span class="Statement">if</span>(j &lt; ir                                               &amp;&amp;
+             mvm-&gt;page_status[mvm-&gt;usage_map[j]].v_page_usage      &lt;
+             mvm-&gt;page_status[mvm-&gt;usage_map[j+<span class="Constant">1</span>]].v_page_usage    )
+             ++j;
+
+          <span class="Statement">if</span>(q &lt; mvm-&gt;page_status[mvm-&gt;usage_map[j]].v_page_usage)
+          {  mvm-&gt;usage_map[i] = mvm-&gt;usage_map[j];
+             j += (i=j);
+          }
+          <span class="Statement">else</span>
+             j = ir + <span class="Constant">1</span>;
+       }
+
+       mvm-&gt;usage_map[i] = indxt;
+   }
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------</span>
+<span class="Comment">    Write a page of memory to backing store - note that this page is locked</span>
+<span class="Comment">    when this is done to avoid race condtions (if we have multiple readers</span>
+<span class="Comment">    and or writers) ...</span>
+<span class="Comment">---------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> mvm_read_page_from_backing_store(mvm_type *mvm, <span class="Type">int</span> v_page)
+
+{   <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span> v_page_offset,
+                      bytes_read;
+
+    <span class="Type">struct</span> flock page_flock;
+
+    <span class="Statement">if</span>(v_page &lt; <span class="Constant">0</span> || mvm == (mvm_type *)<span class="Constant">NULL</span>)
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+
+    v_page_offset = mvm-&gt;v_page_size*v_page;
+
+    <span class="Statement">if</span>((pups_lseek(mvm-&gt;fd,mvm-&gt;v_page_base + v_page_offset,L_SET)) == (-<span class="Constant">1</span>))
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+
+
+<span class="PreProc">    #ifdef SUPPORT_SHARED_MVM</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set lock on file segment </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+
+    page_flock.l_type   = F_RDLCK;
+    page_flock.l_whence = mvm-&gt;v_page_base + v_page_offset;
+    page_flock.l_start  = <span class="Constant">1</span>;
+    page_flock.l_len    = mvm-&gt;v_page_size*<span class="Statement">sizeof</span>(_BYTE);
+    (<span class="Type">void</span>)fcntl(mvm-&gt;fd,F_SETLKW,&amp;page_flock);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> SUPPORT_SHARED_MVM </span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(mvm-&gt;initialised == TRUE &amp;&amp; (bytes_read = pups_pipe_read(mvm-&gt;fd,mvm-&gt;vmem[v_page],mvm-&gt;v_page_size*<span class="Statement">sizeof</span>(_BYTE))) != mvm-&gt;v_page_size*<span class="Statement">sizeof</span>(_BYTE))
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;mvm_page: page read failed for mvm </span><span class="Special">%s</span><span class="Constant"> (page </span><span class="Special">%d</span><span class="Constant">, offset </span><span class="Special">%d</span><span class="Constant">: </span><span class="Special">%d</span><span class="Constant"> bytes read)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                                         mvm-&gt;name,v_page,
+                                                                                            v_page_offset,
+                                                                                               bytes_read);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    }
+
+
+<span class="PreProc">    #ifdef SUPPORT_SHARED_MVM</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Release lock on file segment </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)fcntl(mvm-&gt;fd,F_UNLCK,&amp;page_flock);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> SUPPORT_SHARED_MVM </span><span class="Comment">*/</span>
+
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------</span>
+<span class="Comment">    Write a page of memory to backing store ...</span>
+<span class="Comment">---------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> mvm_write_page_to_backing_store(mvm_type *mvm, <span class="Type">int</span> v_page)
+
+{   <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span> v_page_offset,
+                      bytes_written;
+
+    <span class="Type">struct</span> flock page_flock;
+
+    <span class="Statement">if</span>(v_page &lt; <span class="Constant">0</span> || mvm == (mvm_type *)<span class="Constant">NULL</span>)
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+
+    v_page_offset = mvm-&gt;v_page_size*v_page;
+    <span class="Statement">if</span>((pups_lseek(mvm-&gt;fd,mvm-&gt;v_page_base + v_page_offset,L_SET)) == (-<span class="Constant">1</span>))
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+
+<span class="PreProc">    #ifdef SUPPORT_SHARED_MVM</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set lock on file segment </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+
+    page_flock.l_type   = F_WRLCK;
+    page_flock.l_whence = mvm-&gt;v_page_base + v_page_offset;
+    page_flock.l_start  = <span class="Constant">1</span>;
+    page_flock.l_len    = mvm-&gt;v_page_size*<span class="Statement">sizeof</span>(_BYTE);
+    (<span class="Type">void</span>)fcntl(mvm-&gt;fd,F_SETLKW,&amp;page_flock);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> SUPPORT_SHARED_MVM </span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((bytes_written = write(mvm-&gt;fd,mvm-&gt;vmem[v_page], mvm-&gt;v_page_size*<span class="Statement">sizeof</span>(_BYTE))) != mvm-&gt;v_page_size*<span class="Statement">sizeof</span>(_BYTE))
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;mvm_page: page write failed for mvm </span><span class="Special">%s</span><span class="Constant"> (page </span><span class="Special">%d</span><span class="Constant">, offset </span><span class="Special">%d</span><span class="Constant">: </span><span class="Special">%d</span><span class="Constant"> bytes read)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                                          mvm-&gt;name,v_page,
+                                                                                             v_page_offset,
+                                                                                             bytes_written);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    }
+
+<span class="PreProc">    #ifdef SUPPORT_SHARED_MVM</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Release lock on file segment </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)fcntl(mvm-&gt;fd,F_UNLCK,&amp;page_flock);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> SUPPORT_SHARED_MVM </span><span class="Comment">*/</span>
+
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------</span>
+<span class="Comment">    Create an MVM swap file and return a handle to it ...</span>
+<span class="Comment">---------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> mvm_create_named_swapfile(<span class="Type">char</span> *swap_file_name,
+                                      <span class="Type">int</span>            pages,
+                                      <span class="Type">long</span>       page_size)
+
+{   <span class="Type">int</span>   i,
+          swap_handle = (-<span class="Constant">1</span>);
+
+    _BYTE *buf        = (_BYTE *)<span class="Constant">NULL</span>;
+    <span class="Type">struct</span> flock page_flock;
+
+    <span class="Statement">if</span>(swap_file_name == (<span class="Type">char</span> *)<span class="Constant">NULL</span> || pages &lt; <span class="Constant">0</span> || page_size &lt; <span class="Constant">0L</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check that this swap file does not already exist </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(access(swap_file_name,F_OK) != (-<span class="Constant">1</span>))
+    {  pups_set_errno(<span class="Constant">EEXIST</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Create swap file </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(pups_creat(swap_file_name,<span class="PreProc">0</span><span class="Constant">644</span>) == (-<span class="Constant">1</span>))
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+
+    pups_set_errno(OK);
+    swap_handle = pups_open(swap_file_name,<span class="Constant">2</span>,LIVE);
+
+<span class="PreProc">    #ifdef SUPPORT_SHARED_MVM</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set lock on file segment </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+
+    page_flock.l_type   = F_WRLCK;
+    page_flock.l_whence = <span class="Constant">0</span>;
+    page_flock.l_start  = <span class="Constant">0</span>;
+    page_flock.l_len    = <span class="Constant">1</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> If we fail to get lock on paging file simply return </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> someone else is taking care of initialisation!      </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(fcntl(swap_handle,F_SETLK,&amp;page_flock) == (-<span class="Constant">1</span>))
+    {  page_flock.l_type   = F_RDLCK;
+       page_flock.l_whence = <span class="Constant">0</span>;
+       page_flock.l_start  = <span class="Constant">0</span>;
+       page_flock.l_len    = <span class="Constant">1</span>;
+
+
+       <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Acquire a read lock before we return </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+
+       (<span class="Type">void</span>)fcntl(swap_handle,F_SETLKW,&amp;page_flock);
+
+       pups_set_errno(OK);
+       <span class="Statement">return</span>(swap_handle);
+    }
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> SUPPORT_SHARED_MVM </span><span class="Comment">*/</span>
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Fill swap file </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+
+    buf = (_BYTE *)pups_malloc(page_size);
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;pages; ++i)
+       (<span class="Type">void</span>)write(swap_handle,buf,page_size);
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set pointer to start of file </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pups_lseek(swap_handle,<span class="Constant">0</span>,<span class="Constant">SEEK_SET</span>);
+
+
+<span class="PreProc">    #ifdef SUPPORT_SHARED_MVM</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Downgrade write lock to read lock </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+
+    page_flock.l_type   = F_RDLCK;
+    page_flock.l_whence = <span class="Constant">0</span>;
+    page_flock.l_start  = <span class="Constant">0</span>;
+    page_flock.l_len    = <span class="Constant">1</span>;
+    (<span class="Type">void</span>)fcntl(swap_handle,F_SETLK,&amp;page_flock);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> SUPPORT_SHARED_MVM </span><span class="Comment">*/</span>
+
+    <span class="Statement">return</span>(swap_handle);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------------</span>
+<span class="Comment">    Create an MVM swapfile using an open file handle ...</span>
+<span class="Comment">----------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> mvm_create_swapfile(<span class="Type">int</span> swap_handle,
+                                <span class="Type">int</span>       pages,
+                                <span class="Type">long</span>  page_size)
+
+
+{   <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span> offset;
+    <span class="Type">struct</span> flock      page_flock;
+
+    <span class="Statement">if</span>(swap_handle &lt; <span class="Constant">0</span> || pages &lt; <span class="Constant">0</span> || page_size &lt; <span class="Constant">0L</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+<span class="PreProc">    #ifdef SUPPORT_SHARED_MVM</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set lock on file segment </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+
+    page_flock.l_type   = F_WRLCK;
+    page_flock.l_whence = <span class="Constant">0</span>;
+    page_flock.l_start  = <span class="Constant">0</span>;
+    page_flock.l_len    = <span class="Constant">1</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> If we fail to get lock on paging file simply return </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> someone else is taking care of initialisation!      </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(fcntl(swap_handle,F_SETLK,&amp;page_flock) == (-<span class="Constant">1</span>))
+    {  page_flock.l_type   = F_RDLCK;
+       page_flock.l_whence = <span class="Constant">0</span>;
+       page_flock.l_start  = <span class="Constant">0</span>;
+       page_flock.l_len    = <span class="Constant">1</span>;
+
+
+       <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Acquire a read lock before we return </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+
+       (<span class="Type">void</span>)fcntl(swap_handle,F_SETLKW,&amp;page_flock);
+
+       pups_set_errno(<span class="Constant">EBUSY</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> SUPPORT_SHARED_MVM </span><span class="Comment">*/</span>
+
+    pups_set_errno(OK);
+    offset = pups_lseek(swap_handle,<span class="Constant">0</span>,<span class="Constant">SEEK_CUR</span>);
+    (<span class="Type">void</span>)pups_lseek(swap_handle,(<span class="Type">long</span>)pages*page_size,<span class="Constant">SEEK_END</span>);
+    (<span class="Type">void</span>)pups_lseek(swap_handle,<span class="Constant">0</span>,<span class="Constant">SEEK_SET</span>);
+
+
+<span class="PreProc">    #ifdef SUPPORT_SHARED_MVM</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Release lock on paging file       </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Downgrade write lock to read lock </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+
+    page_flock.l_type   = F_RDLCK;
+    page_flock.l_whence = <span class="Constant">0</span>;
+    page_flock.l_start  = <span class="Constant">0</span>;
+    page_flock.l_len    = <span class="Constant">1</span>;
+    (<span class="Type">void</span>)fcntl(swap_handle,F_SETLK,&amp;page_flock);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> SUPPORT_SHARED_MVM </span><span class="Comment">*/</span>
+
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------------</span>
+<span class="Comment">    Delete MVM swapfile ...</span>
+<span class="Comment">----------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> mvm_delete_swapfile(<span class="Type">int</span> swap_file_handle, <span class="Type">char</span> *swap_file_name)
+
+{   <span class="Type">struct</span> flock page_flock;
+
+    <span class="Statement">if</span>(swap_file_handle &lt; <span class="Constant">0</span> || swap_file_name == (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    pups_set_errno(OK);
+    (<span class="Type">void</span>)pups_close((<span class="Type">long</span>)swap_file_handle);
+
+<span class="PreProc">    #ifdef SUPPORT_SHARED_MVM</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Release lock on paging file                             </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> The last process to leave the room turns off the lights </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> and shuts the door!                                     </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+
+    page_flock.l_type   = F_WRLCK;
+    page_flock.l_whence = <span class="Constant">0</span>;
+    page_flock.l_start  = <span class="Constant">0</span>;
+    page_flock.l_len    = <span class="Constant">1</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> If we are the last process to hold a read lock on this        </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> swapfile we can upgrade it to a write lock. At this point     </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> we are the exclusive owner of this file and can safely delete </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> it.                                                           </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(fcntl(swap_file_handle,F_GETLK,&amp;page_flock) == <span class="Constant">0</span>)
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> SUPPORT_SHARED_MVM </span><span class="Comment">*/</span>
+       (<span class="Type">void</span>)unlink(swap_file_name);
+
+    <span class="Statement">if</span>(pups_get_errno() == OK)
+       <span class="Statement">return</span>(<span class="Constant">0</span>);
+    <span class="Statement">else</span>
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------------</span>
+<span class="Comment">    Mark MVM swapfile initialised ...</span>
+<span class="Comment">----------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> mvm_initialised(mvm_type *mvm)
+
+{   <span class="Statement">if</span>(mvm == (mvm_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(OK);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    mvm-&gt;initialised = TRUE;
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------------</span>
+<span class="Comment">    Set maximum (resident) cache for MVM object ...</span>
+<span class="Comment">----------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> mvm_change_cache_size(<span class="Type">int</span> max_page_slots, mvm_type *mvm)
+
+{   <span class="Statement">if</span>(mvm == (mvm_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>;
+    }
+
+    mvm-&gt;max_page_slots = max_page_slots;
+    pups_set_errno(OK);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------------</span>
+<span class="Comment">    Show MVM object statitics ...</span>
+<span class="Comment">----------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC mvm_stat(<span class="Type">FILE</span> *stream, mvm_type *mvm)
+
+{   <span class="Type">struct</span> flock page_flock;
+
+    <span class="Statement">if</span>(mvm == (mvm_type *)<span class="Constant">NULL</span> || stream == (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>;
+    }
+
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    Meta virtual memory object: </span><span class="Special">%s</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,mvm-&gt;name);
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    Page size (virtual)              :  </span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,mvm-&gt;v_page_slots);
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    Page size (physical)             :  </span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,mvm-&gt;max_page_slots);
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    Physical page slots in use       :  </span><span class="Special">%d</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,mvm-&gt;page_slots);
+
+    page_flock.l_type   = F_RDLCK;
+    page_flock.l_whence = <span class="Constant">0</span>;
+    page_flock.l_start  = <span class="Constant">0</span>;
+    page_flock.l_len    = <span class="Constant">1</span>;
+
+<span class="PreProc">    #ifdef SUPPORT_SHARED_MVM </span>
+    <span class="Statement">if</span>(fcntl(mvm-&gt;fd,F_GETLK,&amp;page_flock) == (-<span class="Constant">1</span>))
+       (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    MVM ownership                    :  shared</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    MVM ownership                    :  exclusive</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> SUPPORT_SHARED_MVM </span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    Paging array at 0x</span><span class="Special">%010x</span><span class="Constant"> virtual</span><span class="Special">\n</span><span class="Constant">&quot;</span>,(<span class="Type">long</span>)mvm-&gt;vmem);
+
+    <span class="Statement">if</span>(mvm-&gt;r_w_state == MVM_READ_WRITE)
+       (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    MVM is read/write</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    MVM is read only</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+
+
+
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    Paging array at 0x</span><span class="Special">%010x</span><span class="Constant"> virtual</span><span class="Special">\n</span><span class="Constant">&quot;</span>,(<span class="Type">long</span>)mvm-&gt;vmem);
+
+    <span class="Statement">if</span>(mvm-&gt;r_w_state == MVM_READ_WRITE)
+       (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    MVM is read/write</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    MVM is read only</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+
+    <span class="Statement">if</span>(mvm-&gt;sched_policy == MVM_AGED_AND_ORDERED)
+       (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    Using age order scheduling for page replacement</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    Using round robin scheduling for page replacement</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+
+    <span class="Statement">if</span>(mvm-&gt;initialised == TRUE)
+       (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    MVM is initialised</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    MVM is uninitialised</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+
+    (<span class="Type">void</span>)fflush(stream);
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>;
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------------</span>
+<span class="Comment">    Show MVM objects attached to current application ...</span>
+<span class="Comment">----------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> mvm_show_mvm_objects(<span class="Type">FILE</span> *stream)
+
+{   <span class="Type">int</span> i,
+        cnt = <span class="Constant">0</span>;
+
+    <span class="Statement">if</span>(stream == (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>;
+    }
+
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    MVM objects map for </span><span class="Special">%s</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,appl_name);
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;MVM_TABLE_SIZE; ++i)
+    {   <span class="Statement">if</span>(mvmtab[i] != (mvm_type *)<span class="Constant">NULL</span>)
+        {  (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    </span><span class="Special">%8d</span><span class="Constant">: </span><span class="Special">%s</span><span class="Constant"> (at 0x</span><span class="Special">%010x</span><span class="Constant"> virtual)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,cnt,mvmtab[i]-&gt;name,(<span class="Type">long</span>)mvmtab[i]-&gt;vmem);
+           (<span class="Type">void</span>)fflush(stream);
+
+           ++cnt;
+        }
+    }
+
+    <span class="Statement">if</span>(cnt == <span class="Constant">0</span>)
+       (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    no MVM slots in use (</span><span class="Special">%d</span><span class="Constant"> MVM slots available)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,MVM_TABLE_SIZE);
+    <span class="Statement">else</span> <span class="Statement">if</span>(cnt == <span class="Constant">1</span>)
+       (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    1 MVM slot in use (</span><span class="Special">%d</span><span class="Constant"> MVM slots available)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,MVM_TABLE_SIZE - cnt);
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    </span><span class="Special">%d</span><span class="Constant"> MVM slots in use (</span><span class="Special">%d</span><span class="Constant"> MVM slots available)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,cnt,MVM_TABLE_SIZE - cnt);
+
+    (<span class="Type">void</span>)fflush(stream);
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

@@ -29,8 +29,7 @@ KEPHER \- remove stale temporary files from directory
 |
 .I monitor process name
 ]
-[ >& error/status log file
-]
+[2> <log file>]
 .br
 
 .SH DESCRIPTION
@@ -198,8 +197,6 @@ specified in quoted from (e.g. "lock tmp") if there is more than one file extens
 in the list.
 .br
 
-
-
 .B -mpid
 .I monitor PID 
 |
@@ -220,6 +217,18 @@ process name is specified it must be unique.
 
 .SH FILES
 .I kepher.run
+.br
+
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
 .br
 
 .SH ENVIRONMENT VARIABLES

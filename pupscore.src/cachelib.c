@@ -7,8 +7,8 @@
              NE3 54RT
              Tyne and Wear
 
-    Dated:   27th September 2019 
-    Version: 2.00 
+    Version: 4.14
+    Dated:   18th September 2023 
     Email:   mao@tumblingdice.co.uk
 ---------------------------------------------------------------------------*/
 
@@ -82,7 +82,7 @@ _PRIVATE void cache_slot(int level)
 {   (void)fprintf(stderr,"lib cachelib %s: [ANSI C]\n",CACHELIB_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(c) 2001-2019 Tumbling Dice, Gosforth\n");
+    {  (void)fprintf(stderr,"(c) 2001-2022 Tumbling Dice, Gosforth\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
        (void)fprintf(stderr,"PUPS/P3 fast caching library (built %s %s)\n",__TIME__,__DATE__);
        (void)fflush(stderr);
@@ -129,17 +129,20 @@ _PRIVATE int print_bytes(FILE *,
 // ghost file, synchronising it with memory area
 _PRIVATE void *mmap_invmap_cachememory(unsigned int,
                                        const char *,
+                                       const int,
                                        const unsigned long int);
 
 // Memory map cache directly into the address space
 // of the program
 _PRIVATE void *mmap_fwdmap_cachememory(unsigned int,
                                        const char *,
+                                       const int,
                                        const unsigned long int);
 
 // Map cache memory
 _PRIVATE void *cache_mmap_cachememory (unsigned int,
                                        const char *,
+                                       const  int,
                                        const unsigned long int,
                                        unsigned long int *);
 
@@ -153,6 +156,7 @@ _PRIVATE void *cache_mmap_cachememory (unsigned int,
 
 _PRIVATE void *mmap_fwdmap_cachememory(const unsigned int                c_index,  // Cache index
                                        const          char       *cachefile_name,  // Cache file name
+                                       const          int              h_p_state,  // Hoemostatic protection state
                                        const unsigned long int              size)  // Size of cache
 
 {   int fd,
@@ -165,7 +169,7 @@ _PRIVATE void *mmap_fwdmap_cachememory(const unsigned int                c_index
     /* File permissions must match memory mapping mode */
     /*-------------------------------------------------*/
 
-    if((fd = pups_open(cachefile_name,O_RDWR,LIVE)) == (-1))
+    if((fd = pups_open(cachefile_name,O_RDWR,h_p_state)) == (-1))
     {  (void)snprintf("[mmap_fwdmap_cachememory] cannot open cachefile \"%s\"",SSIZE,cachefile_name);
        pups_error(errstr);
     }
@@ -229,9 +233,10 @@ _PRIVATE void *mmap_fwdmap_cachememory(const unsigned int                c_index
 /* ghost file, synchronising it with memory area */
 /*-----------------------------------------------*/
 
-_PRIVATE void *mmap_invmap_cachememory(const unsigned int        c_index,  // Cache index
-                                       const char        *cachefile_name,  // Name of cache file
-                                       unsigned long int            size)  // Size of cache
+_PRIVATE void *mmap_invmap_cachememory(const    unsigned int         c_index,  // Cache index
+                                       const    char         *cachefile_name,  // Name of cache file
+                                       const    int                h_p_state,  // Homeostatic protection state
+                                       unsigned long int                size)  // Size of cache
 
 {   int  map_flags = 0,
          fd        = (-1);
@@ -251,7 +256,7 @@ _PRIVATE void *mmap_invmap_cachememory(const unsigned int        c_index,  // Ca
        }
     }
 
-    if((fd = pups_open(cachefile_name,O_RDWR,LIVE)) == (-1))
+    if((fd = pups_open(cachefile_name,O_RDWR,h_p_state)) == (-1))
     {  (void)snprintf(errstr,SSIZE,"[mmap_invmap_cachememory] cannot open cachefile \"%s\"",cachefile_name);
        pups_error(errstr);
     }
@@ -370,7 +375,6 @@ _PUBLIC int cache_name2index(const _BOOLEAN have_cache_lock, const char *name)
     pups_error(errstr);
  
     return(-1);
-
 }
 
 
@@ -381,10 +385,11 @@ _PUBLIC int cache_name2index(const _BOOLEAN have_cache_lock, const char *name)
 /* does not exit                */
 /*------------------------------*/
 
-_PRIVATE void *cache_mmap_cachememory(const unsigned int   c_index,  // Cache index
-                                      const char        *file_name,  // Cache file name
-                                      const unsigned long int size,  // Cache size
-                                      unsigned long int       *crc)  // Cache (64 bit) CRC 
+_PRIVATE void *cache_mmap_cachememory(const unsigned int     c_index,  // Cache index
+                                      const char          *file_name,  // Cache file name
+                                      const int            h_p_state,  // Homeostatic protection state
+                                      const unsigned long   int size,  // Cache size
+                                      unsigned long int         *crc)  // Cache (64 bit) CRC 
 
 {   void *cache_ptr = (void *)NULL;
 
@@ -403,7 +408,7 @@ _PRIVATE void *cache_mmap_cachememory(const unsigned int   c_index,  // Cache in
     /*--------------------------*/
     
     if(access(file_name,F_OK | R_OK | W_OK) == (-1))
-       cache_ptr = mmap_invmap_cachememory(c_index,file_name,size);
+       cache_ptr = mmap_invmap_cachememory(c_index,file_name,h_p_state,size);
 
 
     /*--------------------*/
@@ -419,29 +424,25 @@ _PRIVATE void *cache_mmap_cachememory(const unsigned int   c_index,  // Cache in
        /* Check CRC (is cache corrupted?) */
        /*---------------------------------*/
 
-       cache_ptr = mmap_fwdmap_cachememory(c_index,file_name,size);
-       tmp_crc   = pups_crc_64(size,cache_ptr);
-
-       if(tmp_crc != 0x0 && cache[c_index].crc != tmp_crc)
-       {
-
-          /*-------------------------------------------------*/
-          /* Fatal error if CRC not being returned to caller */
-          /*-------------------------------------------------*/
-
-          if(crc == (void *)NULL)
-          {  (void)snprintf(errstr,SSIZE,"[cache_mmap_cachememory] CRC check failure (%016lx != %016lx)",cache[c_index].crc,crc);
-              pups_error(errstr);
-          }
+       cache_ptr = mmap_fwdmap_cachememory(c_index,file_name,h_p_state,size);
 
 
-          /*----------------------*/
-          /* Unmap the cache and  */
-          /* return CRC to caller */
-          /*----------------------*/
+       /*---------------------------------*/
+       /* Check CRC (is cache corrupted?) */
+       /*---------------------------------*/
 
-          else
-          {  cache[c_index].cache_ptr = cache_ptr; 
+       if(crc != (unsigned long int *)NULL)
+       {  tmp_crc   = pups_crc_64(size,cache_ptr);
+
+          if(tmp_crc != 0x0 && cache[c_index].crc != 0x0 && cache[c_index].crc != tmp_crc)
+          {
+
+             /*----------------------*/
+             /* Unmap the cache and  */
+             /* return CRC to caller */
+             /*----------------------*/
+
+             cache[c_index].cache_ptr = cache_ptr; 
              (void)cache_destroy(TRUE,FALSE,c_index); 
 
              *crc = 0x0;
@@ -449,15 +450,15 @@ _PRIVATE void *cache_mmap_cachememory(const unsigned int   c_index,  // Cache in
              pups_set_errno(EINVAL);
              return((void *)NULL);
           }
+
+
+          /*----------------------*/
+          /* Return CRC to caller */
+          /*----------------------*/
+
+          else if(crc != (void *)NULL)
+             *crc = tmp_crc;
        }
-
-
-       /*----------------------*/
-       /* Return CRC to caller */
-       /*----------------------*/
-
-       else if(crc != (void *)NULL)
-          *crc = tmp_crc;
     }
 
     pups_set_errno(OK);
@@ -496,10 +497,11 @@ _PUBLIC int cache_table_init(void)
        {   int j;
            pthread_mutexattr_t attr;
 
-           (void)strlcpy(cache[i].name,"",SSIZE);
-           (void)strlcpy(cache[i].mapinfo_name,"",SSIZE);
-           (void)strlcpy(cache[i].mmap_name,"",SSIZE);
-           (void)strlcpy(cache[i].auxinfo,"",SSIZE);
+           (void)strlcpy(cache[i].path        ,"" ,SSIZE);
+           (void)strlcpy(cache[i].name        ,"", SSIZE);
+           (void)strlcpy(cache[i].mapinfo_name,"", SSIZE);
+           (void)strlcpy(cache[i].mmap_name   ,"", SSIZE);
+           (void)strlcpy(cache[i].auxinfo     ,"", SSIZE);
 
            (void)pthread_mutexattr_settype(&attr,PTHREAD_MUTEX_RECURSIVE);
            (void)pthread_mutex_init(&cache[i].mutex,&attr);
@@ -513,6 +515,7 @@ _PUBLIC int cache_table_init(void)
            cache[i].block_size = 0L;
            cache[i].cache_size = 0L;
            cache[i].crc        = 0L;
+           cache[i].colsize    = 0;
 
            for(j=0; j<MAX_CACHE_BLOCK_OBJECTS; ++j)
            {  cache[i].object_size[i]   = 0L;
@@ -524,6 +527,8 @@ _PUBLIC int cache_table_init(void)
            cache[i].cache_ptr    = (void             *)NULL;
            cache[i].flags        = (_BYTE            *)NULL;
            cache[i].tag          = (unsigned int     *)NULL;
+           cache[i].lifetime     = (int              *)NULL;
+           cache[i].hubness      = (unsigned int     *)NULL;
            cache[i].rwlock       = (pthread_rwlock_t *)NULL;
        }
 
@@ -642,7 +647,9 @@ _PUBLIC int cache_create(const _BOOLEAN     have_cache_lock,  // Lock held on ca
                          unsigned long int             *crc,  // Cache (64 bit) CRC
                          const unsigned int         c_index)  // Cache indentifier
 
-{   int               i;
+{   int i,
+        h_p_state = DEAD;
+
     unsigned long int current_offset = 0L;
 
 
@@ -658,7 +665,6 @@ _PUBLIC int cache_create(const _BOOLEAN     have_cache_lock,  // Lock held on ca
     /*--------------*/
     /* Sanity check */
     /*--------------*/
-
     /*---------*/
     /* No name */
     /*---------*/
@@ -695,7 +701,8 @@ _PUBLIC int cache_create(const _BOOLEAN     have_cache_lock,  // Lock held on ca
     /*----------------*/
 
     if((mmap & CACHE_USE_MAPINFO) == 0)
-    {  char basename[SSIZE] = "";
+    {  char path[SSIZE]      = "",
+            basename[SSIZE]  = "";
 
 
        /*---------------------------------*/
@@ -707,12 +714,20 @@ _PUBLIC int cache_create(const _BOOLEAN     have_cache_lock,  // Lock held on ca
 
 
        /*----------------*/
+       /* Set cache path */
+       /*----------------*/
+
+       (void)strbranch(name,path);
+       (void)strlcpy (cache[c_index].path,path,SSIZE);
+
+
+       /*----------------*/
        /* Set cache name */
        /*----------------*/
 
        (void)strleaf(name,basename);
        (void)strtrnc(basename,'.',1);
-       (void)strlcpy (cache[c_index].name,              basename,SSIZE);
+       (void)strlcpy (cache[c_index].name,basename,SSIZE);
 
        cache[c_index].mmap = CACHE_MMAP;
 
@@ -763,6 +778,16 @@ _PUBLIC int cache_create(const _BOOLEAN     have_cache_lock,  // Lock held on ca
 
        else
           cache[c_index].mmap != CACHE_DEPOPULATE;
+
+
+       /*------------------------*/
+       /* Homeostatic protection */
+       /*------------------------*/
+
+       if(mmap & CACHE_LIVE)
+       {  cache[c_index].mmap |= CACHE_LIVE; 
+          h_p_state = LIVE;
+       }
     }
 
 
@@ -807,6 +832,16 @@ _PUBLIC int cache_create(const _BOOLEAN     have_cache_lock,  // Lock held on ca
 
        else if(mmap & CACHE_DEPOPULATE)
           cache[c_index].mmap |= CACHE_DEPOPULATE; 
+
+
+       /*------------------------*/
+       /* Homeostatic protection */
+       /*------------------------*/
+
+       if(mmap & CACHE_LIVE)
+       {  cache[c_index].mmap |= CACHE_LIVE; 
+          h_p_state = LIVE;
+       }
     }
 
 
@@ -832,7 +867,9 @@ _PUBLIC int cache_create(const _BOOLEAN     have_cache_lock,  // Lock held on ca
        /* Allocate block flags */
        /*----------------------*/
 
-       cache[c_index].flags = (_BYTE *)pups_calloc(n_blocks,sizeof(_BYTE));
+       if(cache[c_index].flags == (_BYTE *)NULL)
+          cache[c_index].flags = (_BYTE *)pups_calloc(n_blocks,sizeof(_BYTE));
+
        for(i=0; i<n_blocks; ++i)
            cache[c_index].flags[i] = 0;
 
@@ -841,16 +878,53 @@ _PUBLIC int cache_create(const _BOOLEAN     have_cache_lock,  // Lock held on ca
        /* Allocate block tags */
        /*---------------------*/
 
-       cache[c_index].tag = (unsigned int *)pups_calloc(n_blocks,sizeof(unsigned int));
+       if(cache[c_index].tag == (unsigned int *)NULL)
+          cache[c_index].tag = (unsigned int *)pups_calloc(n_blocks,sizeof(unsigned int));
+
        for(i=0; i<n_blocks; ++i)
            cache[c_index].tag[i] = 0;
+
+
+       /*-------------------*/
+       /* Allocate lifetime */
+       /*-------------------*/
+
+       if(cache[c_index].lifetime == (int *)NULL)
+          cache[c_index].lifetime = (int *)pups_calloc(n_blocks,sizeof(int));
+
+       for(i=0; i<n_blocks; ++i)
+           cache[c_index].lifetime[i] = BLOCK_IMMORTAL;
+
+
+       /*------------------*/
+       /* Allocate hubness */
+       /*------------------*/
+
+       if(cache[c_index].hubness == (unsigned int *)NULL)
+          cache[c_index].hubness = (unsigned int *)pups_calloc(n_blocks,sizeof(unsigned int));
+
+       for(i=0; i<n_blocks; ++i)
+           cache[c_index].hubness[i] = 0;
+
+
+       /*------------------*/
+       /* Allocate binding */
+       /*------------------*/
+
+       if(cache[c_index].binding == (unsigned int *)NULL)
+          cache[c_index].binding = (unsigned int *)pups_calloc(n_blocks,sizeof(unsigned int));
+
+       for(i=0; i<n_blocks; ++i)
+           cache[c_index].binding[i] = 0;
 
 
        /*------------------------*/
        /* Allocate block rwlocks */
        /*------------------------*/
 
-       cache[c_index].rwlock = (pthread_rwlock_t *)pups_calloc(n_blocks,sizeof(pthread_rwlock_t));
+       if(cache[c_index].rwlock == (pthread_rwlock_t *)NULL)
+          cache[c_index].rwlock = (pthread_rwlock_t *)pups_calloc(n_blocks,sizeof(pthread_rwlock_t));
+
        for(i=0; i<n_blocks; ++i)
            (void)pthread_rwlock_init(&cache[c_index].rwlock[i],(pthread_rwlockattr_t *)NULL);
 
@@ -915,6 +989,7 @@ _PUBLIC int cache_create(const _BOOLEAN     have_cache_lock,  // Lock held on ca
 
     if((cache[c_index].cache_ptr = (void *)cache_mmap_cachememory(c_index,
                                                                   name,
+                                                                  h_p_state,
                                                                   cache[c_index].n_blocks*cache[c_index].block_size,
                                                                                                                crc)) == (void *)NULL)
 
@@ -944,7 +1019,8 @@ _PUBLIC int cache_create(const _BOOLEAN     have_cache_lock,  // Lock held on ca
     /* Allocate cache block pointer map */
     /*----------------------------------*/
 
-    cache[c_index].blockmap = (block_mtype *)pups_calloc(cache[c_index].n_blocks,sizeof(block_mtype));
+    if(cache[c_index].blockmap == (block_mtype *)NULL)
+       cache[c_index].blockmap = (block_mtype *)pups_calloc(cache[c_index].n_blocks,sizeof(block_mtype));
 
 
     /*-----------------------------------------*/
@@ -1011,6 +1087,168 @@ _PUBLIC int cache_msync(const _BOOLEAN have_cache_lock, const unsigned int c_ind
 
 
 
+/*------------------------------------------------------*/
+/* Make all file descriptors associated with cache live */
+/* (i.e. homeostatic)                                   */
+/*------------------------------------------------------*/
+
+_PUBLIC int cache_live(const _BOOLEAN have_cache_lock, const unsigned int c_index)
+
+{   int h_p_level_1,
+        h_p_level_2;
+
+
+    /*----------------------------------*/
+    /* Only the root thread can process */
+    /* PSRP requests                    */
+    /*----------------------------------*/
+
+    if(pupsthread_is_root_thread() == FALSE)
+       pups_error("[cache destroy] attempt by non root thread to perform PUPS/P3 memory mapped cache operation");
+
+
+    /*--------------*/
+    /* Sanity check */
+    /*--------------*/
+
+    if(c_index >= MAX_CACHES)
+    {  (void)snprintf(errstr,SSIZE,"[cache_destroy] cache index range error [cache index (%d) > max caches (%d)\n",c_index,MAX_CACHES);
+       pups_error(errstr);
+    }
+
+
+    #ifdef PTHREAD_SUPPORT
+    if(have_cache_lock == FALSE)
+       (void)pthread_mutex_lock(&cache[c_index].mutex);
+    #endif /* PTHREAD_SUPPORT */
+
+
+    /*-----------------*/
+    /* Make cache live */
+    /*-----------------*/
+
+    if((h_p_level_1 = pups_fd_alive(cache[c_index].mmap_fd,   "pups_default_fd_homeostat",&pups_default_fd_homeostat)) == (-1))
+    {  
+       #ifdef PTHREAD_SUPPORT
+       if(have_cache_lock == FALSE)
+          (void)pthread_mutex_unlock(&cache[c_index].mutex);
+       #endif /* PTHREAD_SUPPORT */
+
+       pups_set_errno(EINVAL);
+       return(-1);
+    }
+
+
+    /*------------------------*/
+    /* Make mapinfo file live */
+    /*------------------------*/
+
+    if((h_p_level_2 = pups_fd_alive(cache[c_index].mapinfo_fd,"pups_default_fd_homeostat",&pups_default_fd_homeostat)) == (-1)  ||
+        h_p_level_2 != h_p_level_1                                                                                               )
+    {
+       #ifdef PTHREAD_SUPPORT
+       if(have_cache_lock == FALSE)
+          (void)pthread_mutex_unlock(&cache[c_index].mutex);
+       #endif /* PTHREAD_SUPPORT */
+
+       pups_set_errno(EINVAL);
+       return(-1);
+    }
+
+
+    #ifdef PTHREAD_SUPPORT
+    if(have_cache_lock == FALSE)
+       (void)pthread_mutex_unlock(&cache[c_index].mutex);
+    #endif /* PTHREAD_SUPPORT */
+
+    pups_set_errno(OK);
+    return(h_p_level_1);
+}
+
+
+
+
+/*------------------------------------------------------*/
+/* Make all file descriptors associated with cache dead */
+/* (i.e. non homeostatic)                               */
+/*------------------------------------------------------*/
+
+_PUBLIC int cache_dead(const _BOOLEAN have_cache_lock, const unsigned int c_index)
+
+{   int h_p_level_1,
+        h_p_level_2;
+
+
+    /*----------------------------------*/
+    /* Only the root thread can process */
+    /* PSRP requests                    */
+    /*----------------------------------*/
+
+    if(pupsthread_is_root_thread() == FALSE)
+       pups_error("[cache destroy] attempt by non root thread to perform PUPS/P3 memory mapped cache operation");
+
+
+    /*--------------*/
+    /* Sanity check */
+    /*--------------*/
+
+    if(c_index >= MAX_CACHES)
+    {  (void)snprintf(errstr,SSIZE,"[cache_destroy] cache index range error [cache index (%d) > max caches (%d)\n",c_index,MAX_CACHES);
+       pups_error(errstr);
+    }
+
+
+    #ifdef PTHREAD_SUPPORT
+    if(have_cache_lock == FALSE)
+       (void)pthread_mutex_lock(&cache[c_index].mutex);
+    #endif /* PTHREAD_SUPPORT */
+
+
+    /*------------------*/
+    /* Make cache dead  */
+    /*------------------*/
+
+    if((h_p_level_1 = pups_fd_dead(cache[c_index].mmap_fd)) == (-1))
+    {
+       #ifdef PTHREAD_SUPPORT
+       if(have_cache_lock == FALSE)
+          (void)pthread_mutex_unlock(&cache[c_index].mutex);
+       #endif /* PTHREAD_SUPPORT */
+
+       pups_set_errno(EINVAL);
+       return(-1);
+    }
+
+
+    /*-------------------------*/
+    /* Make  mapinfo file dead */
+    /*-------------------------*/
+
+    if((h_p_level_2 = pups_fd_dead(cache[c_index].mapinfo_fd)) == (-1)  ||
+        h_p_level_1 != h_p_level_2                                       )
+    {
+       #ifdef PTHREAD_SUPPORT
+       if(have_cache_lock == FALSE)
+          (void)pthread_mutex_unlock(&cache[c_index].mutex);
+       #endif /* PTHREAD_SUPPORT */
+
+       pups_set_errno(EINVAL);
+       return(-1);
+    }
+
+
+
+    #ifdef PTHREAD_SUPPORT
+    if(have_cache_lock == FALSE)
+       (void)pthread_mutex_unlock(&cache[c_index].mutex);
+    #endif /* PTHREAD_SUPPORT */
+
+    pups_set_errno(OK);
+    return(h_p_level_1);
+}
+
+
+
 /*----------------------------------------*/
 /* Destroy cache (optionally deleting it) */
 /*----------------------------------------*/
@@ -1052,53 +1290,13 @@ _PUBLIC int cache_destroy(const _BOOLEAN have_cache_lock, const _BOOLEAN delete_
     if(cache[c_index].cache_ptr != (void *)NULL)
     { 
 
-       /*--------------------------------------------------------*/
-       /* Only sync cache (and save mapinfo) if it is read/write */
-       /*--------------------------------------------------------*/
-
-       if((cache[c_index].mmap & CACHE_PRIVATE) == 0)
-       {  
-
-          /*------------------------------------------*/
-          /* Upate mapinfo file associated with cache */
-          /*------------------------------------------*/
-
-                                                                  /*--------------------------------------------*/
-          (void)cache_write_mapinfo(FALSE,                        /* No homeostatic protection                  */
-                                    have_cache_lock,              /* If TRUE lock held on cache                 */
-                                    cache[c_index].mapinfo_name,  /* Name of file containing cache mapping info */
-                                    c_index);                     /* Index of cache to be mapped                */
-                                                                  /*--------------------------------------------*/
-
-          /*-------------------------------------*/
-          /* Synchronise cache with disk image   */
-          /* and block until operation completes */
-          /* (flushes cache to disk)             */
-          /*-------------------------------------*/
-
-          (void)msync((void *)cache[c_index].cache_ptr,
-                      cache[c_index].cache_size,
-                      MS_SYNC | MS_INVALIDATE);
-
-       }
-
-
        /*-------------*/
        /* Unmap cache */
        /*-------------*/
 
-       if(munmap((void *)cache[c_index].cache_ptr,cache[c_index].cache_size) == (-1))
-          pups_error("[cache_destroy] cannot unmap cache");
+       if(munmap(cache[c_index].cache_ptr,cache[c_index].cache_size) == (-1))
+         pups_error("[cache_destroy] cannot unmap cache");
 
-
-       /*--------------------------------*/
-       /* Delete cache if asked to do so */
-       /*--------------------------------*/
-
-       if(delete_cache == TRUE)
-       {  (void)unlink(cache[c_index].mapinfo_name);
-          (void)unlink(cache[c_index].mmap_name);
-       }
 
        (void)strlcpy(cache[c_index].mapinfo_name,"",SSIZE);
        (void)strlcpy(cache[c_index].mmap_name,   "",SSIZE);
@@ -1126,16 +1324,27 @@ _PUBLIC int cache_destroy(const _BOOLEAN have_cache_lock, const _BOOLEAN delete_
 
        cache[c_index].mmap_fd = (-1);
        cache[c_index].mmap    = 0;
-    }
 
+
+       /*--------------------------------*/
+       /* Delete cache if asked to do so */
+       /*--------------------------------*/
+
+       if(delete_cache == TRUE)
+       {  (void)unlink(cache[c_index].mapinfo_name);
+          (void)unlink(cache[c_index].mmap_name);
+       }
+    }
 
     /*--------------------------------*/
     /* Clear cache datastructures and */
     /* free allocated memory          */
     /*--------------------------------*/
 
-    (void)strlcpy(cache[c_index].name,     "",SSIZE);
+    (void)strlcpy(cache[c_index].path,"",SSIZE);
+    (void)strlcpy(cache[c_index].name,"",SSIZE);
 
+    cache[c_index].u_blocks   = 0;
     cache[c_index].n_blocks   = 0;
     cache[c_index].n_objects  = 0;
     cache[c_index].block_size = 0L;
@@ -1155,8 +1364,8 @@ _PUBLIC int cache_destroy(const _BOOLEAN have_cache_lock, const _BOOLEAN delete_
        cache[c_index].blockmap = (block_mtype *)NULL;
     }
 
-    cache[c_index].cache_ptr = (void *)NULL;
-    cache[c_index].cache_size   = 0L;
+    cache[c_index].cache_ptr  = (void *)NULL;
+    cache[c_index].cache_size = 0L;
 
 
     /*------------------*/
@@ -1179,15 +1388,44 @@ _PUBLIC int cache_destroy(const _BOOLEAN have_cache_lock, const _BOOLEAN delete_
     }
 
 
+    /*---------------------*/
+    /* Free block lifetime */
+    /*---------------------*/
+
+    if(cache[c_index].lifetime != (int *)NULL)
+    {  (void)pups_free((void *)cache[c_index].lifetime);
+       cache[c_index].lifetime = (int *)NULL;
+    }
+
+
+    /*--------------------*/
+    /* Free block hubness */
+    /*--------------------*/
+
+    if(cache[c_index].hubness != (unsigned int *)NULL)
+    {  (void)pups_free((void *)cache[c_index].hubness);
+       cache[c_index].hubness = (unsigned int *)NULL;
+    }
+
+
+    /*--------------------*/
+    /* Free block binding */
+    /*--------------------*/
+
+    if(cache[c_index].binding != (unsigned int *)NULL)
+    {  (void)pups_free((void *)cache[c_index].binding);
+       cache[c_index].binding = (unsigned int *)NULL;
+    }
+
+
     /*---------------------------*/
     /* Free block access rwlocks */
     /*---------------------------*/
 
     if(cache[c_index].rwlock != (pthread_rwlock_t *)NULL)
     {  (void)pups_free((void *)cache[c_index].rwlock);
-       cache[c_index].flags = (pthread_rwlock_t *)NULL;
+       cache[c_index].rwlock = (pthread_rwlock_t *)NULL;
     }
-
 
     #ifdef PTHREAD_SUPPORT
     if(have_cache_lock == FALSE)
@@ -1312,11 +1550,13 @@ _PUBLIC int cache_display_statistics(const _BOOLEAN   have_cache_lock,  // TRUE 
 
     (void)fprintf(stream,"\n    Cache statistics\n");
     (void)fprintf(stream,"    ================\n\n");
-    (void)fprintf(stream,"    %-32s:  %d\n",                                       "cache identifier",c_index);
-    (void)fprintf(stream,"    %-32s:  %016lx\n",                                   "cache 64 bit CRC",cache[c_index].crc);
-    (void)fprintf(stream,"    %-32s:  \"%s\"\n",                                   "cache name",cache[c_index].name);
-    (void)fprintf(stream,"    %-32s:  %016lx virtual\n",                           "cache located at",(unsigned long int)cache[c_index].cache_ptr);
-    (void)fprintf(stream,"    %-32s:  %s\n",                                       "cache (machine) architecture",cache[c_index].march);
+    (void)fprintf(stream,"    %-32s:  %d\n",                                       "cache identifier"             ,c_index);
+    (void)fprintf(stream,"    %-32s:  %d\n",                                       "cache co-ordination list size",cache[c_index].colsize);
+    (void)fprintf(stream,"    %-32s:  %016lx\n",                                   "cache 64 bit CRC"             ,cache[c_index].crc);
+    (void)fprintf(stream,"    %-32s:  \"%s\"\n",                                   "cache path"                   ,cache[c_index].path);
+    (void)fprintf(stream,"    %-32s:  \"%s\"\n",                                   "cache name"                   ,cache[c_index].name);
+    (void)fprintf(stream,"    %-32s:  %016lx virtual\n",                           "cache located at"             ,(unsigned long int)cache[c_index].cache_ptr);
+    (void)fprintf(stream,"    %-32s:  %s\n",                                       "cache (machine) architecture" ,cache[c_index].march);
 
     if(strcmp(cache[c_index].auxinfo,"") == 0)
        (void)fprintf(stream,"    %-32s:  %s\n",                                       "cache auxilliary data","none");
@@ -1329,8 +1569,23 @@ _PUBLIC int cache_display_statistics(const _BOOLEAN   have_cache_lock,  // TRUE 
     /*---------------------------*/
 
     (void)fprintf(stream,"    %-32s:  memory mapped\n","cache type");
-    (void)fprintf(stream,"    %-32s:  \"%-.48s\"\n",   "cache mapinfo file",cache[c_index].mapinfo_name);
-    (void)fprintf(stream,"    %-32s:  \"%-.48s\"\n",   "cache mmap file",   cache[c_index].mmap_name);
+    (void)fprintf(stream,"    %-32s:  \"%-.48s.map\"\n", "cache mapinfo file",cache[c_index].mapinfo_name);
+
+
+    /*------------------*/
+    /* Hidden mmap file */
+    /*------------------*/
+
+    if(cache[c_index].mmap_name[0] == '.')
+      (void)fprintf(stream,"    %-32s:  \"%-.48s\"\n",   "cache mmap file", &cache[c_index].mmap_name[1]);
+
+
+    /*-------------------*/
+    /* Visible mmap file */
+    /*-------------------*/
+
+    else
+      (void)fprintf(stream,"    %-32s:  \"%-.48s\"\n",   "cache mmap file", cache[c_index].mmap_name);
 
 
     /*-----------------------------------*/
@@ -1563,28 +1818,30 @@ _PUBLIC int cache_display(const _BOOLEAN have_cache_lock, const FILE *stream)
           /*-------------------------------------------------*/
 
           if(strcmp(unitstr," Bytes") != 0)
-             (void)fprintf(stream,"    %04d: (\"%-32s\"): %08d blocks, %7.3f %s mapped into process address space (at %016lx virtual) %s\n",
-                                                                                                                                          i,
-                                                                                                                              cache[i].name,
-                                                                                                                          cache[i].n_blocks,
-                                                                                                                                      fsize,
-                                                                                                                                    unitstr,
-                                                                                                      (unsigned long int)cache[i].cache_ptr,
-                                                                                                                                  mapoptstr);
+             (void)fprintf(stream,"    %04d: (\"%-24s\" path \"%-32s\"): %08d blocks, %7.3f %s mapped into process address space (at %016lx virtual) %s\n",
+                                                                                                                                                         i,
+                                                                                                                                             cache[i].name,
+                                                                                                                                             cache[i].path,
+                                                                                                                                         cache[i].n_blocks,
+                                                                                                                                                     fsize,
+                                                                                                                                                   unitstr,
+                                                                                                                     (unsigned long int)cache[i].cache_ptr,
+                                                                                                                                                 mapoptstr);
 
           /*---------------------------*/
           /* Bytes - use integer units */
           /*---------------------------*/
 
           else
-             (void)fprintf(stream,"    %04d: (\"%-32s\"): %04d blocks, %04d %s mapped into process address space (at %016lx virtual) %s\n",
-                                                                                                                                         i,
-                                                                                                                             cache[i].name,
-                                                                                                                         cache[i].n_blocks,
-                                                                                                                       cache[i].cache_size,
-                                                                                                                                   unitstr,
-                                                                                                     (unsigned long int)cache[i].cache_ptr,
-                                                                                                                                 mapoptstr);
+             (void)fprintf(stream,"    %04d: (\"%-32s\" path \"%-24s\"): %04d blocks, %04d %s mapped into process address space (at %016lx virtual) %s\n",
+                                                                                                                                                        i,
+                                                                                                                                            cache[i].name,
+                                                                                                                                            cache[i].path,
+                                                                                                                                        cache[i].n_blocks,
+                                                                                                                                      cache[i].cache_size,
+                                                                                                                                                  unitstr,
+                                                                                                                    (unsigned long int)cache[i].cache_ptr,
+                                                                                                                                                mapoptstr);
           (void)fflush(stream);
        }
 
@@ -1991,7 +2248,7 @@ _PRIVATE void taglist_init(void)
 {   unsigned int i;
 
     for(i=0; i<MAX_TAGLIST_SIZE; ++i)
-    {  taglist[i].tag = (-1);
+    {  taglist[i].tag           = (-1);
        taglist[i].tagged_blocks = 0;
     }
 }
@@ -2059,12 +2316,12 @@ _PUBLIC int cache_show_blocktag_stats(const _BOOLEAN have_cache_lock, FILE *stre
     /*---------------*/
 
     if(c_index >= MAX_CACHES)
-    {  (void)snprintf(errstr,SSIZE,"[cache_get_blocktag_stats] cache index range error [cache index (%d) > max caches (%d)\n",c_index,MAX_CACHES);
+    {  (void)snprintf(errstr,SSIZE,"[cache_show_blocktag_stats] cache index range error [cache index (%d) > max caches (%d)\n",c_index,MAX_CACHES);
        pups_error(errstr);
     }
 
     if(stream == (FILE *)NULL)
-       pups_error("[cache_get_blocktag_stats] status/log stream not specified");
+       pups_error("[cache_show_blocktag_stats] status/log stream not specified");
 
 
     /*-------------------*/
@@ -2200,6 +2457,47 @@ _PUBLIC long int cache_get_objects(const _BOOLEAN have_cache_lock, const unsigne
 
     pups_set_errno(OK);
     return(block_objects);
+}
+
+
+
+
+/*----------------*/
+/* Get cache path */
+/*----------------*/
+
+_PUBLIC int cache_index2path(const _BOOLEAN     have_cache_lock,  // If TRUE lock held on cache
+                             char                   *cache_path,  // Path to cache
+                             const unsigned int         c_index)  // Index of cache
+
+{
+
+    /*--------------*/
+    /* Sanity check */
+    /*--------------*/
+
+    if(cache_path == (const char *)NULL)
+       pups_error("[cache_index2name] cache path is NULL");
+
+    #ifdef PTHREAD_SUPPORT
+    if(have_cache_lock == FALSE)
+       (void)pthread_mutex_lock(&cache[c_index].mutex);
+    #endif /* PTHREAD_SUPPORT */
+
+    (void)strlcpy(cache_path,cache[c_index].path,SSIZE);
+
+    #ifdef PTHREAD_SUPPORT
+    if(have_cache_lock == FALSE)
+       (void)pthread_mutex_unlock(&cache[c_index].mutex);
+    #endif /* PTHREAD_SUPPORT */
+
+    if(strcmp(cache_path,"") == 0)
+    {  pups_set_errno(EINVAL);
+       return(-1);
+    }
+
+    pups_set_errno(OK);
+    return(0);
 }
 
 
@@ -2425,7 +2723,8 @@ _PUBLIC _BOOLEAN cache_already_loaded(const _BOOLEAN have_cache_lock, const char
 
     if(cache_name == (char *)NULL)
        pups_error("[cache_is_loaded] expecting cache name\n");
-   
+
+
     #ifdef PTHREAD_SUPPORT
     if(have_cache_lock == FALSE)
        (void)pthread_mutex_lock(&cache[c_index].mutex);
@@ -2438,7 +2737,7 @@ _PUBLIC _BOOLEAN cache_already_loaded(const _BOOLEAN have_cache_lock, const char
 
     pups_set_errno(OK);
     for(i=0; i<MAX_CACHES; ++i)
-    {  if(strcmp(cache[i].name,cache_name) == 0 && i != c_index)
+    {  if(strcmp(cache[i].name,cache_name) == 0)
        {  ret = TRUE;
 
           if(c_l_index != (unsigned int *)NULL)
@@ -2504,9 +2803,11 @@ _PUBLIC void *cache_is_allocated(const _BOOLEAN have_cache_lock, const unsigned 
 _PUBLIC unsigned long int cache_write_mapinfo(const _BOOLEAN     try_homeostatic_protection,  // Try homeostatic mapfile protection if TRUE
                                               const _BOOLEAN                have_cache_lock,  // If TRUE lock held on cache
                                               const char                          *map_name,  // Name of file containing cache mapping info
+                                              const unsigned int                       mmap,  // Memroy mapping flags
                                               const unsigned int                    c_index)  // Index of cached to be mapped
 
 {   int i,
+        h_p_state                = DEAD,
         fd                       = (-1);
 
     char map_path[SSIZE]         = "",
@@ -2597,6 +2898,9 @@ _PUBLIC unsigned long int cache_write_mapinfo(const _BOOLEAN     try_homeostatic
     /* have not previously read map file       */
     /*-----------------------------------------*/
 
+    if(mmap & CACHE_LIVE)
+       h_p_state = LIVE;
+
     if(strcmp(cache[c_index].mmap_name,"") == 0)
     {
 
@@ -2612,7 +2916,7 @@ _PUBLIC unsigned long int cache_write_mapinfo(const _BOOLEAN     try_homeostatic
           /*----------------------------*/
 
           if(pups_isalive(map_pathname) == FALSE) 
-          {  if((fd = pups_open(map_pathname,O_WRONLY,LIVE)) == (-1))
+          {  if((fd = pups_open(map_pathname,O_WRONLY,h_p_state)) == (-1))
                 pups_error("[cache_write_mapinfo] cannot open mapinfo file");
 
              is_live = TRUE;
@@ -2658,8 +2962,14 @@ _PUBLIC unsigned long int cache_write_mapinfo(const _BOOLEAN     try_homeostatic
        goto error_exit;
     }
 
+    // Cache path
+    if(pups_write(fd,map_path,256) == (-1))
+    {  (void)pups_close(fd);
+       goto error_exit;
+    }
+
     // Cache name
-    if(pups_write(fd,cache_pathname,256) == (-1))
+    if(pups_write(fd,eff_cache_name,256) == (-1))
     {  (void)pups_close(fd);
        goto error_exit;
     }
@@ -2725,6 +3035,12 @@ _PUBLIC unsigned long int cache_write_mapinfo(const _BOOLEAN     try_homeostatic
        goto error_exit;
     }
 
+    // Co-ordination lsit size
+    if(pups_write(fd,(void *)&cache[c_index].colsize,sizeof(unsigned int)) == (-1))
+    {  (void)pups_close(fd);
+       goto error_exit;
+    }
+
     // Write object descriptions
     for(i=0; i<cache[c_index].n_objects; ++i)
     {  if(pups_write(fd,(void *)&cache[c_index].object_desc[i],256*sizeof(_BYTE)) == (-1))
@@ -2759,11 +3075,36 @@ _PUBLIC unsigned long int cache_write_mapinfo(const _BOOLEAN     try_homeostatic
 
     // Write cache tags
     for(i=0; i<cache[c_index].n_blocks; ++i)
-    {   if(pups_write(fd,(void *)&cache[c_index].tag[i],sizeof(int)) == (-1))
+    {   if(pups_write(fd,(void *)&cache[c_index].tag[i],sizeof(unsigned int)) == (-1))
         {  (void)pups_close(fd);
            goto error_exit;
         }
     }
+
+    // Write cache lifetimes 
+    for(i=0; i<cache[c_index].n_blocks; ++i)
+    {   if(pups_write(fd,(void *)&cache[c_index].lifetime[i],sizeof(int)) == (-1))
+        {  (void)pups_close(fd);
+           goto error_exit;
+        }
+    }
+
+    // Write cache hubnesses 
+    for(i=0; i<cache[c_index].n_blocks; ++i)
+    {   if(pups_write(fd,(void *)&cache[c_index].hubness[i],sizeof(unsigned int)) == (-1))
+        {  (void)pups_close(fd);
+           goto error_exit;
+        }
+    }
+
+    // Write cache binding
+    for(i=0; i<cache[c_index].n_blocks; ++i)
+    {   if(pups_write(fd,(void *)&cache[c_index].binding[i],sizeof(unsigned int)) == (-1))
+        {  (void)pups_close(fd);
+           goto error_exit;
+        }
+    }
+
 
     if(is_live == FALSE)
        (void)pups_close(fd);
@@ -2979,10 +3320,12 @@ _PUBLIC int cache_extract(const char *cache_archive)
 _PUBLIC unsigned long int cache_read_mapinfo(const _BOOLEAN     try_homeostatic_protection,  // If TRUE enable homeostatic protection for map file
                                              const _BOOLEAN                have_cache_lock,  // If TRUE lock held on cache
                                              const char                          *map_name,  // Name of cache map info file
+                                             const unsigned int                       mmap,  // Memory mapping flags
                                              const unsigned int                    c_index)  // Cache index (to map cache into)
 
 {   int i,
-        fd = (-1);
+        h_p_state            = DEAD,
+        fd                   = (-1);
 
     char map_path[SSIZE]     = "",
          map_pathname[SSIZE] = "",
@@ -3071,9 +3414,12 @@ _PUBLIC unsigned long int cache_read_mapinfo(const _BOOLEAN     try_homeostatic_
     /* Try to protect file if requested to do so */
     /*-------------------------------------------*/
 
+    if(mmap & CACHE_LIVE)
+       h_p_state = LIVE;
+
     if(try_homeostatic_protection == TRUE)
     {  if(pups_isalive(map_pathname) == FALSE)
-       {  if((fd = pups_open(map_pathname,O_RDONLY,LIVE)) == (-1))
+       {  if((fd = pups_open(map_pathname,O_RDONLY,h_p_state)) == (-1))
              pups_error("[cache_read_mapinfo] failed to open mapinfo file");
 
           is_live = TRUE;
@@ -3108,6 +3454,12 @@ _PUBLIC unsigned long int cache_read_mapinfo(const _BOOLEAN     try_homeostatic_
 
     // Cache CRC
     if(pups_read(fd,(void *)&cache[c_index].crc,sizeof(unsigned long int)) == (-1))
+    {  (void)pups_close(fd);
+       goto error_exit;
+    }
+
+    // Cache path 
+    if(pups_read(fd,(void *)cache[c_index].path,256) == (-1))
     {  (void)pups_close(fd);
        goto error_exit;
     }
@@ -3178,6 +3530,12 @@ _PUBLIC unsigned long int cache_read_mapinfo(const _BOOLEAN     try_homeostatic_
        goto error_exit;
     }
 
+    // Co-ordination list size 
+    if(pups_read(fd,(void *)&cache[c_index].colsize,sizeof(unsigned int)) == (-1))
+    {  (void)pups_close(fd);
+       goto error_exit;
+    }
+
     // Read descriptions of objects in cache blocks
     for(i=0; i<cache[c_index].n_objects; ++i)
     {   if(pups_read(fd,(void *)&cache[c_index].object_desc[i],256*sizeof(_BYTE)) == (-1))
@@ -3203,7 +3561,8 @@ _PUBLIC unsigned long int cache_read_mapinfo(const _BOOLEAN     try_homeostatic_
     }
 
     // Allocate space for cache block flags
-    cache[c_index].flags = (_BYTE *)pups_calloc(cache[c_index].n_blocks,sizeof(_BYTE));
+    if(cache[c_index].flags == (_BYTE *)NULL)
+       cache[c_index].flags = (_BYTE *)pups_calloc(cache[c_index].n_blocks,sizeof(_BYTE));
 
     // Read cache block flags
     for(i=0; i<cache[c_index].n_blocks; ++i)
@@ -3214,7 +3573,8 @@ _PUBLIC unsigned long int cache_read_mapinfo(const _BOOLEAN     try_homeostatic_
     }
 
     // Allocate space for cache block tags
-    cache[c_index].tag = (_BYTE *)pups_calloc(cache[c_index].n_blocks,sizeof(int));
+    if(cache[c_index].tag == (unsigned int *)NULL)
+       cache[c_index].tag = (unsigned int *)pups_calloc(cache[c_index].n_blocks,sizeof(unsigned int));
 
     // Read cache block tags
     for(i=0; i<cache[c_index].n_blocks; ++i)
@@ -3224,8 +3584,47 @@ _PUBLIC unsigned long int cache_read_mapinfo(const _BOOLEAN     try_homeostatic_
         }
     }
 
+    // Allocate space for cache block lifetimes
+    if(cache[c_index].lifetime == (int *)NULL)
+       cache[c_index].lifetime = (int *)pups_calloc(cache[c_index].n_blocks,sizeof(int));
+
+    // Read cache block lifetimes 
+    for(i=0; i<cache[c_index].n_blocks; ++i)
+    {   if(pups_read(fd,(void *)&cache[c_index].lifetime[i],sizeof(int)) == (-1))
+        {  (void)pups_close(fd);
+           goto error_exit;
+        }
+    }
+
+    // Allocate space for cache block hubnesses 
+    if(cache[c_index].hubness == (unsigned int *)NULL)
+       cache[c_index].hubness = (unsigned int *)pups_calloc(cache[c_index].n_blocks,sizeof(unsigned int));
+
+    // Read cache block hubnesses 
+    for(i=0; i<cache[c_index].n_blocks; ++i)
+    {   if(pups_read(fd,(void *)&cache[c_index].hubness[i],sizeof(unsigned int)) == (-1))
+        {  (void)pups_close(fd);
+           goto error_exit;
+        }
+    }
+
+    // Allocate space for cache block binding 
+    if(cache[c_index].binding == (unsigned int *)NULL)
+       cache[c_index].binding = (unsigned int *)pups_calloc(cache[c_index].n_blocks,sizeof(unsigned int));
+
+    // Read cache block bindings 
+    for(i=0; i<cache[c_index].n_blocks; ++i)
+    {   if(pups_read(fd,(void *)&cache[c_index].binding[i],sizeof(unsigned int)) == (-1))
+        {  (void)pups_close(fd);
+           goto error_exit;
+        }
+    }
+
     // Allocate space for rwlocks
-    cache[c_index].rwlock = (pthread_rwlock_t *)pups_calloc(cache[c_index].n_blocks,sizeof(pthread_rwlock_t));
+    if(cache[c_index].rwlock == (pthread_rwlock_t *)NULL)
+    // Allocate space for rwlocks
+    if(cache[c_index].rwlock == (pthread_rwlock_t *)NULL)
+       cache[c_index].rwlock = (pthread_rwlock_t *)pups_calloc(cache[c_index].n_blocks,sizeof(pthread_rwlock_t));
 
     // Initialise rwlocks
     for(i=0; i<cache[c_index].n_blocks; ++i)
@@ -3308,8 +3707,7 @@ _PUBLIC int cache_reset_blocklocks(const _BOOLEAN have_cache_lock,  // TRUE if l
 
 _PUBLIC int cache_blocks_used(const _BOOLEAN have_cache_lock, const unsigned int c_index)
 
-{   unsigned int i,
-                 blocks_used = 0;
+{   int blocks_used = 0;
 
 
     /*---------------*/
@@ -3337,6 +3735,40 @@ _PUBLIC int cache_blocks_used(const _BOOLEAN have_cache_lock, const unsigned int
     return(blocks_used);
 }
 
+
+
+/*--------------------------------------*/
+/* Reset number of used blocks in cache */
+/*--------------------------------------*/
+
+_PUBLIC int cache_blocks_reset_used(const _BOOLEAN have_cache_lock, const unsigned int c_index)
+
+{
+
+    /*---------------*/
+    /* Sanity checks */
+    /*---------------*/
+
+    if(c_index >= MAX_CACHES)
+    {  (void)snprintf(errstr,SSIZE,"[cache_blocks_reset_used] cache index range error [cache index (%d) > max caches (%d)\n",c_index,MAX_CACHES);
+       pups_error(errstr);
+    }
+
+    #ifdef PTHREAD_SUPPORT
+    if(have_cache_lock == FALSE)
+       (void)pthread_mutex_lock(&cache[c_index].mutex);
+    #endif /* PTHREAD_SUPPORT */
+
+    cache[c_index].u_blocks = 0;
+
+    #ifdef PTHREAD_SUPPORT
+    if(have_cache_lock == FALSE)
+       (void)pthread_mutex_unlock(&cache[c_index].mutex);
+    #endif /* PTHREAD_SUPPORT */
+
+    pups_set_errno(OK);
+    return(0);
+}
 
 
 
@@ -3897,9 +4329,9 @@ _PUBLIC int cache_add_block(const void              *data,               // Loca
 
 
 
-/*------------------------------*/
-/* Delete block data from cache */
-/*------------------------------*/
+/*---------------------------------*/
+/* Delete block of data from cache */
+/*---------------------------------*/
 
 _PUBLIC _BOOLEAN cache_delete_block(const _BOOLEAN     have_cache_lock,  // TRUE if lock held on cache
                                     const _BOOLEAN     have_block_lock,  // TRUE if lock held on block
@@ -3914,7 +4346,7 @@ _PUBLIC _BOOLEAN cache_delete_block(const _BOOLEAN     have_cache_lock,  // TRUE
     /*--------------*/
 
     if(c_index >= MAX_CACHES)
-    {  (void)snprintf(errstr,SSIZE,"[cache_delete_object] cache index range error [cache index (%d) > max caches (%d)\n",c_index,MAX_CACHES);
+    {  (void)snprintf(errstr,SSIZE,"[cache_delete_block] cache index range error [cache index (%d) > max caches (%d)\n",c_index,MAX_CACHES);
        pups_error(errstr);
     }
 
@@ -3963,6 +4395,70 @@ _PUBLIC _BOOLEAN cache_delete_block(const _BOOLEAN     have_cache_lock,  // TRUE
 
 
 
+/*--------------------------------*/
+/* Restore block of data to cache */
+/*--------------------------------*/
+
+_PUBLIC _BOOLEAN cache_restore_block(const _BOOLEAN     have_cache_lock,  // TRUE if lock held on cache
+                                     const _BOOLEAN     have_block_lock,  // TRUE if lock held on block
+                                     const unsigned int         c_index,  // Cache index
+                                     const unsigned int     block_index)  // Block to be restored 
+
+{   _BOOLEAN ret = FALSE;
+
+
+    /*--------------*/
+    /* Sanity check */
+    /*--------------*/
+
+    if(c_index >= MAX_CACHES)
+    {  (void)snprintf(errstr,SSIZE,"[cache_restore_block] cache index range error [cache index (%d) > max caches (%d)\n",c_index,MAX_CACHES);
+       pups_error(errstr);
+    }
+
+
+    #ifdef PTHREAD_SUPPORT
+    if(have_cache_lock == FALSE)
+       (void)pthread_mutex_lock(&cache[c_index].mutex);
+    #endif /* PTHREAD_SUPPORT */
+
+    if(block_index >= cache[c_index].n_blocks)
+    {  (void)snprintf(errstr,SSIZE,"[cache_restore_block] block index range error [block index (%d) > max blocks (%d)\n",block_index,cache[c_index].n_blocks);
+       pups_error(errstr);
+    }
+
+
+    /*------------------------------------*/
+    /* If block is unused mark it as used */
+    /*------------------------------------*/
+
+    #ifdef PTHREAD_SUPPORT
+    if(have_block_lock == FALSE)
+       (void)pthread_rwlock_wrlock(&cache[c_index].rwlock[block_index]);
+    #endif /* PTHREAD_SUPPORT */
+
+    if(cache[c_index].flags[block_index] & ~BLOCK_USED)
+    {  cache[c_index].flags[block_index] |= BLOCK_USED;
+
+       ++cache[c_index].u_blocks;
+       ret = TRUE;
+    }
+
+    #ifdef PTHREAD_SUPPORT
+    if(have_block_lock == FALSE)
+       (void)pthread_rwlock_unlock(&cache[c_index].rwlock[block_index]);
+
+    if(have_cache_lock == FALSE)
+       (void)pthread_mutex_unlock(&cache[c_index].mutex);
+    #endif /* PTHREAD_SUPPORT */
+
+    pups_set_errno(OK);
+    return(ret);
+}
+
+
+
+
 /*-------------*/
 /* Clear cache */
 /*-------------*/
@@ -3987,6 +4483,7 @@ _PUBLIC int cache_clear(const _BOOLEAN have_cache_lock,  // If TRUE lock held on
     #ifdef PTHREAD_SUPPORT
     if(have_cache_lock == FALSE)
        (void)pthread_mutex_lock(&cache[c_index].mutex);
+
 
     /*---------------------------------------------*/
     /* Reset all blocklocks before cache is walked */
@@ -4021,6 +4518,13 @@ _PUBLIC int cache_clear(const _BOOLEAN have_cache_lock,  // If TRUE lock held on
           }
        }
     }
+
+
+    /*--------------------*/
+    /* Reset object count */
+    /*--------------------*/
+
+    cache[c_index].n_objects = 0;
 
     #ifdef PTHREAD_SUPPORT
     if(have_cache_lock == FALSE)
@@ -4195,7 +4699,7 @@ _PUBLIC int cache_get_blocktag_id_str(const unsigned int blocktag_id, char *bloc
     /*--------------------*/
 
     else
-       (void)snprintf(blocktag_id_str,SSIZE,"%d",blocktag_id);
+       (void)snprintf(blocktag_id_str,SSIZE,"%x",blocktag_id);
 
     pups_set_errno(OK);
     return(0);
@@ -4253,6 +4757,7 @@ _PUBLIC int cache_get_blocktag(const _BOOLEAN      have_cache_lock,  // If TRUE 
 
 
 
+
 /*----------------------------------*/
 /* Set tag of specified cache block */
 /*----------------------------------*/
@@ -4269,7 +4774,7 @@ _PUBLIC int cache_set_blocktag(const _BOOLEAN      have_cache_lock,  // If TRUE 
     /*--------------*/
 
     if(c_index >= MAX_CACHES)
-    {  (void)snprintf(errstr,SSIZE,"[cache_get_blocktag] cache index range error [cache index (%d) > max caches (%d)\n",c_index,MAX_CACHES);
+    {  (void)snprintf(errstr,SSIZE,"[cache_set_blocktag] cache index range error [cache index (%d) > max caches (%d)\n",c_index,MAX_CACHES);
        pups_error(errstr);
     }
 
@@ -4279,7 +4784,7 @@ _PUBLIC int cache_set_blocktag(const _BOOLEAN      have_cache_lock,  // If TRUE 
     /*-------------------------*/
 
     if(block_index >= cache[c_index].n_blocks)
-    {  (void)snprintf(errstr,SSIZE,"[cache_get_blocktag] block index range error [block index (%d) > max blocks (%d)\n",block_index, cache[c_index].n_blocks);
+    {  (void)snprintf(errstr,SSIZE,"[cache_set_blocktag] block index range error [block index (%d) > max blocks (%d)\n",block_index, cache[c_index].n_blocks);
        pups_error(errstr);
     }
 
@@ -4299,7 +4804,6 @@ _PUBLIC int cache_set_blocktag(const _BOOLEAN      have_cache_lock,  // If TRUE 
     pups_set_errno(OK);
     return(0);
 }
-
 
 
 
@@ -4371,11 +4875,391 @@ _PUBLIC int cache_change_blocktag(const _BOOLEAN     have_cache_lock,  // If TRU
 
 
 
+
+/*----------------------------------------*/
+/* Show lifetime of specified cache block */
+/*----------------------------------------*/
+
+_PUBLIC int cache_get_blocklifetime(const _BOOLEAN      have_cache_lock,  // If TRUE lock held on cache
+                                    const unsigned int          c_index,  // Cache index
+                                    const unsigned int      block_index)  // Cache block index
+
+{   int lifetime = 0;
+
+
+    /*--------------*/
+    /* Sanity check */
+    /*--------------*/
+
+    if(c_index >= MAX_CACHES)
+    {  (void)snprintf(errstr,SSIZE,"[cache_get_blocklifetime] cache index range error [cache index (%d) > max caches (%d)\n",c_index,MAX_CACHES);
+       pups_error(errstr);
+    }
+
+
+    /*-------------------------*/
+    /* Block index range error */
+    /*-------------------------*/
+
+    if(block_index >= cache[c_index].n_blocks)
+    {  (void)snprintf(errstr,SSIZE,"[cache_get_blocklifetime] block index range error [block index (%d) > max blocks (%d)\n",block_index, cache[c_index].n_blocks);
+       pups_error(errstr);
+    }
+
+
+    #ifdef PTHREAD_SUPPORT
+    if(have_cache_lock == FALSE)
+       (void)pthread_mutex_lock(&cache[c_index].mutex);
+    #endif /* PTHREAD_SUPPORT */
+
+    lifetime = cache[c_index].lifetime[block_index];
+
+    #ifdef PTHREAD_SUPPORT
+    if(have_cache_lock == FALSE)
+       (void)pthread_mutex_unlock(&cache[c_index].mutex);
+    #endif /* PTHREAD_SUPPORT */
+
+    pups_set_errno(OK);
+    return(lifetime); 
+}
+
+
+
+
+/*---------------------------------------*/
+/* Set lifetime of specified cache block */
+/*---------------------------------------*/
+
+_PUBLIC int cache_set_blocklifetime(const _BOOLEAN      have_cache_lock,  // If TRUE lock held on cache
+                                    const int                  lifetime,  // Block lifetime
+                                    const unsigned int          c_index,  // Cache index
+                                    const unsigned int      block_index)  // Cache block index
+
+{ 
+
+    /*--------------*/
+    /* Sanity check */
+    /*--------------*/
+
+    if(c_index >= MAX_CACHES)
+    {  (void)snprintf(errstr,SSIZE,"[cache_set_blocklifetime] cache index range error [cache index (%d) > max caches (%d)\n",c_index,MAX_CACHES);
+       pups_error(errstr);
+    }
+
+
+    /*-------------------------*/
+    /* Block index range error */
+    /*-------------------------*/
+
+    if(block_index >= cache[c_index].n_blocks)
+    {  (void)snprintf(errstr,SSIZE,"[cache_set_blocklifetime] block index range error [block index (%d) > max blocks (%d)\n",block_index, cache[c_index].n_blocks);
+       pups_error(errstr);
+    }
+
+
+    #ifdef PTHREAD_SUPPORT
+    if(have_cache_lock == FALSE)
+       (void)pthread_mutex_lock(&cache[c_index].mutex);
+    #endif /* PTHREAD_SUPPORT */
+
+    cache[c_index].lifetime[block_index] = lifetime;
+
+    #ifdef PTHREAD_SUPPORT
+    if(have_cache_lock == FALSE)
+       (void)pthread_mutex_unlock(&cache[c_index].mutex);
+    #endif /* PTHREAD_SUPPORT */
+
+    pups_set_errno(OK);
+    return(0);
+}
+
+
+
+
+
+/*--------------------------------------*/
+/* Get hubness of specified cache block */
+/*--------------------------------------*/
+
+_PUBLIC unsigned int cache_get_blockhubness(const _BOOLEAN      have_cache_lock,  // If TRUE lock held on cache
+                                            const unsigned int          c_index,  // Cache index
+                                            const unsigned int      block_index)  // Cache block index
+
+{   unsigned int hubness = 0;
+
+
+    /*--------------*/
+    /* Sanity check */
+    /*--------------*/
+
+    if(c_index >= MAX_CACHES)
+    {  (void)snprintf(errstr,SSIZE,"[cache_get_blockhubness] cache index range error [cache index (%d) > max caches (%d)\n",c_index,MAX_CACHES);
+       pups_error(errstr);
+    }
+
+
+    /*-------------------------*/
+    /* Block index range error */
+    /*-------------------------*/
+
+    if(block_index >= cache[c_index].n_blocks)
+    {  (void)snprintf(errstr,SSIZE,"[cache_get_blockhubness] block index range error [block index (%d) > max blocks (%d)\n",block_index, cache[c_index].n_blocks);
+       pups_error(errstr);
+    }
+
+
+    #ifdef PTHREAD_SUPPORT
+    if(have_cache_lock == FALSE)
+       (void)pthread_mutex_lock(&cache[c_index].mutex);
+    #endif /* PTHREAD_SUPPORT */
+
+    hubness = cache[c_index].hubness[block_index];
+
+    #ifdef PTHREAD_SUPPORT
+    if(have_cache_lock == FALSE)
+       (void)pthread_mutex_unlock(&cache[c_index].mutex);
+    #endif /* PTHREAD_SUPPORT */
+
+    pups_set_errno(OK);
+    return(hubness); 
+}
+
+
+
+
+/*--------------------------------------*/
+/* Set hubness of specified cache block */
+/*--------------------------------------*/
+
+_PUBLIC int cache_set_blockhubness(const _BOOLEAN      have_cache_lock,  // If TRUE lock held on cache
+                                   const unsigned int         hubness,   // Block hubness
+                                   const unsigned int         c_index,   // Cache index
+                                   const unsigned int     block_index)   // Cache block index
+
+{ 
+
+    /*--------------*/
+    /* Sanity check */
+    /*--------------*/
+
+    if(c_index >= MAX_CACHES)
+    {  (void)snprintf(errstr,SSIZE,"[cache_set_blockhubness] cache index range error [cache index (%d) > max caches (%d)\n",c_index,MAX_CACHES);
+       pups_error(errstr);
+    }
+
+
+    /*-------------------------*/
+    /* Block index range error */
+    /*-------------------------*/
+
+    if(block_index >= cache[c_index].n_blocks)
+    {  (void)snprintf(errstr,SSIZE,"[cache_set_blockhubness] block index range error [block index (%d) > max blocks (%d)\n",block_index, cache[c_index].n_blocks);
+       pups_error(errstr);
+    }
+
+
+    #ifdef PTHREAD_SUPPORT
+    if(have_cache_lock == FALSE)
+       (void)pthread_mutex_lock(&cache[c_index].mutex);
+    #endif /* PTHREAD_SUPPORT */
+
+    cache[c_index].hubness[block_index] = hubness;
+
+    #ifdef PTHREAD_SUPPORT
+    if(have_cache_lock == FALSE)
+       (void)pthread_mutex_unlock(&cache[c_index].mutex);
+    #endif /* PTHREAD_SUPPORT */
+
+    pups_set_errno(OK);
+    return(0);
+}
+
+
+
+
+
+/*--------------------------------------*/
+/* Get binding of specified cache block */
+/*--------------------------------------*/
+
+_PUBLIC unsigned int cache_get_blockbinding(const _BOOLEAN      have_cache_lock,  // If TRUE lock held on cache
+                                            const unsigned int          c_index,  // Cache index
+                                            const unsigned int      block_index)  // Cache block index
+
+{   unsigned int binding = 0;
+
+
+    /*--------------*/
+    /* Sanity check */
+    /*--------------*/
+
+    if(c_index >= MAX_CACHES)
+    {  (void)snprintf(errstr,SSIZE,"[cache_get_binding] cache index range error [cache index (%d) > max caches (%d)\n",c_index,MAX_CACHES);
+       pups_error(errstr);
+    }
+
+
+    /*-------------------------*/
+    /* Block index range error */
+    /*-------------------------*/
+
+    if(block_index >= cache[c_index].n_blocks)
+    {  (void)snprintf(errstr,SSIZE,"[cache_get_binding] block index range error [block index (%d) > max blocks (%d)\n",block_index, cache[c_index].n_blocks);
+       pups_error(errstr);
+    }
+
+
+    #ifdef PTHREAD_SUPPORT
+    if(have_cache_lock == FALSE)
+       (void)pthread_mutex_lock(&cache[c_index].mutex);
+    #endif /* PTHREAD_SUPPORT */
+
+    binding = cache[c_index].hubness[block_index];
+
+    #ifdef PTHREAD_SUPPORT
+    if(have_cache_lock == FALSE)
+       (void)pthread_mutex_unlock(&cache[c_index].mutex);
+    #endif /* PTHREAD_SUPPORT */
+
+    pups_set_errno(OK);
+    return(binding); 
+}
+
+
+
+
+/*--------------------------------------*/
+/* Set binding of specified cache block */
+/*--------------------------------------*/
+
+_PUBLIC int cache_set_blockbinding(const _BOOLEAN      have_cache_lock,  // If TRUE lock held on cache
+                                   const unsigned int         binding,   // Block binding 
+                                   const unsigned int         c_index,   // Cache index
+                                   const unsigned int     block_index)   // Cache block index
+
+{ 
+
+    /*--------------*/
+    /* Sanity check */
+    /*--------------*/
+
+    if(c_index >= MAX_CACHES)
+    {  (void)snprintf(errstr,SSIZE,"[cache_set_blockbinding] cache index range error [cache index (%d) > max caches (%d)\n",c_index,MAX_CACHES);
+       pups_error(errstr);
+    }
+
+
+    /*-------------------------*/
+    /* Block index range error */
+    /*-------------------------*/
+
+    if(block_index >= cache[c_index].n_blocks)
+    {  (void)snprintf(errstr,SSIZE,"[cache_set_blockbinding] block index range error [block index (%d) > max blocks (%d)\n",block_index, cache[c_index].n_blocks);
+       pups_error(errstr);
+    }
+
+
+    #ifdef PTHREAD_SUPPORT
+    if(have_cache_lock == FALSE)
+       (void)pthread_mutex_lock(&cache[c_index].mutex);
+    #endif /* PTHREAD_SUPPORT */
+
+    cache[c_index].binding[block_index] = binding;
+
+    #ifdef PTHREAD_SUPPORT
+    if(have_cache_lock == FALSE)
+       (void)pthread_mutex_unlock(&cache[c_index].mutex);
+    #endif /* PTHREAD_SUPPORT */
+
+    pups_set_errno(OK);
+    return(0);
+}
+
+
+
+
+
+/*---------------------------------------*/
+/* Get co-ordination list size for cache */
+/*---------------------------------------*/
+
+_PUBLIC unsigned int cache_get_colsize(const _BOOLEAN      have_cache_lock,  // If TRUE lock held on cache
+                                       const unsigned int          c_index)  // Cache index
+
+{   unsigned int colsize = 0;
+
+
+    /*--------------*/
+    /* Sanity check */
+    /*--------------*/
+
+    if(c_index >= MAX_CACHES)
+    {  (void)snprintf(errstr,SSIZE,"[cache_set_colsize] cache index range error [cache index (%d) > max caches (%d)\n",c_index,MAX_CACHES);
+       pups_error(errstr);
+    }
+
+    #ifdef PTHREAD_SUPPORT
+    if(have_cache_lock == FALSE)
+       (void)pthread_mutex_lock(&cache[c_index].mutex);
+    #endif /* PTHREAD_SUPPORT */
+
+    colsize = cache[c_index].colsize;
+
+    #ifdef PTHREAD_SUPPORT
+    if(have_cache_lock == FALSE)
+       (void)pthread_mutex_unlock(&cache[c_index].mutex);
+    #endif /* PTHREAD_SUPPORT */
+
+    pups_set_errno(OK);
+    return(colsize); 
+}
+
+
+
+
+/*---------------------------------------*/
+/* Set co-ordination list-size for cache */
+/*---------------------------------------*/
+
+_PUBLIC int cache_set_colsize(const _BOOLEAN     have_cache_lock,  // If TRUE lock held on cache
+                              unsigned int       colsize,          // Co-ordination list size 
+                              const unsigned int c_index)          // Cache index
+
+{ 
+
+    /*--------------*/
+    /* Sanity check */
+    /*--------------*/
+
+    if(c_index >= MAX_CACHES)
+    {  (void)snprintf(errstr,SSIZE,"[cache_set_colsize] cache index range error [cache index (%d) > max caches (%d)\n",c_index,MAX_CACHES);
+       pups_error(errstr);
+    }
+
+    #ifdef PTHREAD_SUPPORT
+    if(have_cache_lock == FALSE)
+       (void)pthread_mutex_lock(&cache[c_index].mutex);
+    #endif /* PTHREAD_SUPPORT */
+
+    cache[c_index].colsize = colsize;
+
+    #ifdef PTHREAD_SUPPORT
+    if(have_cache_lock == FALSE)
+       (void)pthread_mutex_unlock(&cache[c_index].mutex);
+    #endif /* PTHREAD_SUPPORT */
+
+    pups_set_errno(OK);
+    return(0);
+}
+
+
+
+
 /*--------------------------*/
 /* Swap cache table entries */
 /*--------------------------*/
 
-void swap_cache_table_entries(int c_index, const int index_1, const int index_2)
+_PRIVATE void swap_cache_table_entries(int c_index, const int index_1, const int index_2)
 
 {   unsigned int     tmp_int;
     pthread_rwlock_t tmp_rwlock;
@@ -4666,7 +5550,10 @@ _PUBLIC int cache_resize(const _BOOLEAN     have_cache_lock,  // Lock on cache h
     /* Unmap memory segment */
     /*----------------------*/
 
-    (void)munmap(cache[c_index].cache_ptr,cache[c_index].cache_size);
+    if(munmap(cache[c_index].cache_ptr,cache[c_index].cache_size) == (-1))
+       pups_error("[cache_resize] cannot unmap cache");
+
+    //munmap(cache[c_index].cache_ptr,cache[c_index].cache_size);
 
 
 
@@ -4697,13 +5584,14 @@ _PUBLIC int cache_resize(const _BOOLEAN     have_cache_lock,  // Lock on cache h
     /* Reallocate block parameters */
     /*-----------------------------*/
 
-    cache[c_index].flags        = (_BYTE            *)pups_realloc((void *)cache[c_index].flags,   n_blocks*sizeof(_BYTE));
-    cache[c_index].tag          = (unsigned int     *)pups_realloc((void *)cache[c_index].tag,     n_blocks*sizeof(unsigned int));
-    cache[c_index].rwlock       = (pthread_rwlock_t *)pups_realloc((void *)cache[c_index].rwlock,  n_blocks*sizeof(pthread_rwlock_t));
-    cache[c_index].blockmap     = (block_mtype      *)pups_realloc((void *)cache[c_index].blockmap,n_blocks*sizeof(block_mtype));
-    cache[c_index].n_blocks     = n_blocks;
-    cache[c_index].cache_size   = new_size;
-    cache[c_index].cache_ptr    = cache_ptr;
+    cache[c_index].flags       = (_BYTE            *)pups_realloc((void *)cache[c_index].flags,   n_blocks*sizeof(_BYTE));
+    cache[c_index].tag         = (unsigned int     *)pups_realloc((void *)cache[c_index].tag,     n_blocks*sizeof(unsigned int));
+    cache[c_index].lifetime    = (int              *)pups_realloc((void *)cache[c_index].lifetime,n_blocks*sizeof(int));
+    cache[c_index].rwlock      = (pthread_rwlock_t *)pups_realloc((void *)cache[c_index].rwlock,  n_blocks*sizeof(pthread_rwlock_t));
+    cache[c_index].blockmap    = (block_mtype      *)pups_realloc((void *)cache[c_index].blockmap,n_blocks*sizeof(block_mtype));
+    cache[c_index].n_blocks    = n_blocks;
+    cache[c_index].cache_size  = new_size;
+    cache[c_index].cache_ptr   = cache_ptr;
 
 
     /*-------------------------------------------------------*/
@@ -4725,32 +5613,42 @@ _PUBLIC int cache_resize(const _BOOLEAN     have_cache_lock,  // Lock on cache h
        #endif /* DEBUG */
 
 
-       /*------------------------*/
-       /* Initialise extra flags */
-       /*------------------------*/
+       /*---------------------------------------*/
+       /* Initialise extra per block parameters */
+       /*---------------------------------------*/
 
        if(i > cache[c_index].n_blocks)
+       {
+
+          /*------------------------*/
+          /* Initialise extra flags */
+          /*------------------------*/
+           
           cache[c_index].flags[i] = 0;
 
 
-       /*-----------------------------*/
-       /* Initialise extra block tags */
-       /*-----------------------------*/
+          /*-----------------------------*/
+          /* Initialise extra block tags */
+          /*-----------------------------*/
 
-       if(i > cache[c_index].n_blocks)
           cache[c_index].tag[i] = 0;
 
 
-       /*-------------------------*/
-       /* Initialise extra wlocks */
-       /*------------------------*/
+          /*----------------------------------*/
+          /* Initialise extra block lifetimes */
+          /*----------------------------------*/
 
-       if(i > cache[c_index].n_blocks)
+          cache[c_index].tag[i] = BLOCK_IMMORTAL;
+
+
+          /*-------------------------*/
+          /* Initialise extra wlocks */
+          /*------------------------*/
+
           (void)pthread_rwlock_init(&cache[c_index].rwlock[i],(pthread_rwlockattr_t *)NULL);
+       }
     }
 
-    //cache[c_index].n_blocks   = n_blocks;
-    //cache[c_index].cache_size = new_size;
 
     #ifdef PTHREAD_SUPPORT
     if(have_cache_lock == FALSE)

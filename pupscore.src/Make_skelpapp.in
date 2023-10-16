@@ -1,14 +1,14 @@
-#-----------------------------------------------------------------------
+#-------------------------------------------
 # Makefile for PSRP application. @APPNAME.
 # Extra entries may be needed in
-# LIBS, .o, and .c sections of the makefile.
+# LIBS, .o, and .c sections of the makefile
 # 
-# M.A. O'Neill, Tumbling Dice 23/01/2018
-#-----------------------------------------------------------------------
+# M.A. O'Neill, Tumbling Dice 04/01/2022
+#------------------------------------------
 
-CFLAGS		=	TARGET_CFLAGS TARGET_ARCHDEPCFLAGS -finline-functions -fopenmp -ffast-math
-LDFLAGS 	=	TARGET_LDFLAGS TARGET_ARCHDEPLDFLAGS -lgomp
-CC		=	gcc
+CFLAGS		= TARGET_CFLAGS TARGET_ARCHDEPCFLAGS -finline-functions -fopenmp -ffast-math
+LDFLAGS 	= TARGET_LDFLAGS TARGET_ARCHDEPLDFLAGS -lgomp
+CC		= gcc
 LIBS 		=
 
 @APPNAME:	@APPNAME.o $(LIBS)
@@ -20,9 +20,23 @@ LIBS 		=
 		$(CC) $(CFLAGS) -DMAX_SLOTS=32 -DSLOT=seg_slot_18		\
 		$(H_OPTS) -DMAX_USE_SLOTS=4 -DUSE=usage_slot_2 -c @APPNAME.c
 
+
+#--------------
+# Clean section
+#--------------
+
 .PHONY:		clean
 clean:
+		@rm *.o
+
+.PHONY:		cleanall
+cleanall:
 		@rm *.o @APPNAME
+
+
+#----------------
+# Install section
+#----------------
 
 .PHONY:		install	
 install:
@@ -31,7 +45,14 @@ install:
 .PHONY:		unstripped
 unstripped:
 		@cp -f @APPNAME TARGET_INSTALL_DIR
+		@[ -f man1/@APPNAME ] && cp man1/@APPNAME TARGET_MAN_DIR
+
+
+#------------------
+# Uninstall section
+#------------------
 
 .PHONY:		uninstall
 uninstall	
 		@rm TARGET_INSTALL_DIR/@APPNAME
+		@[ -f TARGET_MAN_DIR/@APPNAME.1 ] && rm TARGET_MAN_DIR/@APPNAME.1 || true

@@ -1,0 +1,1617 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/nfolib.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Error { color: #ffffff; background-color: #ff6060; padding-bottom: 1px; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Purpose: Numerical function support for scientific programming. This</span>
+<span class="Comment">             version contains fixes for the bugs discovered by Mike Cook</span>
+<span class="Comment">             of Laserscan Laboratories [mikec@uk.co.lsl]</span>
+
+<span class="Comment">    Author:  M.A. O'Neill</span>
+<span class="Comment">             Tumbling Dice Ltd</span>
+<span class="Comment">             Gosforth</span>
+<span class="Comment">             Newcastle upon Tyne</span>
+<span class="Comment">             NE3 4RT</span>
+<span class="Comment">             United Kingdom</span>
+
+<span class="Comment">    Version: 2.00</span>
+<span class="Comment">    Dated:   4th January 2022</span>
+<span class="Comment">    E-Mail:  mao@tumblingdice.co.uk </span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;me.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;utils.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;nfo.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stdlib.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Slot and usage functions - used by slot manager ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Slot usage function </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> nfolib_slot(<span class="Type">int</span> level)
+{   (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;int lib nfolib </span><span class="Special">%s</span><span class="Constant">: [ANSI C]</span><span class="Special">\n</span><span class="Constant">&quot;</span>,NFO_VERSION);
+
+    <span class="Statement">if</span>(level &gt; <span class="Constant">1</span>)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;(C) 1985-2022 Tumbling Dice</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Author: M.A. O'Neill</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;PUPS/P3 numerical function library (built </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+    }
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Segment identification for numerical function library </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef SLOT</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;slotman.h&gt;</span>
+_EXTERN <span class="Type">void</span> (* SLOT )() __attribute__ ((aligned(<span class="Constant">16</span>))) = nfolib_slot;
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> SLOT </span><span class="Comment">*/</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Do not have _EXTERN defined for the header file of this library </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#undef   __NOT_LIB_SOURCE__</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;nfo.h&gt;</span>
+<span class="PreProc">#define  __NOT_LIB_SOURCE__</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;casino.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;utils.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Constants/variables exported by library </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC _CONST FTYPE NATURAL = <span class="Constant">1.0e30</span>;      <span class="Comment">// Natural spline boundries</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------*.</span>
+<span class="Error">/</span><span class="Comment">* Public variable sqrarg which is used by some macros </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC FTYPE sqrarg;
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Standard definitions required by minimisation routines </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _CONST FTYPE GOLD   = <span class="Constant">1.618034</span>;
+_PRIVATE _CONST FTYPE GLIMIT = <span class="Constant">100.0</span>;
+
+
+<span class="Comment">/*</span><span class="Comment">---------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Golden Ratios </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------</span><span class="Comment">*/</span>
+
+_PRIVATE _CONST FTYPE R      = <span class="Constant">0.61803399</span>;
+_PRIVATE _CONST FTYPE C      = <span class="Constant">0.38196601</span>;
+_PRIVATE _CONST FTYPE CGOLD  = <span class="Constant">0.3819660</span>;
+_PRIVATE _CONST FTYPE ZEPS   = <span class="Constant">1.0e-10</span>;
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Minimum cut off value </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _CONST FTYPE TINY  = <span class="Constant">1.0e-20</span>;
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Maximum iterations Brent Minimiser </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _CONST <span class="Type">int</span> BR_ITMAX = <span class="Constant">100</span>;
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Maximum iterations Powell Minimiser </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define PO_ITMAX   </span><span class="Constant">200</span>
+<span class="PreProc">#define PASS_ITMAX </span><span class="Constant">10</span>
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Tolerance for Powell Minimiser </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _CONST FTYPE TOL     = <span class="Constant">2.0e-4</span>;
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Static functions which are local to this library ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Linear minimisation routine for Powell </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+_PROTOTYPE _PRIVATE <span class="Type">void</span> linmin  (FTYPE [],       \
+                                  FTYPE [],       \
+                                  <span class="Type">int</span>,            \
+                                  FTYPE *,        \
+                                  FTYPE (* )());
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Support routines for least squares fitting </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+
+_PROTOTYPE _PRIVATE FTYPE xtran(FTYPE, <span class="Type">int</span>);
+_PROTOTYPE _PRIVATE FTYPE ytran(FTYPE, <span class="Type">int</span>);
+_PROTOTYPE _PRIVATE FTYPE atran(FTYPE, <span class="Type">int</span>);
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Support routine for linmin </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+_PROTOTYPE _PRIVATE FTYPE f1dim(FTYPE);
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Standard macros used by nfolib ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_EXTERN FTYPE sqrarg;
+
+<span class="PreProc">#ifdef MAX</span>
+<span class="PreProc">#undef MAX</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> MAX </span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef MIN</span>
+<span class="PreProc">#undef MIN</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> MIN </span><span class="Comment">*/</span>
+
+<span class="PreProc">#define MAX(a,b) ((a) &gt; (b) ? (a) : (b))</span>
+<span class="PreProc">#define MIN(a,b) ((a) &lt; (b) ? (a) : (b))</span>
+<span class="PreProc">#define SIGN(a,b) ((b) &gt; </span><span class="Constant">0.0</span><span class="PreProc"> ? FABS(a) : -FABS(a))</span>
+<span class="PreProc">#define SHFT(a,b,c,d) (a)=(b);(b)=(c);(c)=(d);</span>
+<span class="PreProc">#define SQR(a) (sqrarg = (a), sqrarg*sqrarg)</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Least squares regression package.</span>
+
+<span class="Comment">    Linear, Inverse, Log, Power and Exponential least squares fits.</span>
+<span class="Comment">    See Micro User, Educational suppliment for further details.</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> least_squares(<span class="Type">int</span>            fit,  <span class="Comment">// Type of fit required </span>
+                           <span class="Type">int</span>          n_pts,  <span class="Comment">// Number of data points </span>
+                           FTYPE      x_arr[],  <span class="Comment">// Array of X data </span>
+                           FTYPE     y_arr[],   <span class="Comment">// Array of Y data</span>
+                           FTYPE         *r1,   <span class="Comment">// Goodness of fit</span>
+                           FTYPE         *r2,   <span class="Comment">// Coeff of determination</span>
+                           FTYPE lsq_coeff[])   <span class="Comment">// Least squares coeffs</span>
+
+{   <span class="Type">int</span> i,
+        numpts = <span class="Constant">0</span>;
+
+    FTYPE divisor = <span class="Constant">0.0</span>,
+          a       = <span class="Constant">0.0</span>,
+          x       = <span class="Constant">0.0</span>,
+          y       = <span class="Constant">0.0</span>,
+          xsum    = <span class="Constant">0.0</span>,
+          ysum    = <span class="Constant">0.0</span>,
+          xysum   = <span class="Constant">0.0</span>,
+          x2sum   = <span class="Constant">0.0</span>,
+          y2sum   = <span class="Constant">0.0</span>;
+
+   <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;n_pts; ++i)
+   {   x      = xtran(x_arr[i],fit);
+       y      = ytran(y_arr[i],fit);
+       xsum   = xsum + x;
+       ysum   = ysum + y;
+       x2sum  = x2sum + x * x;
+       y2sum  = y2sum + y * y;
+       xysum  = xysum + x * y;
+       numpts = numpts + <span class="Constant">1</span>;
+   }
+
+   divisor = x2sum * numpts - xsum * xsum;
+   <span class="Statement">if</span>(divisor == <span class="Constant">0</span>)
+      pups_error(<span class="Constant">&quot;[least_squares] regression not possible&quot;</span>);
+   <span class="Statement">else</span>
+   {  a = (ysum * x2sum - xsum * xysum) / divisor;
+      lsq_coeff[<span class="Constant">0</span>] = atran(a,fit);
+      lsq_coeff[<span class="Constant">1</span>] = (numpts * xysum - xsum * ysum) / divisor;
+
+
+         <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+         <span class="Comment">/*</span><span class="Comment"> Calculate coefficient of correlation </span><span class="Comment">*/</span>
+         <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+
+         *r2 = a * ysum + lsq_coeff[<span class="Constant">0</span>] * xysum - <span class="Constant">1</span> / numpts * ysum * ysum;
+         *r2 = (*r2) / (y2sum - <span class="Constant">1</span> / numpts * ysum * ysum);
+         *r1 = (*r2) / (*r2) * sqr(FABS(*r2));
+    }
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Transform X co-ordinate ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE FTYPE xtran(FTYPE x, <span class="Type">int</span> fit)
+
+{  <span class="Statement">if</span>(fit == LOGFIT || fit == EXPNFIT)
+      <span class="Statement">return</span>(LOG(x));
+   <span class="Statement">else</span>
+      <span class="Statement">return</span>(x);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Transform Y co-ordinate ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE FTYPE ytran(FTYPE y, <span class="Type">int</span> fit)
+
+{  <span class="Statement">if</span>(fit == PWRFIT || fit == EXPNFIT)
+      <span class="Statement">return</span>(LOG(y));
+
+   <span class="Statement">if</span>(fit == INVSFIT)
+      <span class="Statement">return</span>(<span class="Constant">1.0</span> / y);
+   <span class="Statement">else</span>
+      <span class="Statement">return</span>(y);
+}
+
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Transform a ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE FTYPE atran(FTYPE a, <span class="Type">int</span> fit)
+
+{  <span class="Statement">if</span>(fit == PWRFIT || fit == EXPNFIT)
+      <span class="Statement">return</span>(LOG(a));
+   <span class="Statement">else</span>
+      <span class="Statement">return</span>(a);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to generate a cubic  interpolation table ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> spline(FTYPE  x[],    <span class="Comment">// Array of X values</span>
+                    FTYPE  y[],    <span class="Comment">// Array of Y values</span>
+                    <span class="Type">int</span>      n,    <span class="Comment">// Number of points</span>
+                    FTYPE  yp1,    <span class="Comment">// Boundary condition 1</span>
+                    FTYPE  ypn,    <span class="Comment">// Boundary condition 2</span>
+                    FTYPE  y2[])   <span class="Comment">// Array of Y derivatives dy/dx</span>
+
+{   <span class="Type">int</span> i,
+        k;
+
+    FTYPE p,
+          qn,
+          sig,
+          un,
+          *u  = (FTYPE *)<span class="Constant">NULL</span>;
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Given the arrays x[1..n] and y[1..n] containing a tabulated function </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> i.e. yi = f(xi) with x1 &lt; x2 &lt; .. &lt; xn, and given values yp1 and ypn </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> for the first derivative of the interpolating function at points     </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> 1 and n respectively, this routine returns an array y2[1..n] that    </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> contains the second derivatives of the interpolating function at     </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> the tabulated points xi. If y1 and/or ypn are equal to 1e30 or       </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> greater, the routine is signalled to set the corresponding           </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> boundary conditions for a natural spline, with zero second           </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> derivative on that boundry                                           </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> ---------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    u = (FTYPE *)pups_malloc(n*<span class="Statement">sizeof</span>(FTYPE));
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set boundry condition to be natural </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(yp1 &gt; (FTYPE)<span class="Constant">0.99e30</span>)
+       y2[<span class="Constant">0</span>] = u[<span class="Constant">0</span>] = (FTYPE)<span class="Constant">0.0</span>;
+    <span class="Statement">else</span>
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set boundry condition to have a specified first derivative </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    {
+        y2[<span class="Constant">0</span>] = (FTYPE)(-<span class="Constant">0.5</span>);
+        u[<span class="Constant">0</span>] = (<span class="Constant">3.0</span>/(x[<span class="Constant">1</span>] - x[<span class="Constant">0</span>]))*((y[<span class="Constant">1</span>] - y[<span class="Constant">0</span>])/(x[<span class="Constant">1</span>] - x[<span class="Constant">0</span>]) - yp1);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> This is the decomposition loop of the tridiagonal algorithm </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">1</span>; i &lt; n - <span class="Constant">1</span>; i++)  <span class="Comment">// MAO  Was &lt;= in original version</span>
+    {   sig = (x[i] - x[i-<span class="Constant">1</span>]) / (x[i+<span class="Constant">1</span>] - x[i-<span class="Constant">1</span>]);
+        p   = sig*y2[i-<span class="Constant">1</span>] + (FTYPE)<span class="Constant">2.0</span>;
+
+
+       <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> y2 and u are used for temporary storage of the decomposed </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> factors                                                   </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+       y2[i] = (sig - (FTYPE)<span class="Constant">1.0</span>) / p;
+       u[i]  = (y[i+<span class="Constant">1</span>] - y[i]) / (x[i+<span class="Constant">1</span>] - x[i]) -
+                                 (y[i] - y[i-<span class="Constant">1</span>]) / (x[i] - x[i-<span class="Constant">1</span>]);
+       u[i]  = ((FTYPE)<span class="Constant">6.0</span>*u[i] / (x[i+<span class="Constant">1</span>] - x[i-<span class="Constant">1</span>]) - sig*u[i-<span class="Constant">1</span>]) / p;
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set upper boundry conditon to be natural </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(ypn &gt; (FTYPE)<span class="Constant">0.99e30</span>)
+        qn = un = (FTYPE)<span class="Constant">0.0</span>;
+    <span class="Statement">else</span>
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set upper boundry condition to a specified first derivative </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    {  qn = (FTYPE)<span class="Constant">0.5</span>;
+       un = ((FTYPE)<span class="Constant">3.0</span> / (x[n-<span class="Constant">1</span>] - x[n-<span class="Constant">2</span>]))*(ypn - (y[n-<span class="Constant">1</span>] - y[n-<span class="Constant">2</span>]) /
+                                                     (x[n-<span class="Constant">1</span>] - x[n-<span class="Constant">2</span>]));
+    }
+    y2[n-<span class="Constant">1</span>] = (un - qn*u[n-<span class="Constant">2</span>]) / (qn*y2[n-<span class="Constant">2</span>] + (FTYPE)<span class="Constant">1.0</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> This is the backsubstitution loop of the tridiagonal </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> algorithm                                            </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(k = n - <span class="Constant">2</span>; k &gt;= <span class="Constant">0</span>; k--)
+        y2[k] = y2[k]*y2[k+<span class="Constant">1</span>] + u[k];
+
+    free((<span class="Type">char</span> *)u);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to generate fitted function from least squares parameters ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC FTYPE lsq_fgen(FTYPE tr, <span class="Type">int</span> fit, FTYPE lsq_coeff[])
+
+{  <span class="Statement">if</span>(fit == LINFIT)
+      tr = lsq_coeff[<span class="Constant">0</span>] + lsq_coeff[<span class="Constant">1</span>]*tr;
+   <span class="Statement">else</span>
+      <span class="Statement">if</span>(fit == INVSFIT)
+         tr = <span class="Constant">1</span> / (lsq_coeff[<span class="Constant">0</span>] + lsq_coeff[<span class="Constant">2</span>]*tr);
+      <span class="Statement">else</span>
+         <span class="Statement">if</span>(fit == LOGFIT)
+            tr = lsq_coeff[<span class="Constant">1</span>] + lsq_coeff[<span class="Constant">2</span>]*log(tr);
+         <span class="Statement">else</span>
+            <span class="Statement">if</span>(fit == EXPNFIT)
+               tr = lsq_coeff[<span class="Constant">1</span>]*EXP(lsq_coeff[<span class="Constant">2</span>]*tr);
+            <span class="Statement">else</span>
+               <span class="Statement">if</span>(fit == PWRFIT)
+                  tr = lsq_coeff[<span class="Constant">1</span>] + EXP(log(tr) * lsq_coeff[<span class="Constant">2</span>]);
+               <span class="Statement">else</span>
+                  pups_error(<span class="Constant">&quot;[lsq_fgn] incorrect fit parameter&quot;</span>);
+
+    <span class="Statement">return</span>(tr);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Linear interpolation routine ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC FTYPE lint(FTYPE xa[],    <span class="Comment">// Array of X values</span>
+                   FTYPE ya[],    <span class="Comment">// Array of Y values</span>
+                   <span class="Type">int</span>      n,    <span class="Comment">// Number of points</span>
+                   FTYPE    x)    <span class="Comment">// Point to interpolate</span>
+
+{   <span class="Type">int</span> klo,
+        khi,
+          k;
+
+    FTYPE h,
+          ret;
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> We will find the correct place in the table by means of a bisection.  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> This is optimal if sequential calls to this routine are at random     </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> values of X. If the sequential calls are in order and closely spaced, </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> it would be better to store the previous values of klo,khi and test,  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> if they remain appropriate on the next call                           </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> ----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    klo = <span class="Constant">0</span>;
+    khi = n;
+
+    <span class="Statement">while</span>(khi - klo &gt; <span class="Constant">1</span>)
+    {   k = (khi + klo) &gt;&gt; <span class="Constant">1</span>;
+        <span class="Statement">if</span>(xa[k] &gt; x)
+           khi = k;
+        <span class="Statement">else</span>
+           klo = k;
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> The xa's must be distinct </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(xa[khi] - xa[klo] == <span class="Constant">0.0</span>)
+        pups_error(<span class="Constant">&quot;[lint] xa's must be distinct&quot;</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> klo and khi now bracket the input value of x </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+
+    h = (ya[khi] - ya[klo]) / (xa[khi] - xa[klo]);
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Interpolate numerical function within bracketed region </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------</span><span class="Comment">*/</span>
+
+    ret = ya[klo] + h*(x - xa[klo]);
+    <span class="Statement">return</span>(ret);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Cubic spline interpolation. For further details see</span>
+<span class="Comment">    &quot;Numerical Recipes in C&quot; pp96-97 ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC FTYPE splint(FTYPE  xa[],     <span class="Comment">// Array of X values </span>
+                     FTYPE  ya[],     <span class="Comment">// Array of Y values </span>
+                     FTYPE y2a[],     <span class="Comment">// Array of derivatives dy/dx </span>
+                     <span class="Type">int</span>       n,     <span class="Comment">// Number of points </span>
+                     FTYPE     x)     <span class="Comment">// Point to interpolate </span>
+
+{
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Given the arrays xa[1..n] and ya[1..n] which tabulate a funstion     </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> (with the xa's in order) and given the array y2a[1..n] which is the  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> output from the spline function and given a value of x, this routine </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> returns a cubic spline interpolated y                                </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> ---------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Type">int</span> k;
+
+    _IMMORTAL <span class="Type">int</span> klo,
+                  khi;
+
+    _IMMORTAL _BOOLEAN init = TRUE;
+
+    FTYPE h,
+          b,
+          a,
+          ret;
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> We will find the correct place in the table by means of a bisection.  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> This is optimal if sequential calls to this routine are at random     </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">                                                                       </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> values of X. If the sequential calls are in order and closely spaced, </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> it would be better to store the previous values of klo,khi and test,  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> if they remain appropriate on the next call                           </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> ----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(init == TRUE)
+    {  klo = <span class="Constant">0</span>;
+       khi = n;
+    }
+
+    <span class="Statement">while</span>(khi - klo &gt; <span class="Constant">1</span>)
+    {   k = (khi + klo) &gt;&gt; <span class="Constant">1</span>;
+        <span class="Statement">if</span>(xa[k] &gt; x)
+           khi = k;
+        <span class="Statement">else</span>
+           klo = k;
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> klo and khi now bracket the input value of x </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+
+    h = xa[khi] - xa[klo];
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> The xa's must be distinct </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(h == (FTYPE)<span class="Constant">0.0</span>)
+        pups_error(<span class="Constant">&quot;[splint] xa's must be distinct&quot;</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Cubic spline may now be evaluated </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+
+     a = (xa[khi] - x) / h;
+     b = (x - xa[klo]) / h;
+     ret = a*ya[klo] + b*ya[khi] + ((a*a*a - a)*y2a[klo] +
+                                   (b*b*b - b)*y2a[khi])*(h*h) /
+                                                     (FTYPE)<span class="Constant">6.0</span>;
+
+     <span class="Statement">return</span>(ret);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to integrate a numerical function using the Trapezium rule ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC FTYPE trapspl(FTYPE    t_1,    <span class="Comment">// Integral lower limit </span>
+                      FTYPE    t_2,    <span class="Comment">// Integral upper limit</span>
+                      FTYPE      h,    <span class="Comment">// Trapezium size h </span>
+                      FTYPE    y[],    <span class="Comment">// Array of Y values </span>
+                      FTYPE   y2[],    <span class="Comment">// Array of derivatives dy/dx </span>
+                      FTYPE    x[],    <span class="Comment">// Array of Y values </span>
+                      <span class="Type">int</span>    n_pts)    <span class="Comment">// Number of pts in num function </span>
+
+{   <span class="Type">int</span> i,
+        i_pts;
+
+    FTYPE sum,
+         comp,
+         time,
+         t_pts,
+         frac_pts,
+         i_sign;
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> If the upper and the lower limits of the integral are the same return </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> zero result                                                           </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> ----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(t_1 == t_2)
+      <span class="Statement">return</span>((FTYPE)<span class="Constant">0.0</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Get the sign of the integral </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(t_2 &lt; t_1)
+    {  time = t_2;
+       i_sign = (-<span class="Constant">1.0</span>);
+    }
+    <span class="Statement">else</span>
+    {  time   = t_1;
+       i_sign = <span class="Constant">1.0</span>;
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Get effective number of trapezia </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+    t_pts    = FABS(t_2 - t_1) / h;
+    frac_pts = t_pts - FLOOR(t_pts);
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> If there is a fractional number of trapezia, round up to next integer </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> value and recalculate step length                                     </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(frac_pts &gt; ASSUMED_ZERO)
+    {  i_pts = (<span class="Type">int</span>)FLOOR(t_pts) + <span class="Constant">1</span>;
+
+
+       <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Get the effective step length h </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+
+       h = FABS(t_2 - t_1) / i_pts;
+    }
+    <span class="Statement">else</span>
+       i_pts = (<span class="Type">int</span>)(t_pts);
+
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Find the values of the intergrand at the endpoints of the </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> integral                                                  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+
+    sum =  splint(x,y,y2,n_pts,t_1)*h / <span class="Constant">2.0</span>;
+    sum += splint(x,y,y2,n_pts,t_2)*h / <span class="Constant">2.0</span>;
+
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Find the pups_main part of the integral </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">1</span>; i&lt;i_pts; ++i)
+    {  comp = splint(x,y,y2,n_pts,time)*h;
+       sum  += comp;
+       time += h;
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Return the result </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">return</span>(sum*i_sign);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Integration routine using Simpsons rule ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC FTYPE Simpson_spl(FTYPE        from,   <span class="Comment">// Integral lower limit</span>
+                          FTYPE          to,   <span class="Comment">// Integral upper limit</span>
+                          FTYPE        step,   <span class="Comment">// Simpson step length</span>
+                          FTYPE   y_table[],   <span class="Comment">// Array of Y values</span>
+                          FTYPE  yd_table[],   <span class="Comment">// Array of derivatives</span>
+                          FTYPE   x_table[],   <span class="Comment">// Array of X values</span>
+                          <span class="Type">int</span>         n_pts)   <span class="Comment">// Number of pts in function</span>
+
+{  <span class="Type">int</span> i,
+       s_pts;
+
+   FTYPE sum,
+         sume,
+         sumo,
+         val;
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Get number of points over which integration will take place, if this is </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> even then auto adjust the number of points                              </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    s_pts = (<span class="Type">int</span>)((to - from) / step) + <span class="Constant">1</span>;
+    <span class="Statement">if</span>(s_pts &lt; <span class="Constant">3</span>)
+    {  s_pts = <span class="Constant">3</span>;
+       step = (to - from) / s_pts;
+    }
+
+    <span class="Statement">if</span>(ieven(s_pts) == TRUE)
+    {  ++s_pts;
+       step = (to - from) / s_pts;
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Sum odd points </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+
+    i   = <span class="Constant">0</span>;
+    sumo = <span class="Constant">0.0</span>;
+    val = from + step;
+
+    <span class="Statement">do</span> {  sumo += <span class="Constant">4</span>*splint(x_table,y_table,yd_table,n_pts,val);
+          val  += <span class="Constant">2</span>*step;
+          i    += <span class="Constant">2</span>;
+       } <span class="Statement">while</span>(i &lt; s_pts - <span class="Constant">1</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Sum even points </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> ----------------</span><span class="Comment">*/</span>
+
+    i = <span class="Constant">2</span>;
+    sume = <span class="Constant">0.0</span>;
+    val = from + <span class="Constant">2</span>*step;
+
+    <span class="Statement">do</span> {  sume += <span class="Constant">2</span>*splint(x_table,y_table,yd_table,n_pts,val);
+          val += <span class="Constant">2</span>*step;
+          i += <span class="Constant">2</span>;
+       } <span class="Statement">while</span>(i &lt; s_pts - <span class="Constant">2</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Add end points </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+
+    sum = (splint(x_table,y_table,yd_table,n_pts,from) +
+           splint(x_table,y_table,yd_table,n_pts,to))  * step/<span class="Constant">3</span>;
+
+    <span class="Statement">return</span>((sum + (step*(sumo + sume) / <span class="Constant">3</span>))*fsign(to - from));
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to differentiate using Milnes' method ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC FTYPE Milne_diff(<span class="Type">int</span> el, FTYPE h, FTYPE y_arr[])
+
+{   <span class="Statement">return</span>((-<span class="Constant">3</span> * y_arr[el - <span class="Constant">1</span>] + <span class="Constant">4</span>*y_arr[el] - y_arr[el + <span class="Constant">1</span>]) / (<span class="Constant">2</span>*h));
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Global definitions required by linmin/f1dim routines ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">int</span> ncom = <span class="Constant">0</span>;
+
+FTYPE pcom[MAX_D]  = { <span class="Constant">0.0</span> },
+      xicom[MAX_D] = { <span class="Constant">0.0</span> },
+      (*nrfunc)()  = (FTYPE *)<span class="Constant">NULL</span>;
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Linear minimisation routine ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> linmin(FTYPE        p[],
+                     FTYPE       xi[],
+                     <span class="Type">int</span>            n,
+                     FTYPE      *fret,
+                     FTYPE  (* func)())
+
+{   <span class="Type">int</span> j;
+
+    FTYPE xx,
+          xmin,
+          fx,
+          fb,
+          fa,
+          bx,
+          ax;
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Given an n dimesional point p[1..n], and an n dimensional direction </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> xi[1..n] moves and resets p to where the function, func(p) takes on </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> a minimum along the direction xi from p, and replaces by the actual </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> vector displacement that p was moved. Also returns fret, the value  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> of func at location p. This is all actually accomplished by calling </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> the routines mbrak and Brent ...                                    </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">                                                                     </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Define global variables                                             </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> --------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    ncom   = n;
+    nrfunc = func;
+
+    <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;n; j++)
+    {   pcom[j]  = p[j];
+        xicom[j] = xi[j];
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Initial guess for brackets </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+    ax = <span class="Constant">0.0</span>;
+    xx = <span class="Constant">1.0</span>;
+    bx = <span class="Constant">2.0</span>;
+
+    mnbrak(&amp;ax,&amp;xx,&amp;bx,&amp;fa,&amp;fx,&amp;fb,f1dim);
+    *fret = Brent(ax,xx,bx,f1dim,TOL,&amp;xmin);
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Construct vector to return </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;n; j++)
+    {   xi[j] *= xmin;
+        p[j]  += xi[j];
+    }
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    This function MUST accompany linmin ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE FTYPE f1dim(FTYPE x)
+
+{   <span class="Type">int</span> j;
+
+    FTYPE f,
+          xt[<span class="Constant">32</span>] = { <span class="Constant">0.0</span> };
+
+    <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;ncom; j++)
+        xt[j] = pcom[j] + x*xicom[j];
+
+    f = (*nrfunc)(xt);
+    <span class="Statement">return</span>(f);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to minimise a linear function using Brent's method ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC FTYPE Brent(FTYPE      ax,    <span class="Comment">// Bracket 1</span>
+                    FTYPE      bx,    <span class="Comment">// Bracket 2</span>
+                    FTYPE      cx,    <span class="Comment">// Bracket 3</span>
+                    FTYPE ( *f)(),    <span class="Comment">// Function to be minimised</span>
+                    FTYPE     tol,    <span class="Comment">// Relaxation tolerance</span>
+                    FTYPE   *xmin)    <span class="Comment">// X co-ordinate of minimum</span>
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Given a function f, and given a bracketing triplet of abiscissas ax,    </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> bx, cx (such that bx is between ax and cx) and f(bx) is less than both. </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> f(ax) and f(cx), this routine isolates the minimum to fractional     .  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> precision of about tol using Brent's method. The abscisa of the value   </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> is returned as xmin, and the minimum function is returned as Brent, the </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> returned function value                                                 </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> ------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+{   <span class="Type">int</span> iter;
+
+    FTYPE a,
+          b,
+          d,
+          etemp,
+          fu,
+          fv,
+          fw,
+          fx,
+          p,
+          q,
+          r,
+          tol1,
+          tol2,
+          u,
+          v,
+          w,
+          x,
+          xm,
+          e = <span class="Constant">0.0</span>;
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> a and b must be in ascending order, though the input abscissas need </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> not be                                                              </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    a = ((ax &lt; cx) ? ax : cx);
+    b = ((ax &gt; cx) ? ax : cx);
+
+    x  = w  = v  = bx;
+    fw = fv = fx = (*f)(x);
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Main routine loop </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(iter=<span class="Constant">1</span>; iter&lt;= BR_ITMAX; iter++)
+    {   xm   = <span class="Constant">0.5</span>*(a+b);
+        tol2 = <span class="Constant">2.0</span>*(tol1 = tol*FABS(x) + ZEPS);
+
+
+        <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> Test for done here </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+
+        <span class="Statement">if</span>(FABS(x - xm) &lt;= (tol2 - <span class="Constant">0.5</span>*(b - a)))
+        {  *xmin = x;
+           <span class="Statement">return</span>(fx);
+        }
+
+
+        <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> Construct a trial parabolic fit </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+
+        <span class="Statement">if</span>(FABS(e) &gt; tol1)
+        {  r = (x - w)*(fx - fv);
+           q = (x - v)*(fx - fw);
+           p = (x - v)*q - (x - w)*r;
+           q = <span class="Constant">2.0</span>*(q - r);
+           <span class="Statement">if</span>(q &gt; <span class="Constant">0.0</span>)
+              p = (-p);
+           q = FABS(q);
+           etemp = e;
+           e = d;
+
+
+           <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> Determine the acceptabilty of parabolic fit, and take Golden Section </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> Search into the larger of the two segments                           </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+           <span class="Statement">if</span>(FABS(p) &gt;= FABS(<span class="Constant">0.5</span>*q*etemp) ||
+              p &lt;= q*(a - x)               ||
+              p &gt;= q*(b - x))
+              d = CGOLD*(e = (x &gt;= xm ? a-x : b-x));
+           <span class="Statement">else</span>
+           {
+
+
+              <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+              <span class="Comment">/*</span><span class="Comment">  Take the parabolic step </span><span class="Comment">*/</span>
+              <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+
+              d = p / q;
+              u = x + d;
+
+              <span class="Statement">if</span>(u-a &lt; tol2 || b-u &lt; tol2)
+                 d = SIGN(tol1,xm-x);
+           }
+       }
+       <span class="Statement">else</span>
+          d = CGOLD*(e = (x &gt;= xm ? a-x : b-x));
+
+       u = (FABS(d) &gt;= tol1 ? x+d : x + SIGN(tol1,d));
+
+
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">  This is the one function evaluation per iteration </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+
+       fu = (*f)(u);
+
+
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Now we have to decide what to do with generated function </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(fu &lt;= fx)
+       {  <span class="Statement">if</span>(u &gt;= x)
+             a = x;
+          <span class="Statement">else</span>
+             b = x;
+          SHFT(v,w,x,u);
+          SHFT(fv,fw,fx,fu);
+       }
+       <span class="Statement">else</span>
+       {  <span class="Statement">if</span>(u &lt; x)
+             a = u;
+          <span class="Statement">else</span>
+             b = u;
+          <span class="Statement">if</span>(fu &lt;= fw || w == x)
+          {  v  = w;
+             w  = u;
+             fv = fw;
+             fw = fu;
+          }
+          <span class="Statement">else</span>
+          {  <span class="Statement">if</span>(fu &lt;= fv || v == x || v == w)
+             {  v  = u;
+                fv = fu;
+             }
+          }
+      }
+   }
+   pups_error(<span class="Constant">&quot;[Brent] too many iterations&quot;</span>);
+
+   <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+   <span class="Comment">/*</span><span class="Comment"> Stop compiler from producing error messages </span><span class="Comment">*/</span>
+   <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+
+   <span class="Statement">return</span>(<span class="Comment">/*</span><span class="Comment">DDUM</span><span class="Comment">*/</span> <span class="Constant">0</span>);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Minimisation in N dimesions using Powells' method ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> Powell(FTYPE          p[],  <span class="Comment">// Co-ordinate of minimum</span>
+                    FTYPE  xi[][MAX_D],  <span class="Comment">// Direction set matrix</span>
+                    <span class="Type">int</span>              n,  <span class="Comment">// Number of dimensions</span>
+                    <span class="Type">int</span>        maxiter,  <span class="Comment">// Iteration limit</span>
+                    FTYPE         ftol,  <span class="Comment">// Relaxation tolerance</span>
+                    <span class="Type">int</span>          *iter,  <span class="Comment">// Actual iterations</span>
+                    FTYPE        *fret,  <span class="Comment">// Value of minimum</span>
+                    FTYPE   (* func)(),  <span class="Comment">// Function to minimise</span>
+                    FTYPE   (* m_f1)(),
+                    FTYPE   (* m_f2)())
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Minimisation of a function of n variables. Input consists of an         </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> initial starting point p[1..n]; an initial matrix xi[1..n][1..n] whose  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> columns usually contain the unit vectors in the directions defined by   </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> a set of orthognal vectors at the starting point. ftol is a fractional  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> tolerance function value such that failure to decrease by more than     </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> this amount on 1 iteration signifies doneness. On output, p is set to   </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> the best point found, xi is the current direction set, fret is then the </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> returned function value at the current location of p.                   </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">                                                                         </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Further details of the operation of this routine are given in           </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> &quot;Numerical Recipes in C, pp.314-316                                     </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> ------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+{   <span class="Type">int</span> i,
+        j,
+        ibig;
+
+    FTYPE t,
+          fptt,
+          fp,
+          del,
+          pt[MAX_D]  = { <span class="Constant">0.0</span> },
+          ptt[MAX_D] = { <span class="Constant">0.0</span> },
+          xit[MAX_D] = { <span class="Constant">0.0</span> };
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Compute initial point </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(maxiter &lt; <span class="Constant">3</span>)
+       maxiter = <span class="Constant">3</span>;
+
+    *fret = (*func)(p);
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Save intial point </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;n; ++j)
+    {  pt[j]  = p[j];
+
+
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Initialise ptt - prevents loop monitor from getting junk </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> at first invocation                                      </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+
+       ptt[j] = p[j];
+    }
+
+    <span class="Statement">for</span>(*iter=<span class="Constant">1</span>;;(*iter)++)
+    {   fp   = (*fret);
+        ibig = <span class="Constant">0</span>;
+        del  = <span class="Constant">0.0</span>;
+
+
+        <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> For each iteration, loop over all directions in the set </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+
+        <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;n; i++)
+        {
+
+            <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment"> Copy the direction </span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+
+            <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;n; j++)
+                xit[j] = xi[j][i];
+
+            fptt = (*fret);
+
+
+            <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment"> Minimise along it </span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+            linmin(p,xit,n,fret,func);
+
+
+            <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment"> Record it if it is the largest decrease so far </span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+
+            <span class="Statement">if</span>(FABS(fptt - (*fret)) &gt; del)
+            {  del  = FABS(fptt - (*fret));
+               ibig = i;
+            }
+
+        }
+
+
+        <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> If appropriate enter the performance monitor </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+
+        <span class="Statement">if</span>(*m_f1 != <span class="Constant">NULL</span>)
+          (*m_f1)(*iter,*fret,ptt);
+
+
+        <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> Termination criterion </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+
+        <span class="Statement">if</span>(<span class="Constant">2.0</span>*FABS(fp - (*fret)) &lt;= ftol*(FABS(fp)+FABS(*fret)) ||
+           (*iter &gt; maxiter))
+        {
+
+           <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> Force Powell to do at least 3 iterations </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+
+           <span class="Statement">if</span>(*m_f2 != <span class="Constant">NULL</span>)
+              (*m_f2)(*iter,*fret);
+           <span class="Statement">return</span>;
+        }
+
+
+        <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------</span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> Construct the extrapolated point and average the direction moved. Save </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> the old starting point                                                 </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+        <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;n; j++)
+        {   ptt[j] = <span class="Constant">2.0</span>*p[j] - pt[j];
+            xit[j] = p[j] - pt[j];
+            pt[j]  = p[j];
+        }
+
+
+        <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> Function value at the extrapolated point </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+
+        fptt = (*func)(ptt);
+        <span class="Statement">if</span>(fptt &lt; fp)
+        {  t = <span class="Constant">2.0</span>*(fp - <span class="Constant">2.0</span>*(*fret) + fptt)*SQR(fp - (*fret) -  del) -
+                                                    del*SQR(fp - fptt);
+
+
+           <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> Move to minimum of the new direction </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+
+           <span class="Statement">if</span>(t &lt; <span class="Constant">0.0</span>)
+           {  linmin(p,xit,n,fret,func);
+
+
+              <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+              <span class="Comment">/*</span><span class="Comment"> Save new direction </span><span class="Comment">*/</span>
+              <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+
+              <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;n; j++)
+                  xi[j][ibig] = xit[j];
+           }
+       }
+    }
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to bracket a minimum in 1 dimension ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> mnbrak(FTYPE         *ax,   <span class="Comment">// Bracket 1 </span>
+                    FTYPE         *bx,   <span class="Comment">// Bracket 2</span>
+                    FTYPE         *cx,   <span class="Comment">// Bracket 3</span>
+                    FTYPE         *fa,   <span class="Comment">// f(bracket 1)</span>
+                    FTYPE         *fb,   <span class="Comment">// f(bracket 2)</span>
+                    FTYPE         *fc,   <span class="Comment">// f(bracket 3)</span>
+                    FTYPE  (* func)())   <span class="Comment">// Function to minimise </span>
+
+{   FTYPE u,
+          r,
+          q,
+          fu,
+          dum,
+          ulim;
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Given a function func, and given distinct intial points at ax and bx,   </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> this routine searches in the downhill direction (defined by the         </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> function evaluated at the intial points), and returns new points, ax,   </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> bx, and cx which bracket the minimum of the function. Also returned are </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> the function values at the three points, fa, fb and fc                  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    *fa = (*func)(*ax);
+    *fb = (*func)(*bx);
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Switch roles of a and b so that we can go downhill in the direction </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> from a to b                                                         </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> --------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(*fb &gt; *fa)
+    {  SHFT(dum,*ax,*bx,dum)
+       SHFT(dum,*fb,*fa,dum)
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> First guess for C </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+    *cx = (*bx) + GOLD*(*bx - *ax);
+    *fc = (*func)(*cx);
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Keep returning here until bracketed </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">while</span>(*fb &gt; *fc)
+    {   r = (*bx - *ax)*(*fb - *fc);
+        q = (*bx - *cx)*(*fb - *fa);
+
+
+        <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------</span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> Compute u by parabolic extrapolation from a,b and c, TINY is used to </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> prevent possible devision by zero                                    </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+        u = (*bx) - ((*bx - *cx)*q - (*bx - *ax)*r) /
+                    (<span class="Constant">2.0</span>*SIGN(MAX(FABS(q - r),TINY),q - r));
+
+        ulim = (*bx) + GLIMIT*(*cx - *bx);
+
+
+        <span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> Test various possibilities </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+        <span class="Statement">if</span>((*bx - u)*(u - *cx) &gt; <span class="Constant">0.0</span>)
+        {
+
+            <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment"> Parabolic u between b and c - try it </span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+
+            fu = (*func)(u);
+            <span class="Statement">if</span>(fu &lt; *fc)
+            {
+
+
+               <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment"> Got a minimum between b and c </span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+
+               *ax = (*bx);
+               *bx = u;
+               *fa = (*fb);
+               *fb = fu;
+               <span class="Statement">return</span>;
+            }
+            <span class="Statement">else</span>
+            {  <span class="Statement">if</span>(fu &gt; *fb)
+               {
+
+                   <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+                   <span class="Comment">/*</span><span class="Comment"> Got a minimum between a and u </span><span class="Comment">*/</span>
+                   <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+
+                   *cx = u;
+                   *fc = fu;
+                   <span class="Statement">return</span>;
+                }
+           }
+
+
+           <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">  Parabolic fit was no use. Use default magnification </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+           u  = (*cx) + GOLD*(*cx - *bx);
+           fu = (*func)(u);
+        }
+        <span class="Statement">else</span>
+        {
+
+           <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> Parabolic fit is between c and its allowed limit </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+
+           <span class="Statement">if</span>((*cx - u)*(u - ulim) &gt; <span class="Constant">0.0</span>)
+           {  fu = (*func)(u);
+              <span class="Statement">if</span>(fu &lt; *fc)
+              {  SHFT(*bx,*cx,u,*cx + GOLD*(*cx - *bx))
+                 SHFT(*fb,*fc,fu,(*func)(u))
+              }
+           }
+           <span class="Statement">else</span>
+           {  <span class="Statement">if</span>((u - ulim)*(ulim - *cx) &gt;= <span class="Constant">0.0</span>)
+              {
+
+
+                   <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+                   <span class="Comment">/*</span><span class="Comment">  Limit parabolic u to its maximum value </span><span class="Comment">*/</span>
+                   <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+
+                   u  = ulim;
+                   fu = (*func)(u);
+               }
+               <span class="Statement">else</span>
+               {
+
+                  <span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment"> Reject parabolic u, use default magnification </span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+
+                  u  = (*cx) + GOLD*(*cx - *bx);
+                  fu = (*func)(u);
+               }
+            }
+        }
+
+
+        <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> Eliminate oldest point and continue </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+
+        SHFT(*ax,*bx,*cx,u);
+        SHFT(*fa,*fb,*fc,fu);
+    }
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Find the minimum of a function of one dimension using the Golden</span>
+<span class="Comment">    section search ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC FTYPE golden(FTYPE       ax,   <span class="Comment">// Guess [bracket 1 co-ordinate] </span>
+                     FTYPE       bx,   <span class="Comment">// Guess [bracket 2 co-ordinate]</span>
+                     FTYPE       cx,   <span class="Comment">// Guess [bracket 3 co-ordinate]</span>
+                     FTYPE  (* f)(),   <span class="Comment">// Function to be bracketed</span>
+                     FTYPE      tol,   <span class="Comment">// Bracket tolerance</span>
+                     FTYPE    *xmin)   <span class="Comment">// Co-ordinate of minimum</span>
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Given a function f, and given a bracketing triplet of abcissas ax,   </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> bx, and cx, (such that bx is between ax and cx), and f(bx) is less   </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> than f(ax) and f(cx)), this routine performs golden section search   </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> for the minimum, isolating it to a fractional tolerance of about     </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> tol. The absissa of the minimum is returned as xmin, and the minimum </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> function value is returned as golden, the returned function          </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> value                                                                </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+{   FTYPE f0,
+          f1,
+          f2,
+          f3,
+          x0,
+          x1,
+          x2,
+          x3;
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> At any given time, we will keep track of four points x0,x1,x2,x3 </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    x0 = ax;
+    x3 = cx;
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Make x0 to x1 the smaller segment </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(FABS(cx - bx) &gt; FABS(bx - ax))
+    {  x1 = bx;    <span class="Comment">// Fill in new point to be tried</span>
+       x2 = bx + C*(cx - bx);
+    }
+    <span class="Statement">else</span>
+    {  x2 = bx;
+       x1 = bx + C*(bx - ax);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> The initial function evaluations. Note that we never need to </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> evaluate the function at the original endpoints              </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> -------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    f1 = (*f)(x1);
+    f2 = (*f)(x2);
+
+    <span class="Statement">while</span>(FABS(x3 - x0) &gt; tol*(FABS(x1) + FABS(x2)));
+    {    <span class="Statement">if</span>(f2 &lt; f1)
+         {  SHFT(x0,x1,x2,R*x1 + C*x3)
+            SHFT(f0,f1,f2,(*f)(x2));
+         }
+         <span class="Statement">else</span>
+         {  SHFT(x3,x2,x1,R*x2 + C*x0);
+            SHFT(f3,f2,f1,(*f)(x1));
+         }
+     }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">  We are done - output the best of two current values </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(f1 &gt; f2)
+    {  *xmin = x1;
+       <span class="Statement">return</span>(f1);
+    }
+    <span class="Statement">else</span>
+    {  *xmin = x2;
+       <span class="Statement">return</span>(x2);
+    }
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to minimise a function of N dimesions stochatically using</span>
+<span class="Comment">    simulated annealing ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> anneal(FTYPE          p[],   <span class="Comment">// Co-ordinate of minimum </span>
+                    FTYPE  delta_range,   <span class="Comment">// Delta range for random jumping </span>
+                    <span class="Type">int</span>              n,   <span class="Comment">// Number of dimensions in function</span>
+                    FTYPE         ftol,   <span class="Comment">// Relaxation tolerance</span>
+                    <span class="Type">int</span>          *iter,   <span class="Comment">// Number of iterations</span>
+                    FTYPE        *fret,   <span class="Comment">// Value of minimum</span>
+                    FTYPE   (* func)(),   <span class="Comment">// Function to minimise</span>
+                    FTYPE   (* m_f1)(),   <span class="Comment">// Loop monitor function</span>
+                    FTYPE   (* m_f2)())   <span class="Comment">// Exit monitor function</span>
+
+{   <span class="Type">int</span> i;
+
+    _BOOLEAN looper = TRUE;
+
+    FTYPE current_cost,
+          ptt[MAX_D] = { <span class="Constant">0.0</span> };
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Initialise the current cost </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+
+    current_cost = (*func)(p);
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Main loop of simulated annealing minimiser </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">do</span> {
+
+           <span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> Genrerate new purturbation vector </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+
+           <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;n; ++i)
+              ptt[i] =  p[i] + delta_range*(ran1() - <span class="Constant">0.5</span>);
+
+
+           <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">  Find out the cost of the new state vector </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+
+           *fret = (*func)(ptt);
+
+
+           <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> If returned cost less than current cost, replace p with p_delta and </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> current cost with fret                                              </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+           <span class="Statement">if</span>(*fret &lt; current_cost)
+           {  current_cost = *fret;
+
+
+              <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+              <span class="Comment">/*</span><span class="Comment"> If appropriate enter the performance monitor </span><span class="Comment">*/</span>
+              <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+
+              <span class="Statement">if</span>(*m_f1 != <span class="Constant">NULL</span>)
+                (*m_f1)(*iter,*fret,ptt);
+
+
+               <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment">  If the change is less than ftol - we are done </span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+
+               <span class="Statement">if</span>(*fret - current_cost &lt; ftol)
+               {  <span class="Statement">if</span>(*m_f2 != <span class="Constant">NULL</span>)
+                    (*m_f2)();
+                  <span class="Statement">return</span>;
+               }
+            }
+        } <span class="Statement">while</span>(looper == TRUE);
+
+    <span class="Statement">for</span>(i=<span class="Constant">1</span>; i&lt;n; ++i)
+        p[i] = ptt[i];
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

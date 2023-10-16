@@ -1,0 +1,187 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/atest.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Check criu functionality                      </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> M.A. O'Neill, Tumbling Dice, 4th January 2022 </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;stdio.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stdlib.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/stat.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/types.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;signal.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sched.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;time.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> String size </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define SSIZE               </span><span class="Constant">2048</span><span class="PreProc"> </span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Global variables </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+<span class="Type">int</span>  pid                   = (-<span class="Constant">1</span>);
+<span class="Type">int</span>  ssave_delay           = <span class="Constant">10</span>;
+<span class="Type">char</span> checkpoint_dir[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Signal handler for SIGTERM and SIGINT </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">int</span> term_handler(<span class="Type">int</span> signum)
+
+{   <span class="Type">char</span> rm_cmd[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+    (<span class="Type">void</span>)snprintf(rm_cmd,SSIZE,<span class="Constant">&quot;rm -rf </span><span class="Special">%s</span><span class="Constant">&quot;</span>,checkpoint_dir);
+    (<span class="Type">void</span>)system(rm_cmd);
+
+    exit(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> (Alarm) handler for state saving </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">int</span> alarm_handler(<span class="Type">int</span> signum)
+
+{   <span class="Type">char</span>   criu_cmd[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+    <span class="Type">struct</span> timespec delay;
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;STATE SAVE</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Run criu command to checkpoint process </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)snprintf(criu_cmd,SSIZE,<span class="Constant">&quot;criu --shell-job dump -D </span><span class="Special">%s</span><span class="Constant"> -t </span><span class="Special">%d</span><span class="Constant"> &amp;&quot;</span>,checkpoint_dir,pid);
+    (<span class="Type">void</span>)system(criu_cmd);
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> This is a dummy system call - on restore </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> EINTR will be generated                  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+
+    delay.tv_sec  = <span class="Constant">60</span>;
+    delay.tv_nsec = <span class="Constant">0</span>;
+
+    (<span class="Type">void</span>)nanosleep(&amp;delay,(<span class="Type">struct</span> timespec *)<span class="Constant">NULL</span>);
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;RESTART</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Reschedule alarm </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> is restarted     </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)alarm(ssave_delay);
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Main entry point </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+<span class="Type">int</span> main(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   <span class="Type">int</span>             iter  = <span class="Constant">0</span>;
+    <span class="Type">struct</span> timespec nsleep;
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Get iteration for (Criu) dump </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(argc &gt; <span class="Constant">2</span>)
+       exit(<span class="Constant">255</span>);
+    <span class="Statement">else</span> <span class="Statement">if</span>(argc == <span class="Constant">2</span>)
+    {  <span class="Statement">if</span>(sscanf(argv[<span class="Constant">1</span>],<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">&quot;</span>,&amp;ssave_delay) != <span class="Constant">1</span> || ssave_delay &lt;= <span class="Constant">0</span>)
+          exit(<span class="Constant">255</span>);
+    }
+
+    pid = getpid();
+
+    (<span class="Type">void</span>)snprintf(checkpoint_dir,SSIZE,<span class="Constant">&quot;criu.</span><span class="Special">%d</span><span class="Constant">.checkpoint&quot;</span>,pid);
+    (<span class="Type">void</span>)mkdir(checkpoint_dir,<span class="PreProc">0</span><span class="Constant">700</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set up signal handlers </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)signal(<span class="Constant">SIGINT</span>, (<span class="Type">void</span> *)&amp;term_handler);
+    (<span class="Type">void</span>)signal(<span class="Constant">SIGTERM</span>,(<span class="Type">void</span> *)&amp;term_handler);
+    (<span class="Type">void</span>)signal(<span class="Constant">SIGALRM</span>,(<span class="Type">void</span> *)&amp;alarm_handler);
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Main loop </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)alarm(ssave_delay);
+    <span class="Statement">while</span>(<span class="Constant">1</span>)
+    {   (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Iteration: </span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,iter);
+        (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+        ++iter;
+
+        nsleep.tv_sec  = <span class="Constant">1</span>;
+        nsleep.tv_nsec = <span class="Constant">0</span>;
+        (<span class="Type">void</span>)nanosleep(&amp;nsleep,(<span class="Type">struct</span> timespec *)<span class="Constant">NULL</span>);
+    }
+
+    exit(<span class="Constant">0</span>);
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

@@ -1,0 +1,257 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/hdid.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------</span>
+<span class="Comment">    Purpose: get disk serial number</span>
+
+<span class="Comment">    Author:  M.A. O'Neill</span>
+<span class="Comment">             Tumbling Dice Ltd</span>
+<span class="Comment">             Gosforth</span>
+<span class="Comment">             Newcastle upon Tyne</span>
+<span class="Comment">             NE3 4RT</span>
+<span class="Comment">             United Kingdom</span>
+
+<span class="Comment">    Version: 2.02 </span>
+<span class="Comment">    Dated:   24th May 2022</span>
+<span class="Comment">    E-mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">---------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;stdio.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;bsd/string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stdlib.h&gt;</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/ioctl.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;linux/hdreg.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;xtypes.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Version of hdid </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define HDID_VERSION    </span><span class="Constant">&quot;2.02&quot;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> String size </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define SSIZE           </span><span class="Constant">2048</span><span class="PreProc"> </span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Functions which are private to this application </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+
+_PROTOTYPE _PRIVATE <span class="Type">int</span> ecryptstr(<span class="Type">int</span>, <span class="Type">char</span> *, <span class="Type">char</span> *);
+_PROTOTYPE _PRIVATE _BOOLEAN strin(<span class="Type">char</span> *, <span class="Type">char</span> *);
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Main program entry point </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> main(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   <span class="Type">int</span>    i,
+           seed,
+           dev_index,
+           ddes           = (-<span class="Constant">1</span>);
+
+    <span class="Type">char</span>   hostname[SSIZE],
+           hd_device[SSIZE] = <span class="Constant">&quot;/dev/hda&quot;</span>;
+
+    <span class="Type">struct</span> hd_driveid disk_info;
+
+    _BOOLEAN do_ecrypt = FALSE;
+
+    (<span class="Type">void</span>)gethostname(hostname,SSIZE);
+    <span class="Statement">if</span>(argc == <span class="Constant">1</span> || strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;-usage&quot;</span>) == <span class="Constant">0</span> || strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;-help&quot;</span>) == <span class="Constant">0</span>)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">hdid version </span><span class="Special">%s</span><span class="Constant">, (C) Tumbling Dice 2003-2022 (built </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,HDID_VERSION,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;HDID is free software, covered by the GNU General Public License, and you are</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;welcome to change it and/or distribute copies of it under certain conditions.</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;See the GPL and LGPL licences at www.gnu.org for further details</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;HDID comes with ABSOLUTELY NO WARRANTY</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">Usage: hdid [-usage | -help] | [-ecrypt &lt;seed&gt;] [disk device name | default]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       exit(<span class="Constant">255</span>);
+    }
+    <span class="Statement">else</span> <span class="Statement">if</span>(argc == <span class="Constant">2</span>)
+    {  <span class="Statement">if</span>(strin(argv[<span class="Constant">1</span>],<span class="Constant">&quot;/dev/&quot;</span>) == TRUE)
+          (<span class="Type">void</span>)strlcpy(hd_device,argv[<span class="Constant">1</span>],SSIZE);
+       <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;default&quot;</span>) == <span class="Constant">0</span>)
+          (<span class="Type">void</span>)strlcpy(hd_device,<span class="Constant">&quot;/dev/hda&quot;</span>,SSIZE);
+       <span class="Statement">else</span>
+          (<span class="Type">void</span>)snprintf(hd_device,SSIZE,<span class="Constant">&quot;/dev/</span><span class="Special">%s</span><span class="Constant">&quot;</span>,argv[<span class="Constant">1</span>]);
+    }
+    <span class="Statement">else</span> <span class="Statement">if</span>(argc &gt;= <span class="Constant">3</span>)
+    {  <span class="Statement">if</span>(strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;-ecrypt&quot;</span>) == <span class="Constant">0</span>)
+       {  do_ecrypt = TRUE;
+
+          <span class="Statement">if</span>(argc == <span class="Constant">4</span>)
+          {  <span class="Statement">if</span>(sscanf(argv[<span class="Constant">2</span>],<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">&quot;</span>,&amp;seed) != <span class="Constant">1</span>)
+             {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;hdid (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): encryption (</span><span class="Special">%s</span><span class="Constant">) seed must be an integer (&gt;= 0)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,getpid(),hostname,argv[<span class="Constant">3</span>]);
+                (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+                exit(<span class="Constant">255</span>);
+             }
+
+             dev_index = <span class="Constant">3</span>;
+          }
+          <span class="Statement">else</span>
+          {  seed = <span class="Constant">9999</span>;
+             dev_index = <span class="Constant">2</span>;
+          }
+       }
+       <span class="Statement">else</span>
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;hdid (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): expecting </span><span class="Special">\&quot;</span><span class="Constant">-ecrypt</span><span class="Special">\&quot;</span><span class="Constant"> parameter</span><span class="Special">\n</span><span class="Constant">&quot;</span>,getpid(),hostname);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+          exit(<span class="Constant">255</span>);
+       }
+
+       <span class="Statement">if</span>(strin(argv[dev_index],<span class="Constant">&quot;/dev/&quot;</span>) == TRUE)
+          (<span class="Type">void</span>)strlcpy(hd_device,argv[dev_index],SSIZE);
+       <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(argv[dev_index],<span class="Constant">&quot;default&quot;</span>) == <span class="Constant">0</span>)
+          (<span class="Type">void</span>)strlcpy(hd_device,<span class="Constant">&quot;/dev/sda&quot;</span>,SSIZE);
+       <span class="Statement">else</span>
+          (<span class="Type">void</span>)snprintf(hd_device,SSIZE,<span class="Constant">&quot;/dev/</span><span class="Special">%s</span><span class="Constant">&quot;</span>,argv[dev_index]);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Strip trailing partition number from device </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=strlen(hd_device)-<span class="Constant">1</span>; i &gt; <span class="Constant">0</span>; --i)
+    {  <span class="Statement">if</span>(isdigit(hd_device[strlen(hd_device)-<span class="Constant">1</span>]))
+          hd_device[strlen(hd_device)-<span class="Constant">1</span>] = <span class="Special">'\0'</span>;
+       <span class="Statement">else</span>
+          <span class="Statement">break</span>;
+    }
+
+    <span class="Statement">if</span>((ddes = open(hd_device,<span class="Constant">0</span>)) == (-<span class="Constant">1</span>))
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;hdid (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): failed to open (disk) device </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n</span><span class="Constant">&quot;</span>,getpid(),hostname,hd_device);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       exit(<span class="Constant">255</span>);
+    }
+
+    <span class="Statement">if</span>(ioctl(ddes,HDIO_GET_IDENTITY,(<span class="Type">void</span> *)&amp;disk_info) == (-<span class="Constant">1</span>))
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;hdid (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): failed to probe (disk) device </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n</span><span class="Constant">&quot;</span>,getpid(),hostname,hd_device);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       (<span class="Type">void</span>)close(ddes);
+       exit(<span class="Constant">255</span>);
+    }
+
+    (<span class="Type">void</span>)close(ddes);
+
+    <span class="Statement">if</span>(do_ecrypt == TRUE)
+    {  <span class="Type">char</span> ecrypted_serial[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+       (<span class="Type">void</span>)ecryptstr(seed,(<span class="Type">char</span> *)disk_info.serial_no,(<span class="Type">char</span> *)ecrypted_serial);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> [seed </span><span class="Special">%d</span><span class="Constant">, device </span><span class="Special">%s</span><span class="Constant">]</span><span class="Special">\n</span><span class="Constant">&quot;</span>,ecrypted_serial,seed,hd_device);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stdout</span>);
+    }
+    <span class="Statement">else</span>
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> [device </span><span class="Special">%s</span><span class="Constant">]</span><span class="Special">\n</span><span class="Constant">&quot;</span>,disk_info.serial_no,hd_device);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stdout</span>);
+    }
+
+    exit(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Encrypt a string ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> ecryptstr(<span class="Type">int</span> seed, <span class="Type">char</span> *plaintext, <span class="Type">char</span> *cipher)
+
+{   <span class="Type">int</span> i;
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Encrypt string </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)srand(seed);
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;strlen(plaintext); ++i)
+    {   cipher[i] = (<span class="Type">unsigned</span> <span class="Type">char</span>)((<span class="Type">int</span>)plaintext[i] ^ rand());
+
+        <span class="Statement">while</span>((<span class="Type">int</span>)cipher[i] &lt; <span class="Constant">60</span> || (<span class="Type">int</span>)cipher[i] &gt; <span class="Constant">85</span>)
+              cipher[i] = (<span class="Type">unsigned</span> <span class="Type">char</span>)((<span class="Type">int</span>)cipher[i] ^ rand());
+    }
+
+    cipher[i] = <span class="Special">'\0'</span>;
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Look for the occurence of string s2 within string s1 ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _BOOLEAN strin(<span class="Type">char</span> *s1, <span class="Type">char</span> *s2)
+
+{   <span class="Type">int</span> i,
+        cmp_size,
+        chk_limit;
+
+    <span class="Statement">if</span>(strlen(s2) &gt; strlen(s1))
+       <span class="Statement">return</span>(FALSE);
+
+    chk_limit = strlen(s1) - strlen(s2) + <span class="Constant">1</span>;
+    cmp_size  = strlen(s2);
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;chk_limit; ++i)
+    {  <span class="Statement">if</span>(strncmp(&amp;s1[i],s2,cmp_size) == <span class="Constant">0</span>)
+          <span class="Statement">return</span>(TRUE);
+    }
+
+    <span class="Statement">return</span>(FALSE);
+}
+
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

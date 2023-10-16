@@ -8,11 +8,11 @@
              NE3 4RT
              United Kingdom
 
-    E-mail:  mao@tumblingdice.co.uk 
     Version: 2.00 
-    Dated:   30th August 2019 
+    Dated:   4th January 2022
+    E-mail:  mao@tumblingdice.co.uk 
 
-    Adapted from public domain ansi header by J.R. Bammi [jrb@cadence.com]
+    Adapted from public domain ANSI header by J.R. Bammi [jrb@cadence.com]
 ------------------------------------------------------------------------------*/
 
 #ifndef _ANSI_H

@@ -1,7 +1,7 @@
-/*-----------------------------------*/
-/* Looper payload (for testing)      */
-/* M.A. O'Neill, Tumbling Dice, 2019 */
-/*-----------------------------------*/
+/*-----------------------------------------------*/
+/* Looper payload (for testing)                  */
+/* M.A. O'Neill, Tumbling Dice, 4th January 2021 */
+/*-----------------------------------------------*/
 
 
 #include <stdio.h>

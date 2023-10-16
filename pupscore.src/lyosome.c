@@ -8,13 +8,14 @@
               NE3 4RT
               United Kingdom
 
-     Version: 2.00 
-     Dated:   30th August 2019 
+     Version: 2.01 
+     Dated:   24th May 2022
      E-mail:  mao@tumblingdice.co.uk
 ---------------------------------------------------------------------------------------*/
 
 #include <stdio.h>
 #include <string.h>
+#include <bsd/string.h>
 #include <xtypes.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -36,7 +37,7 @@
 /* Vesion of lyosome */
 /*-------------------*/
 
-#define  LYOSOME_VERSION    "2.00"
+#define  LYOSOME_VERSION    "2.01"
 #define  FOREVER            (-9999.0)
 
 
@@ -66,108 +67,10 @@ _PRIVATE time_t   lifetime               = 60;
 
 
 
+
 /*--------------------------------------------------------------------------------------
     Functions which are local to this application ...
 --------------------------------------------------------------------------------------*/
-
-
-#ifdef BSD_FUNCTION_SUPPORT
-/*--------------------------------------------------------------------------------------
-    Strlcpy and stlcat function based on OpenBSD functions ...
---------------------------------------------------------------------------------------*/
-/*------------------*/
-/* Open BSD Strlcat */
-/*------------------*/
-_PRIVATE size_t strlcat(char *dst, const char *src, size_t dsize)
-{
-	const char *odst = dst;
-	const char *osrc = src;
-	size_t      n    = dsize;
-	size_t      dlen;
-
-
-        /*------------------------------------------------------------------*/
-	/* Find the end of dst and adjust bytes left but don't go past end. */
-        /*------------------------------------------------------------------*/
-
-	while (n-- != 0 && *dst != '\0')
-		dst++;
-	dlen = dst - odst;
-	n = dsize - dlen;
-
-	if (n-- == 0)
-		return(dlen + strlen(src));
-	while (*src != '\0') {
-		if (n != 0) {
-			*dst++ = *src;
-			n--;
-		}
-		src++;
-	}
-	*dst = '\0';
-
-
-        /*----------------------------*/
-        /* count does not include NUL */
-        /*----------------------------*/
-
-	return(dlen + (src - osrc));
-}
-
-
-
-
-/*------------------*/
-/* Open BSD strlcpy */
-/*------------------*/
-
-_PRIVATE size_t strlcpy(char *dst, const char *src, size_t dsize)
-{
-	const char   *osrc = src;
-	size_t nleft       = dsize;
-
-
-        /*---------------------------------*/
-	/* Copy as many bytes as will fit. */
-        /*---------------------------------*/
-
-	if (nleft != 0) {
-		while (--nleft != 0) {
-			if ((*dst++ = *src++) == '\0')
-				break;
-		}
-	}
-
-
-        /*-----------------------------------------------------------*/
-	/* Not enough room in dst, add NUL and traverse rest of src. */
-        /*-----------------------------------------------------------*/
-
-	if (nleft == 0) {
-		if (dsize != 0)
-
-                        /*-------------------*/
-                        /* NUL-terminate dst */
-                        /*-------------------*/
-
-			*dst = '\0';
-		while (*src++)
-			;
-	}
-
-
-        /*----------------------------*/
-        /* count does not include NUL */
-        /*----------------------------*/
-
-	return(src - osrc - 1);
-}
-#endif /* BSD_FUNCTION_SUPPORT */
-
-
-
-
-
 /*---------------------*/
 /* Handler for SIGALRM */
 /*---------------------*/
@@ -354,7 +257,7 @@ _PUBLIC int main(int argc, char *argv[])
     /*---------------------*/
 
     if(argc == 1 || strcmp(argv[1],"-usage") == 0)
-    {  (void)fprintf(stderr,"\nlyosome lightweight file destructor version %s, (C) Tumbling Dice, 2004-2018 (built %s %s)\n",LYOSOME_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nlyosome lightweight file destructor version %s, (C) Tumbling Dice, 2004-2022 (built %s %s)\n",LYOSOME_VERSION,__TIME__,__DATE__);
        (void)fprintf(stderr,"\nUsage: lyosome [-lifetime <destruct delay in seconds:60>] | [-verbose:FALSE]\n");
        (void)fprintf(stderr,"               [-always:FALSE] [-d:FALSE] [-protect:FALSE] !name of file to protect!\n\n");
        (void)fprintf(stderr,"LYOSOME is free software, covered by the GNU General Public License, and you are\n");
@@ -373,7 +276,7 @@ _PUBLIC int main(int argc, char *argv[])
                 (void)fflush(stderr);
              }
 
-             exit(-1);
+             exit(255);
           }
 
           ++i;
@@ -400,7 +303,7 @@ _PUBLIC int main(int argc, char *argv[])
                    (void)fflush(stderr);
                 }
 
-                exit(-1);
+                exit(255);
              }
 
              pname_pos = i + 1;
@@ -423,7 +326,7 @@ _PUBLIC int main(int argc, char *argv[])
           (void)fflush(stderr);
        }
 
-       exit(-1);
+       exit(255);
     }
  
     p_index = argc - 1;
@@ -435,7 +338,7 @@ _PUBLIC int main(int argc, char *argv[])
           (void)fflush(stderr);
        }
 
-       exit(-1);
+       exit(255);
     }
 
 
@@ -510,7 +413,7 @@ dot_inserted:
              (void)fflush(stderr);
           }
 
-          exit(-1);
+          exit(255);
        }
        else
        {  if(do_verbose == TRUE)
@@ -536,7 +439,7 @@ dot_inserted:
              (void)fflush(stderr);
           }
 
-          exit(-1);
+          exit(255);
        }
 
        nargv = (char **)calloc(64,sizeof(char *));
@@ -566,7 +469,7 @@ dot_inserted:
           (void)setsid();
           (void)execvp(tmpPathName,nargv);
 
-          _exit(-1);
+          _exit(255);
        }
     }
     else if(strncmp(ppath,"/tmp",4) == 0)
@@ -592,7 +495,7 @@ dot_inserted:
                  (void)fflush(stderr);
               }
 
-              exit(-1);
+              exit(255);
            }
         }
         else if(access(principal,F_OK | R_OK | W_OK) == (-1))

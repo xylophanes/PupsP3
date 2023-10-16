@@ -1,4 +1,4 @@
-.TH FSW 1 "16th April 2015" "PUPSP3 commands" "PUPSP3 commands"
+.TH FSW 1 "4th October 2023" "PUPSP3 commands" "PUPSP3 commands"
 .SH NAME
 .br
 
@@ -32,9 +32,9 @@ fsw \ the file system watcher - intelligent pipe o/p filter
 [
 .B -guard
 ]]
-< <stdin>
-> <stdout>
->& <log file>
+[< <stdin>]
+[1> <stdout>]
+[2> <log file>]
 .br
 
 .SH DESCRIPTION
@@ -43,7 +43,10 @@ provides a mechanism for watching a file system which is being written to by a
 pipeline. If the file system becomes full, this is detected by
 .I fsw(1)
 which will then suspend the pipeline processes until space is once more
-available on the target output file system.
+available on the target output file system. If
+.I fsw(1)
+is not a component in a pipeline it returns immediately if the monitored filesystem
+is not full. Otherwise, it blocks until space becomes available.
 .br 
 
  
@@ -163,6 +166,21 @@ uses the PUPS libraries, see
 .I pups(3)
 .br
 
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
+.br
+
+.SH ENVIRONMENTAL VARIABLES
+none.
+.bt
 .SH COPYRIGHT
 (C) Tumbling Dice Ltd, Gosforth.
 .br

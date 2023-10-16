@@ -1,0 +1,303 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.5.1.src.git/include.libs/vector3.h.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="cpp">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Header for vector3/matrix3 linear programming library ...</span>
+
+<span class="Comment">    Author:  M.A. O'Neill</span>
+<span class="Comment">             Tumbling Dice Ltd</span>
+<span class="Comment">             Gosforth</span>
+<span class="Comment">             Newcastle upon Tyne</span>
+<span class="Comment">             NE3 4RT</span>
+<span class="Comment">             United Kingdom</span>
+
+<span class="Comment">     Version: 2.09 </span>
+<span class="Comment">     Date:    4th January 2022</span>
+<span class="Comment">     E-mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifndef VECTOR3_H</span>
+<span class="PreProc">#define VECTOR3_H</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Keep c2man happy </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;c2man.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">*********</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Version </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">*********</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define VEC3_VERSION    </span><span class="Constant">&quot;2.09&quot;</span>
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Floating point representation </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;ftype.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Variables exported by the vector3 library </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef _NOT_LIB_SOURCE__</span>
+
+_EXPORT _CONST <span class="Type">int</span> ANNOT;
+_EXPORT _CONST <span class="Type">int</span> N_ANNOT;
+
+<span class="PreProc">#else</span>
+<span class="PreProc">#   undef  _EXPORT</span>
+<span class="PreProc">#   define _EXPORT</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> _NOT_LIB_SOURCE__ </span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Return types (for Gaussian elimination) </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define NOT_SINGULAR        </span><span class="Constant">0</span>
+<span class="PreProc">#define IS_SINGULAR         </span><span class="Constant">1</span>
+<span class="PreProc">#define EXIT_IF_SINGULAR    </span><span class="Constant">0</span>
+<span class="PreProc">#define DISCARD_IF_SINGULAR </span><span class="Constant">1</span>
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Definition of the vector3 type </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">typedef</span> <span class="Type">struct</span> {  FTYPE comp[<span class="Constant">3</span>];                <span class="Comment">// Vector components</span>
+               }  vector3;
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Definition of the matrix3 type </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">typedef</span> <span class="Type">struct</span> {   FTYPE comp[<span class="Constant">3</span>][<span class="Constant">3</span>];            <span class="Comment">// Matrix components</span>
+               } matrix3;
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    These are the functions which are associated with the type vector3 ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Comment">// Assign a vector3</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> v3ass(vector3 *, FTYPE, FTYPE, FTYPE);
+
+<span class="Comment">// Print contents of a vector3</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> v3print(<span class="Type">FILE</span> *, <span class="Type">char</span> *, vector3 *);
+
+<span class="Comment">// Write vector3 to stream</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> v3write(<span class="Type">char</span> *, vector3 *, <span class="Type">FILE</span> *);
+
+<span class="Comment">// Solve linear equations using Gaussian Elimination</span>
+_PROTOTYPE _EXPORT _BOOLEAN m3GE_solve(<span class="Type">int</span> *, matrix3 *, vector3 *, vector3 *);
+
+<span class="Comment">// Read vector3 from stream</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> v3read(<span class="Type">char</span> *, vector3 *, <span class="Type">FILE</span> *);
+
+<span class="Comment">// Test whether vector3s parallel</span>
+_PROTOTYPE _EXPORT _BOOLEAN v3par(vector3 *, vector3 *);
+
+<span class="Comment">// Test whether vector3s equal</span>
+_PROTOTYPE _EXPORT _BOOLEAN v3eq(vector3 *, vector3 *);
+
+<span class="Comment">// Test vector3 sign hetrogeneity</span>
+_PROTOTYPE _EXPORT _BOOLEAN v3hecs(vector3 *);
+
+<span class="Comment">// Get vector3 magnitude</span>
+_PROTOTYPE _EXPORT FTYPE v3mag(vector3 *);
+
+<span class="Comment">// Get dot product</span>
+_PROTOTYPE _EXPORT FTYPE v3dot(vector3 *, vector3*);
+
+<span class="Comment">// Get angle between two vector3s</span>
+_PROTOTYPE _EXPORT FTYPE v3ang(vector3 *, vector3*);
+
+<span class="Comment">// Get scalar distance between a point in 3 space and line</span>
+_PROTOTYPE _EXPORT FTYPE v3dpoints(vector3 *, vector3 *, vector3 *);
+
+<span class="Comment">// Compute the spatial entropy of a set of vector3s</span>
+_PROTOTYPE _EXPORT FTYPE v3lvsi(<span class="Type">int</span>, vector3 *);
+
+<span class="Comment">// Convert vector3 to matrix3 column</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> v3tomatc(<span class="Type">int</span>, matrix3 *, vector3 *);
+
+<span class="Comment">// Calculate the additive inverse of a vector3</span>
+_PROTOTYPE _EXPORT vector3 v3inv(vector3 *);
+
+<span class="Comment">// Zero a vector3</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> v3zero(vector3 *);
+
+<span class="Comment">// Add vector3s</span>
+_PROTOTYPE _EXPORT vector3 v3add(vector3 *, vector3 *);
+
+<span class="Comment">// Subtract vectors</span>
+_PROTOTYPE _EXPORT vector3 v3sub(vector3 *, vector3 *);
+
+<span class="Comment">// Shift vector3</span>
+_PROTOTYPE _EXPORT vector3 v3shift(vector3 *, vector3 *);
+
+<span class="Comment">// Find cross product for pair of 3-vector3s</span>
+_PROTOTYPE _EXPORT vector3 v3cross(vector3 *, vector3 *);
+
+<span class="Comment">// Find unit vector3 in direction of argument vector3</span>
+_PROTOTYPE _EXPORT vector3 v3unit(vector3 *);
+
+<span class="Comment">// Express vector3 in given axis system</span>
+_PROTOTYPE _EXPORT  vector3 v3axtran(vector3 *,  \
+                                     vector3 *,  \
+                                     vector3 *,  \
+                                     vector3 *);
+
+<span class="Comment">// Compute vector3 sign</span>
+_PROTOTYPE _EXPORT vector3 v3sign(vector3 *);
+
+<span class="Comment">// Multiply vector3 by scalar</span>
+_PROTOTYPE _EXPORT vector3 v3scalm(FTYPE, vector3 *);
+
+<span class="Comment">// Divide vector3 by scalar</span>
+_PROTOTYPE _EXPORT vector3 v3scald(FTYPE, vector3 *);
+
+<span class="Comment">// Find vector3 perpendicular to plane defined by #1 and #2</span>
+_PROTOTYPE _EXPORT vector3 v3planp(vector3 *, vector3 *);
+
+<span class="Comment">// Generate unit vector3 pointing in random direction</span>
+_PROTOTYPE _EXPORT vector3 v3urnd(<span class="Type">void</span>);
+
+<span class="Comment">// Generate unit vector3 pointing in random direction of random size</span>
+_PROTOTYPE _EXPORT vector3 v3rnd(FTYPE);
+
+<span class="Comment">// Rotate vector3 about X axis of reference axis system</span>
+_PROTOTYPE _EXPORT vector3 v3rotx(vector3 *, FTYPE);
+
+<span class="Comment">// Rotate vector3 about y axis of reference axis system</span>
+_PROTOTYPE _EXPORT vector3 v3roty(vector3 *, FTYPE);
+
+<span class="Comment">// Rotate vector3 about z axis of reference axis system</span>
+_PROTOTYPE _EXPORT vector3 v3rotz(vector3 *, FTYPE);
+
+<span class="Comment">// Multiply vector3 by matrix3</span>
+_PROTOTYPE _EXPORT vector3 v3mult(matrix3 *, vector3 *);
+
+<span class="Comment">// Calculate smallest vector3 between line and point</span>
+_PROTOTYPE _EXPORT vector3 v3dpointv(vector3 *, vector3 *, vector3 *);
+
+<span class="Comment">// Calculate smallest vector3 between two skew lines</span>
+_PROTOTYPE _EXPORT  vector3 v3dlinesv(<span class="Type">int</span>    *,
+                                      vector3 *,
+                                      vector3 *,
+                                      vector3 *,
+                                      vector3 *,
+                                      vector3 *,
+                                      vector3 *,
+                                      vector3 *);
+
+<span class="Comment">// Compute the nearest approach of m vector3s</span>
+_PROTOTYPE _EXPORT vector3 v3mlinesv(<span class="Type">int</span> *, <span class="Type">int</span>, vector3 *, vector3 *, FTYPE *);
+
+<span class="Comment">// Compute planar distortion to vector3 caused by rotation projection</span>
+_PROTOTYPE _EXPORT vector3 v3distort(vector3 *, FTYPE, FTYPE);
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Standard 3matrix3 functions </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+
+<span class="Comment">// Assign zero matrix3 </span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> m3zero(matrix3 *);
+
+<span class="Comment">// Assign 3x3 matrix3</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> m3ass(matrix3 *,
+                              FTYPE,    \
+                              FTYPE,    \
+                              FTYPE,    \
+                              FTYPE,    \
+                              FTYPE,    \
+                              FTYPE,    \
+                              FTYPE,    \
+                              FTYPE,    \
+                              FTYPE);
+
+<span class="Comment">// Assign identity matrix3</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> m3ident(matrix3 *);
+
+<span class="Comment">// Print matrix3</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> m3print(<span class="Type">FILE</span> *, <span class="Type">char</span> *, matrix3 *);
+
+<span class="Comment">// Test if matrix3 is symmetric</span>
+_PROTOTYPE _EXPORT _BOOLEAN m3sym(matrix3 *);
+
+<span class="Comment">// Test if matrices are equal</span>
+_PROTOTYPE _EXPORT _BOOLEAN m3eq(matrix3 *, matrix3 *);
+
+<span class="Comment">// Add matrices</span>
+_PROTOTYPE _EXPORT matrix3 m3add(matrix3 *, matrix3 *);
+
+<span class="Comment">// Subtract matrices</span>
+_PROTOTYPE _EXPORT matrix3 m3sub(matrix3 *, matrix3 *);
+
+<span class="Comment">// Multiply matrices</span>
+_PROTOTYPE _EXPORT matrix3 m3mult(matrix3 *, matrix3 *);
+
+<span class="Comment">// Multiply matrix3 by scalar</span>
+_PROTOTYPE _EXPORT matrix3 mscalm(FTYPE, matrix3 *);
+
+<span class="Comment">// Form Euler matrix3</span>
+_PROTOTYPE _EXPORT matrix3 m3euler(FTYPE, vector3 *);
+
+<span class="Comment">// Form small angle Euler matrix3</span>
+_PROTOTYPE _EXPORT matrix3 m3seuler(FTYPE, vector3 *);
+
+<span class="Comment">// Find inverse of matrix3</span>
+_PROTOTYPE _EXPORT matrix3 m3inv(matrix3 *);
+
+<span class="PreProc">#ifdef _CPLUSPLUS</span>
+<span class="PreProc">#   undef  _EXPORT</span>
+<span class="PreProc">#   define _EXPORT </span><span class="Type">extern</span><span class="PreProc"> C</span>
+<span class="PreProc">#else</span>
+<span class="PreProc">#   undef _EXPORT</span>
+<span class="PreProc">#   define _EXPORT </span><span class="Type">extern</span>
+<span class="PreProc">#endif</span>
+
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> VECTOR3_H </span><span class="Comment">*/</span>
+
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

@@ -1,0 +1,2226 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/pc2c.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Error { color: #ffffff; background-color: #ff6060; padding-bottom: 1px; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Purpose: automatic (POSIX) threading of sources which are written to comply with</span>
+<span class="Comment">             PUPS semantics (impemnted as a C pre-processor).</span>
+
+<span class="Comment">    Author:  M.A. O'Neill</span>
+<span class="Comment">             Tumbling Dice Ltd</span>
+<span class="Comment">             Gosforth</span>
+<span class="Comment">             Newcastle upon Tyne</span>
+<span class="Comment">             NE3 4RT</span>
+<span class="Comment">             United Kingdom</span>
+
+<span class="Comment">    Version: 2.01 </span>
+<span class="Comment">    Dated:   24th May 2022</span>
+<span class="Comment">    E-mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">-------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;stdio.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;bsd/string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stdlib.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;xtypes.h&gt;</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Defines which are private to this application ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Version of pc2c </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define PC2C_VERSION   </span><span class="Constant">&quot;2.01&quot;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> String size </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define SSIZE          </span><span class="Constant">2048</span><span class="PreProc"> </span>
+
+
+<span class="PreProc">#define UP             </span><span class="Constant">1</span>
+<span class="PreProc">#define DOWN           (-</span><span class="Constant">1</span><span class="PreProc">)</span>
+<span class="PreProc">#define MTABLE_SIZE    </span><span class="Constant">256</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Check that function head modifiers _ROOTTHREAD, _DLL_ORIFICE </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> and _THREADSAFE are being used correctly                     </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PROTOTYPE _PRIVATE _BOOLEAN check_function_head_modifiers(<span class="Type">char</span> *);
+
+<span class="Comment">// Strip comments from line</span>
+_PROTOTYPE _PRIVATE <span class="Type">void</span> strip_line(<span class="Type">char</span> *, <span class="Type">char</span> *);
+
+<span class="Comment">// Set up a default function mutex definition</span>
+_PROTOTYPE _PRIVATE <span class="Type">void</span> default_fmutex_define(<span class="Type">char</span> *);
+
+<span class="Comment">// Set up a use function mutex definition</span>
+_PROTOTYPE _PRIVATE <span class="Type">void</span> use_fmutex_define(<span class="Type">char</span> *);
+
+<span class="Comment">// Translate a _TKEY directive</span>
+_PROTOTYPE _PRIVATE <span class="Type">void</span> tkey_transform(<span class="Type">char</span> *);
+
+<span class="Comment">// Translate a _TKEY_BIND directive</span>
+_PROTOTYPE _PRIVATE <span class="Type">void</span> tkey_bind_transform(<span class="Type">char</span> *);
+
+<span class="Comment">// Translate a _TKEY_FREE directive</span>
+_PROTOTYPE _PRIVATE <span class="Type">void</span> tkey_free_transform(<span class="Type">char</span> *);
+
+<span class="Comment">// Replace characrer c_1 in string s by character c_2 */</span>
+_PROTOTYPE _PRIVATE <span class="Type">void</span> ch_rep(<span class="Type">char</span> *, <span class="Type">char</span>, <span class="Type">char</span>);
+
+<span class="Comment">// Check that string is upper case</span>
+_PROTOTYPE _PRIVATE _BOOLEAN is_upper(<span class="Type">char</span> *);
+
+<span class="Comment">// Parse a PUPS-C macro function (checking its syntax)</span>
+_PROTOTYPE _PRIVATE _BOOLEAN parse_pups_c_macro_function(<span class="Type">char</span> *, <span class="Type">int</span>, <span class="Type">char</span> [<span class="Constant">32</span>][SSIZE]);
+
+<span class="Comment">// Check for empty lines (contain only spaces cntl-c)</span>
+_PROTOTYPE _PRIVATE _BOOLEAN empty_line(<span class="Type">char</span> *);
+
+<span class="Comment">// Check if-else construct syntax</span>
+_PROTOTYPE _PRIVATE _BOOLEAN check_if_else(<span class="Type">char</span> *);
+
+<span class="Comment">// Count number of (non-embedded) characters in line</span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> chcnt(<span class="Type">char</span> *, <span class="Type">char</span>);
+
+<span class="Comment">// Check that function head conforms to PUPS-C syntax</span>
+_PROTOTYPE _PRIVATE _BOOLEAN ansi_c_head(<span class="Type">char</span> *);
+
+<span class="Comment">// Check that orifice function prototype is correct</span>
+_PROTOTYPE _PRIVATE _BOOLEAN check_orifice_arguments(<span class="Type">char</span> *);
+
+<span class="Comment">// Strip characters from string</span>
+_PROTOTYPE _PRIVATE <span class="Type">void</span> strpach(<span class="Type">char</span> *, <span class="Type">char</span>);
+
+<span class="Comment">// Extended fputs function (checks for newline in O/P data)</span>
+_PROTOTYPE _PRIVATE <span class="Type">void</span> xfputs(<span class="Type">char</span> *, <span class="Type">FILE</span> *);
+
+<span class="Comment">// Routine to skip text which has already been substituted</span>
+_PROTOTYPE _PRIVATE <span class="Type">void</span> skip_pre_substituted_text(<span class="Type">char</span> *);
+
+<span class="Comment">// Routine to skip comments in source text</span>
+_PROTOTYPE _PRIVATE <span class="Type">void</span> skip_comment(<span class="Type">char</span> *);
+
+<span class="Comment">// Initialise mutex table</span>
+_PROTOTYPE _PRIVATE <span class="Type">void</span> init_mtable(<span class="Type">void</span>);
+
+<span class="Comment">// Add mutex to list of defined mutexes</span>
+_PROTOTYPE _PRIVATE _BOOLEAN defined(<span class="Type">char</span> *);
+
+<span class="Comment">// Add mutex to list of defined mutexes</span>
+_PROTOTYPE _PRIVATE _BOOLEAN undefine(<span class="Type">char</span> *);
+
+<span class="Comment">// Adjust function block count</span>
+_PROTOTYPE _PRIVATE <span class="Type">void</span> braket(<span class="Type">int</span>);
+
+<span class="Comment">// Get position of character</span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> ch_pos(<span class="Type">char</span> *, <span class="Type">char</span>);
+
+<span class="Comment">// Count number of bra '{' symbols in line</span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> nbras(<span class="Type">char</span> *);
+
+<span class="Comment">// Count number of ket '}' symbols in line</span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> nkets(<span class="Type">char</span> *);
+
+<span class="Comment">// Detect a PUPS function head</span>
+_PROTOTYPE _PRIVATE _BOOLEAN is_function_head(<span class="Type">char</span> *);
+
+<span class="Comment">// Detect a PUPS function exit point</span>
+_PROTOTYPE _PRIVATE _BOOLEAN is_function_exit(<span class="Type">char</span> *);
+
+<span class="Comment">// Test for occurence of s2 within s1</span>
+_PROTOTYPE _PRIVATE _BOOLEAN strin(<span class="Type">char</span> *, <span class="Type">char</span> *);
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Test for occurence of s2 within s1 retruning position of </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> of extracted string                                      </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PROTOTYPE _PRIVATE _BOOLEAN strinpos(<span class="Type">long</span> *, <span class="Type">long</span> *, <span class="Type">char</span> *, <span class="Type">char</span> *);
+
+<span class="Comment">// Reverse strip character from strinposg</span>
+_PROTOTYPE _PRIVATE <span class="Type">char</span> *rstrpch(<span class="Type">char</span> *, <span class="Type">char</span>);
+
+<span class="Comment">// Routine to strip s2 from s1</span>
+_PROTOTYPE _PRIVATE _BOOLEAN strinstrip(<span class="Type">char</span> *, <span class="Type">char</span> *);
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Variables which are private to this application ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+                                                      <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+_PRIVATE _BOOLEAN in_function_body       = FALSE;     <span class="Comment">/*</span><span class="Comment"> TRUE if in function body           </span><span class="Comment">*/</span>
+_PRIVATE _BOOLEAN is_prototype           = FALSE;     <span class="Comment">/*</span><span class="Comment"> TRUE if function prototype         </span><span class="Comment">*/</span>
+_PRIVATE _BOOLEAN is_rootthreaded        = FALSE;     <span class="Comment">/*</span><span class="Comment"> TRUE if func runs root thread only </span><span class="Comment">*/</span>
+_PRIVATE _BOOLEAN is_threadsafe          = FALSE;     <span class="Comment">/*</span><span class="Comment"> TRUE if funcguaranteed threadsafe  </span><span class="Comment">*/</span>
+_PRIVATE _BOOLEAN is_dll_orifice         = FALSE;     <span class="Comment">/*</span><span class="Comment"> TRUE if func DLL access orifice    </span><span class="Comment">*/</span>
+_PRIVATE _BOOLEAN no_auto_unlock         = FALSE;     <span class="Comment">/*</span><span class="Comment"> TRUE if auto mutex unlock mode     </span><span class="Comment">*/</span>
+_PRIVATE _BOOLEAN use_default_mutex      = TRUE;      <span class="Comment">/*</span><span class="Comment"> TRUE if using default mutex        </span><span class="Comment">*/</span>
+_PRIVATE _BOOLEAN in_comment             = FALSE;     <span class="Comment">/*</span><span class="Comment"> TRUE if pc2c translator in comment </span><span class="Comment">*/</span>
+_PRIVATE _BOOLEAN one_line_comment       = FALSE;     <span class="Comment">/*</span><span class="Comment"> TRUE if pc2c translator in comment </span><span class="Comment">*/</span>
+_PRIVATE _BOOLEAN m_alternative_body     = FALSE;     <span class="Comment">/*</span><span class="Comment"> TRUE if func has conitional forms  </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>      f_ts_cnt               = <span class="Constant">0</span>;         <span class="Comment">/*</span><span class="Comment"> Number of threadsafe functions     </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>      f_rto_cnt              = <span class="Constant">0</span>;         <span class="Comment">/*</span><span class="Comment"> Number of exec root thread funcs   </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>      f_orifice_cnt          = <span class="Constant">0</span>;         <span class="Comment">/*</span><span class="Comment"> Number of DLL orifice functions    </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>      l_cnt                  = <span class="Constant">0</span>;         <span class="Comment">/*</span><span class="Comment"> Line counter                       </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>      r_cnt                  = <span class="Constant">0</span>;         <span class="Comment">/*</span><span class="Comment"> Function block counter             </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>      tsd_cnt                = <span class="Constant">0</span>;         <span class="Comment">/*</span><span class="Comment"> TSD key counter                    </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>      n_bras                 = <span class="Constant">0</span>;         <span class="Comment">/*</span><span class="Comment"> bra '{' counter                    </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>      n_kets                 = <span class="Constant">0</span>;         <span class="Comment">/*</span><span class="Comment"> ket '}' counter                    </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>      n_mutexes              = <span class="Constant">0</span>;         <span class="Comment">/*</span><span class="Comment"> Number of user defined mutexes     </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">char</span>     current_f_mutex[SSIZE] = <span class="Constant">&quot;&quot;</span>;        <span class="Comment">/*</span><span class="Comment"> Currently active mutex macro       </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">char</span>     default_mutex[SSIZE]   = <span class="Constant">&quot;default&quot;</span>; <span class="Comment">/*</span><span class="Comment"> Current default mutex              </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">char</span>     mutex[SSIZE]           = <span class="Constant">&quot;default&quot;</span>; <span class="Comment">/*</span><span class="Comment"> Current insertion mutex            </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">char</span>     current_mutex[SSIZE]   = <span class="Constant">&quot;default&quot;</span>; <span class="Comment">/*</span><span class="Comment"> Currently selected mutex           </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">char</span>     line[SSIZE]            = <span class="Constant">&quot;&quot;</span>;        <span class="Comment">/*</span><span class="Comment"> Line being parsed                  </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">char</span>     current_f_line[SSIZE]  = <span class="Constant">&quot;&quot;</span>;        <span class="Comment">/*</span><span class="Comment"> Current func def line              </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">char</span>     m_alt_body_line[SSIZE] = <span class="Constant">&quot;&quot;</span>;        <span class="Comment">/*</span><span class="Comment"> Line following #else statement     </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">char</span>     fname[SSIZE]           = <span class="Constant">&quot;&quot;</span>;        <span class="Comment">/*</span><span class="Comment"> Current function name              </span><span class="Comment">*/</span>
+                                                      <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+
+                                                      <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">char</span>     defined_mutex[MTABLE_SIZE][SSIZE];  <span class="Comment">/*</span><span class="Comment"> Table of user defined mutexes      </span><span class="Comment">*/</span>
+                                                      <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Main entry point for pc2c ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> main(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   _BOOLEAN is_f_head      = FALSE,
+             is_f_exit      = FALSE;
+
+    <span class="Type">char</span> arglist[<span class="Constant">32</span>][SSIZE] = { <span class="Constant">&quot;&quot;</span> };
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">PUPS parallel C  to C translation tool version </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,PC2C_VERSION);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;(C) Tumbling Dice, 2006-2022 (built </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+
+    <span class="Statement">if</span>(isatty(<span class="Constant">0</span>) == <span class="Constant">1</span> || isatty(<span class="Constant">1</span>) == <span class="Constant">1</span>)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Usage: pc2c &lt; &lt;input PUPS parallel C file&gt; &gt; &lt;output C file&gt;</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;PC2C is free software, covered by the GNU General Public License, and you are</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;welcome to change it and/or distribute copies of it under certain conditions.</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;See the GPL and LGPL licences at www.gnu.org for further details</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;PC2C comes with ABSOLUTELY NO WARRANTY</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+
+       exit(<span class="Constant">255</span>);
+    }
+
+    init_mtable();
+    <span class="Statement">do</span> {
+
+<span class="Statement">next_line</span>: (<span class="Type">void</span>)fgets(line,SSIZE,<span class="Constant">stdin</span>);
+           <span class="Statement">if</span>(feof(<span class="Constant">stdin</span>) == <span class="Constant">1</span>)
+              <span class="Statement">goto</span> done;
+
+           ++l_cnt;
+
+
+           <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> Print PUPS-C/C++ to C/C++ translation banner if this is the first </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> translation pass on input source file                             </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+           <span class="Statement">if</span>(l_cnt == <span class="Constant">1</span> &amp;&amp; strin(line,<span class="Constant">&quot;&gt;&gt;&gt;&gt;&quot;</span>) == FALSE)
+           {  (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;/*&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;*/</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+              (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;/*    PUPS C/C++ text processed by pc2c version </span><span class="Special">%-5s</span><span class="Constant">                 */</span><span class="Special">\n</span><span class="Constant">&quot;</span>,PC2C_VERSION);
+              (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;/*    (C) M.A. O'Neill, Tumbling Dice                                */</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+              (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">#include &lt;tad.h&gt;</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+              (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;/*&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;*/</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+              (<span class="Type">void</span>)fflush(<span class="Constant">stdout</span>);
+           }
+
+
+           <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> Skip lines which contain only spaces and/or '\n' characters </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+
+           <span class="Statement">if</span>(empty_line(line) == TRUE)
+              <span class="Statement">goto</span> next_line;
+
+
+           <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> Substituted text - read lines of source until we reach end of text </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+           skip_pre_substituted_text(line);
+
+
+           <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> Comment - read lines of source until we reach end of comment </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------</span><span class="Comment">*/</span>
+
+           skip_comment(line);
+
+
+           <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> Check for multi statement lines - invalid syntax in PUPS-C </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------</span><span class="Comment">*/</span>
+
+           <span class="Statement">if</span>(chcnt(line,<span class="Constant">';'</span>) &gt; <span class="Constant">1</span> &amp;&amp; strin(line,<span class="Constant">&quot;for&quot;</span>) == FALSE)
+           {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">: PUPS-C syntax error: </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,l_cnt,rstrpch(line,<span class="Special">'\n'</span>));
+              (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+              exit(<span class="Constant">255</span>);
+           }
+
+
+           <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> Check to see if this line contains a macro #else statement </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------</span><span class="Comment">*/</span>
+
+           <span class="Statement">if</span>(strin(line,<span class="Constant">&quot;#else&quot;</span>) == TRUE)
+           {  m_alternative_body = TRUE;
+
+              (<span class="Type">void</span>)xfputs(line,<span class="Constant">stdout</span>);
+              (<span class="Type">void</span>)fflush(<span class="Constant">stdout</span>);
+              (<span class="Type">void</span>)fgets(line,<span class="Constant">255</span>,<span class="Constant">stdin</span>);
+              ++l_cnt;
+
+              (<span class="Type">void</span>)strlcpy(m_alt_body_line,line,SSIZE);
+           }
+
+
+           <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> Check to see if this line has set a specific thread mutex </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> if it has, convert definition to macro                    </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+
+           <span class="Statement">if</span>(strin(line,<span class="Constant">&quot;_USE_FMUTEX&quot;</span>) == TRUE)
+           {  use_fmutex_define(line);
+              <span class="Statement">goto</span> next_line;
+           }
+
+
+           <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> Define a default mutex to be used globally as the mutex for </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> a set of contiguous functions. If no arguments are supplied </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> the builtin default mutex is used                           </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+
+           <span class="Statement">if</span>(strin(line,<span class="Constant">&quot;_DEFAULT_FMUTEX&quot;</span>) == TRUE)
+           {  default_fmutex_define(line);
+              <span class="Statement">goto</span> next_line;
+           }
+
+
+           <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> Destroy a key in which per thread data is stored </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+
+           <span class="Statement">if</span>(in_function_body == TRUE &amp;&amp; strin(line,<span class="Constant">&quot;_TKEY_BIND&quot;</span>) == TRUE)
+           {  tkey_bind_transform(line);
+              <span class="Statement">goto</span> next_line;
+           }
+
+
+           <span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> Bind a key in which per thread data is stored </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+
+           <span class="Statement">if</span>(in_function_body == TRUE &amp;&amp; strin(line,<span class="Constant">&quot;_TKEY_FREE&quot;</span>) == TRUE)
+           {  tkey_free_transform(line);
+              <span class="Statement">goto</span> next_line;
+           }
+
+
+           <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> Define a key variable in which per-thread data is stored </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+
+           <span class="Statement">if</span>(in_function_body == TRUE &amp;&amp; strin(line,<span class="Constant">&quot;_TKEY&quot;</span>) == TRUE)
+           {  tkey_transform(line);
+              <span class="Statement">goto</span> next_line;
+           }
+
+
+           <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> Check for multiple '{' or '}' on a line </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> illegal under PUPS                      </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+
+           n_bras = nbras(line);
+           n_kets = nkets(line);
+
+
+           <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> Check that block structuring conforms to PUPS-C semantics </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> Also check syntax of PUPS-C keywords                      </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+
+           <span class="Statement">if</span>(n_bras  &gt; <span class="Constant">1</span>                                                                                      ||
+              n_kets  &gt; <span class="Constant">1</span>                                                                                      ||
+              (n_bras &gt;  <span class="Constant">1</span>  &amp;&amp; n_kets &gt;  <span class="Constant">1</span>)                                                                    ||
+              (n_bras == <span class="Constant">1</span>  &amp;&amp; n_kets == <span class="Constant">1</span> &amp;&amp; strin(line,<span class="Constant">&quot;=&quot;</span>)            == FALSE)                             ||
+              (strin(line,<span class="Constant">&quot;_PRIVATE&quot;</span>) == TRUE &amp;&amp; strin(line,<span class="Constant">&quot;_PUBLIC&quot;</span>)   == TRUE)                              ||
+              (strin(line,<span class="Constant">&quot;_PRIVATE&quot;</span>) == TRUE &amp;&amp; strin(line,<span class="Constant">&quot;_IMMORTAL&quot;</span>) == TRUE)                              ||
+              (strin(line,<span class="Constant">&quot;_PUBLIC&quot;</span>)  == TRUE &amp;&amp; strin(line,<span class="Constant">&quot;_IMMORTAL&quot;</span>) == TRUE)                              ||
+              (strin(line,<span class="Constant">&quot;_PUBLIC&quot;</span>)  == TRUE &amp;&amp; strin(line,<span class="Constant">&quot;(&quot;</span>)         == TRUE) &amp;&amp; in_function_body == TRUE  ||
+              (strin(line,<span class="Constant">&quot;_PRIVATE&quot;</span>) == TRUE &amp;&amp; strin(line,<span class="Constant">&quot;(&quot;</span>)         == TRUE) &amp;&amp; in_function_body == TRUE   )
+           {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">: PUPS-C syntax error: </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,l_cnt,rstrpch(line,<span class="Special">'\n'</span>));
+              (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+              exit(<span class="Constant">255</span>);
+           }
+
+
+           <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> Check to see if we have a function head </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+
+           is_f_head = is_function_head(line);
+
+
+           <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> Check that we don't have _ROOTHREAD, _THREADSAFE or _DLL_ORIFICE </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> anywhere except in function heads                                </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+           <span class="Statement">if</span>(is_f_head == FALSE &amp;&amp; is_prototype == FALSE)
+           {  <span class="Statement">if</span>(check_function_head_modifiers(line) == FALSE)
+              {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">: PUPS-C syntax error: </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,l_cnt,rstrpch(line,<span class="Special">'\n'</span>));
+                 (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+                 exit(<span class="Constant">255</span>);
+              }
+           }
+
+
+           <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> Check that if-else statements conform to PUPS-C syntax </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------</span><span class="Comment">*/</span>
+
+           <span class="Statement">if</span>(check_if_else(line) == FALSE)
+           {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">: PUPS-C syntax error: </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,l_cnt,rstrpch(line,<span class="Special">'\n'</span>));
+              (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+              exit(<span class="Constant">255</span>);
+           }
+
+
+           <span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> Check to see if we have a function exit point </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+
+           is_f_exit = is_function_exit(line);
+
+
+           <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> If our previous (none space) line was #else and we were in a      </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> function auto re-enter it when we hit { (assumes that we have     </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> a multiple part conditional function)                             </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+           <span class="Statement">if</span>(m_alternative_body == TRUE)
+           {  <span class="Statement">if</span>(r_cnt == <span class="Constant">0</span> &amp;&amp; n_bras == <span class="Constant">1</span>)
+              {  (<span class="Type">void</span>)strlcpy(mutex,current_mutex,SSIZE);
+                 <span class="Statement">if</span>(strcmp(current_mutex,default_mutex) != <span class="Constant">0</span>)
+                    use_default_mutex = FALSE;
+
+                 is_f_head = is_function_head(current_f_line);
+              }
+              m_alternative_body     = FALSE;
+           }
+
+           <span class="Statement">if</span>(is_f_head == FALSE &amp;&amp; is_f_exit == FALSE)
+           {
+
+              <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+              <span class="Comment">/*</span><span class="Comment"> Check for PUPS-C semantics before line is output </span><span class="Comment">*/</span>
+              <span class="Comment">/*</span><span class="Comment"> also check for end of function block             </span><span class="Comment">*/</span>
+              <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+
+              <span class="Statement">if</span>(n_bras == <span class="Constant">1</span> &amp;&amp; n_kets == <span class="Constant">0</span>)
+                 braket(UP);
+              <span class="Statement">else</span> <span class="Statement">if</span>(n_bras == <span class="Constant">0</span> &amp;&amp; n_kets == <span class="Constant">1</span>)
+              {  braket(DOWN);
+
+                 <span class="Statement">if</span>(r_cnt == <span class="Constant">0</span>)
+                 {  in_function_body  = FALSE;
+                    is_rootthreaded   = FALSE;
+                    is_threadsafe     = FALSE;
+                    is_dll_orifice    = FALSE;
+                    no_auto_unlock    = FALSE;
+                    use_default_mutex = TRUE;
+                    (<span class="Type">void</span>)strlcpy(mutex,default_mutex,SSIZE);
+                 }
+                 <span class="Statement">else</span> <span class="Statement">if</span>(r_cnt &lt; <span class="Constant">0</span>)
+                 {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">: PUPS-C syntax error: </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,l_cnt,rstrpch(line,<span class="Special">'\n'</span>));
+                    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+                    exit(<span class="Constant">255</span>);
+                 }
+              }
+
+              (<span class="Type">void</span>)xfputs(line,<span class="Constant">stdout</span>);
+              (<span class="Type">void</span>)fflush(<span class="Constant">stdout</span>);
+           }
+       } <span class="Statement">while</span>(feof(<span class="Constant">stdin</span>) == <span class="Constant">0</span>);
+
+<span class="Statement">done</span>:
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Print out summary of PUPS-C/C++ to C/C++ translations </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(f_ts_cnt &gt; <span class="Constant">0</span>)
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Special">%d</span><span class="Constant"> function(s) have been made thread safe</span><span class="Special">\n</span><span class="Constant">&quot;</span>,f_ts_cnt);
+
+    <span class="Statement">if</span>(f_orifice_cnt &gt; <span class="Constant">0</span>)
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant"> function(s) have been made DLL orifices</span><span class="Special">\n</span><span class="Constant">&quot;</span>,f_orifice_cnt);
+
+    <span class="Statement">if</span>(f_rto_cnt &gt; <span class="Constant">0</span>)
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant"> function(s) have been made exec root thread only</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,f_rto_cnt);
+
+    <span class="Statement">if</span>(tsd_cnt &gt; <span class="Constant">0</span>)
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant"> TSD key(s) have been defined to protect thread-static data</span><span class="Special">\n</span><span class="Constant">&quot;</span>,tsd_cnt);
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">finished</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+    exit(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Check that the orifice function conforms to a PUPS orifice function prototype ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> check_orifice_arguments(<span class="Type">char</span> *line)
+
+{   <span class="Type">char</span> tmp_str[SSIZE]  = <span class="Constant">&quot;&quot;</span>,
+         ret_type[SSIZE] = <span class="Constant">&quot;&quot;</span>,
+         arg1[SSIZE]     = <span class="Constant">&quot;&quot;</span>,
+         arg2[SSIZE]     = <span class="Constant">&quot;&quot;</span>,
+         arg3[SSIZE]     = <span class="Constant">&quot;&quot;</span>,
+         arg4[SSIZE]     = <span class="Constant">&quot;&quot;</span>,
+         line_buf[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+    (<span class="Type">void</span>)strlcpy(line_buf,line,SSIZE);
+    (<span class="Type">void</span>)strpach(line_buf,<span class="Constant">'('</span>);
+    (<span class="Type">void</span>)strpach(line_buf,<span class="Constant">','</span>);
+    (<span class="Type">void</span>)strpach(line_buf,<span class="Constant">')'</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Case 1 function of form _PUBLIC _DLL_ORIFICE _BOOLEAN func(char *a1, char *a2) </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(sscanf(line_buf,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">&quot;</span>,tmp_str,
+                                                 tmp_str,
+                                                ret_type,
+                                                 tmp_str,
+                                                    arg1,
+                                                    arg2,
+                                                    arg3,
+                                                    arg4) == <span class="Constant">8</span>)
+    {   <span class="Statement">if</span>(strcmp(ret_type,<span class="Constant">&quot;_BOOLEAN&quot;</span>) != <span class="Constant">0</span>)
+           <span class="Statement">return</span>(FALSE);
+
+        arg2[<span class="Constant">1</span>] = <span class="Special">'\0'</span>;
+        (<span class="Type">void</span>)strlcat(arg1,arg2,SSIZE);
+
+        arg4[<span class="Constant">1</span>] = <span class="Special">'\0'</span>;
+        (<span class="Type">void</span>)strlcat(arg3,arg4,SSIZE);
+
+        <span class="Statement">if</span>(strcmp(arg1,<span class="Constant">&quot;char*&quot;</span>) == <span class="Constant">0</span> || strcmp(arg3,<span class="Constant">&quot;char*&quot;</span>) == <span class="Constant">0</span>)
+           <span class="Statement">return</span>(TRUE);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Class 2 function of form _PUBLIC _DLL_ORIFICE _BOOLEAN func(char* a1, char *a2) </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(sscanf(line_buf,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">&quot;</span>,tmp_str,
+                                           tmp_str,
+                                          ret_type,
+                                           tmp_str,
+                                              arg1,
+                                              arg2) == <span class="Constant">6</span>)
+    {   <span class="Statement">if</span>(strcmp(ret_type,<span class="Constant">&quot;_BOOLEAN&quot;</span>) != <span class="Constant">0</span>)
+           <span class="Statement">return</span>(FALSE);
+
+        <span class="Statement">if</span>(strcmp(arg1,<span class="Constant">&quot;char*&quot;</span>) != <span class="Constant">0</span> || strcmp(arg2,<span class="Constant">&quot;char*&quot;</span>) != <span class="Constant">0</span>)
+           <span class="Statement">return</span>(FALSE);
+    }
+
+    <span class="Statement">return</span>(FALSE);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Check that function head conforms to PUPS-C syntax ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _BOOLEAN ansi_c_head(<span class="Type">char</span> *line)
+
+{   <span class="Type">int</span> i,
+        eq_index        = (-<span class="Constant">1</span>),
+        bra_index       = (-<span class="Constant">1</span>),
+        cnt             = <span class="Constant">0</span>;
+
+    <span class="Type">char</span> line_buf[<span class="Constant">4096</span>] = <span class="Constant">&quot;&quot;</span>;
+
+    <span class="Statement">if</span>(in_function_body == TRUE)
+       <span class="Statement">return</span>(FALSE);
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Strip any embedded comments out of the line before </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> we try to process it                               </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+
+    strip_line(line,line_buf);
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> If this is a macro function - ignore it </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(strin(line_buf,<span class="Constant">&quot;_USE_FMUTEX&quot;</span>)            == TRUE    ||
+       strin(line_buf,<span class="Constant">&quot;_DEFINE_FMUTEX&quot;</span>)         == TRUE    ||
+       strin(line_buf,<span class="Constant">&quot;_DEFINE_DEFAULT_FMUTEX&quot;</span>) == TRUE    ||
+       strin(line_buf,<span class="Constant">&quot;_TKEY_BIND&quot;</span>)             == TRUE    ||
+       strin(line_buf,<span class="Constant">&quot;_TKEY_FREE&quot;</span>)             == TRUE    ||
+       strin(line_buf,<span class="Constant">&quot;_TKEY&quot;</span>)                  == TRUE     )
+       <span class="Statement">return</span>(FALSE);
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;cnt; ++i)
+    {  <span class="Statement">if</span>(line_buf[i] == <span class="Constant">'('</span> &amp;&amp; bra_index == (-<span class="Constant">1</span>))
+          bra_index = i;
+       <span class="Statement">else</span> <span class="Statement">if</span>(line_buf[i] == <span class="Constant">'='</span> &amp;&amp; eq_index == (-<span class="Constant">1</span>))
+          eq_index  = i;
+    }
+
+    <span class="Statement">if</span>(eq_index != (-<span class="Constant">1</span>) &amp;&amp; bra_index &gt; eq_index)
+       <span class="Statement">return</span>(FALSE);
+
+    <span class="Statement">if</span>(strin(line_buf,<span class="Constant">&quot;_EXTERN&quot;</span>)  == FALSE    &amp;&amp;
+       strin(line_buf,<span class="Constant">&quot;_PRIVATE&quot;</span>) == FALSE    &amp;&amp;
+       strin(line_buf,<span class="Constant">&quot;_PUBLIC&quot;</span>)  == FALSE    &amp;&amp;
+       bra_index                  != (-<span class="Constant">1</span>)      )
+       <span class="Statement">return</span>(TRUE);
+
+    <span class="Statement">return</span>(FALSE);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Find function head - if found make sure threads calling the function lock it</span>
+<span class="Comment">    on entry ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _BOOLEAN is_function_head(<span class="Type">char</span> *line)
+
+{   <span class="Type">int</span>      h_cnt;
+
+    <span class="Type">char</span>     stripped_line[<span class="Constant">4096</span>] = <span class="Constant">&quot;&quot;</span>,
+             f_head_line[<span class="Constant">4096</span>]   = <span class="Constant">&quot;&quot;</span>;
+
+    <span class="Statement">if</span>(in_function_body == TRUE)
+       <span class="Statement">return</span>(FALSE);
+
+    strip_line(line,stripped_line);
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check that we do not have a non PUPS-C function head </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(ansi_c_head(stripped_line) == TRUE)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">: ANSI PUPS-C syntax error </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,l_cnt,rstrpch(line,<span class="Special">'\n'</span>));
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       exit(<span class="Constant">255</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> We have a PUPS-C function head - parse it </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(strin(stripped_line,<span class="Constant">&quot;(&quot;</span>) == TRUE  &amp;&amp;
+       strin(stripped_line,<span class="Constant">&quot;=&quot;</span>) == FALSE &amp;&amp;
+       (strin(line,<span class="Constant">&quot;_PRIVATE&quot;</span>) == TRUE || strin(line,<span class="Constant">&quot;PUBLIC&quot;</span>) == TRUE))
+    {
+
+       <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> We have a function head - find its body </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Type">int</span> h_cnt           = <span class="Constant">0</span>,
+           index,
+           n_args;
+
+       <span class="Type">char</span> prev_item[SSIZE] = <span class="Constant">&quot;&quot;</span>,
+            next_item[SSIZE] = <span class="Constant">&quot;&quot;</span>,
+            line_buf[SSIZE]  = <span class="Constant">&quot;&quot;</span>,
+            tmp_str[SSIZE]   = <span class="Constant">&quot;&quot;</span>;
+
+       _BOOLEAN is_main    = FALSE,
+                looper     = FALSE;
+
+
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> If the function is not declared as either _PUBLIC  </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> or _PRIVATE it does not conform to PUPS-C syntax   </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(strin(stripped_line,<span class="Constant">&quot;_PUBLIC&quot;</span>) == FALSE &amp;&amp; strin(stripped_line,<span class="Constant">&quot;_PRIVATE&quot;</span>) == FALSE)
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">: PUPS parallel C syntax error </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,h_cnt,rstrpch(f_head_line,<span class="Special">'\n'</span>));
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+          exit(<span class="Constant">255</span>);
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Save function head for error reporting </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+       h_cnt = l_cnt;
+       (<span class="Type">void</span>)strlcpy(f_head_line,stripped_line,SSIZE);
+
+
+       <span class="Comment">/*</span><span class="Comment">---------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> If we have function definition of form:           </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> _PROTOTYPE int func(void); etc return immediately </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">---------------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(strin(stripped_line,<span class="Constant">&quot;;&quot;</span>) == TRUE)
+       {  <span class="Statement">if</span>(strin(stripped_line,<span class="Constant">&quot;_PROTOTYPE&quot;</span>) == TRUE)
+          {  is_prototype = TRUE;
+             <span class="Statement">return</span>(FALSE);
+          }
+          <span class="Statement">else</span>
+          {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">: PUPS-C syntax error </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,h_cnt,rstrpch(f_head_line,<span class="Special">'\n'</span>));
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+             exit(<span class="Constant">255</span>);
+          }
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Extract function name from function head statement </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+
+       (<span class="Type">void</span>)strlcpy(current_f_line,line,SSIZE);
+       (<span class="Type">void</span>)strlcpy(line_buf,stripped_line,SSIZE);
+       <span class="Statement">do</span> {   (<span class="Type">void</span>)strlcpy(prev_item,next_item,SSIZE);
+              looper = strinstrip(line_buf,next_item);
+
+              <span class="Statement">if</span>(strin(next_item,<span class="Constant">&quot;(&quot;</span>) == TRUE)
+              {  <span class="Statement">if</span>(next_item[<span class="Constant">0</span>] == <span class="Constant">'('</span>)
+                   (<span class="Type">void</span>)strlcpy(fname,prev_item,SSIZE);
+                 <span class="Statement">else</span>
+                   (<span class="Type">void</span>)strlcpy(fname,next_item,SSIZE);
+
+                 looper = FALSE;
+              }
+          } <span class="Statement">while</span>(looper == TRUE);
+
+       index = ch_pos(fname,<span class="Constant">'('</span>);
+       fname[index] = <span class="Special">'\0'</span>;
+
+
+       <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Check for type of substitution to be made </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(strin(stripped_line,<span class="Constant">&quot;main(&quot;</span>) == TRUE)
+       {  is_main         = TRUE;
+          is_rootthreaded = TRUE;
+       }
+
+       <span class="Statement">if</span>(strin(stripped_line,<span class="Constant">&quot;_ROOTTHREAD&quot;</span>) == TRUE)
+          is_rootthreaded = TRUE;
+
+       <span class="Statement">if</span>(strin(stripped_line,<span class="Constant">&quot;_DLL_ORIFICE&quot;</span>) == TRUE &amp;&amp; m_alternative_body == FALSE)
+       {  <span class="Statement">if</span>(check_orifice_arguments(line) == FALSE)
+          {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">: PUPS-C syntax error </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,l_cnt,rstrpch(line,<span class="Special">'\n'</span>));
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+             exit(<span class="Constant">255</span>);
+          }
+
+          <span class="Statement">if</span>(fname[<span class="Constant">0</span>] == <span class="Constant">'*'</span>)
+             (<span class="Type">void</span>)strlcpy(tmp_str,&amp;fname[<span class="Constant">1</span>],SSIZE);
+          <span class="Statement">else</span>
+             (<span class="Type">void</span>)strlcpy(tmp_str,fname,SSIZE);
+
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">/*&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;*/</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;/* Inserted automatically by pc2c */</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;_PUBLIC _BOOLEAN </span><span class="Special">%s</span><span class="Constant">_is_orifice = TRUE;</span><span class="Special">\n</span><span class="Constant">&quot;</span>,tmp_str);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;_PUBLIC char </span><span class="Special">%s</span><span class="Constant">_name[SSIZE]      = </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant">;</span><span class="Special">\n</span><span class="Constant">&quot;</span>,SSIZE,fname,fname);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;_PUBLIC char </span><span class="Special">%s</span><span class="Constant">_prototype[SSIZE] = </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant">;</span><span class="Special">\n</span><span class="Constant">&quot;</span>,SSIZE,fname,rstrpch(line,<span class="Special">'\n'</span>));
+          (<span class="Type">void</span>)fflush(<span class="Constant">stdout</span>);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;/*&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;*/</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+
+          is_dll_orifice = TRUE;
+          ++f_orifice_cnt;
+       }
+       <span class="Statement">else</span> <span class="Statement">if</span>(m_alternative_body == FALSE)
+       {  <span class="Statement">if</span>(fname[<span class="Constant">0</span>] == <span class="Constant">'*'</span>)
+             (<span class="Type">void</span>)strlcpy(tmp_str,&amp;fname[<span class="Constant">1</span>],SSIZE);
+          <span class="Statement">else</span>
+             (<span class="Type">void</span>)strlcpy(tmp_str,fname,SSIZE);
+
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">/*&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;*/</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;/* Inserted automatically by pc2c */</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;_PUBLIC _BOOLEAN </span><span class="Special">%s</span><span class="Constant">_is_orifice = FALSE;</span><span class="Special">\n</span><span class="Constant">&quot;</span>,tmp_str);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stdout</span>);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;/*&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;*/</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       }
+
+       <span class="Statement">if</span>(strin(stripped_line,<span class="Constant">&quot;_PROTOTYPE&quot;</span>) == TRUE)
+          is_prototype = TRUE;
+       <span class="Statement">else</span>
+          is_prototype = FALSE;
+
+
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Do not re-emit head if this is an alternative body </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> for a macro conditional function                   </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(m_alternative_body == FALSE)
+       {  (<span class="Type">void</span>)xfputs(line,<span class="Constant">stdout</span>);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stdout</span>);
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> If this function has been declared threadsafe simply </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> note that we are in a function body and return       </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(strin(stripped_line,<span class="Constant">&quot;_THREADSAFE&quot;</span>) == TRUE)
+          is_threadsafe = TRUE;
+
+       <span class="Statement">do</span> {    _BOOLEAN is_substituted = FALSE;
+
+
+               <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment"> Search for body of function                </span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment"> unless this is a macro-expansion           </span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment"> in which case we simply skip to the action </span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+
+               <span class="Statement">if</span>(m_alternative_body == FALSE)
+               {  <span class="Statement">do</span> {   (<span class="Type">void</span>)fgets(line,SSIZE,<span class="Constant">stdin</span>);
+                         ++l_cnt;
+
+
+                         <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+                         <span class="Comment">/*</span><span class="Comment"> Check to see if this is a function     </span><span class="Comment">*/</span>
+                         <span class="Comment">/*</span><span class="Comment"> definition. If it is we will find a ;  </span><span class="Comment">*/</span>
+                         <span class="Comment">/*</span><span class="Comment"> rather than a { as function definitios </span><span class="Comment">*/</span>
+                         <span class="Comment">/*</span><span class="Comment"> have no bodies                         </span><span class="Comment">*/</span>
+                         <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+                         strip_line(line,stripped_line);
+                         <span class="Statement">if</span>(strin(stripped_line,<span class="Constant">&quot;;&quot;</span>) == TRUE &amp;&amp; strin(stripped_line,<span class="Constant">&quot;{&quot;</span>) == FALSE)
+                         {
+
+                            <span class="Comment">/*</span><span class="Comment">---------------------------------------------------</span><span class="Comment">*/</span>
+                            <span class="Comment">/*</span><span class="Comment"> If we have got here and we are not in a prototype </span><span class="Comment">*/</span>
+                            <span class="Comment">/*</span><span class="Comment"> function declaration, this is an error            </span><span class="Comment">*/</span>
+                            <span class="Comment">/*</span><span class="Comment">---------------------------------------------------</span><span class="Comment">*/</span>
+
+                            <span class="Statement">if</span>(is_prototype == FALSE)
+                            {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">: PUPS-C syntax error: </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,h_cnt,rstrpch(f_head_line,<span class="Special">'\n'</span>));
+                               (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+                               exit(<span class="Constant">255</span>);
+                            }
+
+                            is_rootthreaded   = FALSE;
+                            is_threadsafe     = FALSE;
+                            is_dll_orifice    = FALSE;
+                            use_default_mutex = TRUE;
+                            in_function_body  = FALSE;
+
+                            <span class="Statement">return</span>(FALSE);
+                         }
+
+
+                         <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+                         <span class="Comment">/*</span><span class="Comment"> Check for pre-substitutions         </span><span class="Comment">*/</span>
+                         <span class="Comment">/*</span><span class="Comment"> if pre-substituted abort processing </span><span class="Comment">*/</span>
+                         <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+
+                         <span class="Statement">if</span>(strin(stripped_line,<span class="Constant">&quot;&gt;&gt;&gt;&gt;&quot;</span>) == TRUE)
+                         {  skip_pre_substituted_text(stripped_line);
+
+                            is_rootthreaded   = FALSE;
+                            is_threadsafe     = FALSE;
+                            is_dll_orifice    = FALSE;
+                            use_default_mutex = TRUE;
+                            in_function_body  = TRUE;
+
+                            <span class="Statement">return</span>(TRUE);
+                         }
+                         <span class="Statement">else</span>
+                         {
+
+                            <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+                            <span class="Comment">/*</span><span class="Comment"> Check for syntax errors in function header </span><span class="Comment">*/</span>
+                            <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+
+                            n_bras = nbras(stripped_line);
+                            n_kets = nkets(stripped_line);
+
+                            <span class="Statement">if</span>((n_bras &gt; <span class="Constant">1</span> &amp;&amp; n_kets &gt; <span class="Constant">0</span>)                                     ||
+                               n_kets  &gt; <span class="Constant">0</span>                                                    ||
+                               (strin(stripped_line,<span class="Constant">&quot;_PUBLIC&quot;</span>)  == TRUE &amp;&amp; strin(line,<span class="Constant">&quot;(&quot;</span>) == TRUE)    ||
+                               (strin(stripped_line,<span class="Constant">&quot;_PRIVATE&quot;</span>) == TRUE &amp;&amp; strin(line,<span class="Constant">&quot;(&quot;</span>) == TRUE)     )
+                            {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">: PUPS-C syntax error: </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,h_cnt,rstrpch(f_head_line,<span class="Special">'\n'</span>));
+                               (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+                               exit(<span class="Constant">255</span>);
+                            }
+
+                            <span class="Statement">if</span>((n_bras = nbras(stripped_line)) == <span class="Constant">0</span>)
+                            {  (<span class="Type">void</span>)xfputs(line,<span class="Constant">stdout</span>);
+                               (<span class="Type">void</span>)fflush(<span class="Constant">stdout</span>);
+                            }
+                         }
+                      } <span class="Statement">while</span>(n_bras == <span class="Constant">0</span>);
+               }
+
+
+               <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment"> If we have got here and we have a prototype definition  </span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment"> we must raise an error -- prototypes do not have bodies </span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+
+               <span class="Statement">if</span>(is_prototype == TRUE)
+               {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">: PUPS-C syntax error: </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,h_cnt,rstrpch(f_head_line,<span class="Special">'\n'</span>));
+                  (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+                  exit(<span class="Constant">255</span>);
+               }
+
+
+               <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment"> Problem with function block structure </span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+               <span class="Statement">if</span>(n_bras &gt; <span class="Constant">1</span>)
+               {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">: PUPS-C syntax error: </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,l_cnt,rstrpch(line,<span class="Special">'\n'</span>));
+                  (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+                  exit(<span class="Constant">255</span>);
+               }
+
+
+               in_function_body = TRUE;
+               <span class="Statement">if</span>(n_bras == <span class="Constant">1</span> &amp;&amp; n_kets == <span class="Constant">0</span>)
+                  braket(UP);
+
+               <span class="Statement">if</span>(is_threadsafe == TRUE)
+               {  <span class="Statement">if</span>(m_alternative_body == FALSE)
+                  { (<span class="Type">void</span>)xfputs(line,<span class="Constant">stdout</span>);
+                    (<span class="Type">void</span>)fflush(<span class="Constant">stdout</span>);
+                  }
+                  <span class="Statement">else</span>
+                  {  (<span class="Type">void</span>)xfputs(m_alt_body_line,<span class="Constant">stdout</span>);
+                     (<span class="Type">void</span>)fflush(<span class="Constant">stdout</span>);
+                  }
+
+                  <span class="Statement">return</span>(TRUE);
+               }
+
+
+               <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment"> Check to see that this function is not threaded already </span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment"> if it is skip to the end of the function                </span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+
+               <span class="Statement">if</span>(strin(stripped_line,<span class="Constant">&quot;_LOCK_THREAD_FMUTEX_&quot;</span>)      == TRUE    ||
+                  strin(stripped_line,<span class="Constant">&quot;_INIT_PTHREAD_FMUTEXES&quot;</span>)    == TRUE    ||
+                  strin(stripped_line,<span class="Constant">&quot;_DLL_ORIFICE_FUNCTION&quot;</span>)     == TRUE     )
+               {  <span class="Statement">do</span> {    (<span class="Type">void</span>)fgets(line,SSIZE,<span class="Constant">stdin</span>);
+                          ++l_cnt;
+
+                          strip_line(line,stripped_line);
+                          <span class="Statement">if</span>(feof(<span class="Constant">stdin</span>) == <span class="Constant">1</span>)
+                          {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Premature end of file</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+                             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+                             exit(<span class="Constant">255</span>);
+                          }
+
+                          n_bras = nbras(stripped_line);
+                          n_kets = nkets(stripped_line);
+
+
+                          <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+                          <span class="Comment">/*</span><span class="Comment"> Check for syntax errors in pre-substituted function body </span><span class="Comment">*/</span>
+                          <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+
+                          <span class="Statement">if</span>(n_bras &gt; <span class="Constant">1</span> &amp;&amp; n_kets &gt; <span class="Constant">1</span>                                       ||
+                             (strin(stripped_line,<span class="Constant">&quot;_PUBLIC&quot;</span>)  == TRUE &amp;&amp; strin(stripped_line,<span class="Constant">&quot;(&quot;</span>) == TRUE)    ||
+                             (strin(stripped_line,<span class="Constant">&quot;_PRIVATE&quot;</span>) == TRUE &amp;&amp; strin(stripped_line,<span class="Constant">&quot;(&quot;</span>) == TRUE)     )
+                          {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">: PUPS-C syntax error: </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,h_cnt,rstrpch(f_head_line,<span class="Special">'\n'</span>));
+                             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+                          }
+
+                          <span class="Statement">if</span>(n_bras == <span class="Constant">1</span> &amp;&amp; n_kets == <span class="Constant">0</span>)
+                             braket(UP);
+                          <span class="Statement">else</span> <span class="Statement">if</span>(n_bras == <span class="Constant">0</span> &amp;&amp; n_kets == <span class="Constant">1</span>)
+                             braket(DOWN);
+
+                     } <span class="Statement">while</span>(r_cnt &gt; <span class="Constant">0</span>);
+
+                  <span class="Statement">return</span>(TRUE);
+               }
+
+
+               <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment"> If this function is root threaded make sure that only the </span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment"> root thread fgets to run it                               </span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+
+               <span class="Statement">if</span>(is_rootthreaded == TRUE || is_main == TRUE)
+               {  (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">/*&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;*/</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+                  (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;{   /* Inserted automatically by pc2c */</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+
+                  <span class="Statement">if</span>(is_main == TRUE)
+                     (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;    _INIT_PUPS_THREADS</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+
+                     (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;    _EXEC_THREAD_ROOT_THREAD_ONLY</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+
+                  (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;/*&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;*/</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+
+                  <span class="Statement">if</span>(m_alternative_body == FALSE)
+                  {  index = ch_pos(line,<span class="Constant">'{'</span>);
+                     line[index] = <span class="Constant">' '</span>;
+                     (<span class="Type">void</span>)xfputs(line,<span class="Constant">stdout</span>);
+                     (<span class="Type">void</span>)fflush(<span class="Constant">stdout</span>);
+                  }
+                  <span class="Statement">else</span>
+                  {  index = ch_pos(m_alt_body_line,<span class="Constant">'{'</span>);
+                     m_alt_body_line[index] = <span class="Constant">' '</span>;
+                     (<span class="Type">void</span>)xfputs(m_alt_body_line,<span class="Constant">stdout</span>);
+                     (<span class="Type">void</span>)fflush(<span class="Constant">stdout</span>);
+                  }
+
+                  <span class="Comment">//index = ch_pos(fname,'(');</span>
+                  <span class="Comment">//fname[index] = '\0';</span>
+
+                  <span class="Statement">if</span>(is_main == TRUE)
+                     (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">: making PUPS </span><span class="Special">\&quot;</span><span class="Constant">main</span><span class="Special">\&quot;</span><span class="Constant"> function pthread initialisation function</span><span class="Special">\n</span><span class="Constant">&quot;</span>,l_cnt);
+
+                  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">: making PUPS function </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> root thread only</span><span class="Special">\n</span><span class="Constant">&quot;</span>,l_cnt,fname);
+
+                  <span class="Statement">if</span>(is_dll_orifice == TRUE)
+                     (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">: making PUPS function </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> a DLL orifice</span><span class="Special">\n</span><span class="Constant">&quot;</span>,l_cnt,fname);
+
+                  (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+                  ++f_rto_cnt;
+                  <span class="Statement">return</span>(TRUE);
+               }
+               <span class="Statement">else</span> <span class="Statement">if</span>(is_rootthreaded == FALSE)
+               {  (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">/*&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;*/</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+                  (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;{   /* Inserted automatically by pc2c */</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+
+                  <span class="Statement">if</span>(use_default_mutex == TRUE)
+                     (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;    _LOCK_THREAD_FMUTEX(</span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,default_mutex);
+                  <span class="Statement">else</span>
+                     (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;    _LOCK_THREAD_FMUTEX(</span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,mutex);
+
+                  (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;/*&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;*/</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+                  (<span class="Type">void</span>)fflush(<span class="Constant">stdout</span>);
+               }
+
+               <span class="Statement">if</span>(m_alternative_body == FALSE)
+               {  index = ch_pos(stripped_line,<span class="Constant">'{'</span>);
+                  line[index] = <span class="Constant">' '</span>;
+                  (<span class="Type">void</span>)xfputs(line,<span class="Constant">stdout</span>);
+                  (<span class="Type">void</span>)fflush(<span class="Constant">stdout</span>);
+               }
+               <span class="Statement">else</span>
+               {  index = ch_pos(m_alt_body_line,<span class="Constant">'{'</span>);
+                  m_alt_body_line[index] = <span class="Constant">' '</span>;
+                  (<span class="Type">void</span>)xfputs(m_alt_body_line,<span class="Constant">stdout</span>);
+                  (<span class="Type">void</span>)fflush(<span class="Constant">stdout</span>);
+               }
+
+               index = ch_pos(fname,<span class="Constant">'('</span>);
+               fname[index] = <span class="Special">'\0'</span>;
+
+               (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">: making PUPS function </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> threadsafe (using mutex </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                                l_cnt,fname,mutex);
+
+               <span class="Statement">if</span>(is_dll_orifice == TRUE)
+                  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">: making PUPS function </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> a DLL orifice</span><span class="Special">\n</span><span class="Constant">&quot;</span>,l_cnt,fname);
+
+               (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+               ++f_ts_cnt;
+               <span class="Statement">return</span>(TRUE);
+          } <span class="Statement">while</span>(feof(<span class="Constant">stdin</span>) == <span class="Constant">0</span>);
+    }
+
+    <span class="Statement">return</span>(FALSE);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Find the exit points for a function and make sure thread releases locks on exit</span>
+<span class="Comment">    from them ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _BOOLEAN is_function_exit(<span class="Type">char</span> *line)
+
+{   <span class="Type">char</span> tmp_str[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+    <span class="Type">int</span>  index;
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> If we are not in a function body return </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(in_comment       == TRUE     ||
+       in_function_body == FALSE    ||
+       is_rootthreaded  == TRUE     ||
+       is_threadsafe    == TRUE      )
+       <span class="Statement">return</span>(FALSE);
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> If we have a return embedded in a text literal or </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> comment, it should be ignored                     </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">                                                   </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Search for an explicit return statement           </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> and return starting index for it in line          </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(strinpos((<span class="Type">long</span> *)&amp;index,(<span class="Type">long</span> *)<span class="Constant">NULL</span>,line,<span class="Constant">&quot;return&quot;</span>) == TRUE)
+    {  <span class="Type">char</span> tmp_str[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+       <span class="Type">int</span>  embed_index;
+
+
+       <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Make sure return is not embedded in comment </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> or text literal in which case it should be  </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> ignored                                     </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+
+       embed_index = ch_pos(line,<span class="Constant">'&quot;'</span>);
+       <span class="Statement">if</span>(index &gt; embed_index &amp;&amp; embed_index != (-<span class="Constant">1</span>))
+          <span class="Statement">return</span>(FALSE);
+
+       <span class="Statement">if</span>(strinpos((<span class="Type">long</span> *)&amp;embed_index,(<span class="Type">long</span> *)<span class="Constant">NULL</span>,line,<span class="Constant">&quot;/*&quot;</span>) == TRUE)
+       {  <span class="Statement">if</span>(index &gt; embed_index)
+             <span class="Statement">return</span>(FALSE);
+       }
+
+       <span class="Statement">if</span>(strinpos((<span class="Type">long</span> *)&amp;embed_index,(<span class="Type">long</span> *)<span class="Constant">NULL</span>,line,<span class="Constant">&quot;//&quot;</span>) == TRUE)
+       {  <span class="Statement">if</span>(index &gt; embed_index)
+             <span class="Statement">return</span>(FALSE);
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Strip out leading spaces from return statement </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+
+       (<span class="Type">void</span>)strlcpy(tmp_str,&amp;line[index],SSIZE);
+       (<span class="Type">void</span>)strlcpy(line,tmp_str,SSIZE);
+       index = ch_pos(line,<span class="Special">'\n'</span>);
+       line[index] = <span class="Special">'\0'</span>;
+
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">/*&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;*/</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;    {   /* Inserted automatically by pc2c */</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+
+       <span class="Statement">if</span>(use_default_mutex == TRUE)
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;        _UNLOCK_THREAD_FMUTEX(</span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,default_mutex);
+       <span class="Statement">else</span>
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;        _UNLOCK_THREAD_FMUTEX(</span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,mutex);
+
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;        </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">    }</span><span class="Special">\n</span><span class="Constant">&quot;</span>,line);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;/*&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;*/</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stdout</span>);
+
+
+       <span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> If this is the outermost block of a function    </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> there is no need to automatically unlock the    </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> current mutex when we finally exit the function </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(r_cnt - <span class="Constant">1</span> == <span class="Constant">0</span>)
+          no_auto_unlock = TRUE;
+
+       <span class="Statement">return</span>(TRUE);
+    }
+
+    n_kets = nkets(line);
+    <span class="Statement">if</span>(n_bras == <span class="Constant">0</span> &amp;&amp; n_kets == <span class="Constant">1</span> &amp;&amp; no_auto_unlock == FALSE)
+    {  <span class="Statement">if</span>(no_auto_unlock == FALSE)
+       {  braket(DOWN);
+          <span class="Statement">if</span>(r_cnt == <span class="Constant">0</span>)
+          {  (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">/*&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;*/</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+             (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;    /* Inserted automatically by pc2c */</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+
+             <span class="Statement">if</span>(use_default_mutex == TRUE)
+                (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;    _UNLOCK_THREAD_FMUTEX(</span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">}</span><span class="Special">\n</span><span class="Constant">&quot;</span>,default_mutex);
+             <span class="Statement">else</span>
+                (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;    _UNLOCK_THREAD_FMUTEX(</span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">}</span><span class="Special">\n</span><span class="Constant">&quot;</span>,mutex);
+
+             (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;/*&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;*/</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+             in_function_body  = FALSE;
+             is_rootthreaded   = FALSE;
+             is_threadsafe     = FALSE;
+             is_dll_orifice    = FALSE;
+             use_default_mutex = TRUE;
+             (<span class="Type">void</span>)strlcpy(mutex,default_mutex,SSIZE);
+
+             <span class="Statement">return</span>(TRUE);
+          }
+          braket(UP);
+       }
+    }
+
+    no_auto_unlock = FALSE;
+    <span class="Statement">return</span>(FALSE);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Find the exit points for a function and make sure thread releases locks on exit</span>
+<span class="Comment">    from them ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> ch_pos(<span class="Type">char</span> *s, <span class="Type">char</span> c)
+
+{   <span class="Type">int</span> i;
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;strlen(s); ++i)
+       <span class="Statement">if</span>(s[i] == c)
+          <span class="Statement">return</span>(i);
+
+    <span class="Statement">return</span>(-<span class="Constant">1</span>);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Count the number of (non-embedded) characters in a line ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> chcnt(<span class="Type">char</span> *line, <span class="Type">char</span> ch)
+
+{   <span class="Type">int</span> i,
+        bra_cnt = <span class="Constant">0</span>;
+
+    _BOOLEAN in_comment     = FALSE,
+             in_txt_literal = FALSE;
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;strlen(line); ++i)
+    {
+
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Is the block delimiter embedded in a text literal? If so </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> it can be safley ignored                                 </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(line[i] == <span class="Constant">'&quot;'</span>)
+       {  <span class="Statement">if</span>(in_txt_literal == FALSE)
+             in_txt_literal = TRUE;
+          <span class="Statement">else</span>
+             in_txt_literal = FALSE;
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> We can also ignore block delimiters embedded in comments </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>((line[i] == <span class="Constant">'/'</span> &amp;&amp; line[i+<span class="Constant">1</span>] == <span class="Constant">'*'</span>)    ||
+          (line[i] == <span class="Constant">'/'</span> &amp;&amp; line[i+<span class="Constant">1</span>] == <span class="Constant">'/'</span>)     )
+       {  <span class="Statement">if</span>(in_comment == FALSE)
+             in_comment = TRUE;
+          <span class="Statement">else</span> <span class="Statement">if</span>(line[i] == <span class="Constant">'*'</span> &amp;&amp; line[i+<span class="Constant">1</span>] == <span class="Constant">'/'</span>)
+          {  i += <span class="Constant">2</span>;
+             in_comment = FALSE;
+          }
+       }
+
+       <span class="Statement">if</span>(line[i] == ch &amp;&amp; in_txt_literal == FALSE &amp;&amp; in_comment == FALSE)
+          ++bra_cnt;
+    }
+
+    <span class="Statement">return</span>(bra_cnt);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Count the number of brackets '{' [bras] in a line ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> nbras(<span class="Type">char</span> *line)
+
+{   <span class="Statement">return</span>(chcnt(line,<span class="Constant">'{'</span>));
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Count the number of brackets '}' [kets] in a line ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> nkets(<span class="Type">char</span> *line)
+
+{   <span class="Statement">return</span>(chcnt(line,<span class="Constant">'}'</span>));
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Look for the occurence of strinposg s2 within string s1 ...</span>
+<span class="Comment">------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _BOOLEAN strin(<span class="Type">char</span> *s1, <span class="Type">char</span> *s2)
+
+{   <span class="Type">int</span> i,
+        cmp_size,
+        chk_limit;
+
+    <span class="Statement">if</span>(strlen(s2) &gt; strlen(s1))
+       <span class="Statement">return</span>(FALSE);
+
+    chk_limit = strlen(s1) - strlen(s2) + <span class="Constant">1</span>;
+    cmp_size  = strlen(s2);
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;chk_limit; ++i)
+    {  <span class="Statement">if</span>(strncmp(&amp;s1[i],s2,cmp_size) == <span class="Constant">0</span>)
+          <span class="Statement">return</span>(TRUE);
+    }
+
+    <span class="Statement">return</span>(FALSE);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Look for the occurence of strinposg s2 within string s1 returnig indices of start</span>
+<span class="Comment">    and end of s2 within s1 ...</span>
+<span class="Comment">------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _BOOLEAN strinpos(<span class="Type">long</span> *s_pos, <span class="Type">long</span> *e_pos, <span class="Type">char</span> *s1, <span class="Type">char</span> *s2)
+
+{   <span class="Type">int</span> i,
+        cmp_size,
+        chk_limit;
+
+    <span class="Statement">if</span>(strlen(s2) &gt; strlen(s1))
+       <span class="Statement">return</span>(FALSE);
+
+    chk_limit = strlen(s1) - strlen(s2) + <span class="Constant">1</span>;
+    cmp_size  = strlen(s2);
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;chk_limit; ++i)
+    {  <span class="Statement">if</span>(strncmp(&amp;s1[i],s2,cmp_size) == <span class="Constant">0</span>)
+       {  <span class="Statement">if</span>(s_pos != (<span class="Type">long</span> *)<span class="Constant">NULL</span>)
+             *s_pos = i;
+
+          <span class="Statement">if</span>(e_pos != (<span class="Type">long</span> *)<span class="Constant">NULL</span>)
+             *e_pos = i + strlen(s2);
+
+          <span class="Statement">return</span>(TRUE);
+       }
+    }
+
+    <span class="Statement">if</span>(s_pos != (<span class="Type">long</span> *)<span class="Constant">NULL</span>)
+       *s_pos = (-<span class="Constant">1</span>);
+
+    <span class="Statement">if</span>(e_pos != (<span class="Type">long</span> *)<span class="Constant">NULL</span>)
+       *e_pos = (-<span class="Constant">1</span>);
+
+    <span class="Statement">return</span>(FALSE);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Reverse strip character from strinposg ...</span>
+<span class="Comment">------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">char</span> *rstrpch(<span class="Type">char</span> *s, <span class="Type">char</span> c)
+
+{   <span class="Type">int</span> i;
+
+    <span class="Statement">for</span>(i=strlen(s); i&gt;<span class="Constant">0</span>; --i)
+       <span class="Statement">if</span>(s[i] == c)
+       {  s[i] = <span class="Special">'\0'</span>;
+          <span class="Statement">return</span>(s);
+       }
+
+    <span class="Statement">return</span>(s);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Adjust function block count ...</span>
+<span class="Comment">------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> braket(<span class="Type">int</span> direction)
+
+{   <span class="Statement">if</span>(direction == UP)
+       ++r_cnt;
+    <span class="Statement">else</span>
+       --r_cnt;
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Strip string s2 from string s1 ...</span>
+<span class="Comment">------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _BOOLEAN strinstrip(<span class="Type">char</span> *s1, <span class="Type">char</span> *s2)
+
+{   <span class="Type">int</span> start_index,
+        end_index;
+
+    <span class="Type">char</span> tmp_str[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+    <span class="Statement">if</span>(sscanf(s1,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">&quot;</span>,s2) != <span class="Constant">1</span>)
+       <span class="Statement">return</span>(FALSE);
+
+    (<span class="Type">void</span>)strinpos((<span class="Type">long</span> *)&amp;start_index,(<span class="Type">long</span> *)&amp;end_index,s1,s2);
+    (<span class="Type">void</span>)strlcpy(tmp_str,SSIZE,(<span class="Type">char</span> *)&amp;s1[end_index]);
+    (<span class="Type">void</span>)strlcpy(s1,tmp_str,SSIZE);
+
+    <span class="Statement">return</span>(TRUE);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Define a user defined mutex ...</span>
+<span class="Comment">------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _BOOLEAN defined(<span class="Type">char</span> *mutex)
+
+{   <span class="Type">int</span> i;
+
+    <span class="Statement">if</span>(n_mutexes == MTABLE_SIZE)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;pc2c: mutex table full (max </span><span class="Special">%d</span><span class="Constant"> user defined mutexes)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,MTABLE_SIZE);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       exit(<span class="Constant">255</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Search list of defined mutexes to see if current mutex is defined </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;n_mutexes; ++i)
+    {  <span class="Statement">if</span>(strcmp(defined_mutex[i],mutex) == <span class="Constant">0</span>)
+          <span class="Statement">return</span>(FALSE);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Try to find a space for new mutex definition </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;n_mutexes; ++i)
+    {  <span class="Statement">if</span>(strcmp(defined_mutex[i],<span class="Constant">&quot;none&quot;</span>) == <span class="Constant">0</span>)
+       {  (<span class="Type">void</span>)strlcpy(defined_mutex[i],mutex,SSIZE);
+          <span class="Statement">return</span>(TRUE);
+       }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Make space for new mutex definition </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)strlcpy(defined_mutex[n_mutexes++],mutex,SSIZE);
+    <span class="Statement">return</span>(TRUE);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Undefine a user defined mutex ...</span>
+<span class="Comment">------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _BOOLEAN undefine(<span class="Type">char</span> *mutex)
+
+{   <span class="Type">int</span> i;
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;n_mutexes; ++i)
+    {  <span class="Statement">if</span>(strcmp(defined_mutex[i],mutex) == <span class="Constant">0</span>)
+       {  (<span class="Type">void</span>)strlcpy(defined_mutex[i],<span class="Constant">&quot;none&quot;</span>,SSIZE);
+          <span class="Statement">return</span>(TRUE);
+       }
+    }
+
+    <span class="Statement">return</span>(FALSE);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Initialise mutex table ...</span>
+<span class="Comment">------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> init_mtable(<span class="Type">void</span>)
+
+{   <span class="Type">int</span> i;
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;MTABLE_SIZE; ++i)
+       (<span class="Type">void</span>)strlcpy(defined_mutex[i],<span class="Constant">&quot;none&quot;</span>,SSIZE);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Skip text which has already been substituted ...</span>
+<span class="Comment">------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> skip_pre_substituted_text(<span class="Type">char</span> *line)
+
+{   <span class="Statement">if</span>(strin(line,<span class="Constant">&quot;&gt;&gt;&gt;&gt;&quot;</span>) == TRUE)
+    {  (<span class="Type">void</span>)xfputs(line,<span class="Constant">stdout</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stdout</span>);
+
+
+       <span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Adjust any counts which have been incremented </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+
+       --f_orifice_cnt;
+       <span class="Statement">do</span> {    (<span class="Type">void</span>)fgets(line,<span class="Constant">255</span>,<span class="Constant">stdin</span>);
+               ++l_cnt;
+
+               n_bras = nbras(line);
+               n_kets = nkets(line);
+
+
+               <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment"> Check for bra-ket (function block) errors </span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+               <span class="Statement">if</span>((n_bras &gt;  <span class="Constant">0</span> &amp;&amp; n_kets &gt;  <span class="Constant">0</span>)    ||
+                  n_bras  &gt;  <span class="Constant">1</span>                    ||
+                  n_kets  &gt;  <span class="Constant">1</span>                     )
+               {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">: PUPS-C syntax error: </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,l_cnt,rstrpch(line,<span class="Special">'\n'</span>));
+                  (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+                  exit(<span class="Constant">255</span>);
+               }
+
+
+               <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment"> Adjust function block count </span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+
+               <span class="Statement">if</span>(n_bras == <span class="Constant">1</span>)
+                  braket(UP);
+               <span class="Statement">else</span> <span class="Statement">if</span>(n_kets == <span class="Constant">1</span>)
+               {  braket(DOWN);
+                  <span class="Statement">if</span>(r_cnt == <span class="Constant">0</span>)
+                     in_function_body = FALSE;
+               }
+
+               (<span class="Type">void</span>)xfputs(line,<span class="Constant">stdout</span>);
+               (<span class="Type">void</span>)fflush(<span class="Constant">stdout</span>);
+          } <span class="Statement">while</span>(strin(line,<span class="Constant">&quot;&lt;&lt;&lt;&lt;&quot;</span>) == FALSE);
+
+          (<span class="Type">void</span>)fgets(line,<span class="Constant">255</span>,<span class="Constant">stdin</span>);
+          ++l_cnt;
+
+    }
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Skip text which has contains comments ...</span>
+<span class="Comment">------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> skip_comment(<span class="Type">char</span> *line)
+
+{   <span class="Type">long</span> c_s_pos,
+         b_s_pos;
+
+    <span class="Type">char</span> tmp_str[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check that we have a skippable comment </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+    one_line_comment = FALSE;
+    (<span class="Type">void</span>)strlcpy(tmp_str,<span class="Constant">&quot;&quot;</span>,SSIZE);
+    (<span class="Type">void</span>)sscanf(line,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">&quot;</span>,tmp_str);
+
+    <span class="Statement">if</span>(strncmp(tmp_str,<span class="Constant">&quot;/*&quot;</span>,<span class="Constant">2</span>) == <span class="Constant">0</span>)
+    {  (<span class="Type">void</span>)xfputs(line,<span class="Constant">stdout</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stdout</span>);
+
+
+       <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Is comment a one-liner? </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(strin(line,<span class="Constant">&quot;*/&quot;</span>) == FALSE)
+       {  <span class="Statement">do</span> {    (<span class="Type">void</span>)fgets(line,<span class="Constant">255</span>,<span class="Constant">stdin</span>);
+                  ++l_cnt;
+
+                  (<span class="Type">void</span>)xfputs(line,<span class="Constant">stdout</span>);
+                  (<span class="Type">void</span>)fflush(<span class="Constant">stdout</span>);
+              } <span class="Statement">while</span>(strin(line,<span class="Constant">&quot;*/&quot;</span>) == FALSE);
+       }
+       <span class="Statement">else</span>
+          one_line_comment = TRUE;
+
+       (<span class="Type">void</span>)fgets(line,<span class="Constant">255</span>,<span class="Constant">stdin</span>);
+       ++l_cnt;
+    }
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Extended fputs function ...</span>
+<span class="Comment">------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> xfputs(<span class="Type">char</span> *line, <span class="Type">FILE</span> *stream)
+
+{   <span class="Statement">if</span>(ch_pos(line,<span class="Special">'\n'</span>) == (-<span class="Constant">1</span>))
+       strlcat(line,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>,SSIZE);
+
+    (<span class="Type">void</span>)fputs(line,stream);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Strip characters from string ...</span>
+<span class="Comment">------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> strpach(<span class="Type">char</span> *s, <span class="Type">char</span> ch)
+
+{   <span class="Type">int</span> i,
+        cnt = <span class="Constant">0</span>;
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;strlen(s); ++i)
+    {  <span class="Statement">if</span>(s[i] == ch)
+          s[i] = <span class="Constant">' '</span>;
+    }
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Check that if-else statements conform to PUPS-C syntax ...</span>
+<span class="Comment">------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _BOOLEAN check_if_else(<span class="Type">char</span> *line)
+
+{   <span class="Type">int</span> i,
+        cnt,
+        s_cnt,
+        e_cnt;
+
+    <span class="Type">char</span> line_buf[<span class="Constant">4096</span>];
+
+    _BOOLEAN looper     = FALSE,
+             in_comment = FALSE;
+
+    _IMMORTAL _BOOLEAN in_if_else = FALSE;
+
+    <span class="Statement">if</span>(in_function_body == FALSE)
+       <span class="Statement">return</span>(TRUE);
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Strip any embedded comments out of the line </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+
+    strip_line(line,line_buf);
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> We now have a line stripped of all embedded comments  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> if it begins with &quot;if&quot; or &quot;else&quot; it must end with &quot;)&quot; </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> to conform to PUPS-C syntax                           </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------</span><span class="Comment">*/</span>
+
+    s_cnt = <span class="Constant">0</span>;
+    <span class="Statement">while</span>(line_buf[s_cnt] == <span class="Constant">' '</span>)
+          ++s_cnt;
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check for and if, else construct </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(strncmp(&amp;line_buf[s_cnt],<span class="Constant">&quot;if&quot;</span>,<span class="Constant">2</span>)   == <span class="Constant">0</span>    ||
+       strncmp(&amp;line_buf[s_cnt],<span class="Constant">&quot;else&quot;</span>,<span class="Constant">4</span>) == <span class="Constant">0</span>    ||
+       in_if_else                         == TRUE  )
+    {
+
+      <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> And make sure that it is legal PUPS-C </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+       e_cnt = strlen(line_buf);
+       <span class="Statement">while</span>(line_buf[e_cnt] == <span class="Constant">' '</span> || line_buf[e_cnt] == <span class="Special">'\n'</span> || line_buf[e_cnt] == <span class="Special">'\0'</span>)
+           --e_cnt;
+
+
+       <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Check &quot;if&quot; and &quot;else&quot; PUPS-C syntax </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(strncmp(&amp;line_buf[s_cnt],<span class="Constant">&quot;if&quot;</span>,<span class="Constant">2</span>) == <span class="Constant">0</span> || in_if_else == TRUE)
+       {  <span class="Statement">if</span>(line_buf[e_cnt] == <span class="Constant">')'</span>)
+          {  in_if_else = FALSE;
+             <span class="Statement">return</span>(TRUE);
+          }
+          <span class="Statement">else</span>
+             in_if_else = TRUE;
+       }
+       <span class="Statement">else</span> <span class="Statement">if</span>(strncmp(&amp;line_buf[s_cnt],<span class="Constant">&quot;else&quot;</span>,<span class="Constant">4</span>) == <span class="Constant">0</span>)
+       {  <span class="Statement">if</span>(line_buf[e_cnt] == <span class="Constant">'e'</span> || line_buf[e_cnt] == <span class="Constant">')'</span>)
+             <span class="Statement">return</span>(TRUE);
+          <span class="Statement">else</span>
+             in_if_else = TRUE;
+       }
+   }
+
+
+   <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+   <span class="Comment">/*</span><span class="Comment"> Statement is not an if-else construct </span><span class="Comment">*/</span>
+   <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+   <span class="Statement">return</span>(TRUE);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Check for empty lines in PUPS-C text ...</span>
+<span class="Comment">------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _BOOLEAN empty_line(<span class="Type">char</span> *line)
+
+{   <span class="Type">int</span>  cnt = <span class="Constant">0</span>;
+    <span class="Type">char</span> first_item[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> From the viewpoint of pc2c macro directive are empty lines </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(sscanf(line,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">&quot;</span>,first_item) == <span class="Constant">1</span>)
+    {  <span class="Statement">if</span>(first_item[<span class="Constant">0</span>] == <span class="Constant">'#'</span>)
+          <span class="Statement">return</span>(TRUE);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Look for &quot;real&quot; empty line </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">while</span>(line[cnt] == <span class="Constant">' '</span> || line[cnt] == <span class="Special">'\n'</span> || line[cnt] == <span class="Special">'\0'</span>)
+    {    <span class="Statement">if</span>(line[cnt] == <span class="Special">'\0'</span>)
+         {  (<span class="Type">void</span>)xfputs(line,<span class="Constant">stdout</span>);
+            (<span class="Type">void</span>)fflush(<span class="Constant">stdout</span>);
+
+            <span class="Statement">return</span>(TRUE);
+         }
+
+         ++cnt;
+    }
+
+    <span class="Statement">return</span>(FALSE);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Check that string is composed of upper case characters (and digits) only ...</span>
+<span class="Comment">------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _BOOLEAN is_upper(<span class="Type">char</span> *s)
+
+{   <span class="Type">int</span> i,
+        cnt = <span class="Constant">0</span>;
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;strlen(s); ++i)
+    {  <span class="Statement">if</span>(isalpha(s[i]) == <span class="Constant">1</span> &amp;&amp; isupper(s[i]) == <span class="Constant">0</span>)
+          <span class="Statement">return</span>(FALSE);
+    }
+
+    <span class="Statement">return</span>(TRUE);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Parse PUPS-C macro. n_args is the number of arguments expected, arglist is a list of</span>
+<span class="Comment">    the parsed arguments, and line is the input line containing the macro. If we get</span>
+<span class="Comment">    any errors FALSE is returned, otherwise TRUE is returned ...</span>
+<span class="Comment">------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _BOOLEAN parse_pups_c_macro_function(<span class="Type">char</span> *line, <span class="Type">int</span> n_args, <span class="Type">char</span> arglist[<span class="Constant">32</span>][SSIZE])
+
+{   <span class="Type">int</span> i,
+        s_index,
+        e_index;
+
+    _BOOLEAN looper        = FALSE;
+
+    <span class="Type">char</span> line_buf[SSIZE]   = <span class="Constant">&quot;&quot;</span>,
+         next_item[SSIZE]  = <span class="Constant">&quot;&quot;</span>,
+         arg_str[SSIZE]    = <span class="Constant">&quot;&quot;</span>,
+         macro_name[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Is this a macro function? By convention, a PUPS-C macro has the form </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> _&lt;NAME&gt;(args) where &lt;NAME&gt; MUST be in upper case.                    </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)strlcpy(line_buf,line,SSIZE);
+    <span class="Statement">do</span> {   looper = strinstrip(line_buf,next_item);
+
+           <span class="Statement">if</span>(looper == TRUE)
+           {  <span class="Statement">if</span>(next_item[<span class="Constant">0</span>] == <span class="Constant">'_'</span>                         &amp;&amp;
+                 (s_index = ch_pos(next_item,<span class="Constant">'('</span>)) != (-<span class="Constant">1</span>)   &amp;&amp;
+                 (e_index = ch_pos(next_item,<span class="Constant">')'</span>)) != (-<span class="Constant">1</span>)    )
+              {
+
+                 <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+                 <span class="Comment">/*</span><span class="Comment"> We have a macro definition - extract arguments </span><span class="Comment">*/</span>
+                 <span class="Comment">/*</span><span class="Comment"> Check for syntax errors                        </span><span class="Comment">*/</span>
+                 <span class="Comment">/*</span><span class="Comment"> Cannot have comments on macro line             </span><span class="Comment">*/</span>
+                 <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+
+                 <span class="Statement">if</span>(strin(line,<span class="Constant">&quot;/*&quot;</span>) == TRUE || strin(line,<span class="Constant">&quot;*/&quot;</span>) == TRUE || strin(line,<span class="Constant">&quot;//&quot;</span>) == TRUE)
+                    <span class="Statement">return</span>(FALSE);
+
+
+                 <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+                 <span class="Comment">/*</span><span class="Comment"> Cannot assign RHS initialiser in PUPS-C macro function definitions </span><span class="Comment">*/</span>
+                 <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+                 <span class="Statement">if</span>(strin(line,<span class="Constant">&quot;=&quot;</span>) == TRUE)
+                    <span class="Statement">return</span>(FALSE);
+
+                 next_item[e_index] = <span class="Special">'\0'</span>;
+                 (<span class="Type">void</span>)strlcpy(arg_str,&amp;next_item[s_index+<span class="Constant">1</span>],SSIZE);
+                 ch_rep(arg_str,<span class="Constant">','</span>,<span class="Constant">' '</span>);
+
+                 next_item[s_index]  = <span class="Special">'\0'</span>;
+                 (<span class="Type">void</span>)strlcpy(macro_name,&amp;next_item[<span class="Constant">1</span>],SSIZE);
+
+
+                 <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+                 <span class="Comment">/*</span><span class="Comment"> Check macro name is upper case </span><span class="Comment">*/</span>
+                 <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+
+                 <span class="Statement">if</span>(is_upper(macro_name) == FALSE)
+                    <span class="Statement">return</span>(FALSE);
+
+                 <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;n_args; ++i)
+                 {
+
+                    <span class="Statement">if</span>(strinstrip(arg_str,arglist[i]) == FALSE)
+                    {
+
+                       <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+                       <span class="Comment">/*</span><span class="Comment"> Macro function found - does not match template </span><span class="Comment">*/</span>
+                       <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+
+                       <span class="Statement">return</span>(FALSE);
+                    }
+                 }
+
+
+                 <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+                 <span class="Comment">/*</span><span class="Comment"> Macro function found - matches template </span><span class="Comment">*/</span>
+                 <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+
+                 <span class="Statement">return</span>(TRUE);
+              }
+           }
+        } <span class="Statement">while</span>(looper == TRUE);
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> This line does not contain a macro function definition </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">return</span>(FALSE);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Replace character c_1 in string s by character c_2 ...</span>
+<span class="Comment">------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> ch_rep(<span class="Type">char</span> *s, <span class="Type">char</span> c_1, <span class="Type">char</span> c_2)
+
+{   <span class="Type">int</span> i;
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;strlen(s); ++i)
+       <span class="Statement">if</span>(s[i] == c_1)
+          s[i] = c_2;
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Translate a thread key create definition ...</span>
+<span class="Comment">------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> tkey_transform(<span class="Type">char</span> *line)
+
+{   <span class="Type">char</span> tkey[SSIZE]        = <span class="Constant">&quot;&quot;</span>,
+         arglist[<span class="Constant">32</span>][SSIZE] = { <span class="Constant">&quot;&quot;</span> };
+
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Define a key variable in which per-thread data is stored </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(in_function_body == FALSE || parse_pups_c_macro_function(line,<span class="Constant">1</span>,arglist) == FALSE)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">: PUPS-C syntax error: </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,l_cnt,rstrpch(line,<span class="Special">'\n'</span>));
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       exit(<span class="Constant">255</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> In the case of _TKEY_CREATE we must transform the macro   </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> into a line of the form _TKEY_CREATE(type,var,keyval);    </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Better not to complicate things by permitting the user to </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> initialise the key here                                   </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)snprintf(tkey,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">_tkey&quot;</span>,arglist[<span class="Constant">0</span>]);
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">/*&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;*/</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;/* Transformed automatically by pc2c                                 */</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;    _TKEY(</span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,tkey);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;/*&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;*/</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stdout</span>);
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">: creating TSD key for </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> in PUPS function </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n</span><span class="Constant">&quot;</span>,l_cnt,arglist[<span class="Constant">0</span>],fname);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+    ++tsd_cnt;
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Translate a thread key delete definition ...</span>
+<span class="Comment">------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> tkey_bind_transform(<span class="Type">char</span> *line)
+
+{   <span class="Type">char</span> tkey[SSIZE]        = <span class="Constant">&quot;&quot;</span>,
+         arglist[<span class="Constant">32</span>][SSIZE] = { <span class="Constant">&quot;&quot;</span> };
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Destroy a key in which per thread data is stored </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(in_function_body == FALSE || parse_pups_c_macro_function(line,<span class="Constant">1</span>,arglist) == FALSE)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">: PUPS-C syntax error: </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,l_cnt,rstrpch(line,<span class="Special">'\n'</span>));
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       exit(<span class="Constant">255</span>);
+    }
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">/*&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;*/</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;/* Transformed automatically by pc2c                                 */</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)snprintf(tkey,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">_tkey&quot;</span>,arglist[<span class="Constant">0</span>]);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;    _TKEY_bind(</span><span class="Special">%s</span><span class="Constant">,</span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,arglist[<span class="Constant">0</span>],tkey);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;/*&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;*/</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stdout</span>);
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">: binding </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> to TSD key in PUPS function </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n</span><span class="Constant">&quot;</span>,l_cnt,arglist[<span class="Constant">0</span>],fname);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+}
+
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Translate a thread key set value definition ...</span>
+<span class="Comment">------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> tkey_free_transform(<span class="Type">char</span> *line)
+
+{   <span class="Type">char</span> tkey[SSIZE]        = <span class="Constant">&quot;&quot;</span>,
+         arglist[<span class="Constant">32</span>][SSIZE] = { <span class="Constant">&quot;&quot;</span> };
+
+    <span class="Statement">if</span>(in_function_body == FALSE || parse_pups_c_macro_function(line,<span class="Constant">1</span>,arglist) == FALSE)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">: PUPS-C syntax error: </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,l_cnt,rstrpch(line,<span class="Special">'\n'</span>));
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       exit(<span class="Constant">255</span>);
+    }
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">/*&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;*/</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;/* Transformed automatically by pc2c                                 */</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)snprintf(tkey,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">_tkey&quot;</span>,arglist[<span class="Constant">0</span>]);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;    _TKEY_FREE(</span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,tkey);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;/*&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;*/</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stdout</span>);
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">: freeing </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> from TSD key in PUPS function </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n</span><span class="Constant">&quot;</span>,l_cnt,arglist[<span class="Constant">0</span>],fname);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Insert an _FMUTEX_DEFINE definition ...</span>
+<span class="Comment">------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> use_fmutex_define(<span class="Type">char</span> *line)
+
+{   <span class="Type">char</span> arglist[<span class="Constant">32</span>][SSIZE] = { <span class="Constant">&quot;&quot;</span> };
+
+    <span class="Statement">if</span>(in_function_body == TRUE || parse_pups_c_macro_function(line,<span class="Constant">1</span>,arglist) == FALSE)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">: PUPS-C syntax error: </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,l_cnt,rstrpch(line,<span class="Special">'\n'</span>));
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       exit(<span class="Constant">255</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Keep a copy of the current mutex in case we are asked to </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> process a macro conditional funtion body                 </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)strlcpy(mutex,arglist[<span class="Constant">0</span>],SSIZE);
+    (<span class="Type">void</span>)strlcpy(current_mutex,arglist[<span class="Constant">0</span>],SSIZE);
+
+    <span class="Statement">if</span>(defined(mutex) == TRUE)
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">: current mutex is </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> (defining)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,l_cnt,mutex);
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">: current mutex is </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n</span><span class="Constant">&quot;</span>,l_cnt,mutex);
+
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+    (<span class="Type">void</span>)fputs(line,<span class="Constant">stdout</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stdout</span>);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Insert an _DEFAULT_FMUTEX_DEFINE definition ...</span>
+<span class="Comment">------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> default_fmutex_define(<span class="Type">char</span> *line)
+
+{   <span class="Type">char</span> arglist[<span class="Constant">32</span>][SSIZE] = { <span class="Constant">&quot;&quot;</span> };
+
+    <span class="Statement">if</span>(in_function_body == TRUE || parse_pups_c_macro_function(line,<span class="Constant">1</span>,arglist) == FALSE)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">: PUPS-C syntax error: </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,l_cnt,rstrpch(line,<span class="Special">'\n'</span>));
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       exit(<span class="Constant">255</span>);
+    }
+
+    <span class="Statement">if</span>(strcmp(arglist[<span class="Constant">0</span>],<span class="Constant">&quot;inbuilt&quot;</span>) == <span class="Constant">0</span>)
+       (<span class="Type">void</span>)strlcpy(default_mutex,<span class="Constant">&quot;default&quot;</span>,SSIZE);
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)strlcpy(default_mutex,arglist[<span class="Constant">0</span>],SSIZE);
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">: defining default mutex </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n</span><span class="Constant">&quot;</span>,l_cnt,default_mutex);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+    (<span class="Type">void</span>)fputs(line,<span class="Constant">stdout</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stdout</span>);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Strip comments from line ...</span>
+<span class="Comment">------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> strip_line(<span class="Type">char</span> *line, <span class="Type">char</span> *stripped_line)
+
+{   <span class="Type">int</span>      i;
+    _BOOLEAN in_comment = FALSE;
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;strlen(line); ++i)
+    {  <span class="Statement">if</span>(line[i] == <span class="Constant">'/'</span> &amp;&amp; line[i+<span class="Constant">1</span>] == <span class="Constant">'*'</span>)
+          in_comment = TRUE;
+       <span class="Statement">else</span> <span class="Statement">if</span>(line[i] == <span class="Constant">'/'</span> &amp;&amp; line[i+<span class="Constant">1</span>] == <span class="Constant">'/'</span>)
+       {  stripped_line[i] = <span class="Special">'\0'</span>;
+          <span class="Statement">return</span>;
+       }
+       <span class="Statement">else</span> <span class="Statement">if</span>(line[i] == <span class="Constant">'*'</span> &amp;&amp; line[i+<span class="Constant">1</span>] == <span class="Constant">'/'</span>)
+       {  in_comment = FALSE;
+          line[i] = <span class="Constant">' '</span>;
+          line[i+<span class="Constant">1</span>] = <span class="Constant">' '</span>;
+       }
+
+       <span class="Statement">if</span>(in_comment == TRUE)
+          stripped_line[i] = <span class="Constant">' '</span>;
+       <span class="Statement">else</span>
+          stripped_line[i] = line[i];
+    }
+
+    stripped_line[i] = <span class="Special">'\0'</span>;
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Check that modifiers (_ROOTTHREAD, _DLL_ORIFICE and _THREADSAFE) are correctly</span>
+<span class="Comment">    used ...</span>
+<span class="Comment">------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _BOOLEAN check_function_head_modifiers(<span class="Type">char</span> *line)
+
+{  <span class="Type">char</span> line_buf[<span class="Constant">4096</span>] = <span class="Constant">&quot;&quot;</span>;
+
+   strip_line(line,line_buf);
+
+   <span class="Statement">if</span>(strin(line_buf,<span class="Constant">&quot;_ROOTTHREAD&quot;</span>)  == TRUE    ||
+      strin(line_buf,<span class="Constant">&quot;_DLL_ORIFICE&quot;</span>) == TRUE    ||
+      strin(line_buf,<span class="Constant">&quot;_THREADSAFE&quot;</span>)  == TRUE     )
+{
+
+
+<span class="PreProc">#ifdef DEBUG</span>
+(<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;LINE CHECK </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,line);
+<span class="Type">void</span><span class="Error">)</span>fflush(<span class="Constant">stderr</span>);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> DEBUG </span><span class="Comment">*/</span>
+
+      <span class="Statement">return</span>(FALSE);
+}
+   <span class="Statement">return</span>(TRUE);
+}
+
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

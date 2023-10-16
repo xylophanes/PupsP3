@@ -1,0 +1,1279 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/nkill.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------</span>
+<span class="Comment">     Purpose: Send signalto named process(es) which could be on remote machine(s)</span>
+
+<span class="Comment">     Author:  M.A. O'Neill</span>
+<span class="Comment">              Tumbling Dice Ltd</span>
+<span class="Comment">              Gosforth</span>
+<span class="Comment">              Newcastle upon Tyne</span>
+<span class="Comment">              NE3 4RT</span>
+<span class="Comment">              United Kingdom</span>
+
+<span class="Comment">     Version: 5.01 </span>
+<span class="Comment">     Dated:   24th May 2022</span>
+<span class="Comment">     E-mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">-------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;stdio.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;bsd/string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;xtypes.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/socket.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;netinet/in.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;arpa/inet.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stdlib.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;pwd.h&gt;</span>
+
+<span class="PreProc">#ifdef SHADOW_SUPPORT</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;shadow.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> SHADOW_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/types.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;netdb.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;fcntl.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;errno.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/stat.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;signal.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;dirent.h&gt;</span>
+
+
+<span class="PreProc">#define _XOPEN_SOURCE</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Get signal mapping appropriate to OS and hardware architecture </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define __DEFINE__</span>
+<span class="PreProc">#if defined(I386) || defined(X86_64)</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sig.linux.x86.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> I386) || X86_64 </span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef ARMV6L</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sig.linux.arm.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> ARMV6L </span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef ARMV7L</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sig.linux.arm.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> ARMV7L </span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef AARCH64</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sig.linux.arm.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> AARCH64 </span><span class="Comment">*/</span>
+<span class="PreProc">#undef __DEFINE__</span>
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------</span>
+<span class="Comment">    Defines which are local to this application ...</span>
+<span class="Comment">------------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Version of nkill </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define NKILL_VERSION </span><span class="Constant">&quot;5.01&quot;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> String size </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define SSIZE         </span><span class="Constant">2048</span>
+
+
+<span class="PreProc">#define MAX_TRYS      </span><span class="Constant">16</span>
+<span class="PreProc">#define O_BLOCK       </span><span class="Constant">0</span>
+<span class="PreProc">#define MAX_HOSTS     </span><span class="Constant">512</span><span class="PreProc"> </span>
+<span class="PreProc">#define SSIZE         </span><span class="Constant">512</span>
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Method flags (for establishing process name) </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define COMM          (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">0</span><span class="PreProc">) </span>
+<span class="PreProc">#define CMDLINE       (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">1</span><span class="PreProc">) </span>
+<span class="PreProc">#define BINNAME       (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">2</span><span class="PreProc">) </span>
+<span class="PreProc">#define STATUS        (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">3</span><span class="PreProc">) </span>
+
+<span class="PreProc">#define NOT_PARSED    </span><span class="Constant">0</span>
+<span class="PreProc">#define PARSED_LOCAL  </span><span class="Constant">1</span>
+<span class="PreProc">#define PARSED        </span><span class="Constant">2</span>
+<span class="PreProc">#define PUPS_AF_INET  AF_INET</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------</span>
+<span class="Comment">    Functions which are local to this application ...</span>
+<span class="Comment">------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Comment">// Get password entry from static table or NIS map by name</span>
+_PROTOTYPE _PRIVATE <span class="Type">struct</span> passwd *pups_getpwnam(<span class="Type">char</span> *);
+
+<span class="Comment">// Get password entry from static table or NIS map by UID</span>
+_PROTOTYPE _PRIVATE <span class="Type">struct</span> passwd *pups_getpwuid(<span class="Type">int</span>);
+
+<span class="Comment">// Convert (local) PID to pidname */</span>
+_PROTOTYPE _PRIVATE _BOOLEAN local_pid_to_pname(<span class="Type">int</span>, <span class="Type">char</span> *);
+
+<span class="Comment">// Convert (local) pidname to pidlist</span>
+_PROTOTYPE _PRIVATE _BOOLEAN local_pname_to_pids(<span class="Type">FILE</span> *, <span class="Type">char</span> *, _BOOLEAN, _BOOLEAN, <span class="Type">char</span> *, <span class="Type">int</span> []);
+
+<span class="Comment">// Extract pidname </span>
+_PROTOTYPE _PRIVATE _BOOLEAN get_pid_name(<span class="Type">char</span> *, <span class="Type">char</span> *, <span class="Type">int</span> *, <span class="Type">char</span> *);
+
+
+<span class="PreProc">#ifdef SSH_SUPPORT</span>
+<span class="Comment">// Check authentication token </span>
+_PROTOTYPE _PRIVATE _BOOLEAN checkuser(<span class="Type">char</span> *username, <span class="Type">char</span> *password);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> SSH_SUPPORT </span><span class="Comment">*/</span>
+
+
+<span class="Comment">// Look for the occurence of string s2 within string s1</span>
+_PROTOTYPE _PRIVATE _BOOLEAN strin(<span class="Type">char</span> *, <span class="Type">char</span> *);
+
+<span class="Comment">// Parse (fully qualified) pidname to pidname,hostname pair or pidname,hostname.username tuple </span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> parse_pidname(<span class="Type">char</span> *, <span class="Type">char</span> *, <span class="Type">char</span> *, <span class="Type">char</span> *);
+
+<span class="Comment">// Distribute signal to process on named host</span>
+_PROTOTYPE _PRIVATE _BOOLEAN nkill(<span class="Type">FILE</span> *, _BOOLEAN, <span class="Type">char</span> *, <span class="Type">char</span> *, <span class="Type">char</span> *, <span class="Type">char</span> *, <span class="Type">char</span> *);
+
+<span class="Comment">// Convert signal name to signal number</span>
+_PRIVATE <span class="Type">int</span> signametosigno(<span class="Type">char</span> *);
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------</span>
+<span class="Comment">    Variables which are private to this application ...</span>
+<span class="Comment">------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">char</span>     username[SSIZE]       = <span class="Constant">&quot;notset&quot;</span>;
+_PRIVATE <span class="Type">char</span>     password[SSIZE]       = <span class="Constant">&quot;notset&quot;</span>;
+_PRIVATE <span class="Type">char</span>     localhostname[SSIZE]  = <span class="Constant">&quot;&quot;</span>;
+_PRIVATE <span class="Type">char</span>     remotehostname[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+_PRIVATE _BOOLEAN binname               = COMM;
+_PRIVATE _BOOLEAN slaved                = FALSE;
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------</span>
+<span class="Comment">    Main entry point to code ...</span>
+<span class="Comment">------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> main(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   <span class="Type">int</span> i,
+        uid,
+        start,
+        parsed;
+
+    <span class="Type">char</span> pidname[SSIZE]         = <span class="Constant">&quot;&quot;</span>,
+         hostname[SSIZE]        = <span class="Constant">&quot;localhost&quot;</span>,
+         signame[SSIZE]         = <span class="Constant">&quot;SIGTERM&quot;</span>,
+         local_hostname[SSIZE]  = <span class="Constant">&quot;&quot;</span>,
+         target_hostname[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+    _BOOLEAN s_all              = FALSE;
+    <span class="Type">FILE</span>     *stream            = (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Decode the comand tail. nkill commands are of the for            </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> nkill !signal | signame! &lt;process-list&gt;                          </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> where the processes in the &lt;process-list&gt; can be either          </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> of the form numeric-pid, process-name, numeric-pid@hostname or   </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> process-name@hostname                                            </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> If we only have one argument display help information </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(argc &lt; <span class="Constant">2</span> || strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;-usage&quot;</span>) == <span class="Constant">0</span> || strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;-help&quot;</span>) == <span class="Constant">0</span>)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">nkill version </span><span class="Special">%s</span><span class="Constant">, (C) 1999-2022 Tumbling Dice (built </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,NKILL_VERSION,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">Usage: nkill [+/-all] [+/-verbose] [+binname | +status] [-slaved:FALSE] [-psrp] !signum | signame! &lt;process-list&gt;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">Process list entries have the following forms:</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;numeric-pid              :    Process identifier on local host</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;numeric-pid@localhost    :    Process identifier on local host</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;numeric-pid@&lt;host&gt;       :    Process identifier on remote host</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;process-name             :    Named process on local host</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;process-name@localhost   :    Named process on local host</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;process-name@&lt;host&gt;      :    Named process on remote host</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">+all kills all named process of given name on selected host</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;-all kills named process on given host only if its name is unique</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;+verbose turns on verbose mode</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;-verbose turns off verbose mode</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;+binname uses binary rather than execution name</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;+status uses name from /proc/status rather than execution name</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;-usage displays (this) usage message</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;NKILL is free software, covered by the GNU General Public License, and you are</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;welcome to change it and/or distribute copies of it under certain conditions.</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;See the GPL and LGPL licences at www.gnu.org for further details</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;NKILL comes with ABSOLUTELY NO WARRANTY</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+
+       exit(<span class="Constant">255</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Process environment information. nkill() has two   </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> environmental flags, NKILL_VERBOSE which means     </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> error and status information are to be logged to   </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> stdin and NKILL_ALL which means processes which    </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> share an overloaded process name all get signalled </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(getenv(<span class="Constant">&quot;NKILL_ALL&quot;</span>) !=  (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+       s_all = TRUE;
+
+    <span class="Statement">if</span>(getenv(<span class="Constant">&quot;NKILL_VERBOSE&quot;</span>) != (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+       stream = <span class="Constant">stderr</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Decode command tail </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(strncmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;SIG&quot;</span>,<span class="Constant">3</span>) == <span class="Constant">0</span>)
+    {  start = <span class="Constant">2</span>;
+       (<span class="Type">void</span>)strlcpy(signame,argv[<span class="Constant">1</span>],SSIZE);
+    }
+    <span class="Statement">else</span>
+       start = <span class="Constant">1</span>;
+
+    <span class="Statement">for</span>(i=start; i&lt;argc; ++i)
+    {
+
+       <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Do we have a -all flag ?              </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> If so kill all processes of same name </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> on a given host                       </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(strcmp(argv[i],<span class="Constant">&quot;+all&quot;</span>) == <span class="Constant">0</span>)
+          s_all = TRUE;
+       <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(argv[i],<span class="Constant">&quot;-all&quot;</span>) == <span class="Constant">0</span>)
+
+
+          <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Only kill named process on given host if it </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> is unique                                   </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+
+          s_all = FALSE;
+       <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(argv[i],<span class="Constant">&quot;-slaved&quot;</span>) == <span class="Constant">0</span>)
+          slaved = TRUE;
+       <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(argv[i],<span class="Constant">&quot;+verbose&quot;</span>) == <span class="Constant">0</span>)
+          stream = <span class="Constant">stderr</span>;
+       <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(argv[i],<span class="Constant">&quot;+cmdline&quot;</span>) == <span class="Constant">0</span>)
+          binname = CMDLINE;
+       <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(argv[i],<span class="Constant">&quot;+binname&quot;</span>) == <span class="Constant">0</span>)
+          binname = BINNAME;
+       <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(argv[i],<span class="Constant">&quot;+status&quot;</span>) == <span class="Constant">0</span>)
+          binname = STATUS;
+
+
+       <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Do we have a process descriptor of the form &lt;pdes&gt;@&lt;host&gt;? </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------</span><span class="Comment">*/</span>
+
+       parsed = parse_pidname(argv[i],pidname,target_hostname,username);
+
+       <span class="Statement">if</span>(parsed == PARSED || parsed == PARSED_LOCAL)
+       {  <span class="Statement">if</span>(parsed == PARSED)
+          {  <span class="Type">char</span> password_banner[SSIZE] = <span class="Constant">&quot;&quot;</span>,
+                  local_hostname[SSIZE]  = <span class="Constant">&quot;&quot;</span>;
+
+
+             <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> We must be connected to a terminal device </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+             <span class="Statement">if</span>(isatty(<span class="Constant">0</span>) == <span class="Constant">0</span>)
+             {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">nkill: not connected to a tty</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+                (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+                exit(<span class="Constant">255</span>);
+             }
+
+             (<span class="Type">void</span>)gethostname(local_hostname,SSIZE);
+             <span class="Statement">if</span>(strncmp(target_hostname,<span class="Constant">&quot;localhost&quot;</span>,strlen(target_hostname)-<span class="Constant">1</span>) != <span class="Constant">0</span>)
+<span class="PreProc">             #ifdef SSH_SUPPORT</span>
+             {   <span class="Type">char</span> pwd_file_name[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+
+                 <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+                 <span class="Comment">/*</span><span class="Comment"> Get authentication token from /tmp/authtok.&lt;PID&gt;.tmp -- to minimise the size    </span><span class="Comment">*/</span>
+                 <span class="Comment">/*</span><span class="Comment"> of the security hole this causes, we must delete this file as soon as we have   </span><span class="Comment">*/</span>
+                 <span class="Comment">/*</span><span class="Comment"> read the token                                                                  </span><span class="Comment">*/</span>
+                 <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+                 (<span class="Type">void</span>)snprintf(pwd_file_name,SSIZE,<span class="Constant">&quot;/tmp/authtok.</span><span class="Special">%d</span><span class="Constant">.tmp&quot;</span>,getuid());
+
+                 <span class="Statement">if</span>(access(pwd_file_name,F_OK | R_OK | W_OK) != (-<span class="Constant">1</span>))
+                 {  <span class="Type">FILE</span> *pwd_stream = (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>;
+
+                    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">Getting authentication token from PSRP authorisation file </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n</span><span class="Constant">&quot;</span>,pwd_file_name);
+                    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+                    pwd_stream = fopen(pwd_file_name,<span class="Constant">&quot;r&quot;</span>);
+                    <span class="Statement">if</span>(fscanf(pwd_stream,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">&quot;</span>,password) == <span class="Constant">1</span>)
+                    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Authentication token read</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+                       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+                    }
+
+                    (<span class="Type">void</span>)fclose(pwd_stream);
+                 }
+
+
+                 <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+                 <span class="Comment">/*</span><span class="Comment"> We need to get an authentication token before we </span><span class="Comment">*/</span>
+                 <span class="Comment">/*</span><span class="Comment"> can send a signal                                </span><span class="Comment">*/</span>
+                 <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+
+                 <span class="Statement">if</span>(strcmp(password,<span class="Constant">&quot;notset&quot;</span>) == <span class="Constant">0</span>)
+                 {  (<span class="Type">void</span>)snprintf(password_banner,SSIZE,<span class="Constant">&quot;PUPS </span><span class="Special">%s</span><span class="Constant"> [nkill] password (for </span><span class="Special">%s</span><span class="Constant">): &quot;</span>,local_hostname,username);
+                    (<span class="Type">void</span>)strlcpy(password,getpass(password_banner),SSIZE);
+                 }
+
+
+                 <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+                 <span class="Comment">/*</span><span class="Comment"> Check password </span><span class="Comment">*/</span>
+                 <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+
+                 <span class="Statement">if</span>(checkuser(username,password) == FALSE)
+                 {  <span class="Statement">if</span>(stream != (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>)
+                    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Permission denied</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+                       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+                       exit(<span class="Constant">255</span>);
+                   }
+                }
+             }
+<span class="PreProc">             #else</span>
+             {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;nkill: signalling of processes on remote host not supported (no ssh support)</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+                (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+                exit(<span class="Constant">255</span>);
+             }
+<span class="PreProc">             #endif</span> <span class="Comment">/*</span><span class="Comment"> SSH_SUPPORT </span><span class="Comment">*/</span>
+          }
+          <span class="Statement">else</span> <span class="Statement">if</span>(parsed == PARSED_LOCAL)
+          {  (<span class="Type">void</span>)strlcpy(pidname,argv[i],SSIZE);
+             (<span class="Type">void</span>)strlcpy(target_hostname,<span class="Constant">&quot;localhost&quot;</span>,SSIZE);
+          }
+
+
+          <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Deliver signal to named host </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+
+          (<span class="Type">void</span>)nkill(stream,
+                      s_all,
+                      username,
+                      password,
+                      signame,
+                      target_hostname,
+                              pidname);
+
+       }
+    }
+
+    exit(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------</span>
+<span class="Comment">    Parse pidname returning process,host pair ...</span>
+<span class="Comment">------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> parse_pidname(<span class="Type">char</span> *full_pidname, <span class="Type">char</span> *pidname, <span class="Type">char</span> *hostname, <span class="Type">char</span> *username)
+
+{   <span class="Type">int</span> i,
+        j,
+        cnt = <span class="Constant">0</span>;
+
+    <span class="Type">struct</span> passwd *pwent = (<span class="Type">struct</span> passwd *)<span class="Constant">NULL</span>;
+
+    <span class="Statement">if</span>(full_pidname[<span class="Constant">0</span>] == <span class="Constant">'+'</span> || full_pidname[<span class="Constant">0</span>] == <span class="Constant">'-'</span>)
+       <span class="Statement">return</span>(NOT_PARSED);
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;strlen(full_pidname); ++i)
+    {
+
+       <span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Extract pidname </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(full_pidname[i] != <span class="Constant">'@'</span>)
+          pidname[i] = full_pidname[i];
+       <span class="Statement">else</span>
+       {
+
+          <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Terminate pidname </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+          pidname[i] = <span class="Special">'\0'</span>;
+
+
+          <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Have we specified a username? </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+
+          <span class="Statement">for</span>(j=i+<span class="Constant">1</span>; j&lt;strlen(full_pidname); ++j)
+          {  <span class="Statement">if</span>(full_pidname[j] != <span class="Constant">':'</span>)
+                hostname[cnt++] = full_pidname[j];
+             <span class="Statement">else</span>
+             {
+
+                <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+                <span class="Comment">/*</span><span class="Comment"> Get username (who owns target process) </span><span class="Comment">*/</span>
+                <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+                ++j;
+
+                <span class="Statement">if</span>(snprintf(username,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">&quot;</span>,&amp;full_pidname[j]) == <span class="Constant">0</span>)
+                {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;nkill: expecting name of owner of target pid(name)</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+                   (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+                   <span class="Statement">return</span>(NOT_PARSED);
+                }
+
+
+                <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+                <span class="Comment">/*</span><span class="Comment"> Terminate hostname </span><span class="Comment">*/</span>
+                <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+
+                hostname[j-<span class="Constant">1</span>] = <span class="Special">'\0'</span>;
+
+                <span class="Statement">return</span>(PARSED);
+             }
+          }
+
+
+          <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Terminate hostname </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+
+          hostname[cnt] = <span class="Special">'\0'</span>;
+
+
+          <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> No username specified - so use default </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+          pwent = pups_getpwuid(getuid());
+          (<span class="Type">void</span>)strlcpy(username,pwent-&gt;pw_name,SSIZE);
+
+          <span class="Statement">return</span>(PARSED);
+       }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> No hostname specified - so use default </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)gethostname(hostname,SSIZE);
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> No username specified - so use default </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+    pwent = pups_getpwuid(getuid());
+    (<span class="Type">void</span>)strlcpy(username,pwent-&gt;pw_name,SSIZE);
+
+    <span class="Statement">return</span>(PARSED_LOCAL);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------</span>
+<span class="Comment">    Send a signal to a named host first checking to see if it is</span>
+<span class="Comment">    alive ...</span>
+<span class="Comment">------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _BOOLEAN nkill(<span class="Type">FILE</span>   *stream,   <span class="Comment">/*</span><span class="Comment"> Error log/status stream                </span><span class="Comment">*/</span>
+                        _BOOLEAN s_all,   <span class="Comment">/*</span><span class="Comment"> Signal all procs called pname  if TRUE </span><span class="Comment">*/</span>
+                        <span class="Type">char</span> *username,   <span class="Comment">/*</span><span class="Comment"> Username (on remote host)              </span><span class="Comment">*/</span>
+                        <span class="Type">char</span> *password,   <span class="Comment">/*</span><span class="Comment"> Authentication token                   </span><span class="Comment">*/</span>
+                        <span class="Type">char</span>  *signame,   <span class="Comment">/*</span><span class="Comment"> Signal name (or number)                </span><span class="Comment">*/</span>
+                        <span class="Type">char</span>    *rhost,   <span class="Comment">/*</span><span class="Comment"> Remote host                            </span><span class="Comment">*/</span>
+                        <span class="Type">char</span>  *pidname)   <span class="Comment">/*</span><span class="Comment"> Name of process to signal              </span><span class="Comment">*/</span>
+
+{   <span class="Type">int</span> i,
+        pid,
+        status,
+        signum,
+        reply,
+        cnt  = <span class="Constant">0</span>,
+        sent = <span class="Constant">0</span>,
+        ptab[MAX_HOSTS];
+
+    <span class="Type">char</span> strdum[SSIZE]       = <span class="Constant">&quot;&quot;</span>,
+         lhost[SSIZE]        = <span class="Constant">&quot;&quot;</span>,
+         next_pidname[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+    _BOOLEAN remote = TRUE;
+
+    <span class="Statement">if</span>(sscanf(signame,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">&quot;</span>,&amp;signum) == <span class="Constant">0</span>)
+    {
+
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Translate signal name to signal number </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>((signum = signametosigno(signame)) == (-<span class="Constant">1</span>))
+       {  <span class="Statement">if</span>(stream != (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>)
+          {  <span class="Statement">if</span>(slaved == FALSE)
+                (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;nkill: </span><span class="Special">%s</span><span class="Constant"> is not a valid signal</span><span class="Special">\n</span><span class="Constant">&quot;</span>,signame);
+             <span class="Statement">else</span>
+                (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,-<span class="Constant">EPERM</span>);
+             (<span class="Type">void</span>)fflush(stream);
+          }
+
+          exit(<span class="Constant">255</span>);
+       }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Get name of local host </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)gethostname(lhost,SSIZE);
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Are we trying to signal target running on remote host </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(strcmp(rhost,<span class="Constant">&quot;localhost&quot;</span>) == <span class="Constant">0</span>)
+       remote = FALSE;
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> If we have a named process we need to resolve the process name </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> to PID                                                         </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(sscanf(pidname,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">&quot;</span>,&amp;ptab[<span class="Constant">0</span>]) == <span class="Constant">0</span>)
+    {  <span class="Type">int</span> i,
+           ret = <span class="Constant">0</span>;
+
+
+       <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> If signal is being sent to localhost run ps locally </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(remote == FALSE)
+       {  cnt = local_pname_to_pids(stream,lhost,s_all,binname,pidname,ptab);
+
+          <span class="Statement">if</span>(cnt == <span class="Constant">0</span> &amp;&amp; pidname[<span class="Constant">0</span>] != <span class="Constant">'+'</span> &amp;&amp; pidname[<span class="Constant">0</span>] != <span class="Constant">'-'</span>)
+          {  <span class="Statement">if</span>(stream != (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>)
+             {  <span class="Statement">if</span>(slaved == FALSE)
+                   (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;nkill: process </span><span class="Special">%s</span><span class="Constant"> not running on host </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,pidname,lhost);
+                <span class="Statement">else</span>
+                   (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,-<span class="Constant">EEXIST</span>);
+                (<span class="Type">void</span>)fflush(stream);
+             }
+
+             <span class="Statement">return</span>(FALSE);
+          }
+       }
+<span class="PreProc">       #ifdef SSH_SUPPORT</span>
+       <span class="Statement">else</span>
+       {
+
+          <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Use secure shell (ssh) to send signal to remote host </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+          <span class="Statement">if</span>((pid = fork()) == <span class="Constant">0</span>)
+          {  <span class="Type">char</span> remote_nkill_command[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+
+             <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> Child side of fork </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+
+             <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> Overlay ssh command </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+             (<span class="Type">void</span>)snprintf(remote_nkill_command,SSIZE,<span class="Constant">&quot;nkill </span><span class="Special">%s</span><span class="Constant">&quot;</span>,signame);
+             <span class="Statement">if</span>(stream == <span class="Constant">stderr</span>)
+                (<span class="Type">void</span>)strlcat(remote_nkill_command,<span class="Constant">&quot; +verbose&quot;</span>,SSIZE);
+
+             <span class="Statement">if</span>(binname == TRUE)
+                (<span class="Type">void</span>)strlcat(remote_nkill_command,<span class="Constant">&quot; +binname&quot;</span>,SSIZE);
+
+             <span class="Statement">if</span>(s_all == TRUE)
+                (<span class="Type">void</span>)strlcat(remote_nkill_command,<span class="Constant">&quot; +all&quot;</span>,SSIZE);
+
+             (<span class="Type">void</span>)strlcat(remote_nkill_command,<span class="Constant">&quot; &quot;</span>,    SSIZE);
+             (<span class="Type">void</span>)strlcat(remote_nkill_command,pidname,SSIZE);
+
+             <span class="Statement">if</span>(isatty(<span class="Constant">0</span>) == <span class="Constant">1</span>)
+                (<span class="Type">void</span>)execlp(<span class="Constant">&quot;ssh&quot;</span>,<span class="Constant">&quot;ssh&quot;</span>,<span class="Constant">&quot;-t&quot;</span>,<span class="Constant">&quot;-u&quot;</span>,<span class="Constant">&quot;-l&quot;</span>,username,rhost,remote_nkill_command,(<span class="Type">char</span> *)<span class="Constant">NULL</span>);
+             <span class="Statement">else</span>
+                (<span class="Type">void</span>)execlp(<span class="Constant">&quot;ssh&quot;</span>,<span class="Constant">&quot;ssh&quot;</span>,<span class="Constant">&quot;-u&quot;</span>,<span class="Constant">&quot;-l&quot;</span>,username,rhost,remote_nkill_command,(<span class="Type">char</span> *)<span class="Constant">NULL</span>);
+
+
+             <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> We should not get here </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+             _exit(<span class="Constant">255</span>);
+         }
+
+
+         <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+         <span class="Comment">/*</span><span class="Comment"> Parent side of fork </span><span class="Comment">*/</span>
+         <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+         <span class="Statement">else</span> <span class="Statement">if</span>(pid == (-<span class="Constant">1</span>))
+         {
+
+            <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------</span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment"> If we get here connection to remote host (via ssh) has failed </span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------</span><span class="Comment">*/</span>
+
+            <span class="Statement">if</span>(slaved == FALSE)
+            {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;nkill: failed to connect to remote host (via ssh)</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+               (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+            }
+
+            <span class="Statement">return</span>(FALSE);
+         }
+
+         <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+         <span class="Comment">/*</span><span class="Comment"> Wait for child </span><span class="Comment">*/</span>
+         <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+
+         <span class="Statement">while</span>((ret = waitpid(pid,&amp;status,WNOHANG)) != pid)
+         {    <span class="Statement">if</span>(ret == (-<span class="Constant">1</span>) || WEXITSTATUS(status) &lt; <span class="Constant">0</span> || WEXITSTATUS(status) == <span class="Constant">255</span>)
+              {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;nkill: error connecting to remote host (via ssh)</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+                 (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+                 <span class="Statement">return</span>(FALSE);
+              }
+              <span class="Statement">else</span>
+                 (<span class="Type">void</span>)usleep(<span class="Constant">100</span>);
+         }
+      }
+<span class="PreProc">      #endif</span> <span class="Comment">/*</span><span class="Comment"> SSH_SUPPORT </span><span class="Comment">*/</span>
+    }
+    <span class="Statement">else</span>
+    {
+
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> We are sending a signal to an unamed process </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Lets look up its name                        </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+
+       (<span class="Type">void</span>)local_pid_to_pname(ptab[<span class="Constant">0</span>],pidname);
+       ++cnt;
+
+
+       <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> See if we have a valid target to signal </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">       #ifdef SSH_SUPPORT</span>
+       <span class="Statement">if</span>(remote == TRUE)
+       {  <span class="Type">int</span> ret = <span class="Constant">0</span>;
+
+          <span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> We are sending a signal to a remote numeric PID </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+
+          <span class="Type">char</span> pidstr[SSIZE]               = <span class="Constant">&quot;&quot;</span>,
+               remote_nkill_command[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+
+          <span class="Statement">if</span>((pid = fork()) == <span class="Constant">0</span>)
+          {
+
+             <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> Use secure shell (ssh) rather than PSRP protocols to send signal </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> to remote host                                                   </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> Overlay ssh command                                              </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+             (<span class="Type">void</span>)snprintf(remote_nkill_command,SSIZE,<span class="Constant">&quot;nkill </span><span class="Special">%s</span><span class="Constant">&quot;</span>,signame);
+             <span class="Statement">if</span>(stream == <span class="Constant">stderr</span>)
+                (<span class="Type">void</span>)strlcat(remote_nkill_command,<span class="Constant">&quot; +verbose&quot;</span>,SSIZE);
+
+             <span class="Statement">if</span>(s_all == TRUE)
+                (<span class="Type">void</span>)strlcat(remote_nkill_command,<span class="Constant">&quot; +binname&quot;</span>,SSIZE);
+
+             (<span class="Type">void</span>)strlcat(remote_nkill_command,<span class="Constant">&quot; &quot;</span>,SSIZE);
+             (<span class="Type">void</span>)snprintf(pidstr,SSIZE,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">&quot;</span>,ptab[<span class="Constant">0</span>]);
+             (<span class="Type">void</span>)strlcat(remote_nkill_command,pidstr,SSIZE);
+
+             <span class="Statement">if</span>(isatty(<span class="Constant">0</span>) == <span class="Constant">1</span>)
+                (<span class="Type">void</span>)execlp(<span class="Constant">&quot;ssh&quot;</span>,<span class="Constant">&quot;ssh&quot;</span>,<span class="Constant">&quot;-t&quot;</span>,<span class="Constant">&quot;-l&quot;</span>,username,rhost,remote_nkill_command,(<span class="Type">char</span> *)<span class="Constant">NULL</span>);
+             <span class="Statement">else</span>
+                (<span class="Type">void</span>)execlp(<span class="Constant">&quot;ssh&quot;</span>,<span class="Constant">&quot;ssh&quot;</span>,<span class="Constant">&quot;-l&quot;</span>,username,rhost,remote_nkill_command,(<span class="Type">char</span> *)<span class="Constant">NULL</span>);
+
+
+             _exit(<span class="Constant">255</span>);
+          }
+
+
+          <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Parent side of fork </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+          <span class="Statement">else</span> <span class="Statement">if</span>(pid == (-<span class="Constant">1</span>))
+          {
+
+             <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------</span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> If we get here connection to remote host (via ssh) has failed </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------</span><span class="Comment">*/</span>
+
+             <span class="Statement">if</span>(slaved == FALSE)
+             {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;nkill: failed to connect to remote host (via ssh)</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+                (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+             }
+
+             <span class="Statement">return</span>(FALSE);
+          }
+
+          <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Wait for child </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+
+          <span class="Statement">while</span>((ret = waitpid(pid,&amp;status,WNOHANG) != pid))
+          {    <span class="Statement">if</span>(ret == (-<span class="Constant">1</span>) || WEXITSTATUS(status) &lt; <span class="Constant">0</span> || WEXITSTATUS(status) == <span class="Constant">255</span>)
+               {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;nkill: error connecting to remote host (via ssh)</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+                  (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+                  <span class="Statement">return</span>(FALSE);
+               }
+               <span class="Statement">else</span>
+                  (<span class="Type">void</span>)usleep(<span class="Constant">100</span>);
+          }
+
+          <span class="Statement">return</span>(TRUE);
+       }
+       <span class="Statement">else</span>
+<span class="PreProc">       #endif</span> <span class="Comment">/*</span><span class="Comment"> SSH_SUPPORT </span><span class="Comment">*/</span>
+
+       {
+
+          <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> We are sending signal to a local numeric PID </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+
+          <span class="Statement">if</span>((reply = kill(ptab[<span class="Constant">0</span>],signum)) == (-<span class="Constant">1</span>))
+          {  <span class="Statement">if</span>(stream != (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>)
+             {  <span class="Statement">if</span>(slaved == FALSE)
+                   (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;nkill: process </span><span class="Special">%d</span><span class="Constant"> not running on host </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,ptab[<span class="Constant">0</span>],lhost);
+                <span class="Statement">else</span>
+                   (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,-<span class="Constant">EEXIST</span>);
+                (<span class="Type">void</span>)fflush(stream);
+             }
+
+
+             <span class="Statement">return</span>(FALSE);
+          }
+          <span class="Statement">else</span>
+          {  <span class="Statement">if</span>(stream != (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>)
+             {  <span class="Statement">if</span>(slaved == FALSE)
+                   (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;Signal </span><span class="Special">%s</span><span class="Constant"> sent to </span><span class="Special">%s</span><span class="Constant"> [</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">] (reply </span><span class="Special">%d</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                     signame,pidname,ptab[<span class="Constant">0</span>],lhost,username,reply);
+                <span class="Statement">else</span>
+                   (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,reply);
+             }
+
+             <span class="Statement">return</span>(TRUE);
+          }
+       }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> We are local instance of nkill so lets nail the target PIDlist </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;cnt; ++i)
+    {  <span class="Statement">if</span>((reply = kill(ptab[i],signum)) == <span class="Constant">0</span>)
+       {  <span class="Statement">if</span>(stream != (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>)
+          {  <span class="Statement">if</span>(slaved == FALSE)
+                (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;Signal </span><span class="Special">%s</span><span class="Constant"> sent to </span><span class="Special">%s</span><span class="Constant"> [</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">] (reply </span><span class="Special">%d</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                       signame,pidname,ptab[i],lhost,username,reply);
+             <span class="Statement">else</span>
+                (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,reply);
+          }
+
+          ++sent;
+       }
+       <span class="Statement">else</span>
+       {  <span class="Statement">if</span>(stream != (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>)
+          {  <span class="Statement">if</span>(slaved == FALSE)
+                (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;Failed to send signal </span><span class="Special">%s</span><span class="Constant"> to </span><span class="Special">%s</span><span class="Constant">[</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">]</span><span class="Special">\n</span><span class="Constant">&quot;</span>,signame,pidname,ptab[i],username,lhost);
+             <span class="Statement">else</span>
+                (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,reply);
+          }
+       }
+
+       (<span class="Type">void</span>)fflush(stream);
+    }
+
+    <span class="Statement">if</span>(sent &gt; <span class="Constant">0</span>)
+       <span class="Statement">return</span>(TRUE);
+
+    <span class="Statement">return</span>(FALSE);
+}
+
+
+
+
+
+<span class="PreProc">#ifdef SSH_SUPPORT</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------</span>
+<span class="Comment">    Check to see if remote user is permitted to run this service ...</span>
+<span class="Comment">------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _BOOLEAN checkuser(<span class="Type">char</span> *username, <span class="Type">char</span> *password)
+
+{   <span class="Type">struct</span> passwd  *pwent = (<span class="Type">struct</span> passwd *)<span class="Constant">NULL</span>;
+
+    <span class="Type">char</span> salt[<span class="Constant">2</span>]                 = <span class="Constant">&quot;&quot;</span>,
+         crypted_password[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check arguments -- if any are NULL simply return </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(username == (<span class="Type">char</span> *)<span class="Constant">NULL</span> || password == (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+       <span class="Statement">return</span>(FALSE);
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Authenticate remote user </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((pwent = pups_getpwnam(username)) == (<span class="Type">struct</span> passwd *)<span class="Constant">NULL</span>)
+       <span class="Statement">return</span>(FALSE);
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Crypt password using first two characters </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> in password for &quot;salt&quot;                    </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Crypt password using first two characters </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> in in encrypted password for &quot;salt&quot;       </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+    salt[<span class="Constant">0</span>] = pwent-&gt;pw_passwd[<span class="Constant">0</span>];
+    salt[<span class="Constant">1</span>] = pwent-&gt;pw_passwd[<span class="Constant">1</span>];
+    (<span class="Type">void</span>)strlcpy((<span class="Type">char</span> *)&amp;crypted_password,(<span class="Type">char</span> *)crypt(password,(<span class="Type">char</span> *)&amp;salt),SSIZE);
+
+    <span class="Statement">if</span>(strcmp(pwent-&gt;pw_passwd,crypted_password) != <span class="Constant">0</span>)
+       <span class="Statement">return</span>(FALSE);
+
+    <span class="Statement">return</span>(TRUE);
+}
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> SSH_SUPPORT </span><span class="Comment">*/</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------</span>
+<span class="Comment">    Look for the occurence of string s2 within string s1 ...</span>
+<span class="Comment">------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _BOOLEAN strin(<span class="Type">char</span> *s1, <span class="Type">char</span> *s2)
+
+{   <span class="Type">int</span> i,
+        cmp_size,
+        chk_limit;
+
+    <span class="Statement">if</span>(strlen(s2) &gt; strlen(s1))
+       <span class="Statement">return</span>(FALSE);
+
+    chk_limit = strlen(s1) - strlen(s2) + <span class="Constant">1</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> This *IS* correct! Standard routine has </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> cmp_size = strlen(s2) - 1               </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+
+    cmp_size  = strlen(s2);
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;chk_limit; ++i)
+       <span class="Statement">if</span>(strncmp(&amp;s1[i],s2,cmp_size) == <span class="Constant">0</span>)
+          <span class="Statement">return</span>(TRUE);
+
+    <span class="Statement">return</span>(FALSE);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------</span>
+<span class="Comment">    Translate signal name to signal number ...</span>
+<span class="Comment">---------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> signametosigno(<span class="Type">char</span> *name)
+
+{   <span class="Type">int</span> i;
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;MAX_SIGS; ++i)
+       <span class="Statement">if</span>(signame[i] != (<span class="Type">char</span> *)<span class="Constant">NULL</span> &amp;&amp; strin(signame[i],name) == TRUE)
+          <span class="Statement">return</span>(i+<span class="Constant">1</span>);
+
+    <span class="Statement">return</span>(-<span class="Constant">1</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------</span>
+<span class="Comment">    Extract pidname ...</span>
+<span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _BOOLEAN get_pid_name(<span class="Type">char</span> *pidname, <span class="Type">char</span> *line, <span class="Type">int</span> *pid, <span class="Type">char</span> *next_pidname)
+
+{    <span class="Type">char</span> strdum[SSIZE]   = <span class="Constant">&quot;&quot;</span>,
+          bpidname[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+
+     <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> Make sure we have &quot;pidname&quot; and not &quot;-pidname&quot; </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+
+     (<span class="Type">void</span>)strlcpy(bpidname,pidname,SSIZE);
+     <span class="Statement">if</span>(strin(line,bpidname) == TRUE &amp;&amp; strin(line,<span class="Constant">&quot;nkill&quot;</span>) == FALSE)
+     {  (<span class="Type">void</span>)sscanf(line,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">&quot;</span>,pid);
+        <span class="Statement">return</span>(TRUE);
+     }
+
+     <span class="Statement">return</span>(FALSE);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------</span>
+<span class="Comment">    Convert (local) pidname to list of matching PIDS ...</span>
+<span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _BOOLEAN local_pname_to_pids(<span class="Type">FILE</span>      *stream,
+                                      <span class="Type">char</span>       *lhost,
+                                      _BOOLEAN    s_all,
+                                      _BOOLEAN  binname,
+                                      <span class="Type">char</span>     *pidname,
+                                      <span class="Type">int</span>        ptab[])
+
+
+{  <span class="Type">int</span>  pid,
+        cnt = <span class="Constant">0</span>;
+
+   <span class="Type">char</span> line[SSIZE]         = <span class="Constant">&quot;&quot;</span>,
+        next_pidname[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+   <span class="Type">DIR</span>           *dirp      = (<span class="Type">DIR</span> *)<span class="Constant">NULL</span>;
+   <span class="Type">struct</span> dirent *next_item = (<span class="Type">struct</span> dirent *)<span class="Constant">NULL</span>;
+
+   dirp = opendir(<span class="Constant">&quot;/proc&quot;</span>);
+
+
+   <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+   <span class="Comment">/*</span><span class="Comment"> Scan proc filesystem for pidname </span><span class="Comment">*/</span>
+   <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+   <span class="Statement">while</span>((next_item = readdir(dirp)) != (<span class="Type">struct</span> dirent *)<span class="Constant">NULL</span>)
+   {
+
+        <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> Is next item a process (sub)directory? </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+        <span class="Statement">if</span>(sscanf(next_item-&gt;d_name,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">&quot;</span>,&amp;pid) == <span class="Constant">1</span>)
+        {    <span class="Type">int</span> i,
+                 nb,
+                 fdes = (-<span class="Constant">1</span>);
+
+           <span class="Type">char</span> cmdline[SSIZE]     = <span class="Constant">&quot;&quot;</span>,
+                procpidpath[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+           <span class="Statement">if</span>(binname == COMM)
+           {  (<span class="Type">void</span>)snprintf(procpidpath,SSIZE,<span class="Constant">&quot;/proc/</span><span class="Special">%d</span><span class="Constant">/comm&quot;</span>,pid);
+              fdes = open(procpidpath,<span class="Constant">0</span>);
+              nb   = read(fdes,cmdline,SSIZE);
+              cmdline[nb] = <span class="Special">'\0'</span>;
+              (<span class="Type">void</span>)close(fdes);
+           }
+           <span class="Statement">else</span> <span class="Statement">if</span>(binname == CMDLINE)
+           {  (<span class="Type">void</span>)snprintf(procpidpath,SSIZE,<span class="Constant">&quot;/proc/</span><span class="Special">%d</span><span class="Constant">/cmdline&quot;</span>,pid);
+              fdes = open(procpidpath,<span class="Constant">0</span>);
+              nb   = read(fdes,cmdline,SSIZE);
+              cmdline[nb] = <span class="Special">'\0'</span>;
+              (<span class="Type">void</span>)close(fdes);
+           }
+           <span class="Statement">else</span> <span class="Statement">if</span>(binname == BINNAME)
+           {
+
+              <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+              <span class="Comment">/*</span><span class="Comment"> Get name of binary </span><span class="Comment">*/</span>
+              <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+
+              (<span class="Type">void</span>)snprintf(procpidpath,SSIZE,<span class="Constant">&quot;/proc/</span><span class="Special">%d</span><span class="Constant">/exe&quot;</span>,pid);
+              (<span class="Type">void</span>)readlink(procpidpath,cmdline,SSIZE);
+           }
+           <span class="Statement">else</span> <span class="Statement">if</span>(binname == STATUS)
+           {  <span class="Type">char</span> strdum[SSIZE] = <span class="Constant">&quot;&quot;</span>,
+                   tmpstr[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+              (<span class="Type">void</span>)snprintf(procpidpath,SSIZE,<span class="Constant">&quot;/proc/</span><span class="Special">%d</span><span class="Constant">/status&quot;</span>,pid);
+              fdes = open(procpidpath,<span class="Constant">0</span>);
+              nb   = read(fdes,tmpstr,SSIZE);
+              tmpstr[nb] = <span class="Special">'\0'</span>;
+              (<span class="Type">void</span>)close(fdes);
+              (<span class="Type">void</span>)sscanf(tmpstr,<span class="Constant">&quot;</span><span class="Special">%s%s</span><span class="Constant">&quot;</span>,strdum,cmdline);
+           }
+
+
+           <span class="Comment">/*</span><span class="Comment">------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> Strip path </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">------------</span><span class="Comment">*/</span>
+
+           <span class="Statement">for</span>(i=strlen(cmdline); i&gt;<span class="Constant">0</span>; --i)
+           {   <span class="Statement">if</span>(cmdline[i] == <span class="Constant">'/'</span>)
+                  <span class="Statement">goto</span> stripped;
+           }
+
+<span class="Statement">stripped</span>:
+
+           <span class="Statement">if</span>(strncmp(cmdline,pidname,strlen(pidname)) == <span class="Constant">0</span> || strncmp(&amp;cmdline[i+<span class="Constant">1</span>],pidname,strlen(pidname)) == <span class="Constant">0</span>)
+           {  <span class="Statement">if</span>(cnt == <span class="Constant">1</span> &amp;&amp; s_all == FALSE &amp;&amp; binname == FALSE)
+              {  (<span class="Type">void</span>)closedir(dirp);
+
+                 <span class="Statement">if</span>(stream != (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>)
+                 {  (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;nkill: process </span><span class="Special">%s</span><span class="Constant">[@</span><span class="Special">%s</span><span class="Constant">] is not uniquely named</span><span class="Special">\n</span><span class="Constant">&quot;</span>,pidname,lhost);
+                    (<span class="Type">void</span>)fflush(stream);
+                 }
+
+                 <span class="Statement">return</span>(-<span class="Constant">1</span>);
+              }
+              <span class="Statement">else</span>
+              {  ptab[cnt] = pid;
+                 ++cnt;
+              }
+           }
+        }
+   }
+
+   <span class="Statement">return</span>(cnt);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------</span>
+<span class="Comment">    Translate PID to (local) process name ...</span>
+<span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _BOOLEAN local_pid_to_pname(<span class="Type">int</span> pid, <span class="Type">char</span> *pidname)
+
+{   <span class="Type">int</span>  i;
+
+    <span class="Type">char</span> tmpstr[SSIZE]  = <span class="Constant">&quot;&quot;</span>,
+         cmdline[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+    <span class="Type">int</span> nb,
+        fdes = (-<span class="Constant">1</span>);
+
+    <span class="Type">char</span> procpidpath[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+    (<span class="Type">void</span>)snprintf(procpidpath,SSIZE,<span class="Constant">&quot;/proc/</span><span class="Special">%d</span><span class="Constant">/cmdline&quot;</span>,pid);
+    <span class="Statement">if</span>((fdes = open(procpidpath,<span class="Constant">0</span>)) == (-<span class="Constant">1</span>))
+        <span class="Statement">return</span>(FALSE);
+
+    nb = read(fdes,tmpstr,SSIZE);
+    tmpstr[nb] = <span class="Special">'\0'</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Strip path </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=strlen(tmpstr); i&gt;<span class="Constant">0</span>; --i)
+    {   <span class="Statement">if</span>(tmpstr[i] == <span class="Constant">'/'</span>)
+           <span class="Statement">goto</span> stripped;
+    }
+
+<span class="Statement">stripped</span>:
+
+    (<span class="Type">void</span>)strlcpy(pidname,tmpstr,SSIZE);
+    <span class="Statement">return</span>(TRUE);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------------------</span>
+<span class="Comment">    Extended PUPS getpwnam routine which searches static password table. If this</span>
+<span class="Comment">    fails, the appropriate NIS map is then searched ...</span>
+<span class="Comment">----------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">struct</span> passwd *pups_getpwnam(<span class="Type">char</span> *name)
+
+{   _IMMORTAL <span class="Type">struct</span> passwd *pwent = (<span class="Type">struct</span> passwd *)<span class="Constant">NULL</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Authenticate remote user </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> By static table          </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((pwent = getpwnam(username)) == (<span class="Type">struct</span> passwd *)<span class="Constant">NULL</span>)
+    {
+
+<span class="PreProc">       #ifdef NIS_SUPPORT</span>
+       _BYTE  pwent_buf[<span class="Constant">204</span>]     = <span class="Constant">&quot;&quot;</span>;
+       <span class="Type">struct</span> passwd **pwent_ptr = (<span class="Type">struct</span> passwd **)<span class="Constant">NULL</span>;
+
+
+       <span class="Comment">/*</span><span class="Comment">------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> By NIS map </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>((_nss_nis_getpwnam_r(username,&amp;pwent,pwent_buf,pwent_ptr)) == (-<span class="Constant">1</span>))
+          <span class="Statement">return</span>((<span class="Type">struct</span> passwd *)<span class="Constant">NULL</span>);
+<span class="PreProc">       #else</span>
+       <span class="Statement">return</span>((<span class="Type">struct</span> passwd *)<span class="Constant">NULL</span>);
+<span class="PreProc">       #endif</span> <span class="Comment">/*</span><span class="Comment"> NIS_SUPPORT </span><span class="Comment">*/</span>
+    }
+
+
+<span class="PreProc">    #ifdef SHADOW_SUPPORT</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Are we running a shadow password file? If so get the &quot;real&quot; password </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> from /etc/shadow                                                     </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(strcmp(pwent-&gt;pw_passwd,<span class="Constant">&quot;x&quot;</span>) == <span class="Constant">0</span> &amp;&amp; geteuid() == <span class="Constant">0</span>)
+    {  <span class="Type">struct</span> spwd *shadow = (<span class="Type">struct</span> spwd *)<span class="Constant">NULL</span>;
+
+       <span class="Statement">if</span>((shadow = getspnam(username)) == (<span class="Type">struct</span> spwd *)<span class="Constant">NULL</span>)
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;No such (shadow) user </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n</span><span class="Constant">&quot;</span>,username);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+          <span class="Statement">return</span>(FALSE);
+       }
+
+       pwent-&gt;pw_passwd = shadow-&gt;sp_pwdp;
+    }
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> SHADOW_SUPPORT </span><span class="Comment">*/</span>
+
+    <span class="Statement">return</span>(pwent);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------------------</span>
+<span class="Comment">    Extended PUPS getpwnam routine which searches static password table. If this</span>
+<span class="Comment">    fails, the appropriate NIS map is then searched ...</span>
+<span class="Comment">----------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">struct</span> passwd *pups_getpwuid(<span class="Type">int</span> uid)
+
+{   _IMMORTAL <span class="Type">struct</span> passwd *pwent = (<span class="Type">struct</span> passwd *)<span class="Constant">NULL</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Authenticate remote user </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> By static table          </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((pwent = getpwuid(uid)) == (<span class="Type">struct</span> passwd *)<span class="Constant">NULL</span>)
+    {
+
+<span class="PreProc">       #ifdef NIS_SUPPORT</span>
+       _BYTE  pwent_buf[<span class="Constant">204</span>]     = <span class="Constant">&quot;&quot;</span>;
+       <span class="Type">struct</span> passwd **pwent_ptr = (<span class="Type">struct</span> passwd **)<span class="Constant">NULL</span>;
+
+
+       <span class="Comment">/*</span><span class="Comment">------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> By NIS map </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>((_nss_nis_getpwnam_r(uid,&amp;pwent,pwent_buf,pwent_ptr)) == (-<span class="Constant">1</span>))
+          <span class="Statement">return</span>((<span class="Type">struct</span> passwd *)<span class="Constant">NULL</span>);
+<span class="PreProc">       #else</span>
+       <span class="Statement">return</span>((<span class="Type">struct</span> passwd *)<span class="Constant">NULL</span>);
+<span class="PreProc">       #endif</span> <span class="Comment">/*</span><span class="Comment"> NIS_SUPPORT </span><span class="Comment">*/</span>
+    }
+
+
+<span class="PreProc">    #ifdef SHADOW_SUPPORT </span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Are we running a shadow password file? If so get the &quot;real&quot; password </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> from /etc/shadow                                                     </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(strcmp(pwent-&gt;pw_passwd,<span class="Constant">&quot;x&quot;</span>) == <span class="Constant">0</span>  &amp;&amp; geteuid() == <span class="Constant">0</span>)
+    {  <span class="Type">struct</span> spwd *shadow = (<span class="Type">struct</span> spwd *)<span class="Constant">NULL</span>;
+
+       <span class="Statement">if</span>((shadow = getspnam(pwent-&gt;pw_name)) == (<span class="Type">struct</span> spwd *)<span class="Constant">NULL</span>)
+          <span class="Statement">return</span>(FALSE);
+
+       pwent-&gt;pw_passwd = shadow-&gt;sp_pwdp;
+    }
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> SHADOW_SUPPORT </span><span class="Comment">*/</span>
+
+    <span class="Statement">return</span>(pwent);
+}
+
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

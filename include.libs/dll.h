@@ -8,8 +8,8 @@
              NE3 4RT
              United Kingdom
 
-    Dated:   2nd January 2019 
-    Version: 1.14
+    Version: 2.02 
+    Dated:   4th January 2022
     E-mail:  mao@tumblingdice.co.uk
 -------------------------------------------------------------------------*/
 
@@ -33,7 +33,7 @@
 /* Version */
 /***********/
 
-#define DLL_VERSION       "1.14"
+#define DLL_VERSION       "2.02"
 
 
 /*------------------------------*/

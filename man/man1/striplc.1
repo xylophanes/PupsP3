@@ -1,4 +1,4 @@
-.TH STRIPLC 1 "15 November 2003" "PUPSP3 build tools" "PUPSP3 build tools"
+.TH STRIPLC 1 "15th November 2003" "PUPSP3 build tools" "PUPSP3 build tools"
 
 .SH NAME
 STRIPLC \- strip last character in argument string 
@@ -8,7 +8,7 @@ STRIPLC \- strip last character in argument string
 .B striplc 
 .B [-usage | -help]
 < <stdin>
->& <log file>
+[2> <log file>]
 .br
 
 .SH DESCRIPTION
@@ -26,6 +26,18 @@ build scripts.
 display help and copyright information for the
 .I tas(1)
 filter.
+.br
+
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
 .br
 
 .SH ENVIRONMENT VARIABLES

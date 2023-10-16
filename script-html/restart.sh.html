@@ -1,0 +1,128 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.5.1.src.git/pupscore.src/restart.sh.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="bash">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Identifier { color: #008080; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">#!/bin/bash</span>
+<span class="Comment">#</span>
+<span class="Comment">#-----------------------------------------------------</span>
+<span class="Comment"># Restart process which has been checkpointed via Criu</span>
+<span class="Comment"># M.A. O'Neill, Tumbling Dice, 2021-2022 </span>
+<span class="Comment">#-----------------------------------------------------</span>
+
+
+<span class="Statement">echo</span><span class="Constant"> </span><span class="Statement">&quot;&quot;</span>
+<span class="Statement">echo</span><span class="Constant"> </span><span class="Statement">&quot;</span><span class="Constant">    Restart version 2,00</span><span class="Statement">&quot;</span>
+<span class="Statement">echo</span><span class="Constant"> </span><span class="Statement">&quot;</span><span class="Constant">    (C) Tumbling Dice 2016-2022</span><span class="Statement">&quot;</span>
+<span class="Statement">echo</span><span class="Constant"> </span><span class="Statement">&quot;&quot;</span>
+
+<span class="Comment">#-------------------------</span>
+<span class="Comment"># Parse command tail items</span>
+<span class="Comment">#-------------------------</span>
+
+<span class="Statement">if </span><span class="Statement">[</span> <span class="Statement">&quot;</span><span class="PreProc">$1</span><span class="Statement">&quot;</span> <span class="Statement">=</span> <span class="Constant">usage</span> <span class="Statement">]</span> ||  <span class="Statement">[</span> <span class="Statement">&quot;</span><span class="PreProc">$1</span><span class="Statement">&quot;</span> <span class="Statement">=</span> <span class="Constant">help</span> <span class="Statement">]</span> ;  <span class="Statement">then</span>
+	<span class="Statement">echo</span><span class="Constant"> </span><span class="Statement">&quot;&quot;</span>
+	<span class="Statement">echo</span><span class="Constant"> </span><span class="Statement">&quot;</span><span class="Constant">    Usage: restart.sh !&lt;checkpoint directory name&gt;!</span><span class="Statement">&quot;</span>
+	<span class="Statement">echo</span><span class="Constant"> </span><span class="Statement">&quot;&quot;</span>
+
+	<span class="Statement">exit</span> <span class="Constant">1</span>
+
+
+<span class="Comment">#------------------------</span>
+<span class="Comment"># Process restart request</span>
+<span class="Comment">#------------------------</span>
+
+<span class="Statement">else</span>
+
+
+	<span class="Comment">#-------------</span>
+	<span class="Comment"># Sanity check</span>
+	<span class="Comment">#-------------</span>
+
+	<span class="Statement">if </span><span class="Statement">[</span> <span class="Statement">&quot;</span><span class="PreProc">$1</span><span class="Statement">&quot;</span> <span class="Statement">==</span> <span class="Constant">&quot;&quot;</span> <span class="Statement">]</span> ; <span class="Statement">then</span>
+		<span class="Statement">echo</span><span class="Constant"> </span><span class="Statement">&quot;</span><span class="Constant">restart.sh ERROR: checkpoint directory not specified</span><span class="Statement">&quot;</span>
+		<span class="Statement">echo</span><span class="Constant"> </span><span class="Statement">&quot;&quot;</span>
+
+		<span class="Statement">exit</span> <span class="Constant">255</span>
+	<span class="Statement">fi</span>
+
+	<span class="Comment">#---------------------------</span>
+	<span class="Comment"># Does checkpoint file exit?</span>
+	<span class="Comment">#---------------------------</span>
+
+	<span class="Statement">if </span><span class="Statement">[</span> <span class="Statement">!</span> <span class="Statement">-d</span> <span class="PreProc">$1</span> <span class="Statement">]</span> ; <span class="Statement">then</span>
+
+
+		<span class="Comment">#---------------------------------------</span>
+		<span class="Comment"># See if checkpoint is in /tmp directory</span>
+		<span class="Comment">#---------------------------------------</span>
+
+		<span class="Identifier">absolute_path</span>=<span class="PreProc">$(</span><span class="Statement">echo</span><span class="Constant"> </span><span class="PreProc">$1</span><span class="Constant"> </span><span class="Special">| head </span><span class="Special">-c</span><span class="Special"> </span><span class="Constant">1</span><span class="PreProc">)</span>
+		<span class="Statement">if </span><span class="Statement">[</span> <span class="Statement">&quot;</span><span class="PreProc">$absolute_path</span><span class="Statement">&quot;</span> <span class="Statement">!=</span> <span class="Statement">&quot;</span><span class="Constant">/</span><span class="Statement">&quot;</span> <span class="Statement">]</span> &amp;&amp; <span class="Statement">[</span> <span class="Statement">!</span> <span class="Statement">-d</span> /tmp/<span class="PreProc">$1</span> <span class="Statement">]</span> ; <span class="Statement">then</span>
+			<span class="Statement">echo</span><span class="Constant"> </span><span class="Statement">&quot;&quot;</span>
+			<span class="Statement">echo</span><span class="Constant"> </span><span class="Statement">&quot;</span><span class="Constant">restart.sh ERROR: cannot find checkpoint directory: </span><span class="PreProc">$1</span><span class="Statement">&quot;</span>
+			<span class="Statement">echo</span><span class="Constant"> </span><span class="Statement">&quot;&quot;</span>
+
+			<span class="Statement">exit</span> <span class="Constant">255</span>
+		<span class="Statement">else</span>
+			<span class="Identifier">checkpoint</span>=/tmp/<span class="PreProc">$1</span>
+		<span class="Statement">fi</span>
+
+
+	<span class="Comment">#---------------------------------------</span>
+	<span class="Comment"># Checkpoint is in current directory</span>
+	<span class="Comment"># or at absolute location in filesystem</span>
+	<span class="Comment">#---------------------------------------</span>
+
+	<span class="Statement">else</span>
+
+		<span class="Identifier">checkpoint</span>=<span class="PreProc">$1</span>
+
+		<span class="Statement">echo</span><span class="Constant"> </span><span class="Statement">&quot;</span><span class="Constant">    Restarting checkpoint (from directory: </span><span class="PreProc">$checkpoint</span><span class="Constant">)</span><span class="Statement">&quot;</span>
+		<span class="Statement">echo</span><span class="Constant"> </span><span class="Statement">&quot;&quot;</span>
+	<span class="Statement">fi</span>
+<span class="Statement">fi</span>
+
+
+<span class="Comment">#-----------------------------</span>
+<span class="Comment"># Restart checkpointed process</span>
+<span class="Comment">#-----------------------------</span>
+
+<span class="Statement">if </span><span class="Statement">[</span> <span class="Statement">&quot;</span><span class="PreProc">$2</span><span class="Statement">&quot;</span> <span class="Statement">==</span> <span class="Constant">detach</span> <span class="Statement">]</span> <span class="Statement">then</span>
+	<span class="Statement">exec</span> criu <span class="Special">--log-file</span> /dev/null <span class="Special">--shell-job</span> restore <span class="Statement">-d</span> <span class="Statement">-D</span> <span class="PreProc">$checkpoint</span>
+<span class="Statement">else</span>
+	<span class="Statement">exec</span> criu <span class="Special">--log-file</span> /dev/null <span class="Special">--shell-job</span> restore <span class="Statement">-D</span> <span class="PreProc">$checkpoint</span>
+<span class="Statement">fi</span>
+
+<span class="Statement">exit</span> <span class="Constant">0</span>
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

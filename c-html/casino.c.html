@@ -1,0 +1,2208 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/casino.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Error { color: #ffffff; background-color: #ff6060; padding-bottom: 1px; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Purpose: Portable random number generator library. This version has bug in</span>
+<span class="Comment">             ran3() routine corrected.</span>
+
+<span class="Comment">    Author:  M.A. O'Neill</span>
+<span class="Comment">             Tumbling Dice Ltd</span>
+<span class="Comment">             Gosforth</span>
+<span class="Comment">             Newcastle upon Tyne</span>
+<span class="Comment">             NE3 4RT</span>
+<span class="Comment">             United Kingdom</span>
+
+<span class="Comment">    Version: 1.16</span>
+<span class="Comment">    Dated:   4th January 2022</span>
+<span class="Comment">    E-Mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;me.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;utils.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;errno.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;math.h&gt;</span>
+
+<span class="PreProc">#undef   __NOT_LIB_SOURCE__</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;casino.h&gt;</span>
+<span class="PreProc">#define  __NOT_LIB_SOURCE__</span>
+
+
+_PRIVATE <span class="Type">void</span>  avevar(FTYPE [], <span class="Type">int</span>, FTYPE *, FTYPE *);
+_PRIVATE FTYPE betacf(FTYPE, FTYPE, FTYPE x);
+_PRIVATE FTYPE betai(FTYPE, FTYPE, FTYPE);
+_PRIVATE <span class="Type">void</span>  gser(FTYPE *, FTYPE a, FTYPE, FTYPE *);
+_PRIVATE <span class="Type">void</span>  gcf(FTYPE *, FTYPE, FTYPE, FTYPE *);
+_PRIVATE FTYPE gammq(FTYPE, FTYPE);
+_PRIVATE FTYPE factln(<span class="Type">int</span>);
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Slot and usage functions - used by slot manager ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Slot usage function </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> casino_slot(<span class="Type">int</span> level)
+{   (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;lib casino </span><span class="Special">%s</span><span class="Constant">: [ANSI C]</span><span class="Special">\n</span><span class="Constant">&quot;</span>,CASINO_VERSION);
+
+    <span class="Statement">if</span>(level &gt; <span class="Constant">1</span>)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;(C) 1985-2022 Tumbling Dice</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Author: M.A. O'Neill</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;PUPS/P3 random number generator library (built </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+    }
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Segment identification for casino library </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef SLOT</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;slotman.h&gt;</span>
+_EXTERN <span class="Type">void</span> (* SLOT )() __attribute__ ((aligned(<span class="Constant">16</span>))) = casino_slot;
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> SLOT </span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Defines for 'ran1' </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _CONST <span class="Type">int</span>    M1  = <span class="Constant">259200</span>;
+_PRIVATE _CONST <span class="Type">int</span>    IA1 = <span class="Constant">7141</span>;
+_PRIVATE _CONST <span class="Type">int</span>    IC1 = <span class="Constant">54773</span>;
+_PRIVATE _CONST <span class="Type">int</span>    M2  = <span class="Constant">134456</span>;
+_PRIVATE _CONST <span class="Type">int</span>    IA2 = <span class="Constant">8121</span>;
+_PRIVATE _CONST <span class="Type">int</span>    IC2 = <span class="Constant">28411</span>;
+_PRIVATE _CONST <span class="Type">int</span>    M3  = <span class="Constant">243000</span>;
+_PRIVATE _CONST <span class="Type">int</span>    IA3 = <span class="Constant">4561</span>;
+_PRIVATE _CONST <span class="Type">int</span>    IC3 = <span class="Constant">51349</span>;
+_PRIVATE _CONST FTYPE  RM1 = <span class="Constant">3.85802469e-6</span>;
+_PRIVATE _CONST FTYPE  RM2 = <span class="Constant">7.437377283e-6</span>;
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------*.</span>
+<span class="Error">/</span><span class="Comment">* Defines for 'ran2' </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _CONST <span class="Type">int</span> M  = <span class="Constant">714025</span>;
+_PRIVATE _CONST <span class="Type">int</span> IA = <span class="Constant">1366</span>;
+_PRIVATE _CONST <span class="Type">int</span> IC = <span class="Constant">150889</span>;
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Defines for 'ran3' </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _CONST <span class="Type">int</span> MBIG   = <span class="Constant">1000000000</span>;
+_PRIVATE _CONST <span class="Type">int</span> MSEED  = <span class="Constant">161803398</span>;
+_PRIVATE _CONST <span class="Type">int</span> MZ     = <span class="Constant">0</span>;
+
+_PRIVATE _CONST FTYPE FAC  = <span class="Constant">1.0e-9</span>;
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Public global variable declarations </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">long</span> r_init;
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Functions which are private to this library </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Comment">// Log of Gamma function </span>
+_PROTOTYPE _PRIVATE FTYPE gammln(FTYPE);
+
+
+<span class="Comment">// Incomplete beta function</span>
+_PROTOTYPE _PRIVATE FTYPE betai(FTYPE, FTYPE, FTYPE);
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Portable random number generator based on the 'ran1' uniform deviate</span>
+<span class="Comment">    generator described in &quot;Numerical Recipes in C&quot; ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC FTYPE ran1(<span class="Type">void</span>)
+
+{
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Returns a uniform deviate between 0.0 and 1.0. Set r_init to any </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> negative value to reinitialise the sequence                      </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    _IMMORTAL <span class="Type">long</span> ix1,
+                   ix2,
+                   ix3;
+
+    _IMMORTAL FTYPE r[<span class="Constant">98</span>] = { <span class="Constant">0.0</span> };
+    FTYPE     temp;
+
+    _IMMORTAL <span class="Type">int</span> iff = <span class="Constant">0</span>;
+    <span class="Type">int</span>           j;
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> initialise on first call, even if not negative </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(r_init &lt; <span class="Constant">0</span> || iff == <span class="Constant">0</span>)
+    {  iff = <span class="Constant">1</span>;
+
+
+       <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Seed the first routine </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+       ix1 = (IC1 - r_init)  % M1;
+       ix1 = (IA1*ix1 + IC1) % M1;
+
+
+       <span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Use ix1 to seed the second </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+       ix2 = ix1 % M2;
+       ix1 = (IA1*ix1 + IC1) % M1;
+
+
+       <span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Use ix1 to seed the third routine </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+
+       ix3 = ix1 % M3;
+
+
+       <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Fill the table with sequential uniform deviates generated by the </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> first two routines                                               </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">for</span>(j=<span class="Constant">1</span>; j&lt;=<span class="Constant">97</span>; j++)
+       {  ix1 = (IA1*ix1+IC1) % M1;
+          ix2 = (IA2*ix2+IC2) % M2;
+
+
+          <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Low and high order peices combined here </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+
+          r[j] = (ix1 + ix2*RM2) * RM1;
+       }
+       r_init = <span class="Constant">1</span>;
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Except when initialising, generate the next number for each </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> sequence                                                    </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    ix1 = (IA1*ix1+IC1) % M1;
+    ix2 = (IA2*ix2+IC2) % M2;
+    ix3 = (IA3*ix3+IC3) % M3;
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Use this sequence to get a number between 0.0 and 1.0 </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------</span><span class="Comment">*/</span>
+
+    j = <span class="Constant">1</span> + ((<span class="Constant">97</span>*ix3) / M3);
+    <span class="Statement">if</span>(j &gt; <span class="Constant">97</span> || j &lt; <span class="Constant">1</span>)
+       pups_error(<span class="Constant">&quot;[ran1] generator error&quot;</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">  Return table entry </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+    temp = r[j];
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> And refill it </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------</span><span class="Comment">*/</span>
+
+    r[j] = (ix1+ix2*RM2)*RM1;
+    <span class="Statement">return</span>((FTYPE)temp);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Random number generator based on the 'ran2' deviate generator</span>
+<span class="Comment">    described in &quot;Numerical Recipes in C&quot; ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC FTYPE ran2(<span class="Type">void</span>)
+
+{
+
+     <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> Returns a uniform deviate between 0.0 and 1.0. Set ium to be any </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> negative value to initialise or reintialise the sequence         </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> -----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+     _IMMORTAL <span class="Type">long</span> iy,
+                    ir[<span class="Constant">98</span>] = { <span class="Constant">0L</span> };
+
+     _IMMORTAL <span class="Type">int</span>  iff = <span class="Constant">0</span>;
+
+     <span class="Type">int</span> j;
+
+     <span class="Statement">if</span>(r_init &lt; <span class="Constant">0</span> || iff == <span class="Constant">0</span>)
+     {  iff = <span class="Constant">1</span>;
+        <span class="Statement">if</span>((r_init = (IC-r_init) % M) &lt; <span class="Constant">0</span>)  r_init = -(r_init);
+
+
+        <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> Initialise the shuffle table </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+
+        <span class="Statement">for</span>(j=<span class="Constant">1</span>; j&lt;=<span class="Constant">97</span>; j++)
+        {  r_init = (IA*r_init + IC) % M;
+           ir[j] = (r_init);
+        }
+        r_init = (IA*r_init + IC) % M;
+        iy = r_init;
+     }
+
+
+     <span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> Start of routine if it is not being initialised </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+
+     j = <span class="Constant">1</span> + <span class="Constant">97.0</span>*iy / M;
+     <span class="Statement">if</span>(j &gt; <span class="Constant">97</span> || j &lt; <span class="Constant">1</span>)
+        pups_error(<span class="Constant">&quot;[ran2] generator error&quot;</span>);
+
+     iy    = ir[j];
+     r_init = (IA*r_init + IC) % M;
+     ir[j] = r_init;
+
+     <span class="Statement">return</span>(( FTYPE)iy / M);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Random number generator based upon the random deviate generator</span>
+<span class="Comment">    'ran3' described in &quot;Numerical Recipes in C&quot;, which is in turn</span>
+<span class="Comment">    based on the portable random deviate generator proposed by Knuth ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC FTYPE ran3(<span class="Type">void</span>)
+
+{
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Returns a random deviate in the range 0.0 to 1.0. Set r_init to any </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> negative value to intialise or reinitialise the sequence            </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    _IMMORTAL <span class="Type">int</span> inext,
+                  inextp;
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> This value should not be modified, see Knuth </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+
+    _IMMORTAL <span class="Type">long</span> ma[<span class="Constant">56</span>] = { <span class="Constant">0L</span> };
+    _IMMORTAL <span class="Type">int</span> iff     = <span class="Constant">0</span>;
+
+    <span class="Type">long</span> mj,
+         mk;
+
+    <span class="Type">int</span> i,
+        ii,
+         k;
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Initialisation </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(r_init &lt; <span class="Constant">0</span> || iff == <span class="Constant">0</span>)
+    {  iff = <span class="Constant">1</span>;
+
+
+       <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Initialize ma[56] using the seed r_init and the large number MSEED </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+       mj     =  MSEED - ((<span class="Type">int</span>)r_init &lt; <span class="Constant">0</span> ? -(<span class="Type">int</span>)r_init: (<span class="Type">int</span>)r_init);
+       mj     %= MBIG;
+       ma[<span class="Constant">55</span>] =  mj;
+       mk     =  <span class="Constant">1</span>;
+
+
+       <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Now initialise the rest of the table in a slightly random order, </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> using numbers which are not especially random                    </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">for</span>(i=<span class="Constant">1</span>; i&lt;=<span class="Constant">54</span>; i++)
+       {  ii     = (<span class="Constant">21</span>*i) % <span class="Constant">55</span>;
+          ma[ii] = mk;
+          mk     = mj - mk;
+          <span class="Statement">if</span>(mk &lt; MZ) mk += MBIG;
+          mj = ma[ii];
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Warm up the generator </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">for</span>(k=<span class="Constant">1</span>; k&lt;=<span class="Constant">4</span>; k++)
+       {  <span class="Statement">for</span>(i=<span class="Constant">1</span>; i&lt;=<span class="Constant">55</span>; i++)
+          {  ma[i] -= ma[<span class="Constant">1</span>+(i+<span class="Constant">30</span>) % <span class="Constant">55</span>];
+             <span class="Statement">if</span>(ma[i] &lt; MZ)
+                ma[i] += MBIG;
+          }
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Prepare indices for first generated number, the constant 31 is </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> special, see Knuth                                             </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+       inext  = <span class="Constant">0</span>;
+       inextp = <span class="Constant">31</span>;
+       r_init  = <span class="Constant">1</span>;
+    }
+
+    <span class="Statement">if</span>(++inext == <span class="Constant">56</span>)  inext  = <span class="Constant">1</span>;
+    <span class="Statement">if</span>(++inextp == <span class="Constant">56</span>) inextp = <span class="Constant">1</span>;
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Here is where we start, except on initialisation. Increment inext, </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> wrapping around 56 to 1                                            </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+                                     <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+    mj = ma[inext] - ma[inextp];     <span class="Comment">/*</span><span class="Comment"> Genrate new number subtractively      </span><span class="Comment">*/</span>
+    <span class="Statement">if</span>(mj &lt; MZ)                      <span class="Comment">/*</span><span class="Comment"> Check it is in range                  </span><span class="Comment">*/</span>
+                                     <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+       mj += MBIG;
+
+                                     <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+    ma[inext] = mj;                  <span class="Comment">/*</span><span class="Comment"> Store it                              </span><span class="Comment">*/</span>
+    <span class="Statement">return</span>((FTYPE)(mj*FAC));         <span class="Comment">/*</span><span class="Comment"> Output derived uniform deviate        </span><span class="Comment">*/</span>
+                                     <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Long period random number generator of L'Ecuyer with Bays-Durham shuffle    </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> as added safeguards. Returns a uniform random deviate between 0.0 and 1.0.  </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Call with idum as a negative integer to initialise; thereafter do not       </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> alter idum between calls. RNMX should aproximate the largest floating point </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> value which is less than one                                                </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define LIM1  </span><span class="Constant">2147483563</span>
+<span class="PreProc">#define LIM2  </span><span class="Constant">2147483399</span>
+<span class="PreProc">#define LAM   (</span><span class="Constant">1.0</span><span class="PreProc">/LIM1)</span>
+<span class="PreProc">#define LIMM1 (LIM1 - </span><span class="Constant">1</span><span class="PreProc">)</span>
+<span class="PreProc">#define LIA1  </span><span class="Constant">40014</span>
+<span class="PreProc">#define LIA2  </span><span class="Constant">40692</span>
+<span class="PreProc">#define LIQ1  </span><span class="Constant">53688</span>
+<span class="PreProc">#define LIQ2  </span><span class="Constant">52774</span>
+<span class="PreProc">#define LIR1  </span><span class="Constant">12211</span>
+<span class="PreProc">#define LIR2  </span><span class="Constant">3791</span>
+<span class="PreProc">#define LNTAB </span><span class="Constant">32</span>
+<span class="PreProc">#define LNDIV (</span><span class="Constant">1</span><span class="PreProc">+LIM1/LNTAB)</span>
+<span class="PreProc">#define LEPS  </span><span class="Constant">1.2e-7</span>
+<span class="PreProc">#define LRNMX (</span><span class="Constant">1.0</span><span class="PreProc"> - LEPS)</span>
+
+
+_PUBLIC FTYPE ran4(<span class="Type">long</span> *idum)
+
+{   <span class="Type">int</span>  j;
+    <span class="Type">long</span> k;
+
+    _IMMORTAL <span class="Type">long</span> idum2     = <span class="Constant">123456789</span>;
+    _IMMORTAL <span class="Type">long</span> iy        = <span class="Constant">0L</span>;
+    _IMMORTAL <span class="Type">long</span> iv[LNTAB] = { <span class="Constant">0L</span> };
+
+    FTYPE temp;
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Initialise if *idum is less than zero </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(*idum &lt;= <span class="Constant">0</span>)
+    {
+
+       <span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Avoid *idum = 0 </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(-(*idum) &lt; <span class="Constant">1</span>)
+          *idum = <span class="Constant">1</span>;
+       <span class="Statement">else</span>
+         *idum = -(*idum);
+
+       idum2 = (*idum);
+
+       <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">  Load the shuffle table (after 8 warm-ups) </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">for</span>(j=LNTAB+<span class="Constant">7</span>; j&gt;=<span class="Constant">0</span>; j--)
+       {   k     = (*idum) / LIQ1;
+           *idum = LIA1*(*idum - k*LIQ1) - k*LIR1;
+
+           <span class="Statement">if</span>(*idum &lt; <span class="Constant">0</span>)
+              *idum += LIM1;
+
+           <span class="Statement">if</span>(j &lt; LNTAB)
+              iv[j] = *idum;
+       }
+
+       iy = iv[<span class="Constant">0</span>];
+     }
+
+
+     <span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> This is the entry point when not initialising </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+
+      k = (*idum)/LIQ1;
+
+
+      <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------</span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> Compute *idum = (IA1*(*idum)) % IM1 without overflows using Schrages </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> method                                                               </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+      *idum = LIA1*(*idum - k*LIQ1) - k*LIR1;
+
+      <span class="Statement">if</span>(*idum &lt; <span class="Constant">0</span>)
+         *idum += LIM1;
+
+      k = idum2/LIQ2;
+
+
+      <span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment">  Compute idum2 = (IA2 * (*idum)) % IM2 likewise </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+
+      idum2 = LIA2*(idum2 - k*LIQ2) - k*LIR2;
+
+      <span class="Statement">if</span>(idum2 &lt; <span class="Constant">0</span>)
+         idum2 += LIM2;
+
+
+      <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------</span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> Shuffle *idum and combine *idum and idum2 to generate output </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------</span><span class="Comment">*/</span>
+
+      j     = iy/LNDIV;
+      iy    = iv[j] - idum2;
+      iv[j] = *idum;
+
+      <span class="Statement">if</span>(iy &lt; <span class="Constant">1</span>)
+         iy += LIMM1;
+
+      <span class="Statement">if</span>((temp =LAM*iy) &gt; LRNMX)
+         <span class="Statement">return</span>(LRNMX);
+      <span class="Statement">else</span>
+         <span class="Statement">return</span>(temp);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Minimal random number generator (Park-Miller) with Bays-Durham shuffle </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> and added safeguards. Returns randome deviate between 0.0 and 1.0      </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define IA    </span><span class="Constant">16807</span>
+<span class="PreProc">#define IM    </span><span class="Constant">2147483647</span>
+<span class="PreProc">#define AM    (</span><span class="Constant">1.0</span><span class="PreProc"> / IM)</span>
+<span class="PreProc">#define IQ    </span><span class="Constant">127773</span>
+<span class="PreProc">#define IR    </span><span class="Constant">2386</span>
+<span class="PreProc">#define NTAB  </span><span class="Constant">32</span>
+<span class="PreProc">#define NDIV  (</span><span class="Constant">1</span><span class="PreProc"> + (IM - </span><span class="Constant">1</span><span class="PreProc">)/NTAB)</span>
+<span class="PreProc">#define EPS   </span><span class="Constant">1.2e-7</span>
+<span class="PreProc">#define RNMX  (</span><span class="Constant">1.0</span><span class="PreProc"> - EPS)</span>
+
+
+_PROTOTYPE _PUBLIC FTYPE ran5(<span class="Type">long</span> *idum)
+
+{    <span class="Type">int</span>  j;
+     <span class="Type">long</span> k;
+
+     _IMMORTAL <span class="Type">long</span> iy = <span class="Constant">0</span>,
+                    iv[NTAB];
+
+     FTYPE temp;
+
+
+     <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> Initilisation section </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+
+     <span class="Statement">if</span>(*idum &lt;= <span class="Constant">0.0</span> || !iy)
+     {  <span class="Statement">if</span>(-(*idum) &lt; <span class="Constant">1</span>)
+           *idum = <span class="Constant">1</span>;
+        <span class="Statement">else</span>
+           *idum = -(*idum);
+
+
+        <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> load shuffle table (afer 8 warm ups) </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+
+        <span class="Statement">for</span>(j=NTAB+<span class="Constant">7</span>; j&gt;=<span class="Constant">0</span>; j--)
+        {  k = (*idum)/IQ;
+           *idum = IA * (*idum - k*IQ) - IR*k;
+
+           <span class="Statement">if</span>(*idum &lt; <span class="Constant">0</span>)
+              *idum += IM;
+
+           <span class="Statement">if</span>(j &lt; NTAB)
+              iv[j] = *idum;
+        }
+        iy = iv[<span class="Constant">0</span>];
+     }
+
+
+     <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> Start here when not initialising </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+     k     = (*idum)/IQ;
+
+
+     <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> Compute idum=(IA*idum) % IM without overflow (via Schrages method) </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+     *idum = IA*(*idum - k*IQ) - IR*k;
+
+     <span class="Statement">if</span>(*idum &lt; <span class="Constant">0</span>)
+        *idum += IM;
+
+     j = iy/NDIV;
+     iy = iv[j];
+     iv[j] = *idum;
+
+     <span class="Statement">if</span>((temp = AM*iy) &gt; RNMX)
+        <span class="Statement">return</span>(RNMX);
+     <span class="Statement">else</span>
+        <span class="Statement">return</span>(temp);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Return a normally distributed deviate with zero mean, and unit</span>
+<span class="Comment">    variance using user defined random number generator ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC FTYPE gasdev(FTYPE (* ran)(<span class="Type">void</span>), FTYPE variance)
+
+{   _IMMORTAL <span class="Type">int</span> iset = <span class="Constant">0</span>;
+    _IMMORTAL FTYPE  gset;
+
+    FTYPE fac,
+          r,
+          v1,
+          v2;
+
+    <span class="Statement">if</span>(iset == <span class="Constant">0</span>)
+    {  <span class="Statement">do</span> {
+
+              <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+              <span class="Comment">/*</span><span class="Comment">  Pick two uniform numbers in the square extending from -1 to +1 in </span><span class="Comment">*/</span>
+              <span class="Comment">/*</span><span class="Comment">  each direction                                                    </span><span class="Comment">*/</span>
+              <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+              v1 = <span class="Constant">2.0</span>*(*ran)() - <span class="Constant">1.0</span>;
+              v2 = <span class="Constant">2.0</span>*(*ran)() - <span class="Constant">1.0</span>;
+
+              r = v1*v1 + v2*v2;
+          } <span class="Statement">while</span>(r &gt;= <span class="Constant">1.0</span>);
+          fac = SQRT(-<span class="Constant">2.0</span>*LOG(r)/r);
+
+
+         <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------</span><span class="Comment">*/</span>
+         <span class="Comment">/*</span><span class="Comment"> Now make the Box-Muller transform to get two normal deviates. Return </span><span class="Comment">*/</span>
+         <span class="Comment">/*</span><span class="Comment"> one and save the other for next time                                 </span><span class="Comment">*/</span>
+         <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+          gset = v1*fac;
+          iset = <span class="Constant">1</span>;        <span class="Comment">// Set flag </span>
+
+          <span class="Statement">return</span>((FTYPE)(v2*fac*SQRT(variance)));
+     }
+     <span class="Statement">else</span>
+     {  iset = <span class="Constant">0</span>;
+        <span class="Statement">return</span>((FTYPE)gset*SQRT(variance));
+     }
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Return Gaussian distribution using the central limit theorem ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC FTYPE gasdev2(FTYPE (*ran)(<span class="Type">void</span>) , FTYPE variance)
+
+{   <span class="Type">int</span>    i = <span class="Constant">5</span>;
+    FTYPE ret;
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Generate deviate (unit variance, centred at zero), using the central </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> limit theorem, with n == 5                                           </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    ret = <span class="Constant">0.0</span>;
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">5</span>; ++i)
+       ret += (*ran)();
+
+    ret = (ret - <span class="Constant">2.50</span>)*SQRT(<span class="Constant">12.0</span>*variance)/<span class="Constant">5.0</span>;
+    <span class="Statement">return</span>(ret);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Return the log of the gamma function ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE FTYPE gammln(FTYPE xx)
+
+{
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Returns the log of the gamma function for xx &gt; 0. Full accuracy is     </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> obtained if xx &gt; 1. For 0 &lt; xx &lt; 1, the refelction formula can be used </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> first                                                                  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    FTYPE x,
+          tmp,
+          ser;
+
+    _IMMORTAL FTYPE cof[<span class="Constant">6</span>] = {  <span class="Constant">76.18009173</span>,
+                                -<span class="Constant">86.50532033</span>,
+                                 <span class="Constant">24.01409822</span>,
+                                -<span class="Constant">1.231739516</span>,
+                                 <span class="Constant">0.120858003e-2</span>,
+                                 -<span class="Constant">0.536382e-5</span>
+                             };
+
+    <span class="Type">int</span> j;
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Internal arithmetic will be done in FTYPE precision, a nicety which </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> can be omitted, if five figure accuracy is sufficient               </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    x    = xx - <span class="Constant">1.0</span>;
+    tmp  =  x + <span class="Constant">5.5</span>;
+    tmp -= (x+<span class="Constant">0.5</span>)*LOG(tmp);
+    ser  = <span class="Constant">1.0</span>;
+
+    <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;=<span class="Constant">5</span>; j++)
+    {  x   += <span class="Constant">1.0</span>;
+       ser =  cof[j]/x;
+    }
+
+    <span class="Statement">return</span>((FTYPE)((-tmp) + LOG(<span class="Constant">2.50662827465</span>)*ser));
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Return N! as a floating point number ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC FTYPE factrl(<span class="Type">int</span> n)
+
+{   _IMMORTAL <span class="Type">int</span> ntop = <span class="Constant">4</span>;
+    _IMMORTAL FTYPE a[<span class="Constant">33</span>] = {<span class="Constant">1.0</span>, <span class="Constant">1.0</span>, <span class="Constant">2.0</span>, <span class="Constant">6.0</span>, <span class="Constant">24.0</span>};
+
+    <span class="Type">int</span> j;
+
+    pups_set_errno(OK);
+    <span class="Statement">if</span>(n &lt; <span class="Constant">0</span>)
+    {  pups_set_errno(<span class="Constant">EDOM</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    <span class="Statement">if</span>(n &gt; <span class="Constant">32</span>)
+      <span class="Statement">return</span>(EXP(gammln(n+<span class="Constant">1.0</span>)));
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> This may cause an overflow </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">while</span>(ntop &lt; n)
+    {    j = ntop++;
+         a[ntop] = a[j]*ntop;
+    }
+
+    <span class="Statement">return</span>(a[n]);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------------</span>
+<span class="Comment">    Returns ln(n!) ...</span>
+<span class="Comment">--------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE FTYPE factln(<span class="Type">int</span> n)
+
+{   _IMMORTAL FTYPE a[<span class="Constant">101</span>];
+
+    pups_set_errno(OK);
+    <span class="Statement">if</span>(n &lt; <span class="Constant">0</span>)
+    {  pups_set_errno(<span class="Constant">EDOM</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1.0</span>);
+    }
+
+    <span class="Statement">if</span>(n &lt;= <span class="Constant">1</span>)
+       <span class="Statement">return</span>(<span class="Constant">0.0</span>);
+
+    <span class="Statement">if</span>(n &lt;= <span class="Constant">100</span>)
+       <span class="Statement">return</span>( a[n] ? a[n] : (a[n] = gammln(n+<span class="Constant">1.0</span>)) );
+    <span class="Statement">else</span>
+       <span class="Statement">return</span>(gammln(n+<span class="Constant">1.0</span>));
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------------</span>
+<span class="Comment">    Return binomial coefficient as a floating point number ...</span>
+<span class="Comment">--------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC FTYPE bico(<span class="Type">int</span> n, <span class="Type">int</span> k)
+
+{   <span class="Statement">return</span>(floor(<span class="Constant">0.5</span> + EXP(factln(n) - factln(k) - factln(n-k))));
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Generate gamma distribution ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC FTYPE gamdev(<span class="Type">int</span> ia, FTYPE (*ran)(<span class="Type">void</span>))
+
+{
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Return a deviate distributed as a gamma distribution of integer order </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> ia, i.e. a waiting time to the iath event in a Poisson process of     </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> unit mean, using the function pointed to by 'ran' as the source of    </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> uniform deviates                                                      </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Type">int</span> j;
+
+    FTYPE am,
+          e,
+          s,
+          v1,
+          v2,
+          x,
+          y;
+
+    <span class="Statement">if</span>(ia &lt; <span class="Constant">1</span>)
+       pups_error(<span class="Constant">&quot;[gamdev] incorrect parameter&quot;</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Use direct method adding waiting times </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(ia &lt; <span class="Constant">6</span>)
+    {  x = <span class="Constant">1.0</span>;
+       <span class="Statement">for</span>(j=<span class="Constant">1</span>; j&lt;=ia; j++)
+          x *= (*ran)();
+       x -= LOG(x);
+    }
+    <span class="Statement">else</span>
+    {
+
+       <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Use rejection method </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">do</span> {
+              <span class="Statement">do</span> {
+
+                      <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+                      <span class="Comment">/*</span><span class="Comment">  These four lines generate the tangent of a random angle i.e. are </span><span class="Comment">*/</span>
+                      <span class="Comment">/*</span><span class="Comment">  equivalent to y = tan(PI * ran())                                </span><span class="Comment">*/</span>
+                      <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+                      <span class="Statement">do</span> {   v1 = <span class="Constant">2.0</span>*(*ran)() - <span class="Constant">1.0</span>;
+                             v2 = <span class="Constant">2.0</span>*(*ran)() - <span class="Constant">1.0</span>;
+                         } <span class="Statement">while</span>(v1*v1*v2*v2 &gt; <span class="Constant">1.0</span>);
+
+                      y  = v2 / v1;
+                      am = ia - <span class="Constant">1</span>;
+                      s = SQRT(<span class="Constant">2.0</span>*am + <span class="Constant">1.0</span>);
+
+
+                      <span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+                      <span class="Comment">/*</span><span class="Comment"> decide whether to reject x </span><span class="Comment">*/</span>
+                      <span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+                      x = s*y + am;
+
+                                     <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+                  } <span class="Statement">while</span>(x &lt;= <span class="Constant">0.0</span>); <span class="Comment">/*</span><span class="Comment"> Reject in region of zero probability  </span><span class="Comment">*/</span>
+                                     <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+              <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+              <span class="Comment">/*</span><span class="Comment"> Ratio of probability fn. to comparison fn </span><span class="Comment">*/</span>
+              <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+              e = (<span class="Constant">1.0</span> + y*y) * EXP(am*LOG(x/am) - s*y);
+          } <span class="Statement">while</span>((*ran)() &gt; e);
+    }
+
+    <span class="Statement">return</span>((FTYPE)x);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Possion deviate distribution ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC FTYPE poidev(FTYPE xm, FTYPE (*ran)(<span class="Type">void</span>))
+
+{
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Returns as floating point number an integer value that is a random </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> deviate drawn from a Poisson distribution of mean xm, using the    </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> random deviate generator pointed to by 'ran'                       </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    _IMMORTAL FTYPE sq,
+                    alxm,
+                    g,
+                    oldm = (-<span class="Constant">1.0</span>);
+
+    FTYPE em,
+          t,
+          y;
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Use direct method </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(xm &lt; <span class="Constant">12.0</span>)
+    {
+
+       <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> If xm is new, compute the exponential </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(xm != oldm)
+       {  oldm = xm;
+          g    = EXP(-xm);
+       }
+
+       em = -<span class="Constant">1</span>;
+       t  =  <span class="Constant">1.0</span>;
+       <span class="Statement">do</span> {
+
+              <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------</span><span class="Comment">*/</span>
+              <span class="Comment">/*</span><span class="Comment"> Instead of adding exponential deviates, it is equivalent to multiply </span><span class="Comment">*/</span>
+              <span class="Comment">/*</span><span class="Comment"> before uniform deviates. The we nver have to take the log, merely    </span><span class="Comment">*/</span>
+              <span class="Comment">/*</span><span class="Comment"> compare the pre-computed exponential                                 </span><span class="Comment">*/</span>
+              <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+              em += <span class="Constant">1.0</span>;
+              t  *= (*ran)();
+          } <span class="Statement">while</span>(t &gt; g);
+    }
+    <span class="Statement">else</span>
+    {
+
+       <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Use rejection method. If xm has changed since the last call, then </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> precompute some functions which occur below                       </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(xm != oldm)
+       {  oldm = xm;
+          sq   = SQRT(<span class="Constant">2.0</span>*xm);
+          alxm = LOG(xm);
+
+
+          <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> The function gammln is the natural log of the gamma function </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------</span><span class="Comment">*/</span>
+
+          g = xm*alxm - gammln(xm + <span class="Constant">1.0</span>);
+       }
+
+       <span class="Statement">do</span> {
+              <span class="Statement">do</span> {
+
+                     <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------</span><span class="Comment">*/</span>
+                     <span class="Comment">/*</span><span class="Comment"> Y is a deviate from a Lorentzian comparison fn, em is y shifted and </span><span class="Comment">*/</span>
+                     <span class="Comment">/*</span><span class="Comment"> scaled                                                              </span><span class="Comment">*/</span>
+                     <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+                      y = TAN(PI*(*ran)());
+                      em = sq*y*xm;
+
+
+                      <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+                      <span class="Comment">/*</span><span class="Comment"> Reject if in regime of zero probability </span><span class="Comment">*/</span>
+                      <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+
+                 } <span class="Statement">while</span>(em &lt; <span class="Constant">0.0</span>);
+
+
+                 <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+                 <span class="Comment">/*</span><span class="Comment">  The trick for integer based distributions </span><span class="Comment">*/</span>
+                 <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+
+                 em = floor(em);
+                 t  = <span class="Constant">0.9</span>*(<span class="Constant">1.0</span> + y*y)*EXP(em*alxm - gammln(em+<span class="Constant">1.0</span>) - g);
+
+
+                 <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+                 <span class="Comment">/*</span><span class="Comment"> The ratio of the desired distribution to the comparison function; </span><span class="Comment">*/</span>
+                 <span class="Comment">/*</span><span class="Comment"> We accept or reject by comparing it to another uniform deviate.   </span><span class="Comment">*/</span>
+                 <span class="Comment">/*</span><span class="Comment"> The factor 0.9 is chosen so that t never exceeds 1                </span><span class="Comment">*/</span>
+                 <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+             } <span class="Statement">while</span>((*ran)() &gt; t);
+    }
+
+    <span class="Statement">return</span>((FTYPE)em);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Binomial distribution ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC FTYPE bnldev(FTYPE pp, <span class="Type">int</span> n, FTYPE (*ran)())
+
+{
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Return as a FTYPE precision floating point number, an integer value     </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> that is a random deviate drawn from a binomial distribution of n trials </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> each of probability pp, using 'ran' as a source of uniform random       </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> deviates                                                                </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Type">int</span> j;
+
+    _IMMORTAL <span class="Type">int</span> nold = (-<span class="Constant">1</span>);
+
+    FTYPE am,
+          em,
+          g,
+          angle,
+          p,
+          bnl,
+          sq,
+          t,
+          y;
+
+    _IMMORTAL FTYPE pold = (-<span class="Constant">1.0</span>),
+                    pc,
+                    plog,
+                    pclog,
+                    en,
+                    oldg;
+
+    p = (pp &lt;= <span class="Constant">0.5</span> ? pp : <span class="Constant">1.0</span> - pp);
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> The binomial distribution is invariant under chnaging pp to 1.-pp, if  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> we also change the answer to a minus itself, we'll remember to do this </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> below. 'am' is the mean of the deviate to be produced                  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> -----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    am = n*p;
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Use the direct method while n is not too large, this can require up </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> to 25 calls to the random deviate generator                         </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(n &lt; <span class="Constant">25</span>)
+    {  bnl = <span class="Constant">0.0</span>;
+       <span class="Statement">for</span>(j=<span class="Constant">1</span>; j&lt;=n; j++)
+          <span class="Statement">if</span>((*ran)() &lt; p)
+            bnl += <span class="Constant">1.0</span>;
+    }
+    <span class="Statement">else</span>
+    {  <span class="Statement">if</span>(am &lt; <span class="Constant">1.0</span>)
+       {
+
+          <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> If fewer than one event is expected out of 25 or more trials, the the </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> distribution is quite accurately Poisson, theefore use direct Poisson </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> method                                                                </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+          g = EXP(-am);
+          t = <span class="Constant">1.0</span>;
+          <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;=n; j++)
+          {  t *= (*ran)();
+             <span class="Statement">if</span>(t &lt; g) <span class="Statement">break</span>;
+          }
+          bnl = (j &lt;= n ? j : n);
+       }
+       <span class="Statement">else</span>
+       {
+
+          <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Use the rejection method. If n has changed then compute useful </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> quantities                                                     </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+          <span class="Statement">if</span>(n != nold)
+          {  en   = n;
+             oldg = gammln(en+<span class="Constant">1.0</span>);
+             nold = n;
+          }
+
+
+          <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> If p has changed, compute useful quantities </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+
+          <span class="Statement">if</span>(p != pold)
+          {  pc    = <span class="Constant">1.0</span> - p;
+             plog  = LOG(p);
+             pclog = LOG(pc);
+             pold  = p;
+          }
+
+
+          <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> The following code implements a rejection method with Lorentzian </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> comparision                                                      </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+          sq = SQRT(<span class="Constant">2.0</span>*am*pc);
+          <span class="Statement">do</span> {
+                 <span class="Statement">do</span> {   angle = PI*(*ran)();
+                        y     = TAN(angle);
+                        em    = sq*y+am;
+                    } <span class="Statement">while</span>(em &lt; <span class="Constant">0.0</span> || em &gt;= (en+<span class="Constant">1.0</span>));           <span class="Comment">// Reject </span>
+
+
+                                    <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+                 em = floor(em);    <span class="Comment">/*</span><span class="Comment"> Trick for integer valued distribution </span><span class="Comment">*/</span>
+                                    <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+                 t = <span class="Constant">1.2</span>*sq*(<span class="Constant">1.0</span> + y*y)*EXP(oldg - gammln(em+<span class="Constant">1.0</span>) -
+                            gammln(en-em+<span class="Constant">1.0</span>) + em*plog + (en-em)*pclog);
+
+
+                 <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+                 <span class="Comment">/*</span><span class="Comment"> Reject, this occurs 1.5 times per deviate on average </span><span class="Comment">*/</span>
+                 <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+             } <span class="Statement">while</span>((*ran)() &gt; t);
+
+          bnl = em;
+       }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Remember to use the symmtry transformation </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(p != pp)
+       bnl = n - bnl;
+
+    <span class="Statement">return</span>((FTYPE)bnl);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Generate a user defined distribution from a numerical function ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC FTYPE numdev(FTYPE (*ran)(<span class="Type">void</span>) , gate_type *gate_f)
+
+{   <span class="Type">int</span> i;
+    FTYPE level;
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Generate trigger value </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+    level = (*ran)()*gate_f-&gt;frame_size;
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Find out which gate has been triggered </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;gate_f-&gt;n_gates; ++i)
+    {  <span class="Statement">if</span>(level &lt;= gate_f-&gt;gate_y[i])
+           <span class="Statement">return</span>(gate_f-&gt;gate_x[i]);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> This should not happen, but flag an error if it does </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+    pups_error(<span class="Constant">&quot;[numdev] generator error&quot;</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Stop compiler from producing error messages </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">return</span>(DDUM);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to compute the number of unique combinations of n objects</span>
+<span class="Comment">    taken from a set of m objects ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> n_from_m(<span class="Type">int</span> n, <span class="Type">int</span> m)
+
+{   <span class="Type">int</span> i,
+        ret         = <span class="Constant">1</span>,
+        n_factorial = <span class="Constant">1</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> compute n! / (n-i)! </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=m; i=m-n; --i)
+        ret *= i;
+
+
+    <span class="Comment">/*</span><span class="Comment">------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Compute n! </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;n; ++i)
+       n_factorial *= i;
+
+    ret /= n_factorial;
+    <span class="Statement">return</span>(ret);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to gernerate the error function, erfcc ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE FTYPE erfcc(FTYPE x)
+
+{   FTYPE t,
+          z,
+          ans;
+
+    z   = fabs(x);
+    t   = <span class="Constant">1.0</span> / (<span class="Constant">1.0</span> + <span class="Constant">0.5</span>*z);
+    ans = t*EXP(-z*z - <span class="Constant">1.26551223</span> + t*(<span class="Constant">1.00002368</span> + t*
+                       (<span class="Constant">0.37409196</span> + t*(<span class="Constant">0.09678418</span> + t*
+                       (-<span class="Constant">0.18628806</span> + t*(<span class="Constant">0.27886807</span> + t*
+                       (-<span class="Constant">1.13520398</span> + t*(<span class="Constant">1.48851587</span> + t*
+                       (-<span class="Constant">0.82215223</span> + t*<span class="Constant">0.17087277</span>)))))))));
+
+    <span class="Statement">return</span>(ans);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Crank routine used by Spearmans rank correlation routine ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> crank(<span class="Type">int</span> n, FTYPE w[], FTYPE *s)
+
+{   <span class="Type">int</span> j = <span class="Constant">0</span>,
+           ji,
+           jt;
+
+    FTYPE t,
+          rank;
+
+    *s = <span class="Constant">0.0</span>;
+    <span class="Statement">while</span>(j &lt; n - <span class="Constant">1</span>)
+    {   <span class="Statement">if</span>(w[j+<span class="Constant">1</span>] != w[j])
+        {  w[j] = j;
+           ++j;
+        }
+        <span class="Statement">else</span>
+        {  <span class="Statement">for</span>(jt=j; jt&lt;n; ++jt)
+              <span class="Statement">if</span>(w[jt] != w[j])
+                 <span class="Statement">break</span>;
+
+            rank = <span class="Constant">0.5</span>*(j + jt - <span class="Constant">1</span>);
+            <span class="Statement">for</span>(ji=j; ji&lt;(jt - <span class="Constant">1</span>); ++ji)
+               w[ji] = rank;
+
+            t  =  jt - j;
+            *s += t*t*t - t;
+            j  =  jt;
+         }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Last element not tied - this is its rank </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(j == (n - <span class="Constant">1</span>))
+      w[n-<span class="Constant">1</span>] = n;
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to perform non parametric rank correlation [Spearman] ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> spear(FTYPE   data1[],      <span class="Comment">// Data array 1</span>
+                   FTYPE   data2[],      <span class="Comment">// Data array 2</span>
+                   <span class="Type">int</span>           n,      <span class="Comment">// Number of data elements</span>
+                   FTYPE        *d,      <span class="Comment">// Sum squared difference of ranks</span>
+                   FTYPE       *zd,      <span class="Comment">// Deviation from null hypothesis</span>
+                   FTYPE    *probd,      <span class="Comment">// Two sided significance</span>
+                   FTYPE       *rs,      <span class="Comment">// Spearmans's rank correlation</span>
+                   FTYPE   *probrs)      <span class="Comment">// Significance of rs dev from zero</span>
+
+{   <span class="Type">int</span> j;
+
+    FTYPE vard,
+          t,
+          sg     = <span class="Constant">0.0</span>,
+          sf     = <span class="Constant">0.0</span>,
+          fac,
+          en3n,
+          en,
+          df     = <span class="Constant">0.0</span>,
+          aved,
+          *wksp1 = (FTYPE *)<span class="Constant">NULL</span>,
+          *wksp2 = (FTYPE *)<span class="Constant">NULL</span>;
+
+    wksp1 = (FTYPE *)pups_calloc(n,<span class="Statement">sizeof</span>(FTYPE));
+    wksp2 = (FTYPE *)pups_calloc(n,<span class="Statement">sizeof</span>(FTYPE));
+
+    <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;n; ++j)
+    {   wksp1[j] = data1[j];
+        wksp2[j] = data2[j];
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Sort each of the data arrays and convert the entries to ranks </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    sort2(n,wksp1,wksp2);
+    crank(n,wksp1,wksp2);
+
+    sort2(n,wksp1,wksp2);
+    crank(n,wksp1,wksp2);
+
+    *d = <span class="Constant">0.0</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Sum the squared difference of ranks </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;n; ++j)
+       *d += sqr(wksp1[j] - wksp2[j]);
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Expectation value D </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+    en   = n;
+    en3n = en*en*en - en;
+    aved = en3n / <span class="Constant">6.0</span> - (sf+sg) / <span class="Constant">12.0</span>;
+    fac    = (<span class="Constant">1.0</span> - sf/en3n)*(<span class="Constant">1.0</span> - sg/en3n);
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Variance of D </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------</span><span class="Comment">*/</span>
+
+    vard   = ((en - <span class="Constant">1.0</span>)*en*en*sqr(en + <span class="Constant">1.0</span>)/<span class="Constant">36.0</span>)*fac;
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Number of significant deviations </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+    *zd    = (*d - aved)/SQRT(vard);
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Significance </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+
+    *probd = erfcc(fabs(*zd)/<span class="Constant">1.4142136</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Spearman's rank correlation coeffiecient </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+
+    *rs    = (<span class="Constant">1.0</span> - (<span class="Constant">6.0</span>/en3n)*(*d + <span class="Constant">0.5</span>*(sf + sg)))/fac;
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> t value of Spearman's rank correlation coefficient </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+
+    t      = (*rs)*SQRT((en - <span class="Constant">2.0</span>)/((*rs + <span class="Constant">1.0</span>)*(<span class="Constant">1.0</span> - (*rs))));
+    df     = en - <span class="Constant">2.0</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Significance of Spearman's rank correlation coefficient </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+
+    *probrs = betai(<span class="Constant">0.5</span>*df, <span class="Constant">0.5</span>, df / (df + t*t));
+
+    pups_free((<span class="Type">void</span> *)wksp1);
+    pups_free((<span class="Type">void</span> *)wksp2);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to compute the incomplete beta functions ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE FTYPE betai(FTYPE a, FTYPE b, FTYPE x)
+
+{   FTYPE bt;
+
+    <span class="Statement">if</span>(x &lt; <span class="Constant">0.0</span> || x &gt; <span class="Constant">1.0</span>)
+      pups_error(<span class="Constant">&quot;[betai] x outside range 0.0 - 1.0&quot;</span>);
+
+    <span class="Statement">if</span>(x == <span class="Constant">0.0</span> || x == <span class="Constant">1.0</span>)
+       bt = <span class="Constant">0.0</span>;
+    <span class="Statement">else</span>
+       bt = EXP(gammln(a+b) - gammln(a) - gammln(b) +
+                              a*LOG(x) + b*LOG(<span class="Constant">1.0</span> - x));
+
+    <span class="Statement">if</span>(x &lt; (a + <span class="Constant">1.0</span>) / (a + b + <span class="Constant">2.0</span>))
+       <span class="Statement">return</span>(bt*betacf(a,b,x) / a);
+    <span class="Statement">else</span>
+       <span class="Statement">return</span>(<span class="Constant">1.0</span> - bt*betacf(b,a,<span class="Constant">1.0</span> - x) / b);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to determine the linear correlation between two sets of</span>
+<span class="Comment">    variables ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define TINY </span><span class="Constant">1.0e-20</span>
+
+_PUBLIC <span class="Type">void</span> pearsn(FTYPE     x[],      <span class="Comment">// Data array 1 </span>
+                    FTYPE     y[],      <span class="Comment">// Data array 2</span>
+                    <span class="Type">int</span>         n,      <span class="Comment">// Number of elements in data array</span>
+                    FTYPE      *r,      <span class="Comment">// Linear correlation coefficient</span>
+                    FTYPE   *prob,      <span class="Comment">// Significance of correlation</span>
+                    FTYPE      *z)      <span class="Comment">// Fisher's Z</span>
+
+{   <span class="Type">int</span> j;
+
+    FTYPE yt,
+          xt,
+          t,
+          df,
+          syy = <span class="Constant">0.0</span>,
+          sxy = <span class="Constant">0.0</span>,
+          sxx = <span class="Constant">0.0</span>,
+          ay  = <span class="Constant">0.0</span>,
+          ax  = <span class="Constant">0.0</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Find the means </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;n; ++j)
+    {  ax += x[j];
+       ay += y[j];
+    }
+
+    ax /= n;
+    ay /= n;
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Compute correlation coefficients </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;n; ++j)
+    {  xt = x[j] - ax;
+       yt = y[j] - ay;
+       sxx += xt*xt;
+       syy += yt*yt;
+       sxy += xt*yt;
+    }
+
+    *r = sxy / SQRT(sxx*syy);
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Fisher's Z transform </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+
+    *z = <span class="Constant">0.5</span>*LOG((<span class="Constant">1.0</span> + (*r) + TINY) / (<span class="Constant">1.0</span> - (*r) + TINY));
+
+    df = n - <span class="Constant">2</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Student's t probability </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+
+    t  = (*r)*SQRT(df / ((<span class="Constant">1.0</span> - (*r) + TINY) * (<span class="Constant">1.0</span> - (*r) + TINY)));
+    *prob = betai(<span class="Constant">0.5</span>*df, <span class="Constant">0.5</span>, df / (df*t*t));
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Return the mean, standard, deviation, variance, skewness and kurtosis of a</span>
+<span class="Comment">    distribution ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> moment(FTYPE data[],   <span class="Comment">// Data to be analysed</span>
+                    <span class="Type">int</span>        n,   <span class="Comment">// Number of pts in dataset</span>
+                    FTYPE   *ave,   <span class="Comment">// Average deviation</span>
+                    FTYPE   *rms,   <span class="Comment">// Root mean square error</span>
+                    FTYPE  *adev,   <span class="Comment">// Average deviation</span>
+                    FTYPE  *sdev,   <span class="Comment">// Standard deviation</span>
+                    FTYPE  *svar,   <span class="Comment">// Variance</span>
+                    FTYPE  *skew,   <span class="Comment">// Skewness</span>
+                    FTYPE  *curt)   <span class="Comment">// Kurtosis</span>
+
+{   <span class="Type">int</span> j;
+
+    FTYPE s = <span class="Constant">0.0</span>,
+           r = <span class="Constant">0.0</span>,
+           p = <span class="Constant">0.0</span>;
+
+    <span class="Statement">if</span>(n &lt;= <span class="Constant">1</span>)
+    {  *ave  = data[<span class="Constant">0</span>];
+       *rms  = <span class="Constant">0.0</span>;
+       *adev = <span class="Constant">0.0</span>;
+       *sdev = <span class="Constant">0.0</span>;
+       *svar = <span class="Constant">0.0</span>;
+       *skew = <span class="Constant">0.0</span>;
+       *curt = <span class="Constant">0.0</span>;
+
+       <span class="Statement">return</span>;
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> First pass to get the mean </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;n; ++j)
+    {  s += data[j];
+       r += data[j]*data[j];
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Second pass to get the higher statistical moments </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------</span><span class="Comment">*/</span>
+
+    *ave  = s / n;
+    *adev = (*svar) = (*skew) = (*curt) = <span class="Constant">0.0</span>;
+
+    <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;n; ++j)
+    {   *adev += fabs(s=data[j] - (*ave));
+        *svar += (p = s*s);
+        *skew += (p *= s);
+        *curt += (p *= s);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Put the pieces together according to convention </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+
+    *rms  = SQRT(r / n);
+    *adev /= n;
+    *svar /= (n - <span class="Constant">1</span>);
+    *sdev =  SQRT(*svar);
+
+    <span class="Statement">if</span>(*svar)
+    {  *skew /= (n*(*svar)*(*sdev));
+       *curt = (*curt) / (n*(*svar)*(*svar)) - <span class="Constant">3.0</span>;
+    }
+    <span class="Statement">else</span>
+    {  *skew = <span class="Constant">0.0</span>;
+       *curt = <span class="Constant">0.0</span>;
+    }
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to test whether two distributions have the same mean. The</span>
+<span class="Comment">    result of the Student t test is returned as t, and its significance</span>
+<span class="Comment">    as prob. This routine is based on that given in Numerical Recipes in C</span>
+<span class="Comment">    p616 ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> ttest(FTYPE   data_1[],
+                   <span class="Type">int</span>           n1,
+                   FTYPE   data_2[],
+                   <span class="Type">int</span>           n2,
+                   FTYPE         *t,
+                   FTYPE      *prob)
+
+
+{   FTYPE df,
+          svar,
+          *ave_1 = (FTYPE *)<span class="Constant">NULL</span>,
+          *ave_2 = (FTYPE *)<span class="Constant">NULL</span>,
+          *var_1 = (FTYPE *)<span class="Constant">NULL</span>,
+          *var_2 = (FTYPE *)<span class="Constant">NULL</span>;
+
+    avevar(data_1,n1,ave_1,var_1);
+    avevar(data_2,n2,ave_2,var_2);
+
+    df = n1 + n2 - <span class="Constant">2</span>;
+
+    svar  = ((n1 - <span class="Constant">1</span>)*(*var_1) + ((FTYPE)n2 - <span class="Constant">1</span>)*(*var_2)) / df;
+    *t    = ((*ave_1) - (*ave_2)) / SQRT(svar*(<span class="Constant">1.0</span>  / n1 + <span class="Constant">1.0</span> / n2));
+    *prob = betai(<span class="Constant">0.5</span>*df, <span class="Constant">0.5</span>, df / (df + (*t)*(*t)));
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Find mean and variance of array ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> avevar(FTYPE data[], <span class="Type">int</span> n, FTYPE *ave, FTYPE *var)
+
+{   <span class="Type">int</span> j;
+
+    FTYPE s,
+          ep;
+
+    <span class="Statement">for</span>(*ave=<span class="Constant">0.0</span>,j=<span class="Constant">0</span>; j&lt;n; ++j)
+       *ave += data[j];
+
+    *ave /= n;
+    *var = ep = <span class="Constant">0.0</span>;
+
+    <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;n; ++j)
+    {  s    =  data[j] - (*ave);
+       ep   += s;
+       *var =  s*s;
+    }
+
+    *var = (*var - ep*ep/n) / (n - <span class="Constant">1</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Student's t for significantly different means where the two populations</span>
+<span class="Comment">    to be compared have significantly different variances ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> tutest(FTYPE data_1[],
+                    <span class="Type">int</span>         n1,
+                    FTYPE data_2[],
+                    <span class="Type">int</span>         n2,
+                    FTYPE       *t,
+                    FTYPE    *prob)
+
+
+{   FTYPE df     = <span class="Constant">0.0</span>,
+          svar,
+          fn_1,
+          fn_2,
+          *ave_1 = (FTYPE *)<span class="Constant">NULL</span>,
+          *ave_2 = (FTYPE *)<span class="Constant">NULL</span>,
+          *var_1 = (FTYPE *)<span class="Constant">NULL</span>,
+          *var_2 = (FTYPE *)<span class="Constant">NULL</span>;
+
+    avevar(data_1,n1,ave_1,var_1);
+    avevar(data_2,n2,ave_2,var_2);
+
+    fn_1 = (FTYPE)n1;
+    fn_2 = (FTYPE)n2;
+
+    svar  = ((fn_1 - <span class="Constant">1</span>)*(*var_1) + (fn_2 - <span class="Constant">1</span>)*(*var_2)) / df;
+    *t    = ((*ave_1) - (*ave_2)) / SQRT(svar*(<span class="Constant">1.0</span> / fn_1 + <span class="Constant">1.0</span> / fn_2));
+    df    = sqr((*var_1)/fn_1 + (*var_2)/fn_2) / sqr(*var_1/fn_1)/(fn_1 - <span class="Constant">1</span>) +
+                                                sqr(*var_2/fn_2) / (fn_2 - <span class="Constant">1</span>);
+
+    *prob = betai(<span class="Constant">0.5</span>*df, <span class="Constant">0.5</span>, df / (df + (*t)*(*t)));
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Compute chi-square and two measure of association for two different</span>
+<span class="Comment">    distributions, Cramer's V and the contingency coefficient ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> cntab1(<span class="Type">int</span>       **nn,
+                    <span class="Type">int</span>         ni,
+                    <span class="Type">int</span>         nj,
+                    FTYPE   *chisq,
+                    FTYPE      *df,
+                    FTYPE    *prob,
+                    FTYPE  *cramrv,
+                    FTYPE     *ccc)
+{   <span class="Type">int</span> nnj,
+        nni,
+        j,
+        i,
+        minij;
+
+    FTYPE sum      = <span class="Constant">0.0</span>,
+          expectd,
+          *sumi    = (FTYPE *)<span class="Constant">NULL</span>,
+          *sumj    = (FTYPE *)<span class="Constant">NULL</span>,
+          temp;
+
+
+    sumi = (FTYPE *)pups_calloc(ni,<span class="Statement">sizeof</span>(FTYPE));
+    sumj = (FTYPE *)pups_calloc(ni,<span class="Statement">sizeof</span>(FTYPE));
+
+    nni = ni;
+    nnj = nj;
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;ni; ++i)
+    {  sumi[i] = <span class="Constant">0.0</span>;
+       <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;nj; ++j)
+       {  sumi[i] += nn[i][j];
+          sum     += nn[i][j];
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Eliminate any zero rows by reducing the number </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(sumi[i] == <span class="Constant">0.0</span>)
+          --nni;
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Get the column totals </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;nj; ++j)
+    {  sumj[j] = <span class="Constant">0.0</span>;
+
+       <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;ni; ++i)
+          sumj[j] += nn[i][j];
+
+
+       <span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Eliminate any zero columns </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(sumj[j] = <span class="Constant">0.0</span>)
+          --nnj;
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Corrected number of degrees of freedom </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+    *df    = nni*nnj - nni  - nnj + <span class="Constant">1</span>;
+    *chisq = <span class="Constant">0.0</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Do the chi-square sum </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;ni; ++i)
+    {  <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;nj; ++j)
+       {  expectd = sumj[j]*sumi[i] / sum;
+          temp    = nn[i][j] - expectd;
+          *chisq  += temp*temp / (expectd + TINY);
+       }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Chi-square probability function </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+
+    *prob   = gammq(<span class="Constant">0.5</span>*(*df),<span class="Constant">0.5</span>*(*chisq));
+    minij   = nni &lt; nnj ? nni - <span class="Constant">1</span> : nnj - <span class="Constant">1</span>;
+    *cramrv = SQRT(*chisq / (sum*minij));
+    *ccc    = SQRT(*chisq / (*chisq + sum));
+
+    (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)sumi);
+    (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)sumj);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Definitions required by the beta and gamma functions package </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define ITMAX </span><span class="Constant">100</span>
+<span class="PreProc">#define BEPS  </span><span class="Constant">3.0e-7</span>
+<span class="PreProc">#define FPMIN </span><span class="Constant">1.0e-30</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Evaluate the continued fraction for incomplete beta function using</span>
+<span class="Comment">    Lentz's method ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE FTYPE betacf(FTYPE a, FTYPE b, FTYPE x)
+
+{   <span class="Type">int</span> m,
+        m2;
+
+    FTYPE aa,
+           c,
+           d,
+           del,
+           h,
+           qab,
+           qam,
+           qap;
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> These q's will be used in factors that occur in the coefficients </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    qab = a + b;
+    qap = a + <span class="Constant">1.0</span>;
+    qam = a - <span class="Constant">1.0</span>;
+
+    c   = <span class="Constant">1.0</span>;
+    d   = <span class="Constant">1.0</span> - qab*x / qap;
+
+    <span class="Statement">if</span>(fabs(d) &lt;FPMIN)
+       d = FPMIN;
+
+    d = <span class="Constant">1.0</span> / d;
+    h = d;
+
+    <span class="Statement">for</span>(m=<span class="Constant">0</span>; m&lt;ITMAX; ++m)
+    {  m2 = <span class="Constant">2</span>*m;
+       aa = m*(b - m)*x / ((qam + m2)*(a + m2));
+
+
+       <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> The even step of the recurrence </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+
+       d = <span class="Constant">1.0</span> + aa*d;
+       <span class="Statement">if</span>(fabs(d) &lt; FPMIN)
+          d = FPMIN;
+
+       c = <span class="Constant">1.0</span> + aa / c;
+       <span class="Statement">if</span>(fabs(c) &lt;FPMIN)
+          c = FPMIN;
+
+       d  =  <span class="Constant">1.0</span> / d;
+       h  *= d*c;
+       aa =  -(a + m)*(qab + m)*x / ((a + m2)*(qap + m2));
+
+
+       <span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Odd step of the recurrence </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+       d = <span class="Constant">1.0</span> + aa*d;
+       <span class="Statement">if</span>(fabs(d) &lt; FPMIN)
+          d = FPMIN;
+
+       c = <span class="Constant">1.0</span> + aa / c;
+       <span class="Statement">if</span>(fabs(c) &lt;FPMIN)
+          c = FPMIN;
+
+       d   =  <span class="Constant">1.0</span> / d;
+       del =  d*c;
+       h   *= del;
+
+
+       <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Test for exit condition </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(fabs(del - <span class="Constant">1.0</span>) &lt; BEPS)
+          <span class="Statement">break</span>;
+    }
+
+    <span class="Statement">if</span>(m &gt; ITMAX)
+      pups_error(<span class="Constant">&quot;[betacf] a or b too big or ITMAX too small&quot;</span>);
+
+    <span class="Statement">return</span>(h);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Return the incomplete gamma function ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE FTYPE gammq(FTYPE a, FTYPE x)
+
+{   FTYPE gamser,
+          gammcf,
+          gln;
+
+    <span class="Statement">if</span>(x &lt;<span class="Constant">0.0</span> || a &lt;= <span class="Constant">0.0</span>)
+      pups_error(<span class="Constant">&quot;[gammq] incorrect argument(s) to gammq&quot;</span>);
+
+    <span class="Statement">if</span>(x &lt; (a + <span class="Constant">1.0</span>))
+    {
+
+       <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Use the series representation </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+
+       gser(&amp;gamser,a,x,&amp;gln);
+       <span class="Statement">return</span>(<span class="Constant">1.0</span> - gamser);
+    }
+    <span class="Statement">else</span>
+    {
+
+       <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Use the continued fraction representation </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+       gcf(&amp;gammcf,a,x,&amp;gln);
+       <span class="Statement">return</span>(gammcf);
+    }
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Return the incomplete gamma function evaluated by its series</span>
+<span class="Comment">    representation ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> gser(FTYPE *gamser, FTYPE a, FTYPE x, FTYPE *gln)
+
+{   <span class="Type">int</span> n;
+
+    FTYPE sum = <span class="Constant">0.0</span>,
+           del,
+           ap;
+
+    *gln = gammln(a);
+
+    <span class="Statement">if</span>(x &lt;= <span class="Constant">0.0</span>)
+    {  <span class="Statement">if</span>(x &lt; <span class="Constant">0.0</span>)
+          pups_error(<span class="Constant">&quot;[gser] x less than 0&quot;</span>);
+
+       *gamser = <span class="Constant">0.0</span>;
+       <span class="Statement">return</span>;
+    }
+    <span class="Statement">else</span>
+    {  ap  = a;
+       del = sum - <span class="Constant">1.0</span>/a;
+
+       <span class="Statement">for</span>(n=<span class="Constant">1</span>; n&lt;=ITMAX; ++n)
+       {  ++ap;
+          del *= x / ap;
+          sum += del;
+
+          <span class="Statement">if</span>(fabs(del) &lt; fabs(sum)*EPS)
+          {  *gamser = sum*EXP(-x + a*LOG(x) - (*gln));
+             <span class="Statement">return</span>;
+          }
+       }
+
+       pups_error(<span class="Constant">&quot;[gser] a too large or ITMAX too small&quot;</span>);
+    }
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Evaluate the incomplete gamma function by its continued fraction ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> gcf(FTYPE *gammcf, FTYPE a, FTYPE x, FTYPE *gln)
+
+{   <span class="Type">int</span> i;
+
+    FTYPE an,
+           b,
+           c,
+           d,
+           del,
+           h;
+
+    *gln = gammln(a);
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set up for evaluating continued fraction by modified Lentz's method </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    b = x + <span class="Constant">1.0</span> - a;
+    c = <span class="Constant">1.0</span> / FPMIN;
+    d = <span class="Constant">1.0</span> / b;
+    h = d;
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Iterate to convergence </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;ITMAX; ++i)
+    {  an = -i*(i - a);
+       b  += <span class="Constant">2.0</span>;
+
+       d  = an*d + b;
+       <span class="Statement">if</span>(fabs(d) &lt; FPMIN)
+          d = FPMIN;
+
+       c = b + an / c;
+       <span class="Statement">if</span>(fabs(c) &lt; FPMIN)
+          c = FPMIN;
+
+       d   = <span class="Constant">1.0</span> / d;
+       del = d*c;
+       h   *= del;
+
+       <span class="Statement">if</span>(fabs(del - <span class="Constant">1.0</span>) &lt;EPS)
+          <span class="Statement">break</span>;
+    }
+
+    <span class="Statement">if</span>(i &gt;= ITMAX)
+       pups_error(<span class="Constant">&quot;[gammcf] a too large or ITMAX too small&quot;</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Put factors in front </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+
+    *gammcf = EXP(-x + a*LOG(x) - (*gln))*h;
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Encrypt datastream using 8 rotor enigma machine (only secure enough to</span>
+<span class="Comment">    deter casual snooping) ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> enigma8write(<span class="Type">unsigned</span> <span class="Type">long</span> key, <span class="Type">int</span> fdes, _BYTE *buf, <span class="Type">unsigned</span> <span class="Type">long</span> size)
+
+{   _IMMORTAL _BOOLEAN entered = FALSE;
+    <span class="Type">unsigned</span> <span class="Type">long</span>      i;
+    <span class="Type">int</span>                ret;
+    _BYTE              rotor;
+
+    pups_set_errno(OK);
+    <span class="Statement">if</span>(fdes == (-<span class="Constant">1</span>) || key == <span class="Constant">0</span> || buf == (_BYTE *)<span class="Constant">NULL</span> || size == <span class="Constant">0</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Start random number generator at correct point </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> in its sequence                                </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(entered == FALSE)
+    {  entered = TRUE;
+       r_init = (<span class="Type">unsigned</span> <span class="Type">long</span>)getpid();
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Encrypt plaintext </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;size; ++i)
+    {  rotor  = (_BYTE)(ran1()*<span class="Constant">256.0</span>);
+       buf[i] = buf[i] % rotor;
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Write cipher </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+
+    ret = write(fdes,buf,size);
+    <span class="Statement">return</span>(ret);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Decrypt datastream using 8 rotor enigma machine (only secure enough to</span>
+<span class="Comment">    stop casual snooping) ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> enigma8read(<span class="Type">unsigned</span> <span class="Type">long</span> key, <span class="Type">int</span> fdes, _BYTE *buf, <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span> size)
+
+{   _IMMORTAL _BOOLEAN entered = FALSE;
+    <span class="Type">unsigned</span> <span class="Type">long</span>      i;
+    <span class="Type">int</span>                ret;
+    _BYTE              rotor;
+
+    pups_set_errno(OK);
+    <span class="Statement">if</span>(fdes == (-<span class="Constant">1</span>) || key == <span class="Constant">0</span> || buf == (_BYTE *)<span class="Constant">NULL</span> || size == <span class="Constant">0</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Start random number generator at correct point </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> in its sequence                                </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(entered == FALSE)
+    {  entered = TRUE;
+       r_init = (<span class="Type">unsigned</span> <span class="Type">long</span>)getpid();
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Read cipher </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+    ret = pups_pipe_read(fdes,buf,size);
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Decrypt cipher </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;size; ++i)
+    {  rotor  = (_BYTE)(ran1()*<span class="Constant">256.0</span>);
+       buf[i] = buf[i] % rotor;
+    }
+
+    <span class="Statement">return</span>(ret);
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

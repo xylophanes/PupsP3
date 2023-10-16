@@ -1,0 +1,1780 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/vec3lib.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Error { color: #ffffff; background-color: #ff6060; padding-bottom: 1px; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Purpose: Standard vector operations library. This version has been</span>
+<span class="Comment">             corrected to remove the bugs found by Mike Cook of Laserscan</span>
+<span class="Comment">             Laboratories [mikec@uk.co.lsl]</span>
+
+
+<span class="Comment">    Author:  M.A. O'Neill</span>
+<span class="Comment">             Tumbling Dice Ltd</span>
+<span class="Comment">             Gosforth</span>
+<span class="Comment">             Newcastle upon Tyne</span>
+<span class="Comment">             NE3 4RT</span>
+<span class="Comment">             United Kingdom</span>
+
+<span class="Comment">    Version: 2.11</span>
+<span class="Comment">    Dated:   4th January 2022</span>
+<span class="Comment">    E-mail:  mao@tumblingdice.co.uk </span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;me.h&gt;</span>
+
+<span class="PreProc">#undef   __NOT_LIB_SOURCE__</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;vector3.h&gt;</span>
+<span class="PreProc">#define  __NOT_LIB_SOURCE__</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;casino.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;utils.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Slot and usage functions - used by slot manager ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Slot usage function </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> veclib_slot(<span class="Type">int</span> level)
+{   (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;lib vec3lib </span><span class="Special">%s</span><span class="Constant">: [ANSI C]</span><span class="Special">\n</span><span class="Constant">&quot;</span>,VEC3_VERSION);
+
+    <span class="Statement">if</span>(level &gt; <span class="Constant">1</span>)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;(C) 1985-2022 Tumbling Dice</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Author: M.A. O'Neill</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;PUPS/P3 vector support library (built </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+    }
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Segment identification for 3-vector library </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef SLOT</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;slotman.h&gt;</span>
+_EXTERN <span class="Type">void</span> (* SLOT )() __attribute__ ((aligned(<span class="Constant">16</span>))) = veclib_slot;
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> SLOT </span><span class="Comment">*/</span>
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Constants exported by the vector3 modules </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define NOT_ASSIGNED (-</span><span class="Constant">999.0</span><span class="PreProc">)</span>
+
+_PUBLIC  _CONST <span class="Type">int</span>    ANNOT   = <span class="Constant">1</span>;
+_PUBLIC  _CONST <span class="Type">int</span>    N_ANNOT = <span class="Constant">0</span>;
+_PRIVATE _CONST FTYPE TINY    = <span class="Constant">1.0e-20</span>;
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Skewness threshold for vmlinesv function </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define NO_SKEW_THRESH -</span><span class="Constant">1</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Maximum number of vectors for vmlinesv function </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define MAX_VECS </span><span class="Constant">256</span><span class="PreProc"> </span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Functions which are private to this library </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Comment">// Eliminate routine for Gaussian elimination</span>
+_PROTOTYPE _PRIVATE _BOOLEAN eliminate(<span class="Type">int</span> *, matrix3 *, vector3 *);
+
+<span class="Comment">// Re-order routine for Gaussian elimination</span>
+_PROTOTYPE _PRIVATE _BOOLEAN reorder(<span class="Type">int</span>, matrix3 *, vector3 *);
+
+<span class="Comment">// Back substitution for Gaussian elimination </span>
+_PROTOTYPE _PRIVATE <span class="Type">void</span> backsub(matrix3 *, vector3*, vector3 *);
+
+<span class="Comment">// LU back substitution routine</span>
+_PROTOTYPE _PRIVATE <span class="Type">void</span> lubksb(<span class="Type">int</span> [], matrix3 *, vector3 *);
+
+<span class="Comment">// LU decomposisition routine</span>
+_PROTOTYPE _PRIVATE <span class="Type">void</span> ludcmp(<span class="Type">int</span> [], FTYPE *, matrix3 *);
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Constructor for the vector3 type (similar to C++ concept) ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> v3ass(vector3   *arg,
+                   FTYPE   comp_1,
+                   FTYPE   comp_2,
+                   FTYPE   comp_3)
+
+{   arg-&gt;comp[<span class="Constant">0</span>] = comp_1;
+    arg-&gt;comp[<span class="Constant">1</span>] = comp_2;
+    arg-&gt;comp[<span class="Constant">2</span>] = comp_3;
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Zero a vector3 ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> v3zero(vector3 *v)
+
+{   <span class="Type">int</span> i;
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">3</span>; ++i)
+       v-&gt;comp[i] = <span class="Constant">0.0</span>;
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to add two vector3s ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC vector3 v3add(vector3 *arg1, vector3 *arg2)
+
+{   <span class="Type">int</span>    i;
+    vector3 ret;
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">3</span>; ++i)
+          ret.comp[i] = arg1-&gt;comp[i] + arg2-&gt;comp[i];
+
+    <span class="Statement">return</span>(ret);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Procedure to calculate the angle between two vector3s ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC FTYPE v3ang(vector3 *arg1, vector3 *arg2)
+
+{   FTYPE arg;
+
+    arg = FABS(v3dot(arg1,arg2)/(v3mag(arg1)*v3mag(arg2)));
+
+    <span class="Statement">if</span>(arg &gt; <span class="Constant">1.0</span>)
+       arg = <span class="Constant">1.0</span>;
+
+    <span class="Statement">return</span>(ACOS(arg));
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">     Procedure to transform a vector3 expressed in terms of a given axis set</span>
+<span class="Comment">     in terms of another axis set. It is assumed that an axis set, which is</span>
+<span class="Comment">     set of vector3s giving the basis of the axis set to be transformed from,</span>
+<span class="Comment">     in terms of the axis set which is to be transformed to is known ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC vector3 v3axtran(vector3  *arg,
+                         vector3 *ax_x,
+                         vector3 *ax_y,
+                         vector3 *ax_z)
+
+{   vector3 ret;
+
+    ret.comp[<span class="Constant">0</span>] = arg-&gt;comp[<span class="Constant">0</span>]*ax_x-&gt;comp[<span class="Constant">0</span>] +
+                  arg-&gt;comp[<span class="Constant">1</span>]*ax_y-&gt;comp[<span class="Constant">0</span>] +
+                  arg-&gt;comp[<span class="Constant">2</span>]*ax_z-&gt;comp[<span class="Constant">0</span>];
+
+    ret.comp[<span class="Constant">1</span>] = arg-&gt;comp[<span class="Constant">0</span>]*ax_x-&gt;comp[<span class="Constant">1</span>] +
+                  arg-&gt;comp[<span class="Constant">1</span>]*ax_y-&gt;comp[<span class="Constant">1</span>] +
+                  arg-&gt;comp[<span class="Constant">2</span>]*ax_z-&gt;comp[<span class="Constant">1</span>];
+
+    ret.comp[<span class="Constant">2</span>] = arg-&gt;comp[<span class="Constant">0</span>]*ax_x-&gt;comp[<span class="Constant">2</span>] +
+                  arg-&gt;comp[<span class="Constant">1</span>]*ax_y-&gt;comp[<span class="Constant">2</span>] +
+                  arg-&gt;comp[<span class="Constant">2</span>]*ax_z-&gt;comp[<span class="Constant">2</span>];
+
+    <span class="Statement">return</span>(ret);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Procedure to take the vector3 product of two vector3 ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC vector3 v3cross(vector3 *arg1, vector3 *arg2)
+
+{   vector3 ret;
+
+    ret.comp[<span class="Constant">0</span>] = arg1-&gt;comp[<span class="Constant">1</span>]*arg2-&gt;comp[<span class="Constant">2</span>] -
+                   arg1-&gt;comp[<span class="Constant">2</span>]*arg2-&gt;comp[<span class="Constant">1</span>];
+
+    ret.comp[<span class="Constant">1</span>] = arg1-&gt;comp[<span class="Constant">2</span>]*arg2-&gt;comp[<span class="Constant">0</span>] -
+                   arg1-&gt;comp[<span class="Constant">0</span>]*arg2-&gt;comp[<span class="Constant">2</span>];
+
+    ret.comp[<span class="Constant">2</span>] = arg1-&gt;comp[<span class="Constant">0</span>]*arg2-&gt;comp[<span class="Constant">1</span>] -
+                   arg1-&gt;comp[<span class="Constant">1</span>]*arg2-&gt;comp[<span class="Constant">0</span>];
+    <span class="Statement">return</span>(ret);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Procedure to take the vector3 product of two vector3s ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC FTYPE v3dot(vector3 *arg1, vector3 *arg2)
+
+{   <span class="Type">int</span>    i;
+    FTYPE sum = <span class="Constant">0.0</span>;
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">3</span>; ++i)
+        sum += arg1-&gt;comp[i]*arg2-&gt;comp[i];
+
+    <span class="Statement">return</span>(sum);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Procedure to test whether two vector3s are equal ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC _BOOLEAN v3eq(vector3 *arg1, vector3 *arg2)
+
+{  <span class="Type">int</span> i,
+       cnt = <span class="Constant">0</span>;
+
+   <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">3</span>; ++i)
+       <span class="Statement">if</span>(arg1-&gt;comp[i] - arg2-&gt;comp[i] &lt; (FTYPE)ASSUMED_ZERO)
+          ++cnt;
+
+       <span class="Statement">if</span>(cnt == <span class="Constant">3</span>)
+          <span class="Statement">return</span>(TRUE);
+       <span class="Statement">else</span>
+          <span class="Statement">return</span>(FALSE);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Invert the argument vector3 ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC vector3 v3inv(vector3 *arg)
+
+{   <span class="Type">int</span>    i;
+    vector3 ret;
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">3</span>; ++i)
+        ret.comp[i] = -arg-&gt;comp[i];
+
+    <span class="Statement">return</span>(ret);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Procedure to find the magnitude of a vector ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC FTYPE v3mag(vector3 *arg)
+
+{   <span class="Type">int</span>   i;
+    FTYPE sum;
+
+    sum = <span class="Constant">0.0</span>;
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">3</span>; ++i)
+       sum += sqr(arg-&gt;comp[i]);
+
+    <span class="Statement">return</span>(SQRT(sum));
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Procedure to see whether a pair of vector3s are parallel ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC _BOOLEAN v3par(vector3 *arg1, vector3 *arg2)
+
+{   FTYPE angle;
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> See if two vectors are parallel by taking the cross product, and then </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> seeing whether all the terms are zero                                 </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    angle = v3ang(arg1,arg2);
+    <span class="Statement">if</span>(angle &lt; (FTYPE)ASSUMED_ZERO)
+       <span class="Statement">return</span>(TRUE);
+    <span class="Statement">else</span>
+       <span class="Statement">return</span>(FALSE);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Procedure to calculate a unit vector3 perpendicular to arg1 and in the</span>
+<span class="Comment">    plane defined by arg_1 and arg_2 ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC vector3 v3planp(vector3 *arg1, vector3 *arg2)
+
+{   vector3 ret;
+
+    FTYPE dp_1,
+          dp_2,
+          ratio;
+
+    dp_1 = v3dot(arg1,arg1);
+    dp_2 = v3dot(arg1,arg2);
+
+    ratio = -dp_2/dp_1;
+    ret = v3scalm(ratio,arg1);
+    ret = v3add(&amp;ret,arg2);
+    ret = v3unit(&amp;ret);
+
+    <span class="Statement">return</span>(ret);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Procedure to input a vector3 from standard input ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> v3read(<span class="Type">char</span>    *vname,
+                   vector3 *arg,
+                   <span class="Type">FILE</span>    *file)
+
+{   <span class="Type">int</span> i;
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">3</span>; ++i)
+    {   <span class="Statement">if</span>(isatty(<span class="Constant">0</span>) == <span class="Constant">1</span>)
+           (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Enter </span><span class="Special">%s</span><span class="Constant">[</span><span class="Special">%d</span><span class="Constant">] &gt; &quot;</span>,vname,i);
+
+        <span class="Statement">if</span>(fscanf(file,<span class="Constant">&quot;</span><span class="Special">%F</span><span class="Constant">&quot;</span>,&amp;arg-&gt;comp[i]) == <span class="Constant">EOF</span>)
+           <span class="Statement">return</span>(<span class="Constant">EOF</span>);
+    }
+
+    <span class="Statement">if</span>(isatty(<span class="Constant">0</span>) == <span class="Constant">1</span>)
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+
+    <span class="Statement">return</span>(<span class="Constant">1</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Procedure to multiply a vector by a scalar ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC vector3 v3scald(FTYPE scalar, vector3 *arg)
+
+{   <span class="Type">int</span>     i;
+    vector3 ret;
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">3</span>; ++i)
+        ret.comp[i] = arg-&gt;comp[i] / scalar;
+
+    <span class="Statement">return</span>(ret);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Procedure to multiply a vector by a scalar ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC vector3 v3scalm(FTYPE scalar, vector3 *arg)
+
+{   <span class="Type">int</span>     i;
+    vector3 ret;
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">3</span>; ++i)
+       ret.comp[i] = arg-&gt;comp[i] * scalar;
+
+    <span class="Statement">return</span>(ret);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Shift origin by the vector (a,b,c) ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC vector3 v3shift(vector3 *arg1, vector3 *arg2)
+
+{   <span class="Type">int</span>     i;
+    vector3 ret;
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">3</span>; ++i)
+        ret.comp[i] = arg1-&gt;comp[i] - arg2-&gt;comp[i];
+
+    <span class="Statement">return</span>(ret);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Procedure to take the sign vector of a vector ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC vector3 v3sign(vector3 *arg)
+
+{  <span class="Type">int</span>     i;
+   vector3 ret;
+
+   <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">3</span>; ++i)
+      ret.comp[i] = (FTYPE)isign(arg-&gt;comp[i]);
+
+   <span class="Statement">return</span>(ret);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to subtract two vectors ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC vector3 v3sub(vector3 *arg1, vector3 *arg2)
+
+{   <span class="Type">int</span>     i;
+    vector3 ret;
+
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">3</span>; ++i)
+       ret.comp[i] = arg1-&gt;comp[i] - arg2-&gt;comp[i];
+
+    <span class="Statement">return</span>(ret);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to find the unit vector in the direction of a given vector ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC vector3 v3unit(vector3 *arg)
+
+{   <span class="Type">int</span>   i;
+    FTYPE magnitude = <span class="Constant">0.0</span>;
+
+    vector3 ret;
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Calculate the magnitude of the vector </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+    magnitude = <span class="Constant">0.0</span>;
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">3</span>; ++i)
+        magnitude += sqr(arg-&gt;comp[i]);
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Now find the three components of the unit vector </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">3</span>; ++i)
+        <span class="Statement">if</span>(magnitude == <span class="Constant">0.0</span>)
+           ret.comp[i] = <span class="Constant">0.0</span>;
+        <span class="Statement">else</span>
+           ret.comp[i] = arg-&gt;comp[i]/SQRT(magnitude);
+
+    <span class="Statement">return</span>(ret);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Procedure to write a vector to stream ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> v3write(<span class="Type">char</span>    *vname,
+                     vector3 *arg,
+                     <span class="Type">FILE</span>    *f_ptr)
+
+{   <span class="Type">int</span> i;
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">3</span>; ++i)
+    {
+
+        <span class="Statement">if</span>(isatty(<span class="Constant">1</span>) == <span class="Constant">1</span>)
+           (<span class="Type">void</span>)fprintf(f_ptr,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">[</span><span class="Special">%d</span><span class="Constant">]:</span><span class="Special">%E</span><span class="Constant">  &quot;</span>,vname,i,arg-&gt;comp[i]);
+        <span class="Statement">else</span>
+           (<span class="Type">void</span>)fprintf(f_ptr,<span class="Constant">&quot;</span><span class="Special">%E</span><span class="Constant">    &quot;</span>,arg-&gt;comp[i]);
+
+    }
+
+    (<span class="Type">void</span>)fprintf(f_ptr,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Rotate a vector by theta degrees about the X axis ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC vector3 v3rotx(vector3 *arg, FTYPE theta)
+
+{   vector3 ret;
+
+    _IMMORTAL FTYPE last_theta = (-<span class="Constant">999.0</span>);
+
+    _IMMORTAL FTYPE cos_theta,
+                    sin_theta;
+
+    <span class="Statement">if</span>(last_theta != theta)
+    {  sin_theta  = SIN(theta);
+       cos_theta  = COS(theta);
+       last_theta = theta;
+    }
+
+    ret.comp[<span class="Constant">0</span>] = arg-&gt;comp[<span class="Constant">0</span>];
+    ret.comp[<span class="Constant">1</span>] = arg-&gt;comp[<span class="Constant">1</span>]*cos_theta - arg-&gt;comp[<span class="Constant">2</span>]*sin_theta;
+    ret.comp[<span class="Constant">2</span>] = arg-&gt;comp[<span class="Constant">1</span>]*sin_theta + arg-&gt;comp[<span class="Constant">2</span>]*cos_theta;
+
+    <span class="Statement">return</span>(ret);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Rotate a vector by theta degrees  about the Y axis ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC vector3 v3roty(vector3 *arg, FTYPE theta)
+
+{   vector3 ret;
+
+    _IMMORTAL FTYPE last_theta = NOT_ASSIGNED;
+
+    _IMMORTAL FTYPE cos_theta,
+                    sin_theta;
+
+    <span class="Statement">if</span>(last_theta != theta)
+    {  sin_theta  = SIN(theta);
+       cos_theta  = COS(theta);
+       last_theta = theta;
+    }
+
+    ret.comp[<span class="Constant">0</span>] = arg-&gt;comp[<span class="Constant">0</span>]*cos_theta  + arg-&gt;comp[<span class="Constant">2</span>]*sin_theta;
+    ret.comp[<span class="Constant">1</span>] = arg-&gt;comp[<span class="Constant">1</span>];
+    ret.comp[<span class="Constant">2</span>] = -arg-&gt;comp[<span class="Constant">0</span>]*sin_theta + arg-&gt;comp[<span class="Constant">2</span>]*cos_theta;
+
+    <span class="Statement">return</span>(ret);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Rotate a vector by theta degrees  about the Z axis ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC vector3 v3rotz(vector3 *arg, FTYPE theta)
+
+{   vector3 ret;
+
+    _IMMORTAL FTYPE last_theta = NOT_ASSIGNED;
+
+    _IMMORTAL FTYPE cos_theta,
+                    sin_theta;
+
+    <span class="Statement">if</span>(last_theta != theta)
+    {  sin_theta  = SIN(theta);
+       cos_theta  = COS(theta);
+       last_theta = theta;
+    }
+
+    ret.comp[<span class="Constant">0</span>] = arg-&gt;comp[<span class="Constant">0</span>]*cos_theta - arg-&gt;comp[<span class="Constant">1</span>]*sin_theta;
+    ret.comp[<span class="Constant">1</span>] = arg-&gt;comp[<span class="Constant">0</span>]*sin_theta + arg-&gt;comp[<span class="Constant">1</span>]*cos_theta;
+    ret.comp[<span class="Constant">2</span>] = arg-&gt;comp[<span class="Constant">2</span>];
+
+    <span class="Statement">return</span>(ret);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to rotate about arbitary axis by angle theta ...</span>
+
+<span class="Comment">    Based on the Euler Matrix derivation given in</span>
+
+<span class="Comment">    &quot;The Algebra of Matrices&quot; by E.H. Thompson,</span>
+<span class="Comment">    Edn. 1, 1969, pp.150-151,</span>
+<span class="Comment">    Published by Hilger.</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC matrix3 m3euler(FTYPE  theta,    <span class="Comment">// Angle of rotation </span>
+                        vector3 *r_axis) <span class="Comment">// Rotation axis </span>
+
+{   _IMMORTAL FTYPE last_theta;
+
+    FTYPE sin_theta,
+          cos_theta;
+
+    matrix3 Euler_mat;
+
+    <span class="Statement">if</span>(last_theta != theta)
+    {  sin_theta  = SIN(theta);
+       cos_theta  = COS(theta);
+       last_theta = theta;
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check that r_axis is in fact a unit vector3 </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(v3mag(r_axis) - ASSUMED_ZERO &gt; <span class="Constant">1.0</span>)
+       pups_error(<span class="Constant">&quot;[m3euler] rotation axis is not a unit vector3&quot;</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> X elements of Euler matrix3 </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+
+    Euler_mat.comp[<span class="Constant">0</span>][<span class="Constant">0</span>] = sqr(r_axis-&gt;comp[<span class="Constant">0</span>]) +
+                              (<span class="Constant">1</span> - sqr(r_axis-&gt;comp[<span class="Constant">0</span>]))*cos_theta;
+
+    Euler_mat.comp[<span class="Constant">0</span>][<span class="Constant">1</span>] = r_axis-&gt;comp[<span class="Constant">0</span>]*r_axis-&gt;comp[<span class="Constant">1</span>]*(<span class="Constant">1</span> - cos_theta) -
+                                                 r_axis-&gt;comp[<span class="Constant">2</span>]*sin_theta;
+
+    Euler_mat.comp[<span class="Constant">0</span>][<span class="Constant">2</span>] = r_axis-&gt;comp[<span class="Constant">0</span>]*r_axis-&gt;comp[<span class="Constant">2</span>]*(<span class="Constant">1</span> - cos_theta) +
+                                                 r_axis-&gt;comp[<span class="Constant">1</span>]*sin_theta;
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Y elements of Euler Matrix </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+    Euler_mat.comp[<span class="Constant">1</span>][<span class="Constant">0</span>] = r_axis-&gt;comp[<span class="Constant">1</span>]*r_axis-&gt;comp[<span class="Constant">0</span>]*(<span class="Constant">1</span> - cos_theta) +
+                                                 r_axis-&gt;comp[<span class="Constant">2</span>]*sin_theta;
+
+    Euler_mat.comp[<span class="Constant">1</span>][<span class="Constant">1</span>] = sqr(r_axis-&gt;comp[<span class="Constant">1</span>]) +
+                              (<span class="Constant">1</span> - sqr(r_axis-&gt;comp[<span class="Constant">1</span>]))*cos_theta;
+
+    Euler_mat.comp[<span class="Constant">1</span>][<span class="Constant">2</span>] = r_axis-&gt;comp[<span class="Constant">1</span>]*r_axis-&gt;comp[<span class="Constant">2</span>]*(<span class="Constant">1</span> - cos_theta) -
+                                                 r_axis-&gt;comp[<span class="Constant">0</span>]*sin_theta;
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Z elements of Euler Matrix </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+    Euler_mat.comp[<span class="Constant">2</span>][<span class="Constant">0</span>] = r_axis-&gt;comp[<span class="Constant">2</span>]*r_axis-&gt;comp[<span class="Constant">0</span>]*(<span class="Constant">1</span> - cos_theta) -
+                                                 r_axis-&gt;comp[<span class="Constant">1</span>]*sin_theta;
+
+    Euler_mat.comp[<span class="Constant">2</span>][<span class="Constant">1</span>] = r_axis-&gt;comp[<span class="Constant">2</span>]*r_axis-&gt;comp[<span class="Constant">1</span>]*(<span class="Constant">1</span> - cos_theta) +
+                                                 r_axis-&gt;comp[<span class="Constant">0</span>]*sin_theta;
+
+    Euler_mat.comp[<span class="Constant">2</span>][<span class="Constant">2</span>] = sqr(r_axis-&gt;comp[<span class="Constant">2</span>]) +
+                             (<span class="Constant">1</span> - sqr(r_axis-&gt;comp[<span class="Constant">2</span>]))*cos_theta;
+
+    <span class="Statement">return</span>(Euler_mat);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Euler matrix3 for small angle rotations [See E.H Thompson, &quot;An</span>
+<span class="Comment">    introduction to the algebra of matrices&quot;] ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC matrix3 m3seuler(FTYPE r_theta, vector3 *r_axis)
+
+{   matrix3 s_Euler_mat;
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check that r_axis is in fact a unit vector3 </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(v3mag(r_axis) - ASSUMED_ZERO &gt; <span class="Constant">1.0</span>)
+       pups_error(<span class="Constant">&quot;[m3seuler] rotation axis is not a unit vector3&quot;</span>);
+
+    s_Euler_mat.comp[<span class="Constant">0</span>][<span class="Constant">0</span>] =  <span class="Constant">1.0</span>;
+    s_Euler_mat.comp[<span class="Constant">0</span>][<span class="Constant">1</span>] = -r_axis-&gt;comp[<span class="Constant">2</span>]*r_theta;
+    s_Euler_mat.comp[<span class="Constant">0</span>][<span class="Constant">2</span>] =  r_axis-&gt;comp[<span class="Constant">1</span>]*r_theta;
+
+    s_Euler_mat.comp[<span class="Constant">0</span>][<span class="Constant">0</span>] =  r_axis-&gt;comp[<span class="Constant">2</span>]*r_theta;
+    s_Euler_mat.comp[<span class="Constant">0</span>][<span class="Constant">1</span>] =  <span class="Constant">1.0</span>;
+    s_Euler_mat.comp[<span class="Constant">0</span>][<span class="Constant">2</span>] = -r_axis-&gt;comp[<span class="Constant">0</span>]*r_theta;
+
+    s_Euler_mat.comp[<span class="Constant">0</span>][<span class="Constant">0</span>] = -r_axis-&gt;comp[<span class="Constant">1</span>]*r_theta;
+    s_Euler_mat.comp[<span class="Constant">0</span>][<span class="Constant">1</span>] =  r_axis-&gt;comp[<span class="Constant">0</span>]*r_theta;
+    s_Euler_mat.comp[<span class="Constant">0</span>][<span class="Constant">2</span>] =  <span class="Constant">1.0</span>;
+
+    <span class="Statement">return</span>(s_Euler_mat);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to print a vector to stream ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> v3print(<span class="Type">FILE</span> *stream, <span class="Type">char</span> *v_annot, vector3 *arg)
+
+{   <span class="Type">int</span> i;
+
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    vprint: </span><span class="Special">%s</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,v_annot);
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">3</span>; ++i)
+    {  (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    component [</span><span class="Special">%d</span><span class="Constant">]: </span><span class="Special">%E</span><span class="Special">\n</span><span class="Constant">&quot;</span>,i,arg-&gt;comp[i]);
+       (<span class="Type">void</span>)fflush(stream);
+    }
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(stream);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to set up a random unit vector3 ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC vector3 v3urnd(<span class="Type">void</span>)
+
+{   <span class="Type">int</span>    i;
+    vector3 ret;
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">3</span>; ++i)
+        ret.comp[i] = ran1();
+
+    ret = v3unit(&amp;ret);
+    <span class="Statement">return</span>(ret);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to set up a randomly pointing vector3 of random size</span>
+<span class="Comment">    max_cs controls the maximum size of any one component ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC vector3 v3rnd(FTYPE max_cs)
+
+{   <span class="Type">int</span>    i;
+    vector3 ret;
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">3</span>; ++i)
+        ret.comp[i] = (ran1() - <span class="Constant">0.5</span>)*max_cs;
+
+    <span class="Statement">return</span>(ret);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to test the component sign hetrogeneity of a vector3 ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC _BOOLEAN v3hecs(vector3 *arg)
+
+{   <span class="Type">int</span> i,
+        sign_sum = <span class="Constant">0</span>;
+
+   <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">3</span>; ++i)
+       sign_sum += fsign(arg-&gt;comp[i]);
+
+   <span class="Statement">if</span>(fabs((FTYPE)sign_sum) &lt; <span class="Constant">3</span>)
+      <span class="Statement">return</span>(TRUE);
+   <span class="Statement">else</span>
+      <span class="Statement">return</span>(FALSE);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to print a matrix3 to stderr ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> m3print(<span class="Type">FILE</span> *stream, <span class="Type">char</span> *m_annot, matrix3 *arg)
+
+{   <span class="Type">int</span> i,
+        j;
+
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    mprint: </span><span class="Special">%s</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,m_annot);
+    (<span class="Type">void</span>)fflush(stream);
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">3</span>; ++i)
+    {  (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    Row:</span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,i);
+       <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;<span class="Constant">3</span>; ++j)
+       {  (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;     Component [</span><span class="Special">%d</span><span class="Constant">,</span><span class="Special">%d</span><span class="Constant">]: </span><span class="Special">%E</span><span class="Special">\n</span><span class="Constant">&quot;</span>,i,j,
+                                                  arg-&gt;comp[i][j]);
+          (<span class="Type">void</span>)fflush(stream);
+       }
+    }
+
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(stream);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Find the solution of a set of linear equations using Gaussian</span>
+<span class="Comment">    elimination. These routines are based on those gib`ven in Pascal in:</span>
+
+<span class="Comment">    &quot;Pascal for Science and Engineering&quot; by McGregor and Watt ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _BOOLEAN eliminate(<span class="Type">int</span> *singular, matrix3 *a, vector3 *b)
+
+{   <span class="Type">int</span> i,
+        j,
+        k;
+
+    FTYPE multiplier;
+
+    i = <span class="Constant">0</span>;
+    <span class="Statement">do</span> {   <span class="Statement">if</span>(reorder(i,a,b) == TRUE)
+           {  <span class="Statement">if</span>(*singular == EXIT_IF_SINGULAR)
+                 pups_error(<span class="Constant">&quot;[eliminate] equations singular&quot;</span>);
+              <span class="Statement">else</span>
+              {  *singular = IS_SINGULAR;
+                 <span class="Statement">return</span>(TRUE);
+              }
+           }
+           <span class="Statement">else</span>
+           {  <span class="Statement">for</span>(k=i+<span class="Constant">1</span>; k&lt;<span class="Constant">3</span>; ++k)
+              {   multiplier = a-&gt;comp[k][i] / a-&gt;comp[i][i];
+                  <span class="Statement">for</span>(j=i+<span class="Constant">1</span>; j&lt;<span class="Constant">3</span>; ++j)
+                     a-&gt;comp[k][j] -= multiplier*a-&gt;comp[i][j];
+                  b-&gt;comp[k] -= multiplier*b-&gt;comp[i];
+                  a-&gt;comp[k][i] = <span class="Constant">0.0</span>;
+              }
+           }
+
+           ++i;
+        } <span class="Statement">while</span>(i != <span class="Constant">3</span>);
+
+     <span class="Statement">if</span>((fabs(a-&gt;comp[<span class="Constant">2</span>][<span class="Constant">2</span>]) &lt;= ASSUMED_ZERO) == TRUE)
+     {   <span class="Statement">if</span>(*singular == EXIT_IF_SINGULAR)
+            pups_error(<span class="Constant">&quot;[eliminate] equations singular&quot;</span>);
+        <span class="Statement">else</span>
+        {   *singular = IS_SINGULAR;
+            <span class="Statement">return</span>(TRUE);
+        }
+     }
+
+     *singular = NOT_SINGULAR;
+     <span class="Statement">return</span>(FALSE);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Reorder routine for Gaussian Elimination ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _BOOLEAN reorder(<span class="Type">int</span> i, matrix3 *a, vector3 *b)
+
+{   <span class="Type">int</span> k,
+        l,
+        j;
+
+    FTYPE temp;
+
+    l = i;
+    <span class="Statement">for</span>(k=i+<span class="Constant">1</span>; k&lt;<span class="Constant">3</span>; ++k)
+       <span class="Statement">if</span>(fabs(a-&gt;comp[k][i]) &gt; fabs(a-&gt;comp[l][i])) l = k;
+
+    <span class="Statement">if</span>((temp = fabs(a-&gt;comp[l][i])) &lt; ASSUMED_ZERO)
+       <span class="Statement">return</span>(TRUE);
+    <span class="Statement">else</span>
+       <span class="Statement">if</span>(i != l)
+       {  <span class="Statement">for</span>(j=i; j&lt;<span class="Constant">3</span>; ++j)
+             fswap(&amp;a-&gt;comp[i][j],&amp;a-&gt;comp[l][j]);
+          fswap(&amp;b-&gt;comp[i],&amp;b-&gt;comp[l]);
+       }
+    <span class="Statement">return</span>(FALSE);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Backsubstitution for Gaussian Elimination ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> backsub(matrix3 *a, vector3 *b, vector3 *x)
+
+{   <span class="Type">int</span> i,
+        j;
+
+     FTYPE s;
+
+     <span class="Statement">for</span>(i=<span class="Constant">2</span>; i&gt;-<span class="Constant">1</span>; --i)
+     {  s = b-&gt;comp[i];
+        <span class="Statement">for</span>(j=i+<span class="Constant">1</span>; j&lt;<span class="Constant">3</span>; ++j)
+           s -= a-&gt;comp[i][j]*x-&gt;comp[j];
+        x-&gt;comp[i] =  s / a-&gt;comp[i][i];
+     }
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Gaussian Elimination solution routine ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC _BOOLEAN m3GE_solve(<span class="Type">int</span> *singular, matrix3 *a, vector3 *b, vector3 *x)
+
+{    <span class="Statement">if</span>(eliminate(singular,a,b) == TRUE)
+        <span class="Statement">return</span>(TRUE);
+
+     backsub(a,b,x);
+     <span class="Statement">return</span>(FALSE);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Return the scalar distance between a line and point at closest</span>
+<span class="Comment">    approach ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC FTYPE v3dpoints(vector3 *pt, vector3 *to_line, vector3 *along_line)
+
+{   vector3 ret_v;
+
+    ret_v = v3dpointv(pt,to_line,along_line);
+    <span class="Statement">return</span>(v3mag(&amp;ret_v));
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Generalised line-point intercept routine ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC vector3 v3dpointv(vector3 *pt, vector3 *to_line, vector3 *along_line)
+
+{   FTYPE theta,
+           thi,
+           to_pt_mag;
+
+    vector3 p_vec,
+           p_u_vec,
+           z_vec,
+           to_pt_u_vec;
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check that the vector3 long_line is a unit vector3 </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(v3mag(along_line) - <span class="Constant">1.0</span> &gt; <span class="Constant">0.001</span>)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;   magnitude is:</span><span class="Special">%E</span><span class="Special">\n</span><span class="Constant">&quot;</span>,v3mag(along_line));
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       pups_error(<span class="Constant">&quot;[vdpointv] vector3 along_line must be a unit vector3&quot;</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set up point plane vector3s </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+
+    p_vec       = v3sub(pt,to_line);
+    p_u_vec     = v3unit(&amp;p_vec);
+    z_vec       = v3cross(&amp;p_u_vec,along_line);
+    z_vec       = v3unit(&amp;z_vec);
+    to_pt_u_vec = v3cross(&amp;z_vec,along_line);
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Calculate principle angle </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+    thi       = v3ang(&amp;p_u_vec,along_line);
+    theta     = FABS(PI / <span class="Constant">2.0</span> - thi);
+    to_pt_mag = v3mag(&amp;p_vec)*cos(theta);
+
+    <span class="Statement">return</span>(v3scalm(to_pt_mag,&amp;to_pt_u_vec));
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Generalised skew intercept routine ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC vector3 v3dlinesv(<span class="Type">int</span>      *singular,  <span class="Comment">// Action if singular</span>
+                         vector3 *divergence,  <span class="Comment">// Ray-ray divergence vector3</span>
+                         vector3       *to_1,  <span class="Comment">// Vector to line 1</span>
+                         vector3    *along_1,  <span class="Comment">// Vector along line 1</span>
+                         vector3       *to_2,  <span class="Comment">// Vector to line 2</span>
+                         vector3    *along_2,  <span class="Comment">// Vector along line 2</span>
+                         vector3     *intw_1,  <span class="Comment">// Skew vector3 for line 1</span>
+                         vector3     *intw_2)  <span class="Comment">// Skew vector3 for line 2</span>
+
+{   matrix3 a;
+
+    vector3 r,
+            b,
+            x,
+            vtemp_1,
+            vtemp_2,
+            ret;
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> First find the tie vector </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+    r = v3cross(along_1,along_2);
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Build the b vector3 for Gaussian elimination </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+
+    b = v3sub(to_1,to_2);
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Build matrix3 </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------</span><span class="Comment">*/</span>
+
+    vtemp_1 = v3inv(along_1);
+    vtemp_2 = v3inv(&amp;r);
+
+    v3tomatc(<span class="Constant">0</span>,&amp;a,along_2);
+    v3tomatc(<span class="Constant">1</span>,&amp;a,&amp;vtemp_1);
+    v3tomatc(<span class="Constant">2</span>,&amp;a,&amp;vtemp_2);
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Solve for lambda, and nu. The space intersect point is then given by: </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> s_int = to_1 + lambda*along_1 + (nu / 2.0)*r                          </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(m3GE_solve(singular,&amp;a,&amp;b,&amp;x) == TRUE)
+    {  *singular = IS_SINGULAR;
+       ret.comp[<span class="Constant">0</span>] = ret.comp[<span class="Constant">1</span>] = ret.comp[<span class="Constant">2</span>] = <span class="Constant">0.0</span>;
+
+       <span class="Statement">return</span>(ret);
+    }
+
+    vtemp_1 = v3scalm(x.comp[<span class="Constant">1</span>],along_1);
+    vtemp_2 = v3scalm(x.comp[<span class="Constant">2</span>]/<span class="Constant">2.0</span>,&amp;r);
+    ret     = v3add(&amp;vtemp_1,&amp;vtemp_2);
+    ret     = v3add(to_1,&amp;ret);
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Find the vector3 divergence </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+
+    vtemp_1 = v3scalm(x.comp[<span class="Constant">1</span>],along_1);
+    *intw_1 = v3add(to_1,&amp;vtemp_1);
+
+    vtemp_2 = v3scalm(x.comp[<span class="Constant">0</span>],along_2);
+    *intw_2 = v3add(to_2,&amp;vtemp_2);
+
+    vtemp_1 = v3sub(intw_1,intw_2);
+    *divergence = vtemp_1;
+
+    <span class="Statement">return</span>(ret);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to find the optimum intesect for multiple ray vectors ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC vector3 v3mlinesv(<span class="Type">int</span>       *singular, <span class="Comment">// Action if singular</span>
+                         <span class="Type">int</span>          n_rays,  <span class="Comment">// Number of rays to consider</span>
+                         vector3          *pc, <span class="Comment">// Array of to_line vector3s</span>
+                         vector3         *ray, <span class="Comment">// Array of along_line vector</span>
+                         FTYPE   *divergence)  <span class="Comment">// RMS divergence </span>
+{   <span class="Type">int</span> i,
+        j,
+        n_vecs = <span class="Constant">0</span>;
+
+    vector3 intw_1,
+            intw_2,
+            skew_v,
+            int_v,
+            mean_int_v,
+            mean_skew_v;
+
+    <span class="Statement">if</span>(n_rays == <span class="Constant">1</span>)
+       pups_error(<span class="Constant">&quot;[vmlinesv] need at least two rays to compute intersect&quot;</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Consider all possible intersects </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+    v3ass(&amp;mean_int_v, <span class="Constant">0.0</span>,<span class="Constant">0.0</span>,<span class="Constant">0.0</span>);
+    v3ass(&amp;mean_skew_v,<span class="Constant">0.0</span>,<span class="Constant">0.0</span>,<span class="Constant">0.0</span>);
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;n_rays; ++i)
+    {   <span class="Statement">for</span>(j=i;  j&lt;n_rays; ++j)
+        {   <span class="Statement">if</span>(i != j)
+            {  int_v = v3dlinesv(singular,
+                                 &amp;skew_v,
+                                 &amp;pc[i],
+                                 &amp;ray[i],
+                                 &amp;pc[j],
+                                 &amp;ray[j],
+                                 &amp;intw_1,
+                                 &amp;intw_2);
+
+               <span class="Statement">if</span>(*singular == IS_SINGULAR)
+               {  mean_int_v.comp[<span class="Constant">0</span>] = mean_int_v.comp[<span class="Constant">1</span>] = mean_int_v.comp[<span class="Constant">2</span>] = <span class="Constant">0.0</span>;
+                  <span class="Statement">return</span>(mean_int_v);
+               }
+
+               mean_int_v  = v3add(&amp;mean_int_v,&amp;int_v);
+               mean_skew_v = v3add(&amp;mean_skew_v,&amp;skew_v);
+               ++n_vecs;
+            }
+        }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Mean scalar distance between rays involved in intersection </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> and the intersection point (note this is an RMS measure)   </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    mean_int_v = v3scald((FTYPE)n_vecs,&amp;mean_int_v);
+
+    *divergence = <span class="Constant">0.0</span>;
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;n_rays; ++i)
+       *divergence += FABS(v3dpoints(&amp;mean_int_v,&amp;pc[i],&amp;ray[i]));
+
+    *divergence = *divergence / (FTYPE)n_rays;
+    <span class="Statement">return</span>(mean_int_v);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    copy a vector to a matrix column ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> v3tomatc(<span class="Type">int</span> row, matrix3 *arg_m, vector3 *arg_v)
+
+{   <span class="Type">int</span> i;
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------</span>
+<span class="Comment">    </span><span class="Error">/</span><span class="Comment">* If the vector3 is not of the same dimensionality as the matrix3 column, </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> print a suitable error message and exit                                 </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">3</span>; ++i)
+       arg_m-&gt;comp[i][row] = arg_v-&gt;comp[i];
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to distort a vector3 in about its X and Y axes ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC vector3 v3distort(vector3 *arg, FTYPE theta, FTYPE thi)
+
+{    vector3 ret;
+
+
+     <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> Apply distortion to X component caused by rotation theta </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+
+     ret.comp[<span class="Constant">0</span>] = arg-&gt;comp[<span class="Constant">0</span>] / cos(theta * DEGRAD);
+
+
+     <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> Apply distortion to Y component caused by rotation thi   </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+
+     ret.comp[<span class="Constant">1</span>] = arg-&gt;comp[<span class="Constant">1</span>] / cos(thi * DEGRAD);
+
+
+     <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> Copy undistorted component of vector3                     </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+
+     ret.comp[<span class="Constant">2</span>] = arg-&gt;comp[<span class="Constant">2</span>];
+
+     <span class="Statement">return</span>(ret);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Zeroise matrix ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> m3zero(matrix3 *arg)
+
+{   <span class="Type">int</span> i,
+        j;
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">3</span>; ++i)
+       <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;<span class="Constant">3</span>; ++j)
+          arg-&gt;comp[i][j] = <span class="Constant">0.0</span>;
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Create identity matrix ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> m3ident(matrix3 *arg)
+
+{   <span class="Type">int</span> i;
+
+    m3zero(arg);
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">3</span>; ++i)
+       arg-&gt;comp[i][i] = <span class="Constant">1.0</span>;
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Assign a matrix - dimentionality fixed at 3 ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> m3ass(matrix3 *arg,
+                   FTYPE  c11,
+                   FTYPE  c12,
+                   FTYPE  c13,
+                   FTYPE  c21,
+                   FTYPE  c22,
+                   FTYPE  c23,
+                   FTYPE  c31,
+                   FTYPE  c32,
+                   FTYPE  c33)
+
+{   arg-&gt;comp[<span class="Constant">0</span>][<span class="Constant">0</span>] = c11;
+    arg-&gt;comp[<span class="Constant">1</span>][<span class="Constant">0</span>] = c12;
+    arg-&gt;comp[<span class="Constant">2</span>][<span class="Constant">0</span>] = c13;
+    arg-&gt;comp[<span class="Constant">0</span>][<span class="Constant">1</span>] = c21;
+    arg-&gt;comp[<span class="Constant">1</span>][<span class="Constant">1</span>] = c22;
+    arg-&gt;comp[<span class="Constant">2</span>][<span class="Constant">1</span>] = c23;
+    arg-&gt;comp[<span class="Constant">0</span>][<span class="Constant">2</span>] = c31;
+    arg-&gt;comp[<span class="Constant">1</span>][<span class="Constant">2</span>] = c32;
+    arg-&gt;comp[<span class="Constant">2</span>][<span class="Constant">2</span>] = c33;
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Multiply a pair of matrices ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC matrix3 m3mmult(matrix3 *arg_1, matrix3 *arg_2)
+
+{   <span class="Type">int</span> i,
+        j,
+        k;
+
+    matrix3 ret;
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">3</span>; ++i)
+    {  <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;<span class="Constant">3</span>; ++j)
+       {   ret.comp[i][j] = <span class="Constant">0.0</span>;
+           <span class="Statement">for</span>(k=<span class="Constant">0</span>; k&lt;<span class="Constant">3</span>; ++k)
+              ret.comp[i][j] += (arg_1-&gt;comp[i][k] * arg_2-&gt;comp[k][j]);
+       }
+    }
+
+    <span class="Statement">return</span>(ret);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Multiply a vector by a matrix ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC vector3 v3mmult(matrix3 *arg_1, vector3 *arg_2)
+
+{   <span class="Type">int</span> i,
+        j;
+
+    vector3 ret;
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">3</span>; ++i)
+    {  ret.comp[i] = <span class="Constant">0.0</span>;
+       <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;<span class="Constant">3</span>; ++j)
+          ret.comp[i] += (arg_1-&gt;comp[i][j] * arg_2-&gt;comp[j]);
+    }
+
+    <span class="Statement">return</span>(ret);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Find the linear inconsistency of a set of vectors ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC FTYPE v3lvsi(<span class="Type">int</span> n_vecs, vector3 vec_arr[])
+
+{   <span class="Type">int</span> i,
+        j;
+
+    FTYPE ret    = <span class="Constant">0.0</span>,
+          mean[] = {<span class="Constant">0.0</span>, <span class="Constant">0.0</span>, <span class="Constant">0.0</span>},
+          adev[] = {<span class="Constant">0.0</span>, <span class="Constant">0.0</span>, <span class="Constant">0.0</span>};
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Form up the means for each component of the set of vector3s in turn </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">3</span>; ++i)
+       <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;n_vecs; ++j)
+          mean[i] += vec_arr[j].comp[i];
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">3</span>; ++i)
+        mean[i] /= n_vecs;
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Now find the average deviation for each component </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">3</span>; ++i)
+       <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;n_vecs; ++j)
+           adev[i] += FABS(vec_arr[j].comp[i] - mean[i]);
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Now form the total linear distortion sum </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">3</span>; ++i)
+        ret += adev[i];
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Deallocate memory </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pups_free((<span class="Type">char</span> *)mean);
+    (<span class="Type">void</span>)pups_free((<span class="Type">char</span> *)adev);
+
+    <span class="Statement">return</span>(ret);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Add a pair of matrices ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC matrix3 m3add(matrix3 *arg_1, matrix3 *arg_2)
+
+{   <span class="Type">int</span> i,
+        j;
+
+    matrix3 ret;
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">3</span>; ++i)
+    {  <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;<span class="Constant">3</span>; ++j)
+          ret.comp[i][j] = arg_1-&gt;comp[i][j] + arg_2-&gt;comp[i][j];
+    }
+
+    <span class="Statement">return</span>(ret);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Subtract a pair of matrices ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC matrix3 m3sub(matrix3 *arg_1, matrix3 *arg_2)
+
+{   <span class="Type">int</span> i,
+        j;
+
+    matrix3 ret;
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">3</span>; ++i)
+    {  <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;<span class="Constant">3</span>; ++j)
+          ret.comp[i][j] = arg_1-&gt;comp[i][j] - arg_2-&gt;comp[i][j];
+    }
+
+    <span class="Statement">return</span>(ret);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Multiply matrix by scalar ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC matrix3 m3scalm(FTYPE arg_1, matrix3 *arg_2)
+
+{   <span class="Type">int</span> i,
+        j;
+
+    matrix3 ret;
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">3</span>; ++i)
+    {  <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;<span class="Constant">3</span>; ++j)
+          ret.comp[i][j] = arg_1 * arg_2-&gt;comp[i][j];
+    }
+
+    <span class="Statement">return</span>(ret);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Find the transpose of a matrix ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC matrix3 m3transp(matrix3 *arg)
+
+{   <span class="Type">int</span> i,
+        j;
+
+    FTYPE   temp;
+    matrix3 ret;
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">3</span>; ++i)
+    {  <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;<span class="Constant">3</span>; ++j)
+          ret.comp[i][j] = arg-&gt;comp[i][j];
+    }
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">3</span>; ++i)
+    {  <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;<span class="Constant">3</span>; ++j)
+       {  temp            = ret.comp[i][j];
+          ret.comp[i][j]  = ret.comp[j][i];
+          ret.comp[j][i] = temp;
+       }
+    }
+
+    <span class="Statement">return</span>(ret);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to solve a set of N linear equations using LU decompostion,</span>
+<span class="Comment">    this routine is taken from &quot;Numerical Recipes in C&quot; pp43-44 ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> lubksb(<span class="Type">int</span> indx[], matrix3 *a, vector3 *b)
+
+{   <span class="Type">int</span> i,
+        ip,
+        j,
+        ii = (-<span class="Constant">1</span>);
+
+    FTYPE sum;
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Solves the set of linear equations A.X = B ... </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">3</span>; ++i)
+    {   ip          = indx[i];
+        sum         = b-&gt;comp[ip];
+        b-&gt;comp[ip] = b-&gt;comp[i];
+        <span class="Statement">if</span>(ii &gt; -<span class="Constant">1</span>)
+           <span class="Statement">for</span>(j=ii; j&lt;=i-<span class="Constant">1</span>; j++)
+               sum -= a-&gt;comp[i][j]*b-&gt;comp[j];
+        <span class="Statement">else</span>
+           <span class="Statement">if</span>(sum != <span class="Constant">0.0</span>)
+              ii = i;
+        b-&gt;comp[i] = sum;
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Do backsubstitution </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">2</span>; i&gt;=<span class="Constant">0</span>; i--)
+    {   sum = b-&gt;comp[i];
+        <span class="Statement">for</span>(j=i+<span class="Constant">1</span>; j&lt;<span class="Constant">3</span>; j++)
+           sum -= a-&gt;comp[i][j]*b-&gt;comp[j];
+
+
+        <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> Store component of solution vector3 X </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+        b-&gt;comp[i] = sum / a-&gt;comp[i][i];
+    }
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to do LU decomposition on the matrix3 a ...</span>
+<span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> ludcmp(<span class="Type">int</span> indx[], FTYPE *d, matrix3 *a)
+
+{   <span class="Type">int</span> i,
+        imax,
+        j,
+        k;
+
+    FTYPE big,
+          dum,
+          sum,
+          temp,
+          vv[<span class="Constant">3</span>];
+
+    *d = <span class="Constant">1.0</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Loop over rows to get implicit scaling information </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">3</span>; ++i)
+    {   big = <span class="Constant">0.0</span>;
+        <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;<span class="Constant">3</span>; ++j)
+           <span class="Statement">if</span>((temp = fabs(a-&gt;comp[i][j])) &gt; big)
+              big = temp;
+        <span class="Statement">if</span>(big == <span class="Constant">0.0</span>)
+           pups_error(<span class="Constant">&quot;[ludcmp] matrix3 singular&quot;</span>);
+
+
+        <span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> Save the scaling </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+        vv[i] = <span class="Constant">1.0</span> / big;
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Loop over columns using Crouts' method </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;<span class="Constant">3</span>; ++j)
+    {   <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;j; ++i)
+        {   sum = a-&gt;comp[i][j];
+            <span class="Statement">for</span>(k=<span class="Constant">0</span>; k&lt;j; ++k)
+                sum -= a-&gt;comp[i][k]*a-&gt;comp[k][j];
+            a-&gt;comp[i][j] = sum;
+        }
+
+
+        <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> Initialise search for largest pivot element </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+
+        big = <span class="Constant">0.0</span>;
+        <span class="Statement">for</span>(i=j; i&lt;<span class="Constant">3</span>; ++i)
+        {   sum = a-&gt;comp[i][j];
+            <span class="Statement">for</span>(k=<span class="Constant">0</span>; k&lt;j; ++k)
+                sum -= a-&gt;comp[i][k]*a-&gt;comp[k][j];
+            a-&gt;comp[i][j] = sum;
+
+
+            <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment">  Is the figure of merit for the pibvot better than the best so far </span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+            <span class="Statement">if</span>((dum = vv[i]*fabs(sum)) &gt;= big)
+            {  big  = dum;
+               imax = i;
+            }
+        }
+
+
+        <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> Test for row interchange </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+
+        <span class="Statement">if</span>(j != imax)
+        {  <span class="Statement">for</span>(k=<span class="Constant">0</span>; k&lt;<span class="Constant">3</span>; ++k)
+           {   dum              = a-&gt;comp[imax][k];
+               a-&gt;comp[imax][k] = a-&gt;comp[j][k];
+               a-&gt;comp[j][k]    = dum;
+           }
+
+
+           <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> Change parity of d </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+
+           *d = -(*d);
+
+
+           <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">  And interchange scale factor </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+
+           vv[imax] = vv[j];
+        }
+
+        indx[j] = imax;
+        <span class="Statement">if</span>(a-&gt;comp[j][j] == <span class="Constant">0.0</span>)
+           a-&gt;comp[j][j] = TINY;
+
+
+        <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> Finally divide by pivot element </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+
+        <span class="Statement">if</span>(j != <span class="Constant">2</span>)
+           dum = <span class="Constant">1.0</span>/a-&gt;comp[j][j];
+
+
+        <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------</span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> If the pivot element is zero, the matrix3 is singular (at least to the </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> precision of this algorithm). For some applications on singular        </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> matrices it is edesirable to substitute TINY for zero                  </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+        <span class="Statement">for</span>(i=j+<span class="Constant">1</span>; i&lt;<span class="Constant">3</span>; ++i)
+            a-&gt;comp[i][j] *= dum;
+    }
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to invert a matrix3 using LU decomposition ...</span>
+<span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC matrix3 m3inv(matrix3 *arg)
+
+{   <span class="Type">int</span> i,
+        j,
+        *indx = (<span class="Type">int</span> *)<span class="Constant">NULL</span>;
+
+    FTYPE   d;
+    vector3 col;
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Decompose the matrix3 'arg' using LU decomposition. This routine is </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> taken from &quot;Numerical Recipes in C&quot;, pp43-44                        </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> --------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    indx = (<span class="Type">int</span> *)pups_realloc(<span class="Constant">3</span>,<span class="Statement">sizeof</span>(<span class="Type">int</span>));
+    ludcmp(indx,&amp;d,arg);
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Use the results of the LU decomposition to find the inverse of the </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> matrix3 by columns                                                 </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;<span class="Constant">3</span>; ++j)
+    {  <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">3</span>; ++i)
+           col.comp[i] = <span class="Constant">0.0</span>;
+
+       col.comp[j] = <span class="Constant">1.0</span>;
+
+
+       <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Solve the resulting set of linear equations </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+
+       lubksb(indx,arg,&amp;col);
+       <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">3</span>; ++i)
+          arg-&gt;comp[i][j] = col.comp[i];
+    }
+
+    <span class="Statement">return</span>(*arg);
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

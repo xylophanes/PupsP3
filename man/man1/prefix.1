@@ -8,7 +8,7 @@ PREFIX \- extract input string prefix.
 .B prefix
 .I string
 > prefix string
->& <log file>
+[2> <log file>]
 .br
 
 .SH DESCRIPTION
@@ -26,6 +26,18 @@ the characters up to the first period are returned.
 display help and copyright information of the
 .I prefix(1)
 filter.
+.br
+
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
 .br
 
 .SH ENVIRONMENT VARIABLES

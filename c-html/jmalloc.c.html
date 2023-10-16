@@ -1,0 +1,923 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/jmalloc.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------</span>
+<span class="Comment">    This version of the memory allocator uses bubbles of memory [mapped in and out of</span>
+<span class="Comment">    of the process adress space via mmap() and munmap()] rather than sbrk(). This</span>
+<span class="Comment">    means the code is (a) POSIX compliant and (b) can often make better use of</span>
+<span class="Comment">    memory resources than traditional memory allocation packages.   </span>
+
+<span class="Comment">    (C) M.A. O'Neill, 03-06-2021, mao@tumblingdice.co.uk.</span>
+<span class="Comment">-------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="PreProc">#include </span><span class="Constant">&lt;stdio.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;signal.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/mman.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;math.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;errno.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;typedefs.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stdatomic.h&gt;</span>
+
+
+<span class="PreProc">#ifdef PTHREAD_SUPPORT</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;pthread.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="PreProc">#define __NOT_LIB_SOURCE__</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;xtypes.h&gt;</span>
+
+<span class="PreProc">#ifdef P3_SUPPORT</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;utils.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> P3_SUPPORT </span><span class="Comment">*/</span>
+<span class="PreProc">#undef __NOT_LIB_SOURCE__ </span>
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> These definitions were in local.h </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define _CKPT_FTABLE_SIZE </span><span class="Constant">1024</span>
+<span class="PreProc">#define GPAGESIZE         ((</span><span class="Type">unsigned</span><span class="PreProc"> </span><span class="Type">long</span><span class="PreProc">)(</span><span class="Constant">4096</span><span class="PreProc">))</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> String size </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define SSIZE             </span><span class="Constant">2048</span><span class="PreProc"> </span>
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Functions imported by this application </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+_IMPORT <span class="Type">void</span> exit(<span class="Type">int</span>);
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Variables imported by this application </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+_IMPORT  <span class="Type">int</span>     errno;
+_PUBLIC _BOOLEAN initialised = FALSE;
+_PUBLIC <span class="Type">void</span>     *start_addr = (<span class="Type">void</span> *)<span class="Constant">NULL</span>;
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Sycall interface to open() and close() is required by mmap_sbrk() </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define CKPT_OPEN(fname,oflag)          syscall(SYS_open, (fname), (oflag))</span>
+<span class="PreProc">#define CKPT_CLOSE(fd)                  syscall(SYS_close, (fd))</span>
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Variables which are private to this module </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> *brk_start = (<span class="Type">void</span> *)<span class="Constant">NULL</span>,
+              *brk_stop  = (<span class="Type">void</span> *)<span class="Constant">NULL</span>;
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Definitions used by the memory allocation packeage </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+
+
+                                                     <span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+<span class="PreProc">#define MUNMAP_THRESHOLD  </span><span class="Constant">1</span><span class="PreProc">                          </span><span class="Comment">/*</span><span class="Comment"> Memory bubble (minimum) utilisation threshold </span><span class="Comment">*/</span>
+<span class="PreProc">#define MALLOC_CRITICAL   </span><span class="Constant">2</span><span class="PreProc">                          </span><span class="Comment">/*</span><span class="Comment"> malloc() call which MUST complete             </span><span class="Comment">*/</span>
+<span class="PreProc">#define JMSZ              (</span><span class="Statement">sizeof</span><span class="PreProc">(</span><span class="Type">struct</span><span class="PreProc"> jmalloc))   </span><span class="Comment">/*</span><span class="Comment"> Size of jmalloc structure                     </span><span class="Comment">*/</span>
+<span class="PreProc">#define PTSZ              (</span><span class="Statement">sizeof</span><span class="PreProc">(</span><span class="Type">void</span><span class="PreProc"> *))           </span><span class="Comment">/*</span><span class="Comment"> Also assuming its &gt; sizeof int                </span><span class="Comment">*/</span>
+                                                     <span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define MASK              </span><span class="Constant">0x17826a9b</span>
+<span class="PreProc">#define JNULL             ((Jmalloc) </span><span class="Constant">0</span><span class="PreProc">)</span>
+
+
+<span class="PreProc">#ifdef PTHREAD_SUPPORT</span>
+_PRIVATE pthread_mutex_t ckpt_malloc_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+_PUBLIC Jmalloc         memlist;
+_PUBLIC Jmalloc         start;
+
+_PRIVATE <span class="Type">struct</span> jmalloc j_head;
+_PRIVATE <span class="Type">int</span>            jminit             = <span class="Constant">0</span>;
+_PRIVATE <span class="Type">unsigned</span> <span class="Type">long</span>  free_called        = <span class="Constant">0</span>;
+_PRIVATE <span class="Type">unsigned</span> <span class="Type">long</span>  malloc_called      = <span class="Constant">0</span>;
+_PRIVATE <span class="Type">double</span>         munmap_utilisation = <span class="Constant">10.0</span>;
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Various macros used by the memory allocation package </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define jloc(l)   ((</span><span class="Type">void</span><span class="PreProc"> *) (&amp;l-&gt;space))</span>
+<span class="PreProc">#define jmal(l)   ((Jmalloc) (((</span><span class="Type">void</span><span class="PreProc"> *)l) - JMSZ + PTSZ))</span>
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------</span>
+<span class="Comment">    Enter critical section.</span>
+<span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">static</span> atomic_flag flag = { <span class="Constant">0</span> };
+<span class="Type">static</span> <span class="Type">int</span> enter_malloc_critical(<span class="Type">void</span>)
+
+{  <span class="Statement">while</span>(atomic_flag_test_and_set(&amp;flag) == <span class="Constant">1</span>)
+         (<span class="Type">void</span>)usleep(<span class="Constant">100</span>);
+
+   <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">   Leave critical section</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">static</span> <span class="Type">int</span> leave_malloc_critical(<span class="Type">void</span>)
+
+{
+    atomic_flag_clear(&amp;flag);
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------- </span>
+<span class="Comment">   Map a memory bubble of size bytes into the process address space.</span>
+<span class="Comment">   Note: size must be an integral multiple of GPAGESIZE. </span>
+<span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> *mmap_sbrk(<span class="Type">size_t</span> size)
+
+{   <span class="Type">void</span>               *ret    = (<span class="Type">void</span> *)<span class="Constant">NULL</span>;
+    _IMMORTAL <span class="Type">int</span>      fdes    = (-<span class="Constant">1</span>);
+    _IMMORTAL _BOOLEAN entered = FALSE;
+
+    <span class="Statement">if</span>(initialised == TRUE)
+       errno = <span class="Constant">0</span>;
+
+    <span class="Statement">if</span>(size == <span class="Constant">0</span>)
+       <span class="Statement">return</span>(brk_stop);
+
+<span class="PreProc">#ifdef NO_MMU</span>
+    <span class="Statement">if</span>(brk_start == (<span class="Type">void</span> *)<span class="Constant">NULL</span>)
+       brk_start = (<span class="Type">void</span> *)START_ADDRESS;
+<span class="PreProc">#else</span> <span class="Comment">/*</span><span class="Comment"> NO_MMU </span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef NO_MMAP_ANONYMOUS</span>
+    fdes = CKPT_OPEN(<span class="Constant">&quot;/dev/zero&quot;</span>,<span class="Constant">2</span>);
+    brk_start = (<span class="Type">void</span> *)mmap((<span class="Type">void</span> *)<span class="Constant">0</span>,size,PROT_READ | PROT_WRITE,MAP_PRIVATE,fdes,<span class="Constant">0</span>);
+    CKPT_CLOSE(fdes);
+<span class="PreProc">#else</span>
+
+    brk_start = (<span class="Type">void</span> *)mmap((<span class="Type">void</span> *)<span class="Constant">0</span>,size,PROT_READ | PROT_WRITE,MAP_PRIVATE | MAP_ANONYMOUS,(-<span class="Constant">1</span>),<span class="Constant">0</span>);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> NO_MMAP_ANONYMOUS </span><span class="Comment">*/</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> NO_MMU </span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(brk_start == (<span class="Type">void</span> *)<span class="Constant">NULL</span>)
+    {  <span class="Statement">if</span>(initialised == TRUE &amp;&amp; errno != <span class="Constant">0</span>)
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;error </span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,errno);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+
+       <span class="Statement">return</span>((<span class="Type">void</span> *)(-<span class="Constant">1</span>));
+    }
+
+    <span class="Statement">if</span>(entered == FALSE)
+    {  entered = TRUE;
+       start_addr = brk_start;
+    }
+
+   <span class="Statement">if</span>((<span class="Type">void</span> *)((<span class="Type">unsigned</span> <span class="Type">long</span>)brk_start + (<span class="Type">unsigned</span> <span class="Type">long</span>)size) &gt; brk_stop)
+      brk_stop = (<span class="Type">void</span> *)((<span class="Type">unsigned</span> <span class="Type">long</span>)brk_start + (<span class="Type">unsigned</span> <span class="Type">long</span>)size);
+
+<span class="PreProc">#ifdef NO_MMU</span>
+   <span class="Statement">if</span>(brk_stop &gt; END_ADDR)
+      <span class="Statement">return</span>((<span class="Type">void</span> *)<span class="Constant">NULL</span>);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment">  NO_MMU </span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef JMALLOC_DEBUG</span>
+<span class="Statement">if</span>(initialised == TRUE)
+{   (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;START: 0x</span><span class="Special">%010x</span><span class="Constant">   END: 0x</span><span class="Special">%010x</span><span class="Constant">   SIZE 0x</span><span class="Special">%010x</span><span class="Constant">  TOTAL: </span><span class="Special">%04d</span><span class="Constant"> [0x</span><span class="Special">%010x</span><span class="Constant">]</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                  brk_start,brk_stop,size,(<span class="Type">unsigned</span> <span class="Type">long</span>)brk_stop - (<span class="Type">unsigned</span> <span class="Type">long</span>)start_addr,start_addr);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+}
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> JMALLOC_DEBUG </span><span class="Comment">*/</span>
+
+    <span class="Statement">return</span>(brk_start);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------- </span>
+<span class="Comment">    Initialise the memory list (first call to any allocation function.</span>
+<span class="Comment">    automatically calls do_init() ...</span>
+<span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> do_init(<span class="Type">void</span>)
+
+{   <span class="Statement">if</span> (!jminit)
+    {  memlist        = &amp;j_head;
+       memlist-&gt;flink = memlist;
+       memlist-&gt;blink = memlist;
+       memlist-&gt;size  = <span class="Constant">0</span>;
+       memlist-&gt;space = (<span class="Type">void</span> *) <span class="Constant">0</span>;
+       start          = memlist;
+       jminit         = <span class="Constant">1</span>;
+    }
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------- </span>
+<span class="Comment">    Exit (on error) ... </span>
+<span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> dump_core(<span class="Type">void</span>)
+{
+   memlist-&gt;space = (<span class="Type">void</span> *)<span class="Constant">NULL</span>;
+
+<span class="PreProc">#ifdef P3_SUPPORT</span>
+   pups_exit(<span class="Constant">255</span>);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> P3_SUPPORT </span><span class="Comment">*/</span>
+
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------- </span>
+<span class="Comment">    Set a piece of memory as &quot;being in use ...</span>
+<span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> *set_used(Jmalloc l)
+{
+  <span class="Statement">return</span> jloc(l);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------- </span>
+<span class="Comment">    Malloc -- return pointer to a region at least size bytes long.</span>
+<span class="Comment">    The required memory is mapped into the process address space</span>
+<span class="Comment">    using mmap() ...</span>
+<span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> malloc() called by calloc() or realloc() </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> *malloc_internal(<span class="Type">const</span> _BOOLEAN is_internal, <span class="Type">size_t</span> size)
+{
+  <span class="Type">int</span> new_pages;
+
+  Jmalloc l,
+          h;
+
+  <span class="Type">void</span>   *tmp = (<span class="Type">void</span> *)<span class="Constant">NULL</span>;
+  Jmalloc newl;
+
+  <span class="Type">void</span>   *loc = (<span class="Type">void</span> *)<span class="Constant">NULL</span>;
+  <span class="Type">size_t</span> newsize;
+
+  sigset_t set,
+           old_set;
+
+
+  <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> Fix for glibc3 calling malloc() before errno location is defined! </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+  <span class="Statement">if</span>(initialised == TRUE)
+     errno = <span class="Constant">0</span>;
+
+  <span class="Statement">if</span>(size &lt;= <span class="Constant">0</span>)
+  {  <span class="Statement">if</span>(malloc_called &gt; <span class="Constant">0</span>)
+        errno = <span class="Constant">EINVAL</span>;
+
+     <span class="Statement">return</span> <span class="Constant">NULL</span>;
+  }
+
+
+  <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> We cannot permit signals to be handled in malloc() </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> if we are about to enter a critical section        </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+
+  <span class="Statement">if</span>(is_internal == FALSE)
+  {  (<span class="Type">void</span>)sigfillset (&amp;set);
+     (<span class="Type">void</span>)sigemptyset(&amp;old_set);
+     (<span class="Type">void</span>)sigprocmask(SIG_SETMASK,&amp;set,&amp;old_set);
+     (<span class="Type">void</span>)enter_malloc_critical();
+  }
+
+  do_init();
+
+
+  <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> In this memory allocator, the memory for each new item is explicitly mapped into the       </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> address space of the calling process. This means that each new item will occupy at least 1 </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> page of memory irrespective of its actual size. On modern machines, with large amounts of  </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> memory this is an acceptable overhead, given that the resulting code is much cleaner and   </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> easier to manipulate than a conventional malloc package.                                   </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+  new_pages = (size + JMSZ) / GPAGESIZE + <span class="Constant">1</span>;
+  newsize   = new_pages*GPAGESIZE;
+  newl      = (Jmalloc) mmap_sbrk(newsize);
+
+
+  <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> Have we actually managed to map in a segment of memory of the requested size? </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+  <span class="Statement">if</span> (newl == (Jmalloc)(-<span class="Constant">1</span>))
+  {
+
+<span class="PreProc">      #ifdef P3_SUPPORT</span>
+      <span class="Statement">if</span>(appl_verbose == TRUE)
+      {  <span class="Type">char</span> date[SSIZE];
+
+         (<span class="Type">void</span>)strdate(date);
+         (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): Jmalloc: out of memory</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                              date,appl_name,appl_pid,appl_host,appl_owner);
+         (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): Trying to get 0x</span><span class="Special">%010x</span><span class="Constant"> bytes (chunk of 0x</span><span class="Special">%010x</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                         date,appl_name,appl_pid,appl_host,appl_owner,size,newsize);
+         (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+      }
+<span class="PreProc">      #else</span>
+      (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;JMALLOC: out of memory</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+      (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+<span class="PreProc">      #endif</span> <span class="Comment">/*</span><span class="Comment"> P3_SUPPORT </span><span class="Comment">*/</span>
+
+     errno = <span class="Constant">ENOMEM</span>;
+
+     <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> Restore signal mask </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+     <span class="Statement">if</span>(is_internal == FALSE)
+     {  (<span class="Type">void</span>)leave_malloc_critical();
+        (<span class="Type">void</span>)sigprocmask(SIG_SETMASK,&amp;old_set,(sigset_t *)<span class="Constant">NULL</span>);
+     }
+
+     <span class="Statement">return</span> <span class="Constant">NULL</span>;
+  }
+
+
+  <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------</span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> Mark this chunk as the start of a new memory mapped </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> area.                                               </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------</span><span class="Comment">*/</span>
+
+  newl-&gt;mmap_size    = newsize;
+  newl-&gt;flink        = memlist;
+  newl-&gt;blink        = memlist-&gt;blink;
+  newl-&gt;flink-&gt;blink = newl;
+  newl-&gt;blink-&gt;flink = newl;
+  newl-&gt;size         = size;
+  l                  = newl;
+
+<span class="PreProc">#ifdef JMALLOC_DEBUG</span>
+<span class="Statement">if</span>(l-&gt;mmap_size &gt; <span class="Constant">0</span>)
+{  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;MMAP ADDRESS (size </span><span class="Special">%d</span><span class="Constant">, </span><span class="Special">%f</span><span class="Constant"> pages, </span><span class="Special">%f</span><span class="Constant"> allocated)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,
+                 l-&gt;size,(<span class="Type">double</span>)l-&gt;size/(<span class="Type">double</span>)GPAGESIZE,(<span class="Type">double</span>)newsize/(<span class="Type">double</span>)GPAGESIZE);
+   (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+}
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> JMALLOC_DEBUG </span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef JMALLOC_DEBUG</span>
+(<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;malloc (</span><span class="Special">%d</span><span class="Constant">) returned 0x</span><span class="Special">%010x</span><span class="Special">\n</span><span class="Constant">&quot;</span>,malloc_called,(<span class="Type">unsigned</span> <span class="Type">long</span>)l);
+(<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> JMALLOC_DEBUG </span><span class="Comment">*/</span>
+
+   loc = set_used(l);
+   malloc_called++;
+
+
+   <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+   <span class="Comment">/*</span><span class="Comment"> Restore signal mask </span><span class="Comment">*/</span>
+   <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+   <span class="Statement">if</span>(is_internal == FALSE)
+   {  (<span class="Type">void</span>)leave_malloc_critical();
+      (<span class="Type">void</span>)sigprocmask(SIG_SETMASK,&amp;old_set,(sigset_t *)<span class="Constant">NULL</span>);
+   }
+
+   <span class="Statement">return</span>(loc);
+}
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> malloc() called by external function </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> *malloc(<span class="Type">size_t</span> size)
+
+{    <span class="Statement">return</span>(malloc_internal(FALSE,size));
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------- </span>
+<span class="Comment">    Free -- free the memory bubble associated with loc, unmapping memory</span>
+<span class="Comment">    associated with it from the process address space ... </span>
+<span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> free() called by calloc() or realloc() </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> free_internal(<span class="Type">const</span> _BOOLEAN is_internal, <span class="Type">const</span> <span class="Type">void</span> *loc)
+{
+  Jmalloc l;
+  Jmalloc pl, nl;
+
+  <span class="Type">int</span>   i;
+  _BYTE *addr = (_BYTE *)<span class="Constant">NULL</span>;
+
+  sigset_t set,
+           old_set;
+
+  <span class="Statement">if</span>(loc == (<span class="Type">void</span> *)<span class="Constant">NULL</span>)
+  {  errno = <span class="Constant">EINVAL</span>;
+     <span class="Statement">return</span>;
+
+  }
+
+
+  <span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> We cannot allow signals to be handled in free() </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+
+  <span class="Statement">if</span>(is_internal == FALSE)
+  {  (<span class="Type">void</span>)sigfillset (&amp;set);
+     (<span class="Type">void</span>)sigemptyset(&amp;old_set);
+     (<span class="Type">void</span>)sigprocmask(SIG_SETMASK,&amp;set,&amp;old_set);
+     (<span class="Type">void</span>)enter_malloc_critical();
+  }
+
+  do_init();
+  free_called++;
+  l = jmal(loc);
+
+  pl = l-&gt;blink;
+  nl = l-&gt;flink;
+
+<span class="PreProc">#ifdef JMALLOC_DEBUG</span>
+(<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;FREE BLOCK UNMAPPED (size </span><span class="Special">%x</span><span class="Constant"> at at 0x</span><span class="Special">%010x</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,l-&gt;mmap_size,l);
+(<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> JMALLOC_DEBUG </span><span class="Comment">*/</span>
+
+  <span class="Statement">if</span>(l == brk_start)
+  {  brk_stop = l;
+
+<span class="PreProc">#ifdef JMALLOC_DEBUG</span>
+(<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;BRK is now 0x</span><span class="Special">%010x</span><span class="Special">\n</span><span class="Constant">&quot;</span>,brk_stop);
+(<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> JMALLOC_DEBUG </span><span class="Comment">*/</span>
+
+  }
+
+
+  <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> Create a fractional block. This is the difference between   </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> the size of the object to be freed and the percentage of it </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> which could be unmapped                                     </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+
+  <span class="Statement">if</span>(initialised == TRUE)
+     errno = <span class="Constant">0</span>;
+
+  (<span class="Type">void</span>)munmap((<span class="Type">void</span> *)l,(<span class="Type">size_t</span>)l-&gt;mmap_size);
+
+<span class="PreProc">#ifdef JMALLOC_DEBUG</span>
+(<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;MUNMAP returned errno </span><span class="Special">%d</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,errno);
+(<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> JMALLOC_DEBUG </span><span class="Comment">*/</span>
+
+  <span class="Statement">if</span>(initialised == TRUE &amp;&amp; errno != <span class="Constant">0</span>)
+  {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;errno is </span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,errno);
+     (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+     exit(<span class="Constant">255</span>);
+  }
+
+  pl-&gt;flink = nl;
+  nl-&gt;blink = pl;
+  start     = nl;
+
+<span class="PreProc">#ifdef JMALLOC_DEBUG</span>
+(<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;free called (</span><span class="Special">%04d</span><span class="Constant">) for ptr 0x</span><span class="Special">%010x</span><span class="Special">\n</span><span class="Constant">&quot;</span>,free_called,(<span class="Type">unsigned</span> <span class="Type">long</span>)loc);
+(<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> JMALLOC_DEBUG </span><span class="Comment">*/</span>
+
+  <span class="Statement">if</span>(initialised == TRUE)
+     errno = <span class="Constant">0</span>;
+
+
+  <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> Restore signal mask </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+  <span class="Statement">if</span>(is_internal == FALSE)
+  {  (<span class="Type">void</span>)leave_malloc_critical();
+     (<span class="Type">void</span>)sigprocmask(SIG_SETMASK,&amp;old_set,(sigset_t *)<span class="Constant">NULL</span>);
+  }
+
+  <span class="Statement">return</span>;
+}
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Called by external function </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> free(<span class="Type">const</span> <span class="Type">void</span> *loc)
+
+{ <span class="Statement">return</span>(free_internal(FALSE,loc));
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------- </span>
+<span class="Comment">    Realloc -- allocate more space to the region pointed to by ptr</span>
+<span class="Comment">    possibly moving the objects stored within the region ...</span>
+<span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> *realloc(<span class="Type">const</span> <span class="Type">void</span> *ptr, <span class="Type">const</span> <span class="Type">size_t</span> size)
+
+{
+  Jmalloc l,
+          l2,
+          nl,
+          newl;
+
+  _BYTE   *loc  = (_BYTE *)<span class="Constant">NULL</span>;
+  _BYTE   *loc2 = (_BYTE *)<span class="Constant">NULL</span>;
+
+  <span class="Type">size_t</span> i,
+         old_size,
+         new_size;
+
+  sigset_t set,
+           old_set;
+
+  <span class="Statement">if</span>(initialised == TRUE)
+     errno = <span class="Constant">0</span>;
+
+
+  <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> We are not in critical section of realloc() </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> so free() is effectively external           </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+
+  new_size = size;
+  <span class="Statement">if</span>(new_size == <span class="Constant">0</span>)
+  {  <span class="Statement">if</span>(ptr != (<span class="Type">void</span> *)<span class="Constant">NULL</span>)
+        free(ptr);
+
+     <span class="Statement">return</span>((<span class="Type">void</span> *)<span class="Constant">NULL</span>);
+  }
+
+
+  <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> This case reduces to malloc() </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+
+  <span class="Statement">if</span>(ptr == (<span class="Type">const</span> <span class="Type">void</span> *)<span class="Constant">NULL</span> &amp;&amp; new_size &gt; <span class="Constant">0</span>)
+  {  loc = (<span class="Type">void</span> *)malloc_internal(TRUE,new_size);
+     <span class="Statement">return</span>(loc);
+  }
+
+
+  <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> We cannot allow signals to be handled in realloc() </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+
+  (<span class="Type">void</span>)sigfillset (&amp;set);
+  (<span class="Type">void</span>)sigemptyset(&amp;old_set);
+  (<span class="Type">void</span>)sigprocmask(SIG_SETMASK,&amp;set,&amp;old_set);
+  (<span class="Type">void</span>)enter_malloc_critical();
+
+  loc = (_BYTE *)ptr;
+  do_init();
+
+  l        = jmal(loc);
+  old_size = l-&gt;size;
+
+
+  <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------</span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> Can we fit the reallocated memory segment into the current memory mapped  </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> region? If so lets do it! If we cannot do this we will need to allocate a </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> new (bigger) block, copy the contents of the currently allocated block to </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> this new block, and then unmap the current block from the process address </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> space.                                                                    </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef JMALLOC_DEBUG</span>
+(<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;REALLOC: block size 0x</span><span class="Special">%010x</span><span class="Constant"> (new size 0x</span><span class="Special">%010x</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,l-&gt;mmap_size - JMSZ - PTRSZ, size);
+(<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> JMALLOC_DEBUG </span><span class="Comment">*/</span>
+
+  <span class="Statement">if</span> (new_size &lt; l-&gt;mmap_size - JMSZ - <span class="Constant">2</span>*PTSZ)
+  {     <span class="Type">double</span> utilisation;
+
+        utilisation = <span class="Constant">100.0</span>*(<span class="Type">double</span>)new_size/(<span class="Type">double</span>)l-&gt;mmap_size;
+
+<span class="PreProc">#ifdef JMALLOC_DEBUG</span>
+(<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;REALLOC: block (0x</span><span class="Special">%010x</span><span class="Constant">, size 0x</span><span class="Special">%010x</span><span class="Constant">) utilisation: </span><span class="Special">%6.3f</span><span class="Constant"> </span><span class="Special">%%</span><span class="Special">\n</span><span class="Constant">&quot;</span>,l-&gt;size,size,utilisation);
+(<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> JMALLOC_DEBUG </span><span class="Comment">*/</span>
+
+
+        <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> Can this bubble be used? </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+
+        <span class="Statement">if</span>(l-&gt;mmap_size == GPAGESIZE || utilisation &gt; munmap_utilisation)
+        {  l-&gt;size   = new_size;
+
+
+           <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> Restore signal mask </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+           (<span class="Type">void</span>)leave_malloc_critical();
+           (<span class="Type">void</span>)sigprocmask(SIG_SETMASK,&amp;old_set,(sigset_t *)<span class="Constant">NULL</span>);
+
+
+<span class="PreProc">#ifdef JMALLOC_DEBUG</span>
+(<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;REALLOC: adjusting block of 0x</span><span class="Special">%010x</span><span class="Constant"> (new size 0x</span><span class="Special">%010x</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,l-&gt;size,size);
+(<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> JMALLOC_DEBUG </span><span class="Comment">*/</span>
+
+           <span class="Statement">return</span> loc;
+        }
+
+
+        <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> If utilisation of the mapped region is less than 10% then unmap the region </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> and return memory to kernel (so other processes can use it)                </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef JMALLOC_DEBUG</span>
+(<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;REALLOC: freeing block of 0x</span><span class="Special">%010x</span><span class="Constant"> (new size 0x</span><span class="Special">%010x</span><span class="Constant">) [utilisation </span><span class="Special">%6.3f</span><span class="Constant"> </span><span class="Special">%%</span><span class="Constant">]</span><span class="Special">\n</span><span class="Constant">&quot;</span>,l-&gt;size,size,utilisation);
+(<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> JMALLOC_DEBUG </span><span class="Comment">*/</span>
+
+  }
+
+
+  <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------</span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> We need to allocate a new block, copy the contents of the old block to it </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> and then unmap the old block from the process address space               </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> If the block is bigger than 64M the we will need to flush data to /tmp to </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> prevent an acute memory shortage occuring.                                </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+  loc2 = malloc_internal(TRUE,new_size);
+  <span class="Statement">for</span> (i = <span class="Constant">0</span>; i &lt; old_size; i++)
+      loc2[i] = loc[i];
+
+
+  <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> In critical section so free() is internal </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+  free_internal(TRUE,loc);
+
+<span class="PreProc">#ifdef JMALLOC_DEBUG</span>
+(<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;REALLOC [0x</span><span class="Special">%010x</span><span class="Constant">] returned 0x</span><span class="Special">%010x</span><span class="Constant"> (with loc1 free)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,(<span class="Type">unsigned</span> <span class="Type">long</span>)ptr,(<span class="Type">unsigned</span> <span class="Type">long</span>)l);
+(<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> JMALLOC_DEBUG </span><span class="Comment">*/</span>
+
+
+  <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> Restore signal mask </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+  (<span class="Type">void</span>)leave_malloc_critical();
+  (<span class="Type">void</span>)sigprocmask(SIG_SETMASK,&amp;old_set,(sigset_t *)<span class="Constant">NULL</span>);
+
+  <span class="Statement">return</span> loc2;
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------- </span>
+<span class="Comment">    Calloc -- allocate space for nelem items of size elsize ... </span>
+<span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> *calloc(<span class="Type">const</span> <span class="Type">size_t</span> nelem, <span class="Type">const</span> <span class="Type">size_t</span> elsize)
+
+{
+  <span class="Type">int</span>    *iptr = (<span class="Type">int</span> *) <span class="Constant">NULL</span>;
+  _BYTE  *ptr  = (<span class="Type">void</span> *)<span class="Constant">NULL</span>;
+  <span class="Type">int</span> sz;
+  <span class="Type">int</span> i;
+
+  sigset_t set,
+           old_set;
+
+  <span class="Statement">if</span>(initialised == TRUE)
+     errno = <span class="Constant">0</span>;
+
+
+  <span class="Comment">/*</span><span class="Comment">---------------------------------------------------</span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> We cannot allow signals to be handled in calloc() </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment">---------------------------------------------------</span><span class="Comment">*/</span>
+
+  (<span class="Type">void</span>)sigfillset (&amp;set);
+  (<span class="Type">void</span>)sigemptyset(&amp;old_set);
+  (<span class="Type">void</span>)sigprocmask(SIG_SETMASK,&amp;set,&amp;old_set);
+  (<span class="Type">void</span>)enter_malloc_critical();
+
+  sz  = nelem*elsize;
+  ptr = malloc_internal(TRUE,sz);
+  <span class="Statement">if</span>(ptr == (_BYTE *)<span class="Constant">NULL</span>)
+  {
+
+     <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> Restore signal mask </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+     (<span class="Type">void</span>)leave_malloc_critical();
+     (<span class="Type">void</span>)sigprocmask(SIG_SETMASK,&amp;old_set,(sigset_t *)<span class="Constant">NULL</span>);
+
+     <span class="Statement">return</span> <span class="Constant">NULL</span>;
+  }
+
+  iptr = (<span class="Type">int</span> *) ptr;
+  <span class="Statement">for</span> (i = <span class="Constant">0</span>; i &lt; sz/<span class="Statement">sizeof</span>(<span class="Type">int</span>); i++)
+      iptr[i] = <span class="Constant">0</span>;
+
+  <span class="Statement">for</span> (i = i * <span class="Statement">sizeof</span>(<span class="Type">int</span>); i &lt; sz; i++)
+      ptr[i] = <span class="Constant">0</span>;
+
+
+  <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> Restore signal mask </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+  (<span class="Type">void</span>)leave_malloc_critical();
+  (<span class="Type">void</span>)sigprocmask(SIG_SETMASK,&amp;old_set,(sigset_t *)<span class="Constant">NULL</span>);
+
+  <span class="Statement">return</span> ((<span class="Type">void</span> *)ptr);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------- </span>
+<span class="Comment">    Set the quantum for flushing out low useage memory bubbles ... </span>
+<span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> mallopt(<span class="Type">const</span> <span class="Type">int</span> cmd, <span class="Type">const</span> <span class="Type">int</span> value)
+{
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set the minimum percentage utilisation for a memory bubble. If the  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> utilisation falls below this threshold, the bubble is unmapped from </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> the process address space.                                          </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(cmd == MUNMAP_THRESHOLD)
+    {  <span class="Statement">if</span>(value == (-<span class="Constant">1</span>))
+          <span class="Statement">return</span>((<span class="Type">int</span>)munmap_utilisation);
+       <span class="Statement">else</span>
+       {  munmap_utilisation = value;
+          <span class="Statement">return</span>(<span class="Constant">0</span>);
+       }
+    }
+
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------- </span>
+<span class="Comment">    Print statistics on the number of memory bubbles currently mapped into</span>
+<span class="Comment">    the process address space ...</span>
+<span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> jmalloc_usage(<span class="Type">const</span> <span class="Type">int</span> show_bubbles, <span class="Type">const</span> <span class="Type">FILE</span> *stream)
+
+{ Jmalloc next = (Jmalloc)<span class="Constant">NULL</span>;
+
+  <span class="Type">int</span>  cnt = <span class="Constant">0</span>;
+
+  <span class="Type">unsigned</span> <span class="Type">long</span> mem_used = <span class="Constant">0</span>,
+           mem_allocated = <span class="Constant">0</span>;
+
+  <span class="Type">double</span> utilisation;
+
+
+<span class="PreProc">  #ifdef P3_SUPPORT</span>
+  <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> Only the root thread can process </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> PSRP requests                    </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+  <span class="Statement">if</span>(pupsthread_is_root_thread() == FALSE)
+     error(<span class="Constant">&quot;attempt by non root thread to perform global jmalloc operation&quot;</span>);
+<span class="PreProc">  #endif</span> <span class="Comment">/*</span><span class="Comment"> P3_SUPPORT </span><span class="Comment">*/</span>
+
+  errno = <span class="Constant">0</span>;
+  <span class="Statement">if</span>(stream == (<span class="Type">const</span> <span class="Type">FILE</span> *)<span class="Constant">NULL</span>)
+  {  errno = <span class="Constant">EINVAL</span>;
+     <span class="Statement">return</span>;
+  }
+
+  (<span class="Type">void</span>)enter_malloc_critical();
+
+  do_init();
+
+  (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">    Memory bubbles mapped into process address space</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+  (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    ================================================</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+
+  <span class="Statement">if</span>(show_bubbles == TRUE)
+     (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+
+  (<span class="Type">void</span>)fflush(stream);
+
+
+  <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------</span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> In order to extract statistics we need to walk the linked list </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> of mapped memory bubbles.                                      </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+  next = memlist;
+  <span class="Statement">do</span> {    <span class="Statement">if</span>(show_bubbles == TRUE)
+          {  <span class="Statement">if</span>(next-&gt;size &gt; <span class="Constant">0</span>)
+                utilisation = <span class="Constant">100.0</span>*(<span class="Type">double</span>)next-&gt;size/(<span class="Type">double</span>)next-&gt;mmap_size;
+             <span class="Statement">else</span>
+                utilisation = <span class="Constant">0.0</span>;
+
+             (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    </span><span class="Special">%04d</span><span class="Constant">: bubble at 0x</span><span class="Special">%010x</span><span class="Constant"> virtual, size 0x</span><span class="Special">%010x</span><span class="Constant">, used 0x</span><span class="Special">%010x</span><span class="Constant"> (utilisation </span><span class="Special">%5.2f</span><span class="Constant"> </span><span class="Special">%%</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                       cnt,(<span class="Type">unsigned</span> <span class="Type">long</span>)next + JMSZ,next-&gt;size,next-&gt;mmap_size,utilisation);
+             (<span class="Type">void</span>)fflush(stream);
+          }
+
+          ++cnt;
+
+          mem_used      += next-&gt;size;
+          mem_allocated += next-&gt;mmap_size;
+
+          next = next-&gt;flink;
+      } <span class="Statement">while</span>(next != start);
+
+   utilisation = <span class="Constant">100.0</span>*(<span class="Type">double</span>)mem_used/(<span class="Type">double</span>)mem_allocated;
+   (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">    </span><span class="Special">%04d</span><span class="Constant"> bubbles currently mapped into process address space (utilisation theshold is </span><span class="Special">%5.2f</span><span class="Constant"> </span><span class="Special">%%</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                                                         cnt,munmap_utilisation);
+   (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    Total memory used 0x</span><span class="Special">%010x</span><span class="Constant"> bytes, allocated 0x</span><span class="Special">%010x</span><span class="Constant"> bytes (utilisation </span><span class="Special">%5.2f</span><span class="Constant"> </span><span class="Special">%%</span><span class="Constant">)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,
+                                                                                    mem_used,mem_allocated,utilisation);
+   (<span class="Type">void</span>)fflush(stream);
+
+   (<span class="Type">void</span>)leave_malloc_critical();
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

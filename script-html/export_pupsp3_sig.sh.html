@@ -1,0 +1,63 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.5.1.src.git/pupscore.src/export_pupsp3_sig.sh.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="bash">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Identifier { color: #008080; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">#!/bin/bash</span>
+<span class="Comment">#</span>
+<span class="Comment">#####################################</span>
+<span class="Comment"># Export P3 signal mappings for bash </span>
+<span class="Comment"># (C) M.A O'Neill, Tumbling Dice 2023</span>
+<span class="Comment">#####################################</span>
+
+<span class="Comment">#-------------------------------------</span>
+<span class="Comment"># This might be appliocation dependent</span>
+<span class="Comment">#-------------------------------------</span>
+
+<span class="Identifier">SIGRTMIN</span>=<span class="Constant">34</span>
+
+<span class="Statement">export</span><span class="Identifier"> PUPSP3_SIGEVENT=</span><span class="PreProc">$((</span><span class="PreProc">$SIGRTMIN</span><span class="Special"> + </span><span class="Constant">4</span><span class="PreProc">))</span>
+<span class="Statement">export</span><span class="Identifier"> PUPSP3_SIGPSRP=</span><span class="PreProc">$((</span><span class="PreProc">$SIGRTMIN</span><span class="Special"> + </span><span class="Constant">5</span><span class="PreProc">))</span>
+<span class="Statement">export</span><span class="Identifier"> PUPSP3_SIGCHAN=</span><span class="PreProc">$((</span><span class="PreProc">$SIGRTMIN</span><span class="Special"> + </span><span class="Constant">6</span><span class="PreProc">))</span>
+<span class="Statement">export</span><span class="Identifier"> PUPSP3_SIGINIT=</span><span class="PreProc">$((</span><span class="PreProc">$SIGRTMIN</span><span class="Special"> + </span><span class="Constant">7</span><span class="PreProc">))</span>
+<span class="Statement">export</span><span class="Identifier"> PUPSP3_SIGCLIENT=</span><span class="PreProc">$((</span><span class="PreProc">$SIGRTMIN</span><span class="Special"> + </span><span class="Constant">8</span><span class="PreProc">))</span>
+<span class="Statement">export</span><span class="Identifier"> PUPSP3_SIGTHREAD=</span><span class="PreProc">$((</span><span class="PreProc">$SIGRTMIN</span><span class="Special"> + </span><span class="Constant">9</span><span class="PreProc">))</span>
+<span class="Statement">export</span><span class="Identifier"> PUPSP3_SIGSLAVE=</span><span class="PreProc">$((</span><span class="PreProc">$SIGRTMIN</span><span class="Special"> + </span><span class="Constant">10</span><span class="PreProc">))</span>
+<span class="Statement">export</span><span class="Identifier"> PUPSP3_SIGCHECK=</span><span class="PreProc">$((</span><span class="PreProc">$SIGRTMIN</span><span class="Special"> + </span><span class="Constant">11</span><span class="PreProc">))</span>
+<span class="Statement">export</span><span class="Identifier"> PUPSP3_SIGRESTART=</span><span class="PreProc">$((</span><span class="PreProc">$SIGRTMIN</span><span class="Special"> + </span><span class="Constant">12</span><span class="PreProc">))</span>
+<span class="Statement">export</span><span class="Identifier"> PUPSP3_SIGALIVE=</span><span class="PreProc">$((</span><span class="PreProc">$SIGRTMIN</span><span class="Special"> + </span><span class="Constant">13</span><span class="PreProc">))</span>
+<span class="Statement">export</span><span class="Identifier"> PUPSP3_SIGTHREADSTOP=</span><span class="PreProc">$((</span><span class="PreProc">$SIGRTMIN</span><span class="Special"> + </span><span class="Constant">14</span><span class="PreProc">))</span>
+<span class="Statement">export</span><span class="Identifier"> PUPSP3_SIGTHREADRESTART=</span><span class="PreProc">$((</span><span class="PreProc">$SIGRTMIN</span><span class="Special"> + </span><span class="Constant">15</span><span class="PreProc">))</span>
+<span class="Statement">export</span><span class="Identifier"> PUPSP3_SIGCRITICAL=</span><span class="PreProc">$((</span><span class="PreProc">$SIGRTMIN</span><span class="Special"> + </span><span class="Constant">16</span><span class="PreProc">))</span>
+
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

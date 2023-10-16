@@ -9,7 +9,7 @@ RESTART \- Restart a command/shell-script previously checkpointed via
 .B restart 
 .B [-usage | -help]
 .B [-detach] [-d signal delay] !-c <criu checkpoint directory>!
->& <log file>
+[2> <log file>]
 .br
 
 .SH DESCRIPTION
@@ -62,6 +62,18 @@ for the checkpoint to be restarted. This option is mandatory.
 
 .SH SIGNALS
 .B SIGRESTART
+.br
+
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
 .br
 
 .SH ENVIRONMENT VARIABLES

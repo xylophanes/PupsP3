@@ -1,0 +1,277 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/phmtrace.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------</span>
+<span class="Comment">    More debugging hooks for `malloc'.</span>
+<span class="Comment">    Copyright (C) 1991, 1992, 1993, 1994 Free Software Foundation, Inc.</span>
+<span class="Comment">		 Written April 2, 1991 by John Gilmore of Cygnus Support.</span>
+<span class="Comment">		 Based on mcheck.c by Mike Haertel.</span>
+
+<span class="Comment">    This library is free software; you can redistribute it and/or</span>
+<span class="Comment">    modify it under the terms of the GNU Library General Public License as</span>
+<span class="Comment">    published by the Free Software Foundation; either version 2 of the</span>
+<span class="Comment">    License, or (at your option) any later version.</span>
+
+<span class="Comment">    This library is distributed in the hope that it will be useful,</span>
+<span class="Comment">    but WITHOUT ANY WARRANTY; without even the implied warranty of</span>
+<span class="Comment">    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU</span>
+<span class="Comment">    Library General Public License for more details.</span>
+
+<span class="Comment">    You should have received a copy of the GNU Library General Public</span>
+<span class="Comment">    License along with this library; see the file COPYING.LIB.  If</span>
+<span class="Comment">    not, write to the Free Software Foundation, Inc., 675 Mass Ave,</span>
+<span class="Comment">    Cambridge, MA 02139, USA.</span>
+
+<span class="Comment">    The author may be reached (Email) at the address mike@ai.mit.edu,</span>
+<span class="Comment">    or (US mail) as Mike Haertel c/o Free Software Foundation.</span>
+
+<span class="Comment">    Shared heap modification by Mark O'Neill (mao@tumblingdice.co.uk)</span>
+<span class="Comment">    (C) 1998-2022 M.A. O'Neill, Tumbling Dice</span>
+<span class="Comment">--------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;xtypes.h&gt;</span>
+<span class="PreProc">#ifndef	_PHMALLOC_INTERNAL</span>
+<span class="PreProc">#define	_PhMALLOC_INTERNAL</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;phmalloc.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PHMALLOC_INTERNAL </span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;stdio.h&gt;</span>
+
+<span class="PreProc">#ifndef	__GNU_LIBRARY__</span>
+_IMPORT <span class="Type">char</span> *getenv ();
+<span class="PreProc">#else</span>
+<span class="PreProc">    #include </span><span class="Constant">&lt;stdlib.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> __GNU_LIBRARY__ </span><span class="Comment">*/</span>
+
+
+_PRIVATE <span class="Type">FILE</span> *mallstream     = (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>;
+_PRIVATE <span class="Type">char</span> mallenv[]       = <span class="Constant">&quot;PHMALLOC_TRACE&quot;</span>;
+
+
+                                                   <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">char</span> mallbuf[<span class="Constant">BUFSIZ</span>] = <span class="Constant">&quot;&quot;</span>;                <span class="Comment">/*</span><span class="Comment"> Buffer for the output </span><span class="Comment">*/</span>
+                                                   <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Address to breakpoint on accesses to </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+
+__ptr_t mallwatch;
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> File name and line number information, for callers that had </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> the foresight to call through a macro.                      </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">char</span> *_mtrace_file = (<span class="Type">char</span> *)<span class="Constant">NULL</span>;
+_PUBLIC <span class="Type">int</span>   _mtrace_line;
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Old hook values </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> (*tr_old_phfree_hook)        __P ((<span class="Type">int</span>, __ptr_t ptr));
+_PRIVATE __ptr_t (*tr_old_phmalloc_hook)   __P ((<span class="Type">int</span>, __malloc_size_t size, <span class="Type">char</span> *));
+_PRIVATE __ptr_t (*tr_old_phrealloc_hook)  __P ((<span class="Type">int</span>, __ptr_t ptr, __malloc_size_t size, <span class="Type">char</span> *));
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> This function is called when the block being alloc'd, realloc'd, or     </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> freed has an address matching the variable &quot;mallwatch&quot;.  In a debugger, </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> set &quot;mallwatch&quot; to the address of interest, then put a breakpoint on    </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> tr_break.                                                               </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> tr_break __P ((<span class="Type">void</span>));
+_PUBLIC <span class="Type">int</span> tr_break ()
+{
+}
+
+_PRIVATE <span class="Type">void</span> tr_where __P ((<span class="Type">void</span>));
+_PRIVATE <span class="Type">void</span> tr_where ()
+{
+    <span class="Statement">if</span>(_mtrace_file)
+    {
+       (<span class="Type">void</span>)fprintf (mallstream, <span class="Constant">&quot;@ </span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%d</span><span class="Constant"> &quot;</span>, _mtrace_file, _mtrace_line);
+       (<span class="Type">void</span>)fflush(mallstream);
+       _mtrace_file = <span class="Constant">NULL</span>;
+    }
+}
+
+
+_PRIVATE <span class="Type">void</span> tr_phfreehook __P ((<span class="Type">int</span>, __ptr_t));
+_PRIVATE <span class="Type">void</span> tr_phfreehook (<span class="Type">int</span> hdes, __ptr_t ptr)
+{
+  tr_where ();
+
+                                                <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+  (<span class="Type">void</span>)fprintf (mallstream, <span class="Constant">&quot;- </span><span class="Special">%p</span><span class="Special">\n</span><span class="Constant">&quot;</span>, ptr);	<span class="Comment">/*</span><span class="Comment"> Be sure to print it first </span><span class="Comment">*/</span>
+                                                <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+  (<span class="Type">void</span>)fflush(mallstream);
+
+  <span class="Statement">if</span>(ptr == mallwatch)
+     tr_break ();
+  __phfree_hook = tr_old_phfree_hook;
+  phfree (hdes, ptr);
+  __phfree_hook = tr_phfreehook;
+}
+
+
+_PRIVATE __ptr_t tr_phmallochook __P ((<span class="Type">int</span>, __malloc_size_t, <span class="Type">char</span> *));
+_PRIVATE __ptr_t tr_phmallochook (<span class="Type">int</span> hdes, __malloc_size_t size, <span class="Type">char</span> *name)
+{
+  __ptr_t hdr;
+
+  __phmalloc_hook = tr_old_phmalloc_hook;
+  hdr             = (__ptr_t) phmalloc (hdes, size, name);
+  __phmalloc_hook = tr_phmallochook;
+
+  tr_where ();
+
+
+  <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> We could be printing a NULL here; that's OK </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+
+  (<span class="Type">void</span>)fprintf (mallstream, <span class="Constant">&quot;+ </span><span class="Special">%p</span><span class="Constant"> </span><span class="Special">%lx</span><span class="Special">\n</span><span class="Constant">&quot;</span>, hdr, (<span class="Type">unsigned</span> <span class="Type">long</span>)size);
+  (<span class="Type">void</span>)fflush(mallstream);
+
+  <span class="Statement">if</span>(hdr == mallwatch)
+    tr_break ();
+
+  <span class="Statement">return</span> hdr;
+}
+
+
+_PRIVATE __ptr_t tr_phreallochook __P ((<span class="Type">int</span> hdes, __ptr_t, __malloc_size_t, <span class="Type">char</span> *));
+_PRIVATE __ptr_t tr_phreallochook (<span class="Type">int</span> hdes, __ptr_t ptr, __malloc_size_t size, <span class="Type">char</span> *name)
+{
+  __ptr_t hdr;
+
+  <span class="Statement">if</span> (ptr == mallwatch)
+    tr_break ();
+
+  __phfree_hook    = tr_old_phfree_hook;
+  __phmalloc_hook  = tr_old_phmalloc_hook;
+  __phrealloc_hook = tr_old_oealloc_hook;
+  hdr              = (__ptr_t) phrealloc (hdes, ptr, size, name);
+  __phfree_hook    = tr_phfreehook;
+  __phmalloc_hook  = tr_phmallochook;
+  __phrealloc_hook = tr_phreallochook;
+  tr_where ();
+
+  <span class="Statement">if</span> (hdr == <span class="Constant">NULL</span>)
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Failed realloc </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)fprintf (mallstream, <span class="Constant">&quot;realloc failed ! </span><span class="Special">%p</span><span class="Constant"> </span><span class="Special">%lx</span><span class="Special">\n</span><span class="Constant">&quot;</span>, ptr, (<span class="Type">unsigned</span> <span class="Type">long</span>)size);
+  <span class="Statement">else</span>
+    (<span class="Type">void</span>)fprintf (mallstream, <span class="Constant">&quot;&lt; </span><span class="Special">%p</span><span class="Special">\n</span><span class="Constant">&gt; </span><span class="Special">%p</span><span class="Constant"> </span><span class="Special">%lx</span><span class="Special">\n</span><span class="Constant">&quot;</span>, ptr, hdr, (<span class="Type">unsigned</span> <span class="Type">long</span>)size);
+  (<span class="Type">void</span>)fflush(mallstream);
+
+  <span class="Statement">if</span> (hdr == mallwatch)
+    tr_break ();
+
+  <span class="Statement">return</span> hdr;
+}
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> We enable tracing if either the environment variable SHMALLOC_TRACE    </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> is set, or if the variable mallwatch has been patched to an address    </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> that the debugging user wants us to stop on.  When patching mallwatch, </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> don't forget to set a breakpoint on tr_break!                          </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> mtrace(<span class="Type">void</span>)
+{
+  <span class="Type">char</span> *mallfile = (<span class="Type">char</span> *)<span class="Constant">NULL</span>;
+
+
+  <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> Don't panic if we're called more than once </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+
+  <span class="Statement">if</span> (mallstream != <span class="Constant">NULL</span>)
+    <span class="Statement">return</span>;
+
+  mallfile = getenv (mallenv);
+  <span class="Statement">if</span> (mallfile != <span class="Constant">NULL</span> || mallwatch != <span class="Constant">NULL</span>)
+  {
+      mallstream = fopen (mallfile != <span class="Constant">NULL</span> ? mallfile : <span class="Constant">&quot;/dev/null&quot;</span>, <span class="Constant">&quot;w&quot;</span>);
+      <span class="Statement">if</span> (mallstream != <span class="Constant">NULL</span>)
+      {
+
+          <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+	  <span class="Comment">/*</span><span class="Comment"> Be sure it doesn't malloc its buffer! </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+	  setbuf (mallstream, mallbuf);
+	  (<span class="Type">void</span>)fprintf (mallstream, <span class="Constant">&quot;= Start</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fflush(mallstream);
+
+	  tr_old_phfree_hook     = __phfree_hook;
+	  __phfree_hook          = tr_ohfreehook;
+	  tr_old_phmalloc_hook   = __phmalloc_hook;
+	  __phmalloc_hook        = tr_phmallochook;
+	  tr_old_phrealloc_hook  = __phrealloc_hook;
+	  __phrealloc_hook       = tr_phreallochook;
+	}
+    }
+}
+
+
+_PUBLIC <span class="Type">void</span> muntrace (<span class="Type">void</span>)
+{
+  <span class="Statement">if</span> (mallstream == (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>)
+    <span class="Statement">return</span>;
+
+  (<span class="Type">void</span>)fprintf (mallstream, <span class="Constant">&quot;= End</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+  (<span class="Type">void</span>)fflush(mallstream);
+  (<span class="Type">void</span>)fclose (mallstream);
+
+  mallstream       = (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>;
+  __ohfree_hook    = tr_old_phfree_hook;
+  __phmalloc_hook  = tr_old_phmalloc_hook;
+  __phrealloc_hook = tr_old_phrealloc_hook;
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

@@ -1,0 +1,434 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/larraytest.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Purpose: Test process list vector and matrix library </span>
+
+<span class="Comment">     Author:  M.A. O'Neill</span>
+<span class="Comment">              Tumbling Dice Ltd</span>
+<span class="Comment">              Gosforth</span>
+<span class="Comment">              Newcastle upon Tyne</span>
+<span class="Comment">              NE3 4RT</span>
+<span class="Comment">              United Kingdom</span>
+
+<span class="Comment">    Version: 2.00 </span>
+<span class="Comment">    Dated:   4th January 2022</span>
+<span class="Comment">    E-mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">-------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define TEST_THREADS</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;me.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;utils.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;netlib.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;psrp.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;ftype.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/file.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/types.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/mman.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;hipl_hdr.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;signal.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;errno.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;pheap.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;vstamp.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;casino.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;hash.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;tad.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;larray.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;math.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stdlib.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Version of this application </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define LARRAYTEST_VERSION    </span><span class="Constant">&quot;2.00&quot;</span>
+
+<span class="PreProc">#ifdef BUBBLE_MEMORY_SUPPORT</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;bubble.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> BUBBLE_MEMORY_SUPPORT </span><span class="Comment">*/</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Get application information for slot manager ...</span>
+<span class="Comment">------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Slot information function </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> larraytest_slot(<span class="Type">int</span> level)
+{   (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;int app (PSRP) larraytest </span><span class="Special">%s</span><span class="Constant">: [ANSI C, PUPS MTD D]</span><span class="Special">\n</span><span class="Constant">&quot;</span>,LARRAYTEST_VERSION);
+
+    <span class="Statement">if</span>(level &gt; <span class="Constant">1</span>)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;(C) 2013-2022 Tumbling Dice</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Author: M.A. ONeill</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Unassigned PSRP dynamic process (PUPS format) (built </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,<span class="Constant">__DATE__</span>);
+    }
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Application usage function </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> larraytest_usage(<span class="Type">void</span>)
+
+{   (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[-state]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[&gt;&amp; &lt;ASCII log file&gt;]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Signals</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;SIGINIT SIGCHAN SIGPSRP: Process status [PSRP] request (protocol </span><span class="Special">%2.2f</span><span class="Constant">F)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,PSRP_PROTOCOL_VERSION);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;SIGCLIENT: tell client server is about to segment</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+
+<span class="PreProc">#ifdef CRUI_SUPPORT</span>
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;SIGCHECK SIGRESTART:      checkpoint and restart signals</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> CRIU_SUPPORT </span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;SIGALIVE: check for existence of client on signal dispatch host</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+}
+
+
+<span class="PreProc">#ifdef SLOT</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;slotman.h&gt;</span>
+_EXTERN <span class="Type">void</span> (* SLOT)() __attribute__ ((aligned(<span class="Constant">16</span>))) = larraytest_slot;
+_EXTERN <span class="Type">void</span> (* USE )() __attribute__ ((aligned(<span class="Constant">16</span>))) = larraytest_usage;
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> SLOT </span><span class="Comment">*/</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">   Application build date ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_EXTERN <span class="Type">char</span> appl_build_time[SSIZE] = <span class="Constant">__TIME__</span>;
+_EXTERN <span class="Type">char</span> appl_build_date[SSIZE] = <span class="Constant">__DATE__</span>;
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Software I.D. tag (used if CKPT support enabled to discard stale dynamic</span>
+<span class="Comment">    checkpoint files) ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define VTAG  </span><span class="Constant">3978</span>
+
+<span class="Type">extern</span> <span class="Type">int</span> appl_vtag = VTAG;
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Main - decode command tail then interpolate using parameters supplied by user ...</span>
+<span class="Comment">--------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> pups_main(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   <span class="Type">int</span> i,
+        j,
+        pos,
+        bytes,
+        components,
+        iter = <span class="Constant">0</span>;
+
+    FTYPE pattern_vector[<span class="Constant">32</span>],
+          pattern_matrix[<span class="Constant">32</span>*<span class="Constant">32</span>];
+
+    <span class="Type">unsigned</span> <span class="Type">char</span> *ptr = (<span class="Type">unsigned</span> <span class="Type">char</span> *)<span class="Constant">NULL</span>;
+    vlist_type *vector = (vlist_type *)   <span class="Constant">NULL</span>;
+    mlist_type *matrix = (mlist_type *)   <span class="Constant">NULL</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Do not allow PSRP clients to connect until we are initialised </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    psrp_ignore_requests();
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Get standard items form the command tail </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+
+    pups_std_init(TRUE,
+                  &amp;argc,
+                  TEST_VERSION,
+                  <span class="Constant">&quot;M.A. O'Neill&quot;</span>,
+                  <span class="Constant">&quot;(PSRP) larraytest&quot;</span>,
+                  <span class="Constant">&quot;2022&quot;</span>,
+                  argv);
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Complain about any unparsed arguments </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+    pups_t_arg_errs(argd,args);
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Initialise PSRP function dispatch handler - note that test is fully dynamic and prepared </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> to import both dynamic functions and data objects                                        </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    psrp_init(PSRP_DYNAMIC_FUNCTION | PSRP_STATIC_DATABAG | PSRP_HOMEOSTATIC_STREAMS,<span class="Constant">NULL</span>);
+    (<span class="Type">void</span>)psrp_load_default_dispatch_table(<span class="Constant">stderr</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Tell PSRP clients we are ready to service their requests </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+
+    psrp_accept_requests();
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Seed random number generator </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)srand48((<span class="Type">long</span>) getpid());
+
+
+<span class="PreProc">    #ifdef SOAK_TEST</span>
+<span class="PreProc">    #ifdef TEST_ALLOC</span>
+    <span class="Statement">while</span>(<span class="Constant">1</span>)
+    {
+
+         <span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+         <span class="Comment">/*</span><span class="Comment"> Excercise bubble memory allocator </span><span class="Comment">*/</span>
+         <span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+
+         bytes = (<span class="Type">int</span>)(drand48()*<span class="Constant">500000000.0</span>);
+         ptr   = (<span class="Type">unsigned</span> <span class="Type">char</span> *)malloc(bytes);
+
+         (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;ITERATION </span><span class="Special">%04d</span><span class="Constant"> allocating and freeing </span><span class="Special">%04d</span><span class="Constant"> bytes of memory (ptr: 0x</span><span class="Special">%010x</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,iter,bytes,ptr);
+         (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+         <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;bytes; ++i)
+            ptr[i] = <span class="Constant">'w'</span>;
+
+         (<span class="Type">void</span>)free((<span class="Type">void</span> *)ptr);
+
+         (<span class="Type">void</span>)pups_sleep(<span class="Constant">1</span>);
+
+         (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;ITERATION </span><span class="Special">%d</span><span class="Constant"> done</span><span class="Special">\n</span><span class="Constant">&quot;</span>,iter++);
+         (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+    }
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> TEST_ALLOC </span><span class="Comment">*/</span>
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> SOAK_TEST  </span><span class="Comment">*/</span>
+
+
+<span class="PreProc">    #ifdef TEST_VECTOR</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Generate random vector </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">32</span>; ++i)
+    {  <span class="Statement">if</span>(drand48() &gt; <span class="Constant">0.5</span>)
+          pattern_vector[i] = <span class="Constant">100.0</span>*drand48() + <span class="Constant">1.0</span>;
+       <span class="Statement">else</span>
+          pattern_vector[i] = <span class="Constant">0.0</span>;
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Create a list vector </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+    components = (<span class="Type">int</span>)(drand48()*<span class="Constant">90.0</span>) + <span class="Constant">10</span>;
+    vector = lvector_create(<span class="Constant">stderr</span>,components,pattern_vector);
+
+    <span class="Comment">// Name it</span>
+    (<span class="Type">void</span>)lvector_set_name(<span class="Constant">&quot;listVector&quot;</span>,vector);
+
+    <span class="Comment">// Print it </span>
+    (<span class="Type">void</span>)lvector_print(<span class="Constant">stderr</span>,<span class="Constant">4</span>,vector);
+
+    <span class="Comment">// inflate it</span>
+    vector = lvector_inflate(FALSE, vector);
+
+    <span class="Comment">// Print it (inflated)</span>
+    (<span class="Type">void</span>)lvector_print(<span class="Constant">stderr</span>,<span class="Constant">4</span>,vector);
+
+    <span class="Comment">// deflate it </span>
+    vector = lvector_deflate(<span class="Constant">stderr</span>, FALSE, <span class="Constant">NULL</span>, vector);
+
+    <span class="Comment">// Print it (deflated)</span>
+    (<span class="Type">void</span>)lvector_print(<span class="Constant">stderr</span>,<span class="Constant">4</span>,vector);
+
+    <span class="Comment">// Save it to an ascii file</span>
+    (<span class="Type">void</span>)lvector_save_to_file(<span class="Constant">&quot;fred.vla&quot;</span>,vector);
+
+    <span class="Comment">// Destroy it</span>
+    vector = lvector_destroy(vector);
+
+    <span class="Comment">// Reload it/</span>
+    vector = lvector_load_from_file(<span class="Constant">&quot;fred.vla&quot;</span>);
+
+    <span class="Comment">// Name it</span>
+    (<span class="Type">void</span>)lvector_set_name(<span class="Constant">&quot;listVectorASCIIReload&quot;</span>,vector);
+
+    <span class="Comment">// Print it (deflated) */</span>
+    (<span class="Type">void</span>)lvector_print(<span class="Constant">stderr</span>,<span class="Constant">5</span>,vector);
+
+    <span class="Comment">// Rename it</span>
+    (<span class="Type">void</span>)lvector_set_name(<span class="Constant">&quot;listVectorBinaryReload&quot;</span>,vector);
+
+    <span class="Comment">// Save it as a binary file </span>
+    (<span class="Type">void</span>)lvector_save_to_binary_file(<span class="Constant">&quot;fred.vlb&quot;</span>,vector);
+
+    <span class="Comment">// Destroy it</span>
+    vector = lvector_destroy(vector);
+
+    <span class="Comment">// Reload it from binary file */</span>
+    vector = lvector_load_from_binary_file(<span class="Constant">&quot;fred.vlb&quot;</span>);
+
+    <span class="Comment">// Print it (deflated)</span>
+    (<span class="Type">void</span>)lvector_print(<span class="Constant">stderr</span>,<span class="Constant">5</span>,vector);
+
+    <span class="Comment">// Destroy it</span>
+    vector = lvector_destroy(vector);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> TEST_VECTOR </span><span class="Comment">*/</span>
+
+
+<span class="PreProc">    #ifdef TEST_MATRIX</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Generate random matrix </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">32</span>; ++i)
+    {  <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;<span class="Constant">32</span>; ++j)
+       {  pos = i*<span class="Constant">32</span> + j;
+
+          <span class="Statement">if</span>(drand48() &lt; <span class="Constant">0.25</span>)
+             pattern_matrix[pos] = <span class="Constant">100.0</span>*drand48() + <span class="Constant">1.0</span>;
+          <span class="Statement">else</span>
+             pattern_matrix[pos] = <span class="Constant">0.0</span>;
+       }
+    }
+
+    <span class="Comment">// Create a matrix </span>
+    matrix = lmatrix_create(<span class="Constant">stderr</span>,<span class="Constant">32</span>,<span class="Constant">32</span>,pattern_matrix);
+
+    <span class="Comment">// Name it </span>
+    (<span class="Type">void</span>)lmatrix_set_name(<span class="Constant">&quot;listMatrix&quot;</span>,matrix);
+
+    <span class="Comment">// Print it</span>
+    (<span class="Type">void</span>)lmatrix_print(<span class="Constant">stderr</span>,<span class="Constant">4</span>,matrix);
+
+    <span class="Comment">// inflate it </span>
+    matrix = lmatrix_inflate(FALSE, matrix);
+
+    <span class="Comment">// Print it (inflated)</span>
+    (<span class="Type">void</span>)lmatrix_print(<span class="Constant">stderr</span>,<span class="Constant">4</span>,matrix);
+
+    <span class="Comment">// deflate it</span>
+    matrix = lmatrix_deflate(<span class="Constant">stderr</span>, FALSE, <span class="Constant">NULL</span>, matrix);
+
+    <span class="Comment">// Print it (deflated)</span>
+    (<span class="Type">void</span>)lmatrix_print(<span class="Constant">stderr</span>,<span class="Constant">4</span>,matrix);
+
+    <span class="Comment">// Save it to an ascii file </span>
+    (<span class="Type">void</span>)lmatrix_save_to_file(<span class="Constant">&quot;fred.mla&quot;</span>,matrix);
+
+    <span class="Comment">// Destroy it</span>
+    (<span class="Type">void</span>)lmatrix_destroy(matrix);
+
+    <span class="Comment">// Reload it</span>
+    matrix = lmatrix_load_from_file(<span class="Constant">&quot;fred.mla&quot;</span>);
+
+    <span class="Comment">// Name it</span>
+    (<span class="Type">void</span>)lmatrix_set_name(<span class="Constant">&quot;listMatrixASCIIReload&quot;</span>,matrix);
+
+    <span class="Comment">// Print it (deflated)</span>
+    (<span class="Type">void</span>)lmatrix_print(<span class="Constant">stderr</span>,<span class="Constant">5</span>,matrix);
+
+    <span class="Comment">// Rename it</span>
+    (<span class="Type">void</span>)lmatrix_set_name(<span class="Constant">&quot;listMatrixBinaryReload&quot;</span>,matrix);
+
+    <span class="Comment">// Save it as a binary file</span>
+    (<span class="Type">void</span>)lmatrix_save_to_binary_file(<span class="Constant">&quot;fred.mlb&quot;</span>,matrix);
+
+    <span class="Comment">// Destroy it</span>
+    (<span class="Type">void</span>)lmatrix_destroy(matrix);
+
+    <span class="Comment">// Reload it from binary file</span>
+    matrix = lmatrix_load_from_binary_file(<span class="Constant">&quot;fred.mlb&quot;</span>);
+
+    <span class="Comment">// Print it (deflated)</span>
+    (<span class="Type">void</span>)lmatrix_print(<span class="Constant">stderr</span>,<span class="Constant">5</span>,matrix);
+
+    <span class="Comment">// Destroy it</span>
+    (<span class="Type">void</span>)lmatrix_destroy(matrix);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> TEST_MATRIX </span><span class="Comment">*/</span>
+
+
+<span class="PreProc">    #if defined(TEST_VECTOR) || defined(TEST_MATRIX)</span>
+<span class="PreProc">    #ifdef SOAK_TEST</span>
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;SOAK test iteration </span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,iter++);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+    (<span class="Type">void</span>)pups_sleep(<span class="Constant">1</span>);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> SOAK_TEST </span><span class="Comment">*/</span>
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> defined(TEST_VECTOR) || defined(TEST_MATRIX) </span><span class="Comment">*/</span>
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Exit from PUPS/PSRP application cleaning up any mess it may have created </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    pups_exit(<span class="Constant">0</span>);
+}
+
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

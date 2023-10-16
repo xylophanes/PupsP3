@@ -32,7 +32,7 @@ VECTOR \- vector PSRP request to remote server
 .B -server
 .I server 
 !
->& <log file>
+[2> <log file>]
 .br
 
 .SH DESCRIPTION
@@ -42,7 +42,6 @@ vectors commands to remote PSRP
 Typically it is started by a PSRP server when it migrates in order to
 maintain conenctivity with local clients.
 .br
-
 
 .SH OPTIONS
 
@@ -144,6 +143,18 @@ command name of target PSRP server (on remote host).
 .I vector(1)
 makes use of PUPS libraries [Portable UNIX Programming System], see
 .I pups(3)
+.br
+
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
 .br
 
 .SH ENVIRONMENT VARIABLES

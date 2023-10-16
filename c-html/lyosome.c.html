@@ -1,0 +1,553 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/lyosome.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------------</span>
+<span class="Comment">     Purpose: Delayed file destructor process </span>
+
+<span class="Comment">     Author:  M.A. O'Neill</span>
+<span class="Comment">              Tumbling Dice Ltd</span>
+<span class="Comment">              Gosforth</span>
+<span class="Comment">              Newcastle upon Tyne</span>
+<span class="Comment">              NE3 4RT</span>
+<span class="Comment">              United Kingdom</span>
+
+<span class="Comment">     Version: 2.01 </span>
+<span class="Comment">     Dated:   24th May 2022</span>
+<span class="Comment">     E-mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">---------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;stdio.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;bsd/string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;xtypes.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stdlib.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/types.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/stat.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;errno.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;signal.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;time.h&gt;</span>
+
+
+<span class="PreProc">#define _XOPEN_SOURCE</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------------------</span>
+<span class="Comment">    Defines which are private to this application ...</span>
+<span class="Comment">--------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Vesion of lyosome </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define  LYOSOME_VERSION    </span><span class="Constant">&quot;2.01&quot;</span>
+<span class="PreProc">#define  FOREVER            (-</span><span class="Constant">9999.0</span><span class="PreProc">)</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> String size </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define SSIZE               </span><span class="Constant">2048</span><span class="PreProc"> </span>
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------------------</span>
+<span class="Comment">    Variable which are private to this application ...</span>
+<span class="Comment">--------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">char</span> principal[SSIZE]           = <span class="Constant">&quot;&quot;</span>;
+_PRIVATE <span class="Type">char</span> principal_link[SSIZE]      = <span class="Constant">&quot;&quot;</span>;
+_PRIVATE <span class="Type">char</span> hostname[SSIZE]            = <span class="Constant">&quot;&quot;</span>;
+_PRIVATE <span class="Type">char</span> pname[SSIZE]               = <span class="Constant">&quot;&quot;</span>;
+_PRIVATE <span class="Type">char</span> new_pname[SSIZE]           = <span class="Constant">&quot;&quot;</span>;
+_PRIVATE <span class="Type">char</span> ppath[SSIZE]               = <span class="Constant">&quot;&quot;</span>;
+_PRIVATE <span class="Type">int</span>  pname_pos                  = <span class="Constant">0</span>;
+_PRIVATE _BOOLEAN principal_is_directory = FALSE;
+_PRIVATE _BOOLEAN do_protect             = FALSE;
+_PRIVATE _BOOLEAN do_verbose             = FALSE;
+_PRIVATE <span class="Type">time_t</span>   start_time;
+_PRIVATE <span class="Type">time_t</span>   lifetime               = <span class="Constant">60</span>;
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------------------</span>
+<span class="Comment">    Functions which are local to this application ...</span>
+<span class="Comment">--------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Handler for SIGALRM </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> exit_handler(<span class="Type">void</span>)
+
+{   <span class="Statement">if</span>(principal_is_directory == TRUE)
+    {  <span class="Type">char</span> rm_cmd[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+       (<span class="Type">void</span>)snprintf(rm_cmd,SSIZE,<span class="Constant">&quot;rm -rf </span><span class="Special">%s</span><span class="Constant">&quot;</span>,principal);
+       (<span class="Type">void</span>)system(rm_cmd);
+    }
+    <span class="Statement">else</span>
+    {  (<span class="Type">void</span>)unlink(principal_link);
+       (<span class="Type">void</span>)unlink(principal);
+    }
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): lifetime of principal [</span><span class="Special">%s</span><span class="Constant">] expired -- deleted</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,pname,getpid(),hostname,principal);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+    exit(<span class="Constant">0</span>);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Handler for SIGTERM </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> term_handler(<span class="Type">int</span> signum)
+
+{   (<span class="Type">void</span>)unlink(principal_link);
+
+    <span class="Statement">if</span>(strncmp(ppath,<span class="Constant">&quot;/tmp&quot;</span>,<span class="Constant">4</span>) == <span class="Constant">0</span>)
+       (<span class="Type">void</span>)unlink(ppath);
+
+    <span class="Statement">if</span>(signum == <span class="Constant">SIGTERM</span>)
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): terminated by SIGTERM</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,pname,getpid(),hostname);
+    <span class="Statement">else</span> <span class="Statement">if</span>(signum == <span class="Constant">SIGINT</span>)
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): terminated by SIGINT</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>, pname,getpid(),hostname);
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): terminated by signal </span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,pname,getpid(),hostname,signum);
+
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+    exit(<span class="Constant">0</span>);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> (Lifetime) reset handler </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> rejuvenation_handler(<span class="Type">int</span> signum)
+{
+    <span class="Statement">if</span>(lifetime != FOREVER)
+    {  start_time = time(<span class="Constant">NULL</span>);
+
+       <span class="Statement">if</span>(do_verbose == TRUE)
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): lifetime (of principal </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant">) reset (</span><span class="Special">%d</span><span class="Constant"> seconds)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,pname,getpid(),hostname,principal,lifetime);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+    }
+    <span class="Statement">else</span>
+    {  <span class="Statement">if</span>(do_verbose == TRUE)
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): lifetime (of principal </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant">) is unlimited</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,pname,getpid(),hostname,principal);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+    }
+
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Status handler </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> status_handler(<span class="Type">int</span> signum)
+
+{   <span class="Type">time_t</span> lifetime_left;
+    <span class="Type">char</span> ftype[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+    lifetime_left = lifetime - (time((<span class="Type">time_t</span>)<span class="Constant">NULL</span>) - start_time);
+
+    <span class="Statement">if</span>(principal_is_directory == TRUE)
+      (<span class="Type">void</span>)strlcpy(ftype,<span class="Constant">&quot;(directory)&quot;</span>,SSIZE);
+    <span class="Statement">else</span>
+      (<span class="Type">void</span>)strlcpy(ftype,<span class="Constant">&quot;(file)&quot;</span>,SSIZE);
+
+    <span class="Statement">if</span>(do_protect)
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): (protected) principal </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> will expire in </span><span class="Special">%d</span><span class="Constant"> seconds</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,pname,getpid(),hostname,ftype,principal,lifetime_left);
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): principal </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> will expire in </span><span class="Special">%d</span><span class="Constant"> seconds</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,pname,getpid(),hostname,ftype,principal,lifetime_left);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+    <span class="Statement">return</span>;
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Extract leaf from the end of pathname </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _BOOLEAN strleaf(<span class="Type">char</span> *pathname, <span class="Type">char</span> *leaf)
+
+{   <span class="Type">int</span> i;
+
+    <span class="Statement">for</span>(i=strlen(pathname); i&gt;= <span class="Constant">0</span>; --i)
+    {  <span class="Statement">if</span>(pathname[i] == <span class="Constant">'/'</span>)
+          <span class="Statement">break</span>;
+    }
+
+    <span class="Statement">if</span>(i &gt; <span class="Constant">0</span>)
+       (<span class="Type">void</span>)strlcpy(leaf,(<span class="Type">char</span> *)&amp;pathname[i+<span class="Constant">1</span>],SSIZE);
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)strlcpy(leaf,pathname,SSIZE);
+
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Make sure path is absolute </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> absolute_path(<span class="Type">char</span> *pathname, <span class="Type">char</span> *absolute_pathname)
+
+{   <span class="Type">char</span> leaf[SSIZE]         = <span class="Constant">&quot;&quot;</span>,
+         current_path[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+    <span class="Statement">if</span>(pathname[<span class="Constant">0</span>] == <span class="Constant">'/'</span>)
+       (<span class="Type">void</span>)strlcpy(absolute_pathname,pathname,SSIZE);
+    <span class="Statement">else</span>
+    {  (<span class="Type">void</span>)strleaf(pathname, leaf);
+       (<span class="Type">void</span>)getcwd(current_path,SSIZE);
+       (<span class="Type">void</span>)snprintf(absolute_pathname,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/</span><span class="Special">%s</span><span class="Constant">&quot;</span>,current_path,leaf);
+    }
+
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------------------</span>
+<span class="Comment">    Main entry point to this application ...</span>
+<span class="Comment">--------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> main(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   <span class="Type">int</span> i,
+        decoded  = <span class="Constant">0</span>,
+        p_index  = <span class="Constant">1</span>;
+
+    <span class="Type">char</span>     tmpstr[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+    _BOOLEAN do_daemon   = FALSE;
+
+    sigset_t    set;
+    <span class="Type">struct</span> stat statBuf;
+
+    (<span class="Type">void</span>)gethostname(hostname,SSIZE);
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Get process name (stripping out branch from path </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)strncpy(ppath,argv[<span class="Constant">0</span>],SSIZE);
+    (<span class="Type">void</span>)absolute_path(ppath,tmpstr);
+    (<span class="Type">void</span>)strlcpy(ppath,tmpstr,SSIZE);
+    (<span class="Type">void</span>)strleaf(ppath,pname);
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Decode command tail </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(argc == <span class="Constant">1</span> || strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;-usage&quot;</span>) == <span class="Constant">0</span>)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">lyosome lightweight file destructor version </span><span class="Special">%s</span><span class="Constant">, (C) Tumbling Dice, 2004-2022 (built </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,LYOSOME_VERSION,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">Usage: lyosome [-lifetime &lt;destruct delay in seconds:60&gt;] | [-verbose:FALSE]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;               [-always:FALSE] [-d:FALSE] [-protect:FALSE] !name of file to protect!</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;LYOSOME is free software, covered by the GNU General Public License, and you are</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;welcome to change it and/or distribute copies of it under certain conditions.</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;See the GPL and LGPL licences at www.gnu.org for further details</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;LYOSOME comes with ABSOLUTELY NO WARRANTY</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       exit(<span class="Constant">0</span>);
+    }
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;argc-<span class="Constant">1</span>; ++i)
+    {  <span class="Statement">if</span>(strcmp(argv[i],<span class="Constant">&quot;-lifetime&quot;</span>) == <span class="Constant">0</span>)
+       {  <span class="Statement">if</span>(i == argc - <span class="Constant">2</span> || argv[i+<span class="Constant">1</span>][<span class="Constant">0</span>] == <span class="Constant">'-'</span> || sscanf(argv[i+<span class="Constant">1</span>],<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">&quot;</span>,&amp;lifetime) != <span class="Constant">1</span>)
+          {  <span class="Statement">if</span>(do_verbose == TRUE)
+             {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): time must be a positive integer</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,pname,getpid(),hostname);
+                (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+             }
+
+             exit(<span class="Constant">255</span>);
+          }
+
+          ++i;
+          decoded += <span class="Constant">2</span>;;
+       }
+       <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(argv[i],<span class="Constant">&quot;-always&quot;</span>) == <span class="Constant">0</span>)
+       {  p_index  = <span class="Constant">2</span>;
+          lifetime = FOREVER;
+          ++decoded;
+       }
+       <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(argv[i],<span class="Constant">&quot;-protect&quot;</span>) == <span class="Constant">0</span>)
+       {  do_protect = TRUE;
+          ++decoded;
+       }
+       <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(argv[i],<span class="Constant">&quot;-d&quot;</span>) == <span class="Constant">0</span>)
+       {  do_daemon  = TRUE;
+
+          <span class="Statement">if</span>(i &lt;= argc - <span class="Constant">2</span> &amp;&amp; argv[i+<span class="Constant">1</span>][<span class="Constant">0</span>] != <span class="Constant">'-'</span>)
+          {  (<span class="Type">void</span>)sscanf(argv[i+<span class="Constant">1</span>],<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">&quot;</span>,new_pname);
+
+             <span class="Statement">if</span>(strcmp(pname,new_pname) == <span class="Constant">0</span>)
+             {  <span class="Statement">if</span>(do_verbose == TRUE)
+                {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): new and old process names cannot be the same</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,pname,getpid(),hostname);
+                   (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+                }
+
+                exit(<span class="Constant">255</span>);
+             }
+
+             pname_pos = i + <span class="Constant">1</span>;
+
+             ++i;
+             decoded += <span class="Constant">2</span>;
+          }
+          <span class="Statement">else</span>
+             ++decoded;
+       }
+       <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(argv[i],<span class="Constant">&quot;-verbose&quot;</span>) == <span class="Constant">0</span>)
+       {  do_verbose = TRUE;
+          ++decoded;
+       }
+    }
+
+    <span class="Statement">if</span>(decoded &lt; argc - <span class="Constant">2</span>)
+    {  <span class="Statement">if</span>(do_verbose == TRUE)
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): command tail items unparsed</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,pname,getpid(),hostname);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+
+       exit(<span class="Constant">255</span>);
+    }
+
+    p_index = argc - <span class="Constant">1</span>;
+
+    (<span class="Type">void</span>)strlcpy(principal,argv[p_index],SSIZE);
+    <span class="Statement">if</span>(access(principal,F_OK | R_OK | W_OK) == (-<span class="Constant">1</span>))
+    {  <span class="Statement">if</span>(do_verbose == TRUE)
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): cannot find principal to protect [</span><span class="Special">%s</span><span class="Constant">]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,pname,getpid(),hostname,principal);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+
+       exit(<span class="Constant">255</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set up signal handlers </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)sigemptyset(&amp;set);
+    (<span class="Type">void</span>)sigprocmask(SIG_SETMASK,&amp;set,(sigset_t *)<span class="Constant">NULL</span>);
+
+    (<span class="Type">void</span>)signal(<span class="Constant">SIGTERM</span>, (<span class="Type">void</span> *)&amp;term_handler);
+    (<span class="Type">void</span>)signal(<span class="Constant">SIGINT</span>,  (<span class="Type">void</span> *)&amp;term_handler);
+    (<span class="Type">void</span>)signal(<span class="Constant">SIGUSR1</span>, (<span class="Type">void</span> *)&amp;status_handler);
+    (<span class="Type">void</span>)signal(<span class="Constant">SIGUSR2</span>, (<span class="Type">void</span> *)&amp;rejuvenation_handler);
+
+    (<span class="Type">void</span>)stat(principal,&amp;statBuf);
+    <span class="Statement">if</span>(S_ISDIR(statBuf.st_mode))
+    {  <span class="Statement">if</span>(do_verbose == TRUE)
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): destroying principal directory </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> after </span><span class="Special">%d</span><span class="Constant"> seconds</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,pname,getpid(),hostname,principal,lifetime);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+
+       principal_is_directory = TRUE;
+       <span class="Statement">if</span>(do_protect == TRUE)
+       {  do_protect = FALSE;
+
+          <span class="Statement">if</span>(do_verbose == TRUE)
+          {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): cannot protect directories (yet)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,pname,getpid(),hostname);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+          }
+       }
+    }
+    <span class="Statement">else</span> <span class="Statement">if</span>(do_protect == TRUE)
+    {
+
+       <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> If we have an absolute path make protective link on its leaf </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">for</span>(i=strlen(principal); i&gt;=<span class="Constant">0</span>; --i)
+       {
+
+          <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Is filename actually a pathname? </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+          <span class="Statement">if</span>(principal[i] == <span class="Constant">'/'</span>)
+          {  <span class="Type">char</span> leaf[SSIZE]   = <span class="Constant">&quot;&quot;</span>,
+                  branch[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+             (<span class="Type">void</span>)strlcpy(leaf,&amp;principal[i+<span class="Constant">1</span>],SSIZE);
+             (<span class="Type">void</span>)strlcpy(branch,principal,SSIZE);
+             branch[i+<span class="Constant">1</span>] = <span class="Special">'\0'</span>;
+
+             (<span class="Type">void</span>)snprintf(principal_link,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">.</span><span class="Special">%s</span><span class="Constant">&quot;</span>,branch,leaf);
+             <span class="Statement">goto</span> dot_inserted;
+          }
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Simple filename </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+
+       (<span class="Type">void</span>)snprintf(principal_link,SSIZE,<span class="Constant">&quot;.</span><span class="Special">%s</span><span class="Constant">.</span><span class="Special">%d</span><span class="Constant">.tmp&quot;</span>,principal,getpid());
+
+<span class="Statement">dot_inserted</span>:
+
+       <span class="Statement">if</span>(link(principal,principal_link) == (-<span class="Constant">1</span>))
+       {  <span class="Statement">if</span>(do_verbose == TRUE)
+          {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">ERROR </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): could not make protective link to principal [</span><span class="Special">%s</span><span class="Constant">] -- aborting</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,pname,getpid(),hostname,principal);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+          }
+
+          exit(<span class="Constant">255</span>);
+       }
+       <span class="Statement">else</span>
+       {  <span class="Statement">if</span>(do_verbose == TRUE)
+          {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): destroying principal file </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> after </span><span class="Special">%d</span><span class="Constant"> seconds</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,pname,getpid(),hostname,principal,lifetime);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+          }
+       }
+    }
+
+    <span class="Statement">if</span>(do_daemon == TRUE)
+    {  <span class="Type">char</span> tmpPathName[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+       <span class="Type">int</span>  nargc            = <span class="Constant">1</span>;
+       <span class="Type">char</span> **nargv          = (<span class="Type">char</span> **)<span class="Constant">NULL</span>;
+
+       <span class="Statement">if</span>(strcmp(new_pname,<span class="Constant">&quot;&quot;</span>) == <span class="Constant">0</span>)
+          (<span class="Type">void</span>)snprintf(tmpPathName,SSIZE,<span class="Constant">&quot;/tmp/lyosome&quot;</span>);
+       <span class="Statement">else</span>
+          (<span class="Type">void</span>)snprintf(tmpPathName,SSIZE,<span class="Constant">&quot;/tmp/</span><span class="Special">%s</span><span class="Constant">&quot;</span>,new_pname);
+
+       <span class="Statement">if</span>(symlink(ppath,tmpPathName) == (-<span class="Constant">1</span>))
+       {  <span class="Statement">if</span>(do_verbose == TRUE)
+          {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): failed to link (lyosome) binary</span><span class="Special">\n</span><span class="Constant">&quot;</span>,pname,getpid(),hostname);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+          }
+
+          exit(<span class="Constant">255</span>);
+       }
+
+       nargv = (<span class="Type">char</span> **)calloc(<span class="Constant">64</span>,<span class="Statement">sizeof</span>(<span class="Type">char</span> *));
+       nargv[<span class="Constant">0</span>] = (<span class="Type">char</span> *)malloc(SSIZE*<span class="Statement">sizeof</span>(<span class="Type">unsigned</span> <span class="Type">char</span>));
+       (<span class="Type">void</span>)strlcpy(nargv[<span class="Constant">0</span>],tmpPathName,SSIZE);
+
+       <span class="Statement">for</span>(i=<span class="Constant">1</span>; i&lt;argc; ++i)
+       {  <span class="Statement">if</span>(i != pname_pos &amp;&amp; strcmp(argv[i],<span class="Constant">&quot;-d&quot;</span>) != <span class="Constant">0</span>)
+          {  nargv[nargc] = (<span class="Type">char</span> *)malloc(SSIZE*<span class="Statement">sizeof</span>(<span class="Type">unsigned</span> <span class="Type">char</span>));
+             (<span class="Type">void</span>)strlcpy(nargv[nargc],argv[i],SSIZE);
+
+             ++nargc;
+          }
+       }
+
+       nargv[nargc] = (<span class="Type">char</span> *)<span class="Constant">NULL</span>;
+
+       <span class="Statement">if</span>(fork() != <span class="Constant">0</span>)
+          _exit(<span class="Constant">0</span>);
+       <span class="Statement">else</span>
+       {  <span class="Statement">if</span>(do_verbose == FALSE)
+          {  (<span class="Type">void</span>)close(<span class="Constant">0</span>);
+             (<span class="Type">void</span>)close(<span class="Constant">1</span>);
+             (<span class="Type">void</span>)close(<span class="Constant">2</span>);
+          }
+
+          (<span class="Type">void</span>)setsid();
+          (<span class="Type">void</span>)execvp(tmpPathName,nargv);
+
+          _exit(<span class="Constant">255</span>);
+       }
+    }
+    <span class="Statement">else</span> <span class="Statement">if</span>(strncmp(ppath,<span class="Constant">&quot;/tmp&quot;</span>,<span class="Constant">4</span>) == <span class="Constant">0</span>)
+       (<span class="Type">void</span>)unlink(ppath);
+
+    <span class="Statement">if</span>(lifetime != FOREVER)
+       start_time = time((<span class="Type">time_t</span>)<span class="Constant">NULL</span>);
+
+    <span class="Statement">while</span>(TRUE)
+    {   <span class="Statement">if</span>(do_protect == TRUE)
+        {  <span class="Statement">if</span>(access(principal,F_OK | R_OK | W_OK) == (-<span class="Constant">1</span>))
+           {  (<span class="Type">void</span>)link(principal_link,principal);
+              <span class="Statement">if</span>(do_verbose == TRUE)
+              {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): attempt to delete principal [</span><span class="Special">%s</span><span class="Constant">] -- relinking</span><span class="Special">\n</span><span class="Constant">&quot;</span>,pname,getpid(),hostname,principal);
+                 (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+              }
+           }
+           <span class="Statement">else</span> <span class="Statement">if</span>(access(principal_link,F_OK | R_OK | W_OK) == (-<span class="Constant">1</span>))
+              (<span class="Type">void</span>)link(principal,principal_link);
+           <span class="Statement">else</span> <span class="Statement">if</span>(access(principal,F_OK | R_OK | W_OK) == (-<span class="Constant">1</span>) &amp;&amp; access(principal_link,F_OK | R_OK | W_OK) == (-<span class="Constant">1</span>))
+           {  <span class="Statement">if</span>(do_verbose == TRUE)
+              {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): lost principal [</span><span class="Special">%s</span><span class="Constant">] -- aborting</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,pname,getpid(),hostname,principal);
+                 (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+              }
+
+              exit(<span class="Constant">255</span>);
+           }
+        }
+        <span class="Statement">else</span> <span class="Statement">if</span>(access(principal,F_OK | R_OK | W_OK) == (-<span class="Constant">1</span>))
+        {  <span class="Statement">if</span>(do_verbose == TRUE)
+           {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): principal [</span><span class="Special">%s</span><span class="Constant">] deleted -- exiting</span><span class="Special">\n</span><span class="Constant">&quot;</span>,pname,getpid(),hostname,principal);
+              (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+           }
+
+           exit(<span class="Constant">0</span>);
+        }
+
+        (<span class="Type">void</span>)usleep(<span class="Constant">10000</span>);
+
+        <span class="Statement">if</span>(lifetime != FOREVER)
+        {  <span class="Statement">if</span>(time((<span class="Type">time_t</span>)<span class="Constant">NULL</span>) - start_time &gt;= lifetime)
+              exit_handler();
+        }
+    }
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

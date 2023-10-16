@@ -1,0 +1,1710 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/netlib.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Purpose: Distributed computing support library.</span>
+
+<span class="Comment">    Author:  M.A. O'Neill</span>
+<span class="Comment">             Tumbling Dice Ltd</span>
+<span class="Comment">             Gosforth</span>
+<span class="Comment">             Newcastle upon Tyne</span>
+<span class="Comment">             NE3 4RT</span>
+<span class="Comment">             United Kingdom</span>
+
+<span class="Comment">    Version: 5.00 </span>
+<span class="Comment">    Dated:   4th January 2022</span>
+<span class="Comment">    E-Mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> If we have OpenMP support then we also have pthread support </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> (OpenMP is built on pthreads for Linux distributions).      </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#if defined(_OPENMP) &amp;&amp; !defined(PTHREAD_SUPPORT)</span>
+<span class="PreProc">#define PTHREAD_SUPPORT</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+
+<span class="PreProc">#include </span><span class="Constant">&lt;me.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;utils.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;psrp.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/types.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/stat.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/time.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/types.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/wait.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stdlib.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/socket.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;netinet/in.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;arpa/inet.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;pwd.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;netdb.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;ctype.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;termios.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/ioctl.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sched.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;dirent.h&gt;</span>
+
+<span class="PreProc">#ifndef _XOPEN_SOURCE</span>
+<span class="PreProc">#define _XOPEN_SOURCE </span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> _XOPEN_SOURCE </span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+
+
+
+<span class="PreProc">#undef   __NOT_LIB_SOURCE__</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;netlib.h&gt;</span>
+<span class="PreProc">#define  __NOT_LIB_SOURCE__</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Slot and usage functions - used by slot manager </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Slot usage function </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> netlib_slot(<span class="Type">int</span> level)
+{   (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;lib netlib </span><span class="Special">%s</span><span class="Constant">: [ANSI C]</span><span class="Special">\n</span><span class="Constant">&quot;</span>,NETLIB_VERSION);
+
+    <span class="Statement">if</span>(level &gt; <span class="Constant">1</span>)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;(C) 1995-2022 Tumbling Dice</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Author: M.A. O'Neill</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;PUPS/P3 network support library (built </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+    }
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+}
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Segment identification for netlib library </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef SLOT</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;slotman.h&gt;</span>
+_EXTERN <span class="Type">void</span> (* SLOT )() __attribute__ ((aligned(<span class="Constant">16</span>))) = netlib_slot;
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> SLOT </span><span class="Comment">*/</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Public variables exported by this library </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+                                  <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+_PUBLIC <span class="Type">int</span> rkill_pid = (-<span class="Constant">1</span>);     <span class="Comment">/*</span><span class="Comment"> Xkill child process </span><span class="Comment">*/</span>
+                                  <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Public variables exported by the extended system command processer ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> pups_system(<span class="Type">const</span> <span class="Type">char</span>        *command_str,  <span class="Comment">// Command string</span>
+                        <span class="Type">const</span> <span class="Type">char</span>         *exec_shell,  <span class="Comment">// Shell used for execing</span>
+                        <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span> exec_flags,   <span class="Comment">// Exec control flags</span>
+                        <span class="Type">int</span>                *child_pid)   <span class="Comment">// PID of child process</span>
+
+{  <span class="Type">int</span> status,
+          pid,
+          io_pipe,                           <span class="Comment">// Input output pipe</span>
+          flag_cnt = <span class="Constant">0</span>,
+          tty,                               <span class="Comment">// Generic control terminal</span>
+          fildes[<span class="Constant">2</span>];                         <span class="Comment">// Extra I/O pipe</span>
+
+    <span class="Type">int</span> *istat        = (<span class="Type">int</span> *)<span class="Constant">NULL</span>,
+        *qstat        = (<span class="Type">int</span> *)<span class="Constant">NULL</span>;
+
+    <span class="Type">char</span> *shell_flags = (<span class="Type">char</span> *)<span class="Constant">NULL</span>;
+    _BOOLEAN obituary = FALSE;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Sanity check </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(command_str == (<span class="Type">const</span> <span class="Type">char</span> *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check for conflicting flag options. </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(exec_flags &amp; PUPS_READ_FIFO)
+    {  <span class="Statement">if</span>(exec_flags &amp; PUPS_WAIT_FOR_CHILD)
+       ++flag_cnt;
+    }
+
+    <span class="Statement">if</span>(exec_flags &amp; PUPS_WRITE_FIFO)
+    {  <span class="Statement">if</span>(exec_flags &amp; PUPS_WAIT_FOR_CHILD)
+       ++flag_cnt;
+    }
+
+    <span class="Statement">if</span>(flag_cnt &gt; <span class="Constant">1</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Get the name of the extra I/O pipe. </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(exec_flags &amp; PUPS_STREAMS_DETACHED)
+    {  tty = open(<span class="Constant">&quot;/dev/tty&quot;</span>,<span class="Constant">2</span>,LIVE);
+       <span class="Statement">if</span>(tty == -<span class="Constant">1</span>)
+       {  pups_set_errno(<span class="Constant">ENOTTY</span>);
+          <span class="Statement">return</span>(-<span class="Constant">1</span>);
+       }
+    }
+
+    <span class="Statement">if</span>((exec_flags &amp; PUPS_READ_FIFO) || (exec_flags &amp; PUPS_WRITE_FIFO))
+    {  <span class="Statement">if</span>(pipe(fildes)  == -<span class="Constant">1</span>)
+       {  pups_set_errno(<span class="Constant">ESPIPE</span>);
+          <span class="Statement">return</span>(-<span class="Constant">1</span>);
+       }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Cancel automatic cleanup of child if we intend to wait for it </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(exec_flags &amp; PUPS_NOAUTO_CLEAN || exec_flags &amp; PUPS_WAIT_FOR_CHILD)
+       (<span class="Type">void</span>)pups_sighandle(<span class="Constant">SIGCHLD</span>,<span class="Constant">&quot;default&quot;</span>,<span class="Constant">SIG_DFL</span>, (sigset_t *)<span class="Constant">NULL</span>);
+
+
+    <span class="Statement">if</span>(exec_flags &amp; PUPS_OBITUARY)
+       obituary = TRUE;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Child side of fork </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((pid = pups_fork(TRUE,obituary)) == <span class="Constant">0</span>)
+    {
+
+       <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Child side of fork </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+
+       <span class="Type">int</span> i;
+
+
+       <span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Set effective and real user i.d's </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+
+       (<span class="Type">void</span>)setreuid(getuid(),getuid());
+
+
+       <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Clear any pending alarm </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+
+       (<span class="Type">void</span>)pups_malarm(<span class="Constant">0</span>);
+
+
+       <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Restore all signals to default states </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">for</span>(i=<span class="Constant">1</span>; i&lt; MAX_SIGS; ++i)
+          (<span class="Type">void</span>)pups_sighandle(i,<span class="Constant">&quot;default&quot;</span>,<span class="Constant">SIG_DFL</span>, (sigset_t *)<span class="Constant">NULL</span>);
+
+
+       <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Connect stdin and stdout to console if detached mode. Otherwise </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> retain stdin for piping to new command.                         </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(exec_flags &amp; PUPS_STREAMS_DETACHED)
+       {  (<span class="Type">void</span>)dup2(tty,<span class="Constant">0</span>);
+          (<span class="Type">void</span>)dup2(tty,<span class="Constant">1</span>);
+          (<span class="Type">void</span>)dup2(tty,<span class="Constant">2</span>);
+          close(tty);
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Make stdin and stdout an implicit channel connecting the child </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> process to its parent.                                         </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+       <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Create an input pipe to the child process </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(exec_flags &amp; PUPS_WRITE_FIFO)
+       {  (<span class="Type">void</span>)dup2 (fildes[<span class="Constant">0</span>],<span class="Constant">0</span>);
+          (<span class="Type">void</span>)close(fildes[<span class="Constant">0</span>]);
+          (<span class="Type">void</span>)close(fildes[<span class="Constant">1</span>]);
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Create an output pipe from the child process </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(exec_flags &amp; PUPS_READ_FIFO)
+       {  (<span class="Type">void</span>)dup2 (fildes[<span class="Constant">1</span>],<span class="Constant">1</span>);
+          (<span class="Type">void</span>)close(fildes[<span class="Constant">0</span>]);
+          (<span class="Type">void</span>)close(fildes[<span class="Constant">1</span>]);
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Detach control terminal and run in new session </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(exec_flags &amp; PUPS_NEW_SESSION)
+          (<span class="Type">void</span>)setsid();
+
+
+       <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Build command to be executed - use a shell if one is requested  </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> otherwise directly overlay command on child.                    </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+       <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Build shell flag string if approriate </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(exec_shell != (<span class="Type">const</span> <span class="Type">char</span> *)<span class="Constant">NULL</span>)
+       {  shell_flags = pups_malloc(SSIZE);
+          (<span class="Type">void</span>)strlcpy(shell_flags,<span class="Constant">&quot;-c&quot;</span>,SSIZE);
+
+          <span class="Statement">if</span>(exec_flags &amp; PUPS_ERROR_EXIT)
+             strlcat(shell_flags,<span class="Constant">&quot;e&quot;</span>,SSIZE);
+
+          <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Return the exit status of the command </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+          <span class="Statement">if</span>(execlp(exec_shell,
+                    exec_shell,
+                    shell_flags,
+                    command_str,(<span class="Type">char</span> *)<span class="Constant">0</span>) == -<span class="Constant">1</span>)
+             _exit(<span class="Constant">255</span>);
+       }
+       <span class="Statement">else</span>
+       {
+
+          <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Run payload command </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+          (<span class="Type">void</span>)pups_execls(command_str);
+          _exit(<span class="Constant">255</span>);
+       }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Parent side of fork </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">else</span> <span class="Statement">if</span>(pid == (-<span class="Constant">1</span>))
+    {  pups_set_errno(<span class="Constant">ENOEXEC</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+    <span class="Statement">else</span>
+       appl_last_child = pid;
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set name of child process </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pups_set_child_name(pid,command_str);
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Return the PID of this child </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(child_pid != (<span class="Type">int</span> *)<span class="Constant">NULL</span>)
+       *child_pid = pid;
+
+    <span class="Statement">if</span>(exec_flags &amp; PUPS_STREAMS_DETACHED)
+       (<span class="Type">void</span>)pups_close(tty);
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set up io_pipe to read or read and write data from child </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((exec_flags &amp; PUPS_READ_FIFO))
+    {  io_pipe = fildes[<span class="Constant">0</span>];
+       (<span class="Type">void</span>)close(fildes[<span class="Constant">1</span>]);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set up io_pipe to write data to child </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(exec_flags &amp; PUPS_WRITE_FIFO)
+    {  io_pipe = fildes[<span class="Constant">1</span>];
+       (<span class="Type">void</span>)close(fildes[<span class="Constant">0</span>]);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Wait for child process to return. </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(exec_flags &amp; PUPS_WAIT_FOR_CHILD)
+    {  <span class="Type">int</span> ret = <span class="Constant">0</span>;
+
+
+       <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> If the appropriate flag is set wait for the command to complete, </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> otherwise carry on while child is executing.                     </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+       istat =  (<span class="Type">int</span> *)(signal(<span class="Constant">SIGINT</span>, <span class="Constant">SIG_IGN</span>));
+       qstat =  (<span class="Type">int</span> *)(signal(<span class="Constant">SIGQUIT</span>,<span class="Constant">SIG_IGN</span>));
+
+       <span class="Statement">while</span>((ret = waitpid(pid,&amp;status,WNOHANG)) != pid)
+       {    <span class="Statement">if</span>(ret == (-<span class="Constant">1</span>))
+            {  pups_set_errno(<span class="Constant">ENOEXEC</span>);
+               <span class="Statement">return</span>(-<span class="Constant">1</span>);
+            }
+
+            (<span class="Type">void</span>)pups_usleep(<span class="Constant">100</span>);
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Restore signal status. </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+       (<span class="Type">void</span>)signal(<span class="Constant">SIGINT</span>, (<span class="Type">void</span> *)istat);
+       (<span class="Type">void</span>)signal(<span class="Constant">SIGQUIT</span>,(<span class="Type">void</span> *)qstat);
+
+
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Return exit status of executed command </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+       pups_set_errno(OK);
+       <span class="Statement">return</span>(WEXITSTATUS(status));
+    }
+
+    pups_set_errno(OK);
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Are we returning a descriptor to command? </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((exec_flags &amp; PUPS_READ_FIFO )  ||
+       (exec_flags &amp; PUPS_WRITE_FIFO)   )
+       <span class="Statement">return</span>(io_pipe);
+
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Open a descriptor to a command pipeline ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> pups_copen(<span class="Type">const</span> <span class="Type">char</span> *command_pipeline, <span class="Type">const</span> <span class="Type">char</span> *shell, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span> mode)
+
+{   <span class="Type">int</span> f_index,
+        fildes,
+        fifo_mode;
+
+    <span class="Type">char</span> *fname = (<span class="Type">char</span> *)<span class="Constant">NULL</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Sanity check </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(command_pipeline == (<span class="Type">const</span> <span class="Type">char</span> *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set up FIFO mode switches </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(mode == <span class="Constant">0</span>)
+       fifo_mode = PUPS_READ_FIFO;
+    <span class="Statement">else</span>
+    {  <span class="Statement">if</span>(mode == <span class="Constant">1</span>)
+          fifo_mode = PUPS_WRITE_FIFO;
+       <span class="Statement">else</span>
+       {  pups_set_errno(<span class="Constant">EINVAL</span>);
+          <span class="Statement">return</span>(-<span class="Constant">1</span>);
+       }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Block signals while command pipeline is opened </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pupshold(ALL_PUPS_SIGS);
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">  Update PUPS file table </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">    #ifdef PTHREAD_SUPPORT</span>
+    (<span class="Type">void</span>)pthread_mutex_lock(&amp;ftab_mutex);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((f_index = pups_find_free_ftab_index()) == (-<span class="Constant">1</span>))
+    {
+
+<span class="PreProc">       #ifdef PTHREAD_SUPPORT</span>
+       (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ftab_mutex);
+<span class="PreProc">       #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+       (<span class="Type">void</span>)pupsrelse(ALL_PUPS_SIGS);
+       pups_set_errno(<span class="Constant">ENFILE</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Execute command pipeline </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((fildes = pups_system(command_pipeline,shell,fifo_mode                 |
+                             PUPS_NEW_SESSION                                 |
+                             PUPS_ERROR_EXIT,&amp;ftab[f_index].fifo_pid)) == (-<span class="Constant">1</span>))
+    {  (<span class="Type">void</span>)pupsrelse(ALL_PUPS_SIGS);
+
+<span class="PreProc">       #ifdef PTHREAD_SUPPORT</span>
+       (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ftab_mutex);
+<span class="PreProc">       #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+       pups_set_errno(<span class="Constant">ENOEXEC</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    <span class="Statement">if</span>(fifo_mode == PUPS_READ_FIFO)
+       (<span class="Type">void</span>)snprintf(ftab[f_index].fname,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> (read)&quot;</span>, command_pipeline);
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)snprintf(ftab[f_index].fname,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> (write)&quot;</span>,command_pipeline);
+
+    ftab[f_index].fdes   = fildes;
+    ftab[f_index].mode   = mode;
+    ftab[f_index].stream = (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>;
+
+<span class="PreProc">    #ifdef PTHREAD_SUPPORT</span>
+    (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ftab_mutex);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pupsrelse(ALL_PUPS_SIGS);
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(fildes);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------</span>
+<span class="Comment">    Close pipe descriptor waiting for associated processes to finish ...</span>
+<span class="Comment">-------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> pups_cclose(<span class="Type">const</span> <span class="Type">int</span> pdes)
+
+{   <span class="Statement">return</span>(pups_close(pdes));
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Open a stream to a command pipeline ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">FILE</span> *pups_fcopen(<span class="Type">const</span> <span class="Type">char</span> *command_pipeline, <span class="Type">const</span> <span class="Type">char</span> *shell, <span class="Type">const</span> <span class="Type">char</span> *mode)
+
+{   <span class="Type">int</span>  i,
+         i_mode,
+         c_des  = (-<span class="Constant">1</span>);
+
+    <span class="Type">FILE</span> *f_ptr = (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Sanity check </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(command_pipeline == (<span class="Type">const</span> <span class="Type">char</span> *)<span class="Constant">NULL</span> || mode == (<span class="Type">const</span> <span class="Type">char</span> *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>((<span class="Type">FILE</span> *)<span class="Constant">NULL</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set up mode switches </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(strcmp(mode,<span class="Constant">&quot;r&quot;</span>) == <span class="Constant">0</span>)
+       i_mode = <span class="Constant">0</span>;
+    <span class="Statement">else</span>
+    {  <span class="Statement">if</span>(strcmp(mode,<span class="Constant">&quot;w&quot;</span>) == <span class="Constant">0</span>)
+          i_mode = <span class="Constant">1</span>;
+       <span class="Statement">else</span>
+       {  <span class="Statement">if</span>(strcmp(mode,<span class="Constant">&quot;w+&quot;</span>) == <span class="Constant">0</span>   ||
+             strcmp(mode,<span class="Constant">&quot;r+&quot;</span>) == <span class="Constant">0</span>)
+             i_mode = <span class="Constant">2</span>;
+          <span class="Statement">else</span>
+          {  pups_set_errno(<span class="Constant">EINVAL</span>);
+             <span class="Statement">return</span>((<span class="Type">FILE</span> *)<span class="Constant">NULL</span>);
+          }
+       }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Open command descriptor </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+
+    c_des = pups_copen(command_pipeline,shell,i_mode);
+    f_ptr = fdopen(c_des,mode);
+
+<span class="PreProc">    #ifdef PTHREAD_SUPPORT</span>
+    (<span class="Type">void</span>)pthread_mutex_lock(&amp;ftab_mutex);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;appl_max_files; ++i)
+    {  <span class="Statement">if</span>(ftab[i].fname != (<span class="Type">char</span> *)<span class="Constant">NULL</span> &amp;&amp; strcmp(ftab[i].fname,command_pipeline) == <span class="Constant">0</span>)
+       {  ftab[i].stream = f_ptr;
+
+<span class="PreProc">          #ifdef PTHREAD_SUPPORT</span>
+          (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ftab_mutex);
+<span class="PreProc">          #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+          pups_set_errno(OK);
+          <span class="Statement">return</span>(f_ptr);
+       }
+    }
+
+<span class="PreProc">    #ifdef PTHREAD_SUPPORT</span>
+    (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ftab_mutex);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+    pups_set_errno(<span class="Constant">ESRCH</span>);
+    <span class="Statement">return</span>(f_ptr);
+}
+
+
+
+
+<span class="PreProc">#ifdef ZLIB_SUPPORT </span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Open a zstream to a command pipeline ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC gzFILE *pups_gzcopen(<span class="Type">const</span> <span class="Type">char</span> *command_pipeline, <span class="Type">const</span> <span class="Type">char</span> *shell, <span class="Type">const</span> <span class="Type">char</span> *mode)
+
+{   <span class="Type">int</span>  i,
+         i_mode,
+         c_des = (-<span class="Constant">1</span>);
+
+    gzFILE *z_ptr = (gzFILE *)<span class="Constant">NULL</span>;
+
+    <span class="Statement">if</span>(command_pipeline == (<span class="Type">const</span> <span class="Type">char</span> *)<span class="Constant">NULL</span> || mode == (<span class="Type">const</span> <span class="Type">char</span> *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>((gzFILE *)<span class="Constant">NULL</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set up mode switches </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(strcmp(mode,<span class="Constant">&quot;r&quot;</span>) == <span class="Constant">0</span>)
+       i_mode = <span class="Constant">0</span>;
+    <span class="Statement">else</span>
+    {  <span class="Statement">if</span>(strcmp(mode,<span class="Constant">&quot;w&quot;</span>) == <span class="Constant">0</span>)
+          i_mode = <span class="Constant">1</span>;
+       <span class="Statement">else</span>
+       {  <span class="Statement">if</span>(strcmp(mode,<span class="Constant">&quot;w+&quot;</span>) == <span class="Constant">0</span>   ||
+             strcmp(mode,<span class="Constant">&quot;r+&quot;</span>) == <span class="Constant">0</span>)
+             i_mode = <span class="Constant">2</span>;
+          <span class="Statement">else</span>
+          {  pups_set_errno(<span class="Constant">EINVAL</span>);
+             <span class="Statement">return</span>((gzFILE *)<span class="Constant">NULL</span>);
+          }
+       }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Open command descriptor </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+
+    c_des = pups_copen(command_pipeline,shell,i_mode);
+    z_ptr = gzdopen(c_des,mode);
+
+<span class="PreProc">    #ifdef PTHREAD_SUPPORT</span>
+    (<span class="Type">void</span>)pthread_mutex_lock(&amp;ftab_mutex);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;appl_max_files; ++i)
+    {  <span class="Statement">if</span>(ftab[i].fname != (<span class="Type">char</span> *)<span class="Constant">NULL</span> &amp;&amp; strcmp(ftab[i].fname,command_pipeline) == <span class="Constant">0</span>)
+       {  ftab[i].zstream = z_ptr;
+
+<span class="PreProc">          #ifdef PTHREAD_SUPPORT</span>
+          (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ftab_mutex);
+<span class="PreProc">          #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+          pups_set_errno(OK);
+          <span class="Statement">return</span>(z_ptr);
+       }
+    }
+
+<span class="PreProc">    #ifdef PTHREAD_SUPPORT</span>
+    (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ftab_mutex);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+    pups_set_errno(<span class="Constant">ESRCH</span>);
+    <span class="Statement">return</span>(z_ptr);
+}
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> ZLIB_SUPPORT </span><span class="Comment">*/</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------</span>
+<span class="Comment">    Do not kill pipestream processes explicitly when pipestream is closed ...</span>
+<span class="Comment">-------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> pups_pipestream_kill_disable(<span class="Type">const</span> <span class="Type">int</span> fdes)
+
+{   <span class="Type">int</span> f_index;
+
+    <span class="Statement">if</span>(fdes &lt; <span class="Constant">0</span> || fdes &gt;= appl_max_files)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+<span class="PreProc">    #ifdef PTHREAD_SUPPORT</span>
+    (<span class="Type">void</span>)pthread_mutex_lock(&amp;ftab_mutex);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((f_index = pups_get_ftab_index(fdes)) == (-<span class="Constant">1</span>))
+    {
+
+<span class="PreProc">       #ifdef PTHREAD_SUPPORT</span>
+       (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ftab_mutex);
+<span class="PreProc">       #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+       pups_set_errno(<span class="Constant">EBADF</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    <span class="Statement">if</span>(ftab[f_index].rd_pid &gt; <span class="Constant">0</span>)
+       ftab[f_index].rd_pid = (-ftab[f_index].rd_pid);
+
+    <span class="Statement">if</span>(ftab[f_index].fifo_pid &gt; <span class="Constant">0</span>)
+       ftab[f_index].fifo_pid = (-ftab[f_index].fifo_pid);
+
+<span class="PreProc">    #ifdef PTHREAD_SUPPORT</span>
+    (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ftab_mutex);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------</span>
+<span class="Comment">    Kill pipestream processes explicitly when pipestream is closed ...</span>
+<span class="Comment">-------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> pups_pipestream_kill_enable(<span class="Type">const</span> <span class="Type">int</span> fdes)
+
+{   <span class="Type">int</span> f_index;
+
+    <span class="Statement">if</span>(fdes &lt; <span class="Constant">0</span> || fdes &gt;= appl_max_files)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+<span class="PreProc">    #ifdef PTHREAD_SUPPORT</span>
+    (<span class="Type">void</span>)pthread_mutex_lock(&amp;ftab_mutex);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((f_index = pups_get_ftab_index(fdes)) == (-<span class="Constant">1</span>))
+    {
+
+<span class="PreProc">       #ifdef PTHREAD_SUPPORT</span>
+       (<span class="Type">void</span>)pthread_mutex_lock(&amp;ftab_mutex);
+<span class="PreProc">       #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+       pups_set_errno(<span class="Constant">EBADF</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    <span class="Statement">if</span>(ftab[f_index].rd_pid &lt; <span class="Constant">0</span>)
+       ftab[f_index].rd_pid = (-ftab[f_index].rd_pid);
+
+    <span class="Statement">if</span>(ftab[f_index].fifo_pid &lt; <span class="Constant">0</span>)
+       ftab[f_index].fifo_pid = (-ftab[f_index].fifo_pid);
+
+<span class="PreProc">    #ifdef PTHREAD_SUPPORT</span>
+    (<span class="Type">void</span>)pthread_mutex_lock(&amp;ftab_mutex);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------</span>
+<span class="Comment">    Close a pipestream waiting for its processes ...</span>
+<span class="Comment">-------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">FILE</span> *pups_fcclose(<span class="Type">const</span> <span class="Type">FILE</span> *pipe_stream)
+
+{    <span class="Statement">return</span>(pups_fclose(pipe_stream));
+}
+
+
+
+
+<span class="PreProc">#ifdef ZLIB_SUPPORT</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------</span>
+<span class="Comment">    Close a pipezstream waiting for its processes ...</span>
+<span class="Comment">-------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC gzFILE *pups_gzcclose(<span class="Type">const</span> gzFILE *pipe_zstream)
+
+{    <span class="Statement">return</span>(pups_gzclose(pipe_zstream));
+}
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> ZLIB_SUPPORT </span><span class="Comment">*/</span>
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Extended system command processer with bi-directional data streams and</span>
+<span class="Comment">    error/status stream ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> pups_system2(<span class="Type">const</span> <span class="Type">char</span>       *command_str,  <span class="Comment">// Command string</span>
+                         <span class="Type">const</span> <span class="Type">char</span>        *exec_shell,  <span class="Comment">// Shell used for execing</span>
+                         <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span> exec_flags,  <span class="Comment">// Exec control flags</span>
+                         <span class="Type">int</span>                *child_pid,  <span class="Comment">// PID of child process</span>
+                         <span class="Type">int</span>                   *in_des,  <span class="Comment">// Pipe to child process</span>
+                         <span class="Type">int</span>                  *out_des,  <span class="Comment">// Pipe from child process</span>
+                         <span class="Type">int</span>                  *err_des)  <span class="Comment">// Child error pipe</span>
+
+{  <span class="Type">int</span> i,
+       status,
+       tty,                               <span class="Comment">// Generic control terminal</span>
+       cnt               = <span class="Constant">0</span>,
+       pid,                               <span class="Comment">// Pid of child process</span>
+       in_fildes[<span class="Constant">2</span>],                      <span class="Comment">// Pipe for O/P to child process</span>
+       out_fildes[<span class="Constant">2</span>],                     <span class="Comment">// Pipe for O/P from child process</span>
+       err_fildes[<span class="Constant">2</span>];                     <span class="Comment">// Pipe child error/status msgs</span>
+
+    _BYTE buf[<span class="Constant">256</span>]       = <span class="Constant">&quot;&quot;</span>;
+    <span class="Type">FILE</span>  *output_stream = (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>;  <span class="Comment">// Stream for copy environment</span>
+
+    <span class="Type">int</span> *istat           = (<span class="Type">int</span> *)<span class="Constant">NULL</span>,
+        *qstat           = (<span class="Type">int</span> *)<span class="Constant">NULL</span>;
+
+    <span class="Type">char</span> *shell_flags    = (<span class="Type">char</span> *)<span class="Constant">NULL</span>,  <span class="Comment">// Exec shell flags</span>
+                 *cwd    = (<span class="Type">char</span> *)<span class="Constant">NULL</span>;  <span class="Comment">// Current working directory</span>
+
+    _BOOLEAN obituary    = FALSE;
+
+    <span class="Statement">if</span>(command_str == (<span class="Type">const</span> <span class="Type">char</span> *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Assign the I/O pipes to the child process </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(in_des != (<span class="Type">int</span> *)<span class="Constant">NULL</span>)
+    {  <span class="Statement">if</span>(pipe(in_fildes)  == (-<span class="Constant">1</span>))
+       {  pups_set_errno(<span class="Constant">ESPIPE</span>);
+          <span class="Statement">return</span>(-<span class="Constant">1</span>);
+       }
+    }
+
+    <span class="Statement">if</span>(out_des != (<span class="Type">int</span> *)<span class="Constant">NULL</span>)
+    {  <span class="Statement">if</span>(pipe(out_fildes)  == (-<span class="Constant">1</span>))
+       {  pups_set_errno(<span class="Constant">ESPIPE</span>);
+          <span class="Statement">return</span>(-<span class="Constant">1</span>);
+       }
+    }
+
+    <span class="Statement">if</span>(err_des != (<span class="Type">int</span> *)<span class="Constant">NULL</span>)
+    {  <span class="Statement">if</span>(pipe(err_fildes)  == (-<span class="Constant">1</span>))
+       {  pups_set_errno(<span class="Constant">ESPIPE</span>);
+          <span class="Statement">return</span>(-<span class="Constant">1</span>);
+       }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Cancel automatic cleanup of child if we intend to wait for it </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(exec_flags &amp; PUPS_NOAUTO_CLEAN || exec_flags &amp; PUPS_WAIT_FOR_CHILD)
+       (<span class="Type">void</span>)pups_sighandle(<span class="Constant">SIGCHLD</span>,<span class="Constant">&quot;default&quot;</span>,<span class="Constant">SIG_DFL</span>, (sigset_t *)<span class="Constant">NULL</span>);
+
+    <span class="Statement">if</span>(exec_flags &amp; PUPS_OBITUARY)
+       obituary = TRUE;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Child side of fork </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((pid = pups_fork(TRUE,obituary)) == <span class="Constant">0</span>)
+    {
+
+       <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Child side of fork </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+
+       <span class="Type">int</span> i;
+
+
+       <span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Set effective and real user i.d's </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+
+       (<span class="Type">void</span>)setreuid(getuid(),getuid());
+
+
+       <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Run child in new session if appropriate </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(exec_flags &amp; PUPS_NEW_SESSION)
+          (<span class="Type">void</span>)setsid();
+
+
+       <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Clear any pending alarm </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+
+       (<span class="Type">void</span>)pups_malarm(<span class="Constant">0</span>);
+
+
+       <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Restore all signals to default states </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">for</span>(i=<span class="Constant">1</span>; i&lt;MAX_SIGS; ++i)
+          (<span class="Type">void</span>)pups_sighandle(i,<span class="Constant">&quot;default&quot;</span>,<span class="Constant">SIG_DFL</span>, (sigset_t *)<span class="Constant">NULL</span>);
+
+
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Reassign the descriptors which the user has requested to be detached </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+       <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Reassign child input descriptor </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(in_des == (<span class="Type">int</span> *)<span class="Constant">NULL</span>)
+       {  <span class="Statement">if</span>((tty = open(<span class="Constant">&quot;/dev/null&quot;</span>,<span class="Constant">2</span>)) == (-<span class="Constant">1</span>))
+             _exit(<span class="Constant">255</span>);
+
+          (<span class="Type">void</span>)dup2 (tty,<span class="Constant">0</span>);
+          (<span class="Type">void</span>)close(tty);
+       }
+       <span class="Statement">else</span>
+       {
+
+          <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Attach child I/P descriptor to parent via pipe </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+
+          (<span class="Type">void</span>)dup2 (in_fildes[<span class="Constant">0</span>],<span class="Constant">0</span>);
+          (<span class="Type">void</span>)close(in_fildes[<span class="Constant">0</span>]);
+          (<span class="Type">void</span>)close(in_fildes[<span class="Constant">1</span>]);
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Reassign child output descriptor </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(out_des == (<span class="Type">int</span> *)<span class="Constant">NULL</span>)
+       {  <span class="Statement">if</span>((tty = open(<span class="Constant">&quot;/dev/null&quot;</span>,<span class="Constant">2</span>)) == (-<span class="Constant">1</span>))
+             _exit(<span class="Constant">255</span>);
+
+          (<span class="Type">void</span>)dup2 (tty,<span class="Constant">1</span>);
+          (<span class="Type">void</span>)close(tty);
+       }
+       <span class="Statement">else</span>
+       {
+
+          <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Attach child O/P descriptor to parent via pipe </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+
+          (<span class="Type">void</span>)dup2 (out_fildes[<span class="Constant">1</span>],<span class="Constant">1</span>);
+          (<span class="Type">void</span>)close(out_fildes[<span class="Constant">0</span>]);
+          (<span class="Type">void</span>)close(out_fildes[<span class="Constant">1</span>]);
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Detach error/status descriptor </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(err_des == (<span class="Type">int</span> *)<span class="Constant">NULL</span>)
+       {  <span class="Statement">if</span>((tty = open(<span class="Constant">&quot;/dev/null&quot;</span>,<span class="Constant">2</span>)) == (-<span class="Constant">1</span>))
+             _exit(<span class="Constant">255</span>);
+
+          (<span class="Type">void</span>)dup2 (tty,<span class="Constant">2</span>);
+          (<span class="Type">void</span>)close(tty);
+       }
+       <span class="Statement">else</span>
+       {
+
+          <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Attach child O/P descriptor to parent via pipe </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+
+          (<span class="Type">void</span>)dup2 (err_fildes[<span class="Constant">1</span>],<span class="Constant">2</span>);
+          (<span class="Type">void</span>)close(err_fildes[<span class="Constant">0</span>]);
+          (<span class="Type">void</span>)close(err_fildes[<span class="Constant">1</span>]);
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Build command to be executed - use a shell if one is requested </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> otherwise directly overlay command on child                    </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+       <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Build shell flag string if approriate </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(exec_shell != (<span class="Type">const</span> <span class="Type">char</span> *)<span class="Constant">NULL</span>)
+       {  shell_flags = pups_malloc(SSIZE);
+          (<span class="Type">void</span>)strlcpy(shell_flags,<span class="Constant">&quot;-c&quot;</span>,SSIZE);
+          <span class="Statement">if</span>(exec_flags &amp; PUPS_ERROR_EXIT)
+          {  (<span class="Type">void</span>)strlcat(shell_flags,<span class="Constant">&quot;e&quot;</span>,SSIZE);
+
+
+             <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> Return the exit status of the command </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+             <span class="Statement">if</span>(execlp(exec_shell,
+                       exec_shell,
+                      shell_flags,
+                      command_str,(<span class="Type">char</span> *)<span class="Constant">0</span>) == -<span class="Constant">1</span>)
+                _exit(<span class="Constant">255</span>);
+          }
+       }
+       <span class="Statement">else</span>
+       {  (<span class="Type">void</span>)pups_execls(command_str);
+          _exit(<span class="Constant">255</span>);
+       }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Parent side of fork  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">else</span> <span class="Statement">if</span>(pid == (-<span class="Constant">1</span>))
+    {  pups_set_errno(<span class="Constant">ENOEXEC</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+    <span class="Statement">else</span>
+    {  *child_pid      = pid;
+       appl_last_child = pid;
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set name of child we have forked </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pups_set_child_name(pid,command_str);
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set up pipe to read data from child </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(in_des != (<span class="Type">int</span> *)<span class="Constant">NULL</span>)
+    {  *in_des = in_fildes[<span class="Constant">1</span>];
+       (<span class="Type">void</span>)close(in_fildes[<span class="Constant">0</span>]);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set up pipe to write data to child </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(out_des != (<span class="Type">int</span> *)<span class="Constant">NULL</span>)
+    {  *out_des = out_fildes[<span class="Constant">0</span>];
+       (<span class="Type">void</span>)close(out_fildes[<span class="Constant">1</span>]);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set up pipe to read status/error data from child </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(err_des != (<span class="Type">int</span> *)<span class="Constant">NULL</span>)
+    {  *err_des = err_fildes[<span class="Constant">0</span>];
+       (<span class="Type">void</span>)close(err_fildes[<span class="Constant">1</span>]);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Wait for child process to return </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(exec_flags &amp; PUPS_WAIT_FOR_CHILD)
+    {  <span class="Type">int</span> ret = <span class="Constant">0</span>;
+
+
+       <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> If the appropriate flag is set wait for the command to complete, </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> otherwise carry on while child is executing ...                  </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+       istat = (<span class="Type">void</span> *)(signal(<span class="Constant">SIGINT</span>, <span class="Constant">SIG_IGN</span>));
+       qstat = (<span class="Type">void</span> *)(signal(<span class="Constant">SIGQUIT</span>,<span class="Constant">SIG_IGN</span>));
+
+       <span class="Statement">while</span>((ret = waitpid(&amp;pid,&amp;status,WNOHANG)) != pid)
+       {    <span class="Statement">if</span>(ret == (-<span class="Constant">1</span>))
+            {  pups_set_errno(<span class="Constant">ENOEXEC</span>);
+               <span class="Statement">return</span>(-<span class="Constant">1</span>);
+            }
+
+            (<span class="Type">void</span>)pups_usleep(<span class="Constant">100</span>);
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Re-enabable automatic child handling once this child has returned </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+       (<span class="Type">void</span>)pups_auto_child();
+
+
+       <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Restore signal status </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+
+       (<span class="Type">void</span>)signal(<span class="Constant">SIGINT</span>, (<span class="Type">void</span> *)istat);
+       (<span class="Type">void</span>)signal(<span class="Constant">SIGQUIT</span>,(<span class="Type">void</span> *)qstat);
+
+
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Return exit status of executed command </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+       pups_set_errno(OK);
+       <span class="Statement">return</span>(WEXITSTATUS(status));
+    }
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Open a descriptor to a command pipeline - this is effectively a</span>
+<span class="Comment">    simplified interface to the pups_system call ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> pups_copen2(<span class="Type">const</span> <span class="Type">char</span> *command_pipeline,  <span class="Comment">// Command stream to execute</span>
+                        <span class="Type">const</span> <span class="Type">char</span>            *shell,  <span class="Comment">// Exec shell</span>
+                        <span class="Type">int</span>               *child_pid,  <span class="Comment">// Child PID</span>
+                        <span class="Type">int</span>                  *in_des,  <span class="Comment">// Input descriptor</span>
+                        <span class="Type">int</span>                 *out_des,  <span class="Comment">// Output descriptor</span>
+                        <span class="Type">int</span>                 *err_des)  <span class="Comment">// Error/status descriptor</span>
+
+{   <span class="Type">int</span> i,
+        f_index[<span class="Constant">3</span>];
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Sanity check </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(command_pipeline == (<span class="Type">const</span> <span class="Type">char</span> *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Block signals while command pipeline is opened </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pupshold(ALL_PUPS_SIGS);
+
+<span class="PreProc">    #ifdef PTHREAD_SUPPORT</span>
+    (<span class="Type">void</span>)pthread_mutex_lock(&amp;ftab_mutex);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+    f_index[<span class="Constant">0</span>] = (-<span class="Constant">1</span>);
+    <span class="Statement">if</span>(in_des != (<span class="Type">int</span> *)<span class="Constant">NULL</span>)
+       f_index[<span class="Constant">0</span>] = pups_find_free_ftab_index();
+
+    f_index[<span class="Constant">1</span>] = (-<span class="Constant">1</span>);
+    <span class="Statement">if</span>(out_des != (<span class="Type">int</span> *)<span class="Constant">NULL</span>)
+       f_index[<span class="Constant">1</span>] = pups_find_free_ftab_index();
+
+    f_index[<span class="Constant">2</span>] = (-<span class="Constant">1</span>);
+    <span class="Statement">if</span>(err_des != (<span class="Type">int</span> *)<span class="Constant">NULL</span>)
+       f_index[<span class="Constant">2</span>] = pups_find_free_ftab_index();
+
+    <span class="Statement">if</span>(f_index[<span class="Constant">0</span>] == (-<span class="Constant">1</span>) || f_index[<span class="Constant">1</span>] == (-<span class="Constant">1</span>) || f_index[<span class="Constant">2</span>] == (-<span class="Constant">1</span>))
+    {
+
+<span class="PreProc">       #ifdef PTHREAD_SUPPORT</span>
+       (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ftab_mutex);
+<span class="PreProc">       #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+       (<span class="Type">void</span>)pupsrelse(ALL_PUPS_SIGS);
+       pups_set_errno(<span class="Constant">ENFILE</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    <span class="Statement">if</span>(pups_system2(command_pipeline,
+                    shell,
+                    PUPS_NEW_SESSION | PUPS_ERROR_EXIT,
+                    child_pid,
+                    in_des,
+                    out_des,
+                    err_des) == -<span class="Constant">1</span>)
+    {
+
+<span class="PreProc">       #ifdef PTHREAD_SUPPORT</span>
+       (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ftab_mutex);
+<span class="PreProc">       #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+       pups_set_errno(<span class="Constant">ENOEXEC</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Bind descriptors to PUPS ftab entries </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">3</span>; ++i)
+    {  <span class="Statement">if</span>(f_index[i] != (-<span class="Constant">1</span>))
+       {  <span class="Statement">switch</span>(i)
+          {    <span class="Statement">case</span> <span class="Constant">0</span>:  (<span class="Type">void</span>)strlcpy(ftab[i].fname,command_pipeline,SSIZE);
+                        ftab[f_index[i]].fdes   = *in_des;
+                        ftab[f_index[i]].mode   = <span class="Constant">0</span>;
+                        ftab[f_index[i]].stream = (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>;
+                        <span class="Statement">break</span>;
+
+               <span class="Statement">case</span> <span class="Constant">1</span>:  (<span class="Type">void</span>)strlcpy(ftab[i].fname,command_pipeline,SSIZE);
+                        ftab[f_index[i]].fdes   = *out_des;
+                        ftab[f_index[i]].mode   = <span class="Constant">1</span>;
+                        ftab[f_index[i]].stream = (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>;
+                        <span class="Statement">break</span>;
+
+               <span class="Statement">case</span> <span class="Constant">2</span>:  (<span class="Type">void</span>)strlcpy(ftab[i].fname,command_pipeline,SSIZE);
+                        ftab[f_index[i]].fdes   = *err_des;
+                        ftab[f_index[i]].mode   = <span class="Constant">1</span>;
+                        ftab[f_index[i]].stream = (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>;
+                        <span class="Statement">break</span>;
+
+               <span class="Statement">default</span>: <span class="Statement">break</span>;
+          }
+       }
+    }
+
+<span class="PreProc">    #ifdef PTHREAD_SUPPORT</span>
+    (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ftab_mutex);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pupsrelse(ALL_PUPS_SIGS);
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Open command pipeline with optional attached input, output and</span>
+<span class="Comment">    error streams ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> pups_fcopen2(<span class="Type">const</span> <span class="Type">char</span> *command_pipeline,    <span class="Comment">// Command stream to exec</span>
+                         <span class="Type">const</span> <span class="Type">char</span>            *shell,    <span class="Comment">// Exec shell</span>
+                         <span class="Type">int</span>               *child_pid,    <span class="Comment">// Child PID</span>
+                         <span class="Type">FILE</span>              *in_stream,    <span class="Comment">// Input stream</span>
+                         <span class="Type">FILE</span>             *out_stream,    <span class="Comment">// Output stream</span>
+                         <span class="Type">FILE</span>             *err_stream)    <span class="Comment">// Error/status stream</span>
+
+{   <span class="Type">int</span> i,
+        in_des,
+        out_des,
+        err_des,
+        f_index[<span class="Constant">3</span>];
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Sanity check </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(command_pipeline == (<span class="Type">const</span> <span class="Type">char</span> *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+<span class="PreProc">    #ifdef PTHREAD_SUPPORT</span>
+    (<span class="Type">void</span>)pthread_mutex_lock(&amp;ftab_mutex);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+    f_index[<span class="Constant">0</span>] = (-<span class="Constant">1</span>);
+    <span class="Statement">if</span>(in_stream  != (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>)
+       f_index[<span class="Constant">0</span>] = pups_find_free_ftab_index();
+
+    f_index[<span class="Constant">1</span>] = (-<span class="Constant">1</span>);
+    <span class="Statement">if</span>(out_stream != (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>)
+       f_index[<span class="Constant">1</span>] = pups_find_free_ftab_index();
+
+    f_index[<span class="Constant">2</span>] = (-<span class="Constant">1</span>);
+    <span class="Statement">if</span>(err_stream != (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>)
+       f_index[<span class="Constant">2</span>] = pups_find_free_ftab_index();
+
+    <span class="Statement">if</span>(f_index[<span class="Constant">0</span>] == (-<span class="Constant">1</span>) || f_index[<span class="Constant">1</span>] == (-<span class="Constant">1</span>) || f_index[<span class="Constant">2</span>] == (-<span class="Constant">1</span>))
+    {
+
+<span class="PreProc">       #ifdef PTHREAD_SUPPORT</span>
+       (<span class="Type">void</span>)pthread_mutex_lock(&amp;ftab_mutex);
+<span class="PreProc">       #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+       (<span class="Type">void</span>)pupsrelse(ALL_PUPS_SIGS);
+       pups_set_errno(<span class="Constant">ENFILE</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    <span class="Statement">if</span>(pups_system2(command_pipeline,
+                    shell,
+                    PUPS_ERROR_EXIT,
+                    child_pid,
+                    &amp;in_des,
+                    &amp;out_des,
+                    &amp;err_des) == (-<span class="Constant">1</span>))
+    {
+
+<span class="PreProc">       #ifdef PTHREAD_SUPPORT</span>
+       (<span class="Type">void</span>)pthread_mutex_lock(&amp;ftab_mutex);
+<span class="PreProc">       #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+       pups_set_errno(<span class="Constant">ENOEXEC</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Bind command stream to descriptor </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">3</span>; ++i)
+    {  <span class="Statement">if</span>(f_index[i] != (-<span class="Constant">1</span>))
+       {  <span class="Statement">switch</span>(i)
+          {    <span class="Statement">case</span> <span class="Constant">0</span>:  (<span class="Type">void</span>)strlcpy(ftab[i].fname,command_pipeline,SSIZE);
+                        ftab[f_index[i]].fdes   = in_des;
+                        ftab[f_index[i]].mode   = <span class="Constant">0</span>;
+                        ftab[f_index[i]].stream = pups_fdopen(in_des,<span class="Constant">&quot;r&quot;</span>);
+                        in_stream               = ftab[f_index[i]].stream;
+                        <span class="Statement">break</span>;
+
+               <span class="Statement">case</span> <span class="Constant">1</span>:  (<span class="Type">void</span>)strlcpy(ftab[i].fname,command_pipeline,SSIZE);
+                        ftab[f_index[i]].fdes   = out_des;
+                        ftab[f_index[i]].mode   = <span class="Constant">1</span>;
+                        ftab[f_index[i]].stream = pups_fdopen(out_des,<span class="Constant">&quot;w&quot;</span>);
+                        out_stream              = ftab[f_index[i]].stream;
+                        <span class="Statement">break</span>;
+
+               <span class="Statement">case</span> <span class="Constant">2</span>:  (<span class="Type">void</span>)strlcpy(ftab[i].fname,command_pipeline,SSIZE);
+                        ftab[f_index[i]].fdes   = err_des;
+                        ftab[f_index[i]].mode   = <span class="Constant">1</span>;
+                        ftab[f_index[i]].stream = pups_fdopen(err_des,<span class="Constant">&quot;w&quot;</span>);
+                        err_stream              = ftab[f_index[i]].stream;
+                        <span class="Statement">break</span>;
+
+               <span class="Statement">default</span>: <span class="Statement">break</span>;
+          }
+       }
+    }
+
+<span class="PreProc">    #ifdef PTHREAD_SUPPORT</span>
+    (<span class="Type">void</span>)pthread_mutex_lock(&amp;ftab_mutex);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Detach process from pipeline ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> detach_from_pipeline(<span class="Type">const</span> <span class="Type">int</span> close_status)
+
+{
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Parent side of fork - simply exit after creating </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> identical child process                          </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(pups_fork(TRUE,FALSE) != <span class="Constant">0</span>)
+    {  <span class="Type">int</span> i;
+
+
+       <span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Set effective and real user i.d's </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+
+       (<span class="Type">void</span>)setreuid(getuid(),getuid());
+
+
+       <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Clear any pending alarm </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+
+       (<span class="Type">void</span>)pups_malarm(<span class="Constant">0</span>);
+
+
+       <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Restore all signals to default states </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">for</span>(i=<span class="Constant">1</span>; i&lt;MAX_SIGS; ++i)
+          (<span class="Type">void</span>)pups_sighandle(i,<span class="Constant">&quot;default&quot;</span>,<span class="Constant">SIG_DFL</span>, (sigset_t *)<span class="Constant">NULL</span>);
+
+       <span class="Statement">if</span>(appl_verbose == TRUE)
+       {  (<span class="Type">void</span>)strdate(date);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">) has detached from pipeline</span><span class="Special">\n</span><span class="Constant">&quot;</span>,date,appl_name,appl_pid,appl_host,appl_owner);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+
+       _exit(<span class="Constant">0</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> If appropriate detach from pipeline process    </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> group                                          </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(close_status &amp; NEW_PGRP)
+       (<span class="Type">void</span>)setsid();
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Child side of fork - close stdio as specified  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> by caller                                      </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Close stdin </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(close_status &amp; CLOSE_STDIN)
+      (<span class="Type">void</span>)close(<span class="Constant">0</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Close stdout </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(close_status &amp; CLOSE_STDOUT)
+      (<span class="Type">void</span>)close(<span class="Constant">1</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Close stderr </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(close_status &amp; CLOSE_STDERR)
+      (<span class="Type">void</span>)close(<span class="Constant">2</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------------------</span>
+<span class="Comment">    Send signal to process running on remote host ...</span>
+<span class="Comment">--------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> pups_rkill(<span class="Type">const</span> <span class="Type">char</span> *hostname, <span class="Type">const</span> <span class="Type">char</span> *ssh_port, <span class="Type">const</span> <span class="Type">char</span> *username, <span class="Type">const</span> <span class="Type">char</span> *pidname, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span> signum)
+
+{   _BOOLEAN looper = TRUE;
+
+    <span class="Type">int</span> trys,
+        pid;
+
+    <span class="Statement">if</span>(pidname == (<span class="Type">const</span> <span class="Type">char</span> *)<span class="Constant">NULL</span> || signum &gt; MAX_SIGS)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Convert pid(name) to numeric process i.d. </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> if we are signalling a local process      </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(hostname == (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+    {  <span class="Statement">if</span>((pid = psrp_pname_to_pid(pidname)) == (-<span class="Constant">1</span>))
+          <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Send signal to process running on remote host </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">else</span> <span class="Statement">if</span>(hostname != (<span class="Type">char</span> *)<span class="Constant">NULL</span>           &amp;&amp;
+            strcmp(<span class="Constant">&quot;localhost&quot;</span>,hostname) != <span class="Constant">0</span>  &amp;&amp;
+            strcmp(appl_host,hostname)   != <span class="Constant">0</span>   )
+    {
+
+<span class="PreProc">#ifndef SSH_SUPPORT</span>
+       (<span class="Type">void</span>)pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+<span class="PreProc">#else</span>
+       <span class="Type">int</span> nb,
+           status = <span class="Constant">0</span>,
+           ret    = <span class="Constant">0</span>;
+
+       <span class="Type">char</span> reply[<span class="Constant">512</span>]              = <span class="Constant">&quot;&quot;</span>,
+            xkilld_parameters[<span class="Constant">512</span>]  = <span class="Constant">&quot;&quot;</span>;
+
+
+       <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Remote kill command </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+       (<span class="Type">void</span>)snprintf(xkilld_parameters,SSIZE,<span class="Constant">&quot;nkill </span><span class="Special">%d</span><span class="Constant"> +verbose </span><span class="Special">%s</span><span class="Constant">&quot;</span>,signum,pidname);
+
+<span class="PreProc">       #ifdef NETLIB_DEBUG</span>
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;XKILL </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,xkilld_parameters);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+<span class="PreProc">       #endif</span> <span class="Comment">/*</span><span class="Comment"> NETLIB_DEBUG </span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>((rkill_pid = pups_fork(FALSE,FALSE)) == <span class="Constant">0</span>)
+       {   <span class="Type">char</span> sshPortOpt[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+          <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Child side of fork </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+
+          <span class="Type">int</span>      ret      = <span class="Constant">0</span>;
+          _BOOLEAN is_a_tty = TRUE;
+
+
+          <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Stop homeostats and remove PSRP channels (this process is about to be </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> overlayed by ssh)                                                     </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+          (<span class="Type">void</span>)pups_malarm(<span class="Constant">0</span>);
+          (<span class="Type">void</span>)signal(<span class="Constant">SIGALRM</span>,<span class="Constant">SIG_IGN</span>);
+
+          appl_verbose = FALSE;
+
+          (<span class="Type">void</span>)pups_closeall();
+          (<span class="Type">void</span>)setsid();
+
+
+          <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> We don't need stdio </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+          (<span class="Type">void</span>)fclose(<span class="Constant">stdin</span>);
+          (<span class="Type">void</span>)fclose(<span class="Constant">stdout</span>);
+          (<span class="Type">void</span>)fclose(<span class="Constant">stderr</span>);
+
+
+          <span class="Statement">if</span>(ssh_port != (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+             (<span class="Type">void</span>)snprintf(sshPortOpt,SSIZE,<span class="Constant">&quot;-P </span><span class="Special">%s</span><span class="Constant">&quot;</span>,ssh_port);
+          <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(ssh_remote_port,<span class="Constant">&quot;&quot;</span>) == <span class="Constant">0</span>)
+             (<span class="Type">void</span>)snprintf(sshPortOpt,SSIZE,<span class="Constant">&quot;-P </span><span class="Special">%s</span><span class="Constant">&quot;</span>,ssh_remote_port);
+
+
+          <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> We are not using passwords. You will </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> need to generate a public/private    </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> keyset for this to work              </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+
+          <span class="Statement">if</span>(ssh_compression == TRUE)
+             (<span class="Type">void</span>)execlp(<span class="Constant">&quot;ssh&quot;</span>,<span class="Constant">&quot;ssh&quot;</span>,sshPortOpt,<span class="Constant">&quot;-oPasswordAuthentication=no&quot;</span>,<span class="Constant">&quot;+C&quot;</span>,<span class="Constant">&quot;-l&quot;</span>,username,hostname,xkilld_parameters,(<span class="Type">char</span> *)<span class="Constant">NULL</span>);
+          <span class="Statement">else</span>
+             (<span class="Type">void</span>)execlp(<span class="Constant">&quot;ssh&quot;</span>,<span class="Constant">&quot;ssh&quot;</span>,sshPortOpt,<span class="Constant">&quot;-oPasswordAuthentication=no&quot;</span>,<span class="Constant">&quot;-l&quot;</span>,username,hostname,xkilld_parameters,(<span class="Type">char</span> *)<span class="Constant">NULL</span>);
+
+
+          <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> We should not get here -- if we do an error has occured </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+
+          _exit(<span class="Constant">255</span>);
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Parent side of fork </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">else</span> <span class="Statement">if</span>(rkill_pid == (-<span class="Constant">1</span>))
+       {  pups_set_errno(<span class="Constant">ENOEXEC</span>);
+          <span class="Statement">return</span>(-<span class="Constant">1</span>);
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Wait for child to terminate </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> and read reply (if any)     </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">while</span>((ret = waitpid(rkill_pid,&amp;status,WNOHANG)) != pid)
+       {    <span class="Statement">if</span>(ret == (-<span class="Constant">1</span>))
+            {  pups_set_errno(<span class="Constant">ENOEXEC</span>);
+               <span class="Statement">return</span>(-<span class="Constant">1</span>);
+            }
+
+            (<span class="Type">void</span>)pups_usleep(<span class="Constant">100</span>);
+       }
+
+       <span class="Statement">if</span>(WEXITSTATUS(status) == <span class="Constant">255</span>)
+       {
+
+          <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> ssh failed to execute nkill command </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+
+          pups_set_errno(<span class="Constant">EACCES</span>);
+          <span class="Statement">return</span>(-<span class="Constant">1</span>);
+       }
+       <span class="Statement">else</span> <span class="Statement">if</span>(WEXITSTATUS(status) &lt; <span class="Constant">0</span>)
+       {
+
+          <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Could not signal remote process </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+
+          pups_set_errno(<span class="Constant">ENOENT</span>);
+          <span class="Statement">return</span>(-<span class="Constant">1</span>);
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> We sent signal to remote process </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+       (<span class="Type">void</span>)pups_set_errno(OK);
+       <span class="Statement">return</span>(ret);
+    }
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> SSH_SUPPORT </span><span class="Comment">*/</span>
+
+    <span class="Statement">else</span>
+    {
+
+       <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Send local signal </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(kill(pid,signum) == (-<span class="Constant">1</span>))
+       {  pups_set_errno(<span class="Constant">EACCES</span>);
+          <span class="Statement">return</span>(-<span class="Constant">1</span>);
+       }
+
+       pups_set_errno(OK);
+       <span class="Statement">return</span>(<span class="Constant">0</span>);
+    }
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

@@ -1,0 +1,84 @@
+.TH BRANCH 1 "7th December 2020" "PUPSP3 tools" "PUPSP3 tools"
+
+.SH NAME
+BRANCH \- extract basal branch from directory path 
+.br
+
+.SH SYNOPSIS
+.B branch 
+[
+.B -usage
+| 
+.B -help
+][
+.B -verbose
+][
+.B -tlength
+.I twig length
+]!
+.I pathname
+[2> <log file>]
+.br
+
+.SH DESCRIPTION
+.I branch(1)
+extracts a basal branch from a pathname (branch). By defaulti,
+.I branch(1)
+extracts the entire
+.B branch
+omitting the
+.B leaf 
+Smaller basal branches are specified
+using the tlength parameter.
+.br
+
+.SH OPTIONS
+
+.B -usage
+|
+.B -help
+display help and copyright information for the
+.I leaf(1)
+filter. The application then exits
+.br
+
+.B -verbose
+tells
+.I branch(1)
+log error/status information to
+.I standard error.
+Defaults to
+.B FALSE
+(no logging).
+.br
+
+.B -tlength
+.I twig length
+specifies the size of the (basal)
+.B twig
+to be extracted from the pathname branch. Defaults to the branch length (i.e. the filename leaf is
+extracted from the pathname).
+
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
+.br
+
+.SH ENVIRONMENT VARIABLES
+None.
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br

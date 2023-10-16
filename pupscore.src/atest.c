@@ -1,7 +1,7 @@
-/*-----------------------------------*/
-/* Check criu functionality          */
-/* M.A. O'Neill, Tumbling Dice, 2019 */
-/*-----------------------------------*/
+/*-----------------------------------------------*/
+/* Check criu functionality                      */
+/* M.A. O'Neill, Tumbling Dice, 4th January 2022 */
+/*-----------------------------------------------*/
 
 #include <stdio.h>
 #include <string.h>
@@ -110,10 +110,10 @@ int main(int argc, char *argv[])
     /*-------------------------------*/
 
     if(argc > 2)
-       exit(-1);
+       exit(255);
     else if(argc == 2)
     {  if(sscanf(argv[1],"%d",&ssave_delay) != 1 || ssave_delay <= 0)
-          exit(-1);
+          exit(255);
     }
 
     pid = getpid();

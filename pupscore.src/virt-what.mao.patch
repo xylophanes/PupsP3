@@ -1,0 +1,8 @@
+337,338c337,340
+< # Check for Docker.
+< if [ -f "${root}/.dockerinit" ]; then
+---
+> 
+> # Check for Docker (MAO /proc/1/mounts is best way to detect docker)
+> isdocker=$(cat /proc/1/mounts | head -1 | grep docker)
+> if [ "$isdocker" != "" ] ; then

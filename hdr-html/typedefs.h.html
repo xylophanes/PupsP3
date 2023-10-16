@@ -1,0 +1,105 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.5.1.src.git/include.libs/typedefs.h.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="cpp">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    The PUPS bubble memory library.</span>
+<span class="Comment">    (C) M.A. O'Neill, 4th January 2021, mao@tumblingdice.co.uk</span>
+<span class="Comment">-------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifndef TYPEDEFS_H</span>
+<span class="PreProc">#define TYPEDEFS_H</span>
+
+<span class="PreProc">#define	MAXLEN		</span><span class="Constant">1024</span>
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------- </span>
+
+<span class="Comment">   Each memory block has 5 extra 32-bit values associated with it.  If malloc</span>
+<span class="Comment">   returns the pointer p to you, the state really looks like:</span>
+
+<span class="Comment">jmal(p)------&gt;  |------------------------------------------------------------|</span>
+<span class="Comment">                | flink (next malloc block in absolute order)                |</span>
+<span class="Comment">                |------------------------------------------------------------|</span>
+<span class="Comment">                | blink (prev malloc block in absolute order)                |</span>
+<span class="Comment">                |------------------------------------------------------------|</span>
+<span class="Comment">                |------------------------------------------------------------|</span>
+<span class="Comment">                | mmap size (size of mapped region)                          |</span>
+<span class="Comment">                |------------------------------------------------------------|</span>
+<span class="Comment">                | size (size of memory allocated in mapped region)           |</span>
+<span class="Comment">p------------&gt;  |------------------------------------------------------------|</span>
+<span class="Comment">                | space: the memory block                                    |</span>
+<span class="Comment">                |                  ...                                       |</span>
+<span class="Comment">                |                  ...                                       |</span>
+<span class="Comment">                |------------------------------------------------------------|</span>
+
+<span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> String/buffer size </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define SSIZE </span><span class="Constant">2048</span>
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Definition of the Jmalloc structure </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">typedef</span> <span class="Type">struct</span> jmalloc {
+  <span class="Type">struct</span> jmalloc *flink;
+  <span class="Type">struct</span> jmalloc *blink;
+  <span class="Type">size_t</span>         mmap_size;
+  <span class="Type">size_t</span>         size;
+  <span class="Type">void</span>           *space;
+} *Jmalloc;
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Filetable structure. Holds information about file table objects </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">typedef</span> <span class="Type">struct</span> ftable_struct {
+  <span class="Type">int</span>      inuse;
+  <span class="Type">int</span>      type;
+  <span class="Type">char</span>     filename[SSIZE];
+  <span class="Type">int</span>      size;
+  <span class="Type">unsigned</span> <span class="Type">char</span> buf[SSIZE];
+  <span class="Type">int</span>      attribute;
+  <span class="Type">int</span>      mode;
+  <span class="Type">int</span>      fd;
+  <span class="Type">off_t</span>    seek_ptr;
+} ftable_entry;
+
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> TYPEDEFS_H </span><span class="Comment">*/</span>
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

@@ -1,0 +1,638 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/eigenlib.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------------</span>
+<span class="Comment">    Purpose:  Eigenvector anaylis library</span>
+
+<span class="Comment">    Author:  M.A. O'Neill</span>
+<span class="Comment">             Tumbling Dice Ltd</span>
+<span class="Comment">             Gosforth</span>
+<span class="Comment">             Newcastle upon Tyne</span>
+<span class="Comment">             NE3 4RT</span>
+<span class="Comment">             United Kingdom</span>
+
+<span class="Comment">    Version: 1.05</span>
+<span class="Comment">    Dated:   4th Janiary 2022</span>
+<span class="Comment">    E-mail:  mao@tumblingdice.co.uk</span>
+
+<span class="Comment">    Some routines here are derived from those given in Press et al (Numerical</span>
+<span class="Comment">    Recipes in C).</span>
+<span class="Comment">----------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="PreProc">#include </span><span class="Constant">&lt;me.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;utils.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;casino.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;errno.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Do not expand _EXTERN for this library </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#undef   __NOT_LIB_SOURCE__</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;eigen.h&gt;</span>
+<span class="PreProc">#define  __NOT_LIB_SOURCE__</span>
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Definitions which are local to this library </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifndef SIGN</span>
+<span class="PreProc">#define SIGN(a,b) ((b) &gt;= </span><span class="Constant">0.0</span><span class="PreProc"> ? FABS(a) : -FABS(a))</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> SIGN </span><span class="Comment">*/</span>
+
+
+<span class="PreProc">#ifndef SQR</span>
+_PRIVATE FTYPE sqrarg;
+<span class="PreProc">#define SQR(a) ((sqrarg = (a)) == </span><span class="Constant">0.0</span><span class="PreProc"> ? </span><span class="Constant">0.0</span><span class="PreProc"> : sqrarg*sqrarg)</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> SQR </span><span class="Comment">*/</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Slot and usage functions - used by slot manager </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Slot usage function </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> eigenlib_slot(<span class="Type">int</span> level)
+{   (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;lib eigenlib </span><span class="Special">%s</span><span class="Constant">: [ANSI C]</span><span class="Special">\n</span><span class="Constant">&quot;</span>,EIGEN_VERSION);
+
+    <span class="Statement">if</span>(level &gt; <span class="Constant">1</span>)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;(C) 1985-2022 Tumbling Dice</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Author: M.A. O'Neill</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;PUPS/P3 eigenvector analysis library (built </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+    }
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Segment identification for eigenlib library </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef SLOT</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;slotman.h&gt;</span>
+_EXTERN <span class="Type">void</span> (* SLOT )() __attribute__ ((aligned(<span class="Constant">16</span>))) = eigenlib_slot;
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> SLOT </span><span class="Comment">*/</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Functions which are private to this module </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+
+_PROTOTYPE _PRIVATE FTYPE pythag(FTYPE a, FTYPE b);
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------------</span>
+<span class="Comment">    Reduce matrix to tridiagonal form ...</span>
+<span class="Comment">----------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> tqli(FTYPE *d, FTYPE *e, <span class="Type">int</span> n, FTYPE **z)
+
+{   <span class="Type">int</span> m,
+        l,
+        iter,
+        i,
+        k;
+
+     FTYPE s,
+           r,
+           p,
+           g,
+           f,
+           dd,
+           c,
+           b;
+
+     <span class="Statement">for</span>(i=<span class="Constant">2</span>; i&lt;=n; i++)
+        e[i-<span class="Constant">1</span>]=e[i];
+
+     e[n]=<span class="Constant">0.0</span>;
+     <span class="Statement">for</span>(l=<span class="Constant">0</span>; l&lt;=n; l++)
+     {   iter=<span class="Constant">0</span>;
+
+         <span class="Statement">do</span> {    <span class="Statement">for</span>(m=l; m&lt;=n-<span class="Constant">1</span>; m++)
+                 {  dd = FABS(d[m])+FABS(d[m+<span class="Constant">1</span>]);
+                    <span class="Statement">if</span>((FTYPE)(FABS(e[m])+dd) == dd)
+                        <span class="Statement">break</span>;
+                 }
+
+                 <span class="Statement">if</span>(m != l)
+                 {  <span class="Statement">if</span>(iter++ == <span class="Constant">30</span>)
+                    {  pups_set_errno(<span class="Constant">E2BIG</span>);
+                       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+                    }
+                 }
+
+                 g = (d[l+<span class="Constant">1</span>]-d[l])/(<span class="Constant">2.0</span>*e[l]);
+                 r = pythag(g,<span class="Constant">1.0</span>);
+                 g = d[m]-d[l]+e[l]/(g+SIGN(r,g));
+                 s = c = <span class="Constant">1.0</span>;
+                 p = <span class="Constant">0.0</span>;
+
+                 <span class="Statement">for</span>(i=m-<span class="Constant">1</span>; i&gt;=l; i--)
+                 {  f      = s*e[i];
+                    b      = c*e[i];
+                    e[i+<span class="Constant">1</span>] = (r=pythag(f,g));
+
+                    <span class="Statement">if</span>(r == <span class="Constant">0.0</span>)
+                    {  d[i+<span class="Constant">1</span>] -= p;
+                       e[m]   =  <span class="Constant">0.0</span>;
+                       <span class="Statement">break</span>;
+                    }
+
+                    s      = f/r;
+                    c      = g/r;
+                    g      = d[i+<span class="Constant">1</span>] - p;
+                    r      = (d[i]-g)*s + <span class="Constant">2.0</span>*c*b;
+                    d[i+<span class="Constant">1</span>] = g + (p=s*r);
+                    g      = c*r - b;
+
+                    <span class="Statement">for</span>(k=<span class="Constant">1</span>; k&lt;=n; k++)
+                    {  f         = z[k][i+<span class="Constant">1</span>];
+                       z[k][i+<span class="Constant">1</span>] = s*z[k][i]+c*f;
+                       z[k][i]   = c*z[k][i]-s*f;
+                    }
+                  }
+
+                  <span class="Statement">if</span>(r == <span class="Constant">0.0</span> &amp;&amp; i &gt;= l)
+                     <span class="Statement">continue</span>;
+
+                  d[l] -= p;
+                  e[l] =  g;
+                  e[m] =  <span class="Constant">0.0</span>;
+            } <span class="Statement">while</span> (m != l);
+    }
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------------------</span>
+<span class="Comment">   Get eigenvalues and eigenvectos of a matrix by Householder reduction ...</span>
+<span class="Comment">---------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> tred2(_BOOLEAN eigenvectors, FTYPE **a, <span class="Type">int</span> n, FTYPE *d, FTYPE *e)
+
+{
+    <span class="Type">int</span> l,
+        k,
+        j,
+        i;
+
+    FTYPE scale,
+          hh,
+          h,
+          g,
+          f;
+
+    <span class="Statement">for</span>(i=n-<span class="Constant">1</span>; i&gt;=<span class="Constant">2</span>; i--)
+    {  l = i-<span class="Constant">1</span>;
+       h = scale=<span class="Constant">0.0</span>;
+
+       <span class="Statement">if</span>(l &gt; <span class="Constant">1</span>)
+       {  <span class="Statement">for</span>(k=<span class="Constant">1</span>; k&lt;=l; k++)
+              scale += FABS(a[i][k]);
+
+          <span class="Statement">if</span>(scale == <span class="Constant">0.0</span>)
+             e[i] = a[i][l];
+          <span class="Statement">else</span>
+          {  <span class="Statement">for</span>(k=<span class="Constant">1</span>; k&lt;=l; k++)
+             {   a[i][k] /= scale;
+                 h       += a[i][k]*a[i][k];
+             }
+
+             f    =  a[i][l];
+             g    =  (f &gt;= <span class="Constant">0.0</span> ? -SQRT(h) : SQRT(h));
+             e[i] =  scale*g;
+
+             h       -= f*g;
+             a[i][l] =  f - g;
+             f       =  <span class="Constant">0.0</span>;
+
+             <span class="Statement">for</span>(j=<span class="Constant">1</span>; j&lt;=l; j++)
+             {   a[j][i] = a[i][j]/h;
+                 g       = <span class="Constant">0.0</span>;
+
+                 <span class="Statement">for</span>(k=<span class="Constant">1</span>; k&lt;=j; k++)
+                    g += a[j][k]*a[i][k];
+
+                 <span class="Statement">for</span>(k=j+<span class="Constant">1</span>; k&lt;=l; k++)
+                    g += a[k][j]*a[i][k];
+
+                 e[j] =  g/h;
+                 f    += e[j]*a[i][j];
+             }
+
+             hh=f/(h+h);
+             <span class="Statement">for</span>(j=<span class="Constant">1</span>; j&lt;=l; j++)
+             {   f    =a[i][j];
+                 e[j] = g = e[j] - hh*f;
+
+                 <span class="Statement">for</span>(k=<span class="Constant">1</span>; k&lt;=j; k++)
+                 a[j][k] -= (f*e[k]+g*a[i][k]);
+             }
+          }
+       }
+       <span class="Statement">else</span>
+          e[i]=a[i][l];
+
+       d[i]=h;
+    }
+
+    d[<span class="Constant">0</span>] = <span class="Constant">0.0</span>;
+    e[<span class="Constant">0</span>] = <span class="Constant">0.0</span>;
+
+    <span class="Statement">for</span>(i=<span class="Constant">1</span>; i&lt;=n; i++)
+    {  <span class="Statement">if</span>(eigenvectors == TRUE)
+       {  l = i-<span class="Constant">1</span>;
+
+          <span class="Statement">if</span>(d[i])
+          {  <span class="Statement">for</span>(j=<span class="Constant">1</span>; j&lt;=l; j++)
+             {  g = <span class="Constant">0.0</span>;
+
+                <span class="Statement">for</span>(k=<span class="Constant">1</span>; k&lt;=l; k++)
+                   g += a[i][k]*a[k][j];
+
+                <span class="Statement">for</span>(k=<span class="Constant">1</span>; k&lt;=l; k++)
+                    a[k][j] -= g*a[k][i];
+             }
+          }
+
+          d[i]    = a[i][i];
+          a[i][i] = <span class="Constant">1.0</span>;
+
+          <span class="Statement">for</span>(j=<span class="Constant">1</span>; j&lt;=l; j++)
+             a[j][i]=a[i][j]=<span class="Constant">0.0</span>;
+       }
+       <span class="Statement">else</span>
+          d[i]    = a[i][i];
+    }
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Support routine for tqli and tred2 ...</span>
+<span class="Comment">------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE FTYPE pythag(FTYPE a, FTYPE b)
+{   FTYPE absa,
+          absb;
+
+    absa = FABS(a);
+    absb = FABS(b);
+
+    <span class="Statement">if</span>(absa &gt; absb)
+       <span class="Statement">return</span> absa*SQRT(<span class="Constant">1.0</span>+SQR(absb/absa));
+    <span class="Statement">else</span>
+       <span class="Statement">return</span> (absb == <span class="Constant">0.0</span> ? <span class="Constant">0.0</span> : absb*SQRT(<span class="Constant">1.0</span>+SQR(absa/absb)));
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Jacobi transformation of a symmetric matrix to compute the eigenvalues and</span>
+<span class="Comment">    eigenvectors ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define ROTATE(a,i,j,k,l) g=a[i][j];h=a[k][l];a[i][j]=g-s*(h+g*tau);\</span>
+<span class="PreProc">	a[k][l]=h+s*(g-h*tau);</span>
+
+_PUBLIC <span class="Type">int</span> jacobi(FTYPE **a, <span class="Type">int</span> n, FTYPE *d, FTYPE **v, <span class="Type">int</span> *nrot)
+
+{   <span class="Type">int</span> i,
+        j,
+        iq,
+        ip;
+
+	FTYPE thresh,
+              theta,
+              tau,
+              t,
+              sm,
+              s,
+              h,
+              g,
+              c,
+              *b = (FTYPE *)<span class="Constant">NULL</span>,
+              *z = (FTYPE *)<span class="Constant">NULL</span>;
+
+	b = (FTYPE *)pups_calloc(n,<span class="Statement">sizeof</span>(FTYPE));
+	z = (FTYPE *)pups_calloc(n,<span class="Statement">sizeof</span>(FTYPE));
+
+	<span class="Statement">for</span>(ip=<span class="Constant">1</span>; ip&lt;=n; ip++)
+        {   <span class="Statement">for</span>(iq=<span class="Constant">0</span>; iq&lt;n; iq++)
+               v[ip][iq] = <span class="Constant">0.0</span>;
+
+            v[ip][ip]=<span class="Constant">1.0</span>;
+        }
+
+        <span class="Statement">for</span>(ip=<span class="Constant">1</span>; ip&lt;=n; ip++)
+        {   b[ip]=d[ip] = a[ip][ip];
+
+            z[ip]=<span class="Constant">0.0</span>;
+        }
+
+        *nrot = <span class="Constant">0</span>;
+        <span class="Statement">for</span>(i=<span class="Constant">1</span>; i&lt;=<span class="Constant">50</span>; i++)
+        {  sm = <span class="Constant">0.0</span>;
+
+           <span class="Statement">for</span>(ip=<span class="Constant">1</span>; ip&lt;=n-<span class="Constant">1</span>; ip++)
+           {  <span class="Statement">for</span>(iq=ip+<span class="Constant">1</span>; iq&lt;=n; iq++)
+                 sm += FABS(a[ip][iq]);
+           }
+
+           <span class="Statement">if</span>(sm == <span class="Constant">0.0</span>)
+           {  (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)z);
+              (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)b);
+
+              pups_set_errno(OK);
+              <span class="Statement">return</span>(<span class="Constant">0</span>);
+           }
+
+           <span class="Statement">if</span>(i &lt; <span class="Constant">4</span>)
+              thresh=<span class="Constant">0.2</span>*sm/(n*n);
+           <span class="Statement">else</span>
+              thresh=<span class="Constant">0.0</span>;
+
+            <span class="Statement">for</span>(ip=<span class="Constant">1</span>; ip&lt;=n-<span class="Constant">1</span>; ip++)
+            {   <span class="Statement">for</span>(iq=ip+<span class="Constant">1</span>; iq&lt;=n; iq++)
+                {   g = <span class="Constant">100.0</span>*FABS(a[ip][iq]);
+
+                    <span class="Statement">if</span>(i &gt; <span class="Constant">4</span> &amp;&amp; (FABS(d[ip]) + g) == FABS(d[ip]) &amp;&amp; (FABS(d[iq]) + g) == FABS(d[iq]))
+                       a[ip][iq]=<span class="Constant">0.0</span>;
+                    <span class="Statement">else</span> <span class="Statement">if</span>(FABS(a[ip][iq]) &gt; thresh)
+                    {  h = d[iq] - d[ip];
+
+                       <span class="Statement">if</span>((FABS(h) + g) == FABS(h))
+                          t = (a[ip][iq])/h;
+                       <span class="Statement">else</span>
+                       {  theta = <span class="Constant">0.5</span>*h/(a[ip][iq]);
+                          t     = <span class="Constant">1.0</span>/(FABS(theta)+SQRT(<span class="Constant">1.0</span>+theta*theta));
+
+                          <span class="Statement">if</span>(theta &lt; <span class="Constant">0.0</span>)
+                             t = -t;
+                       }
+
+                       c     =  <span class="Constant">1.0</span>/SQRT(<span class="Constant">1</span>+t*t);
+                       s     =  t*c;
+                       tau   =  s/(<span class="Constant">1.0</span>+c);
+                       h     =  t*a[ip][iq];
+                       z[ip] -= h;
+                       z[iq] += h;
+                       d[ip] -= h;
+                       d[iq] += h;
+                       a[ip][iq]=<span class="Constant">0.0</span>;
+
+                       <span class="Statement">for</span>(j=<span class="Constant">1</span>; j&lt;=ip-<span class="Constant">1</span>; j++)
+                          ROTATE(a,j,ip,j,iq)
+
+                       <span class="Statement">for</span>(j=ip+<span class="Constant">1</span>; j&lt;=iq-<span class="Constant">1</span>; j++)
+                          ROTATE(a,ip,j,j,iq)
+
+                       <span class="Statement">for</span>(j=iq+<span class="Constant">1</span>; j&lt;=n; j++)
+                           ROTATE(a,ip,j,iq,j)
+
+                       <span class="Statement">for</span>(j=<span class="Constant">1</span>; j&lt;=n; j++)
+                           ROTATE(v,j,ip,j,iq)
+
+                       ++(*nrot);
+                    }
+                 }
+              }
+
+              <span class="Statement">for</span>(ip=<span class="Constant">1</span>; ip&lt;=n; ip++)
+              {  b[ip] += z[ip];
+                 d[ip] =  b[ip];
+                 z[ip] =  <span class="Constant">0.0</span>;
+              }
+	}
+
+        pups_set_errno(<span class="Constant">E2BIG</span>);
+        <span class="Statement">return</span>(-<span class="Constant">1</span>);
+}
+<span class="PreProc">#undef ROTATE</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------</span>
+<span class="Comment">     Sort the eigenvalues and eigenvectors calculated by jacobi or tred2 and tqli into</span>
+<span class="Comment">     descending order ...</span>
+<span class="Comment">------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> eigsrt(FTYPE *d, FTYPE **v, <span class="Type">int</span> n)
+{   <span class="Type">int</span> k,
+        j,
+        i;
+
+    FTYPE p;
+
+    <span class="Statement">for</span>(i=<span class="Constant">1</span>; i&lt;n; i++)
+    {  p = d[k=i];
+
+       <span class="Statement">for</span>(j=i+<span class="Constant">1</span>; j&lt;=n; j++)
+          <span class="Statement">if</span>(d[j] &gt;= p)
+             p=d[k=j];
+
+       <span class="Statement">if</span>(k != <span class="Constant">1</span>)
+       {  d[k] = d[i];
+          d[i] = p;
+
+          <span class="Statement">for</span>(j=<span class="Constant">1</span>; j&lt;=n; j++)
+          {  p       = v[j][i];
+             v[j][i] = v[j][k];
+             v[j][k] = p;
+          }
+      }
+    }
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------</span>
+<span class="Comment">    Generate ATA matrix from input pattern vectors ...</span>
+<span class="Comment">---------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> get_covariance_matrix(<span class="Type">int</span> n_patterns, <span class="Type">int</span> pattern_size, FTYPE **cmatrix, FTYPE **pattern_matrix)
+
+{   <span class="Type">int</span> i,
+        j,
+        k;
+
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;n_patterns; i++)
+    {  <span class="Statement">for</span>(j=i; j&lt;n_patterns; j++)
+       {  cmatrix[i+<span class="Constant">1</span>][j+<span class="Constant">1</span>] = <span class="Constant">0.0</span>;
+
+          <span class="Statement">for</span>(k=<span class="Constant">0</span>; k&lt;pattern_size; k++)
+              cmatrix[i+<span class="Constant">1</span>][j+<span class="Constant">1</span>] += pattern_matrix[i][k] * pattern_matrix[j][k];
+
+          cmatrix[j+<span class="Constant">1</span>][i+<span class="Constant">1</span>] = cmatrix[i+<span class="Constant">1</span>][j+<span class="Constant">1</span>];
+       }
+    }
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------</span>
+<span class="Comment">    Generate eigenvectors ...</span>
+<span class="Comment">---------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> get_eigenvectors(FTYPE significance, <span class="Type">int</span> n_patterns, FTYPE **cmatrix, FTYPE *d, FTYPE *e)
+
+{   <span class="Type">int</span> i,
+        nse = <span class="Constant">0</span>;
+
+    FTYPE trace;
+
+    tred2(TRUE, cmatrix, n_patterns, d, e );
+
+    <span class="Statement">if</span>(tqli( d, e, n_patterns, cmatrix) == (-<span class="Constant">1</span>))
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+
+    eigsrt(d, cmatrix, n_patterns);
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------</span>
+<span class="Comment">    Calculate trace (simply the sum of the eigenvalues of Cov_matrix) and the</span>
+<span class="Comment">    proportion of variation that each eigenvector accounts for ...</span>
+<span class="Comment">---------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    trace = <span class="Constant">0</span>;
+    <span class="Statement">for</span>(i=<span class="Constant">1</span>; i&lt;=n_patterns; i++)
+        trace += d[i];
+
+    nse = <span class="Constant">0</span>;
+    <span class="Statement">for</span>(i=<span class="Constant">1</span>; i&lt;=n_patterns; i++)
+       <span class="Statement">if</span>((d[i]/trace) * <span class="Constant">100.0</span> &gt;= significance)
+          ++nse;
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(nse);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------</span>
+<span class="Comment">    Generate eigenpatterns ...</span>
+<span class="Comment">---------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC FTYPE **get_eigenpatterns(<span class="Type">int</span> nse, <span class="Type">int</span> n_patterns, <span class="Type">int</span> pattern_size, FTYPE **pattern_matrix, FTYPE **eigenvector)
+
+{   <span class="Type">int</span> i,
+        j,
+        k;
+
+    FTYPE **eigenpattern = (FTYPE **)<span class="Constant">NULL</span>;
+
+    <span class="Statement">if</span>((eigenpattern = (FTYPE **)pups_calloc(n_patterns,<span class="Statement">sizeof</span>(FTYPE *))) == (FTYPE **)<span class="Constant">NULL</span>)
+       <span class="Statement">return</span>((FTYPE **)<span class="Constant">NULL</span>);
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;nse; i++)
+    {  <span class="Statement">if</span>((eigenpattern[i] = (FTYPE *)pups_calloc(pattern_size,<span class="Statement">sizeof</span>(FTYPE))) == (FTYPE *)<span class="Constant">NULL</span>)
+       {  <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;i; ++j)
+             (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)eigenpattern[j]);
+
+          (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)eigenpattern);
+
+          pups_set_errno(<span class="Constant">E2BIG</span>);
+          <span class="Statement">return</span>((FTYPE **)<span class="Constant">NULL</span>);
+       }
+    }
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;pattern_size; i++)
+    {   <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;nse; j++)
+        {   eigenpattern[j][i] = <span class="Constant">0.0</span>;
+            <span class="Statement">for</span>(k=<span class="Constant">0</span>; k&lt;n_patterns; k++)
+               eigenpattern[j][i] += pattern_matrix[k][i] * eigenvector[k+<span class="Constant">1</span>][j+<span class="Constant">1</span>];
+        }
+    }
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(eigenpattern);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Generate mapping in eigenspace for given patten vector ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC FTYPE *generate_weight_vector(<span class="Type">int</span> nse, <span class="Type">int</span> pattern_size, FTYPE *pattern, FTYPE **eigenpattern)
+
+{   <span class="Type">int</span> i,
+        j;
+
+    FTYPE *weight = (FTYPE *)<span class="Constant">NULL</span>;
+
+    weight = (FTYPE *)pups_calloc(nse,<span class="Statement">sizeof</span>(FTYPE));
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;nse; ++i)
+    {  weight[i] = <span class="Constant">0.0</span>;
+
+       <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;pattern_size; ++j)
+          weight[i] += pattern[j] *  eigenpattern[i][j];
+
+    }
+
+    <span class="Statement">return</span>(weight);
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

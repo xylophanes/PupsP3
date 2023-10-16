@@ -8,8 +8,8 @@
              NE3 4RT
              United Kingdom
 
-    Dated:   27th September 2019 
-    Version: 6.02 
+    Version: 7.19
+    Dated:   5th September 2023 
     E-Mail:  mao@tumblingdice.co.uk
 ----------------------------------------------------------------------------*/
 
@@ -26,6 +26,7 @@
 #include <sys/wait.h>
 #include <dirent.h>
 #include <string.h>
+#include <bsd/string.h>
 #include <errno.h>
 #include <setjmp.h>
 #include <stdarg.h>
@@ -34,7 +35,6 @@
 #include <stdarg.h>
 #include <sys/timeb.h>
 #include <xtypes.h>
-
 
 
 
@@ -192,8 +192,8 @@ _PUBLIC int  ptr,                                                             //
              appl_gid;                                                        // Process GID
 
 #ifdef CRIU_SUPPORT
-             appl_ssaves     = 0,                                             // Number of times state has been saved
-             appl_poll_time  = 60,                                            // Poll time for (Criu) state saving
+             appl_ssaves                  = 0,                                // Number of times state has been saved
+             appl_poll_time               = 60,                               // Poll time for (Criu) state saving
 #endif /* CRIU_SUPPORT */
 
 
@@ -215,17 +215,18 @@ _PUBLIC  int pupsighold_cnt[MAX_SIGS]     = { [0 ... MAX_SIGS-1] = 1 };       //
 
 _PUBLIC _BOOLEAN 
 
+         appl_verbose                     = FALSE,                            // Set appl_verbose reporting mode
+         appl_resident                    = FALSE;                            // TRUE if application is memory resident
+         appl_enable_resident             = FALSE;                            // TRUE if application can be memory resident
          appl_proprietary                 = FALSE;                            // TRUE if application is proprietary
          appl_nodetach                    = FALSE,                            // Don't detach stdio in background
-         versn_flg                        = FALSE,                            // Print version and exit if TRUE
-         appl_verbose                     = FALSE,                            // Set appl_verbose reporting mode
          test_mode                        = FALSE,                            // Set test mode
          init                             = TRUE,                             // Initialise tail decoder system
          pg_leader                        = FALSE,                            // Application is process group leader
          appl_wait                        = FALSE,                            // TRUE if process stopped
          appl_fgnd                        = TRUE,                             // TRUE if in foreground pgrp
          appl_snames_crypted              = FALSE,                            // If TRUE encrypt shadow files
-         pups_exit_entered                = FALSE,                            // TRUE if in pups_exit()
+         //pups_exit_entered                = FALSE,                            // TRUE if in pups_exit()
          argd[255];                                                           // Argument decode status flags
 
 #ifdef CRIU_SUPPORT
@@ -256,7 +257,7 @@ _PUBLIC _BOOLEAN appl_psrp_save           = FALSE;                            //
 _PUBLIC _BOOLEAN appl_etrap               = FALSE;                            // If TRUE trap-wait in pups_exit()
 _PUBLIC _BOOLEAN appl_ppid_exit           = FALSE;                            // If TRUE exit if parent terminates
 _PUBLIC _BOOLEAN appl_rooted              = FALSE;                            // If TRUE system context cannot migrate
-_PUBLIC _BOOLEAN pups_poisoned            = FALSE;                            // TRUE if process poisoned
+_PUBLIC _BOOLEAN pups_process_homeostat   = FALSE;                            // TRUE if process homeostat enabled 
 _PUBLIC _BOOLEAN ignore_pups_signals      = TRUE;                             // Ignore PUPS signals if TRUE
 _PUBLIC _BOOLEAN pups_abort_restart       = FALSE;                            // TRUE if abort handler enabled
 _PUBLIC _BOOLEAN in_vt_handler            = FALSE;                            // TRUE if in vt_handler()
@@ -305,7 +306,8 @@ _PUBLIC char *version                     = (char *)NULL,                     //
              *appl_cmd_str                = (char *)NULL,                     // Application command string
              *appl_host                   = (char *)NULL,                     // Application host processor node
              *appl_state                  = (char *)NULL,                     // Application state information
-             *appl_err                    = (char *)NULL;                     // Application error information
+             *appl_err                    = (char *)NULL,                     // Application error information
+             appl_argfifo[SSIZE]          = "";                               // Argument FIFO (for memory resident application)
 
 _PUBLIC int  (*appl_mail_handler)(char *);                                    // Application specific mail handler
 
@@ -339,14 +341,13 @@ _PRIVATE  FILE *fgnd_stdout = (FILE *)NULL;
 _PRIVATE  FILE *fgnd_stderr = (FILE *)NULL;
 
 
-_PRIVATE _BOOLEAN in_setvitimer     = FALSE;      // TRUE if in setvitimer
-_PRIVATE _BOOLEAN no_vt_services    = FALSE;      // TRUE if VT services disabled
-_PRIVATE _BOOLEAN do_closeall       = FALSE;      // TRUE if closeall entered
-_PRIVATE _BOOLEAN started_detached  = FALSE;      // TRUE if application has been detached
-_PRIVATE _BOOLEAN default_argfile   = FALSE;      // TRUE if default argument file
-_PRIVATE _BOOLEAN in_close_routine  = FALSE;      // TRUE if in pups_close() or pups_fclose()
-_PRIVATE _BOOLEAN fdes_stable       = TRUE;       // File (contents) stable
-_PRIVATE _BOOLEAN jump_vector       = TRUE;       // Context OK for longjmp() if TRUE
+_PRIVATE _BOOLEAN in_setvitimer     = FALSE;      				// TRUE if in setvitimer
+_PRIVATE _BOOLEAN no_vt_services    = FALSE;    				// TRUE if VT services disabled
+_PRIVATE _BOOLEAN do_closeall       = FALSE;      				// TRUE if closeall entered
+_PRIVATE _BOOLEAN started_detached  = FALSE;      				// TRUE if application has been detached
+_PRIVATE _BOOLEAN default_argfile   = FALSE;      				// TRUE if default argument file
+_PRIVATE _BOOLEAN in_close_routine  = FALSE;      				// TRUE if in pups_close() or pups_fclose()
+_PRIVATE _BOOLEAN jump_vector       = TRUE;       				// Context OK for longjmp() if TRUE
 
 
 
@@ -423,7 +424,7 @@ _PRIVATE void utilib_slot(int level)
 {   (void)fprintf(stderr,"int lib utilib %s: [ANSI C]\n",UTILIB_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 1985-2019 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 1985-2022 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
        (void)fprintf(stderr,"PUPS/P3 general purpose utilities library (built %s %s)\n\n",__TIME__,__DATE__);
     }
@@ -444,7 +445,7 @@ _PRIVATE void utilib_usage()
                                       PUPS_DEFAULT_MIN_CPU,PUPS_DEFAULT_MIN_MEM,PUPS_DEFAULT_RESOURCE_WAIT);
 
     (void)fprintf(stderr,"[-etrap:FALSE]   [-version:FALSE] [-vtag] [-usage:FALSE] [-verbose:FALSE [-test:FALSE]]\n");
-    (void)fprintf(stderr,"-argf <argfile>] [-slots] [-slotinfo] [-secure:FALSE]\n");
+    (void)fprintf(stderr,"[-argf <argfile>] [-slots] [-slotinfo] [-secure:FALSE]\n");
 
 #ifdef SSH_SUPPORT
     (void)fprintf(stderr,"[-on <host> [-bg:FALSE]]\n");
@@ -457,6 +458,9 @@ _PRIVATE void utilib_usage()
 #ifdef _OPENMP
     (void)fprintf(stderr,"[-omp_threads]\n");
 #endif /* _OPENMP */
+
+    if(appl_enable_resident == TRUE)
+       (void)fprintf(stderr,"[-resident <command argument FIFO>]\n");
 
     (void)fprintf(stderr,"[-noseed:FALSE]\n");
     (void)fprintf(stderr,"[-parent <parent pid:%d | parent name>]\n",appl_ppid);
@@ -607,7 +611,7 @@ _PROTOTYPE _PRIVATE int pups_cont_handler(int);
 /* PUPS exit functions on reciept of SIGQUIT            */
 /*------------------------------------------------------*/
 
-_PROTOTYPE _PRIVATE int exit_handler(int);
+_PROTOTYPE _PRIVATE int pups_exit_handler(int);
 
 // Handler for SIGCHLD
 _PROTOTYPE _PRIVATE void chld_handler(int);
@@ -629,103 +633,6 @@ _PROTOTYPE _PRIVATE void shm_init(void);
 
 // Initialise PUPS heap object tracking system
 _PROTOTYPE _PRIVATE void tinit(void);
-
-
-
-
-#ifdef BSD_FUNCTION_SUPPORT
-/*-----------------------------------------------------------------------------
-    Strlcpy and stlcat function based on OpenBSD functions ...
------------------------------------------------------------------------------*/
-/*------------------*/
-/* Open BSD Strlcat */
-/*------------------*/
-_PUBLIC size_t strlcat(char *dst, const char *src, size_t dsize)
-{
-	const char *odst = dst;
-	const char *osrc = src;
-	size_t      n    = dsize;
-	size_t      dlen;
-
-
-        /*------------------------------------------------------------------*/
-	/* Find the end of dst and adjust bytes left but don't go past end. */
-        /*------------------------------------------------------------------*/
-
-	while (n-- != 0 && *dst != '\0')
-		dst++;
-	dlen = dst - odst;
-	n = dsize - dlen;
-
-	if (n-- == 0)
-		return(dlen + strlen(src));
-	while (*src != '\0') {
-		if (n != 0) {
-			*dst++ = *src;
-			n--;
-		}
-		src++;
-	}
-	*dst = '\0';
-
-
-        /*----------------------------*/
-        /* count does not include NUL */
-        /*----------------------------*/
-
-	return(dlen + (src - osrc));
-}
-
-
-
-
-/*------------------*/
-/* Open BSD strlcpy */
-/*------------------*/
-
-_PUBLIC size_t strlcpy(char *dst, const char *src, size_t dsize)
-{
-	const char   *osrc = src;
-	size_t nleft       = dsize;
-
-
-        /*---------------------------------*/
-	/* Copy as many bytes as will fit. */
-        /*---------------------------------*/
-
-	if (nleft != 0) {
-		while (--nleft != 0) {
-			if ((*dst++ = *src++) == '\0')
-				break;
-		}
-	}
-
-
-        /*-----------------------------------------------------------*/
-	/* Not enough room in dst, add NUL and traverse rest of src. */
-        /*-----------------------------------------------------------*/
-
-	if (nleft == 0) {
-		if (dsize != 0)
-
-                        /*-------------------*/
-                        /* NUL-terminate dst */
-                        /*-------------------*/
-
-			*dst = '\0';
-		while (*src++)
-			;
-	}
-
-
-        /*----------------------------*/
-        /* count does not include NUL */
-        /*----------------------------*/
-
-	return(src - osrc - 1);
-}
-#endif /* BSD_FUNCTION_SUPPORT */
-
 
 
 
@@ -832,6 +739,27 @@ _PUBLIC int pups_get_ip_info(const char *dev_name, char *ip_addr, char *node_nam
     return(0);
 }
 
+
+
+/*-----------------------------------------------------------------------------
+    Round a floating point number to N significant figures
+-----------------------------------------------------------------------------*/
+
+_PUBLIC FTYPE sigfig(const FTYPE arg, const unsigned int digits)
+
+{   FTYPE factor,
+          sigfig_arg;
+
+    if(arg == 0.0)
+       return(0.0);
+    else if(digits == 0)
+       return(arg);
+
+    factor     = POW(10.0, digits - CEIL(LOG10(FABS(arg))));
+    sigfig_arg = ROUND(arg * factor) / factor;
+
+    return(sigfig_arg);
+}
 
 
 
@@ -1308,16 +1236,26 @@ _PUBLIC int pups_find_free_ftab_index(void)
        if(ftab[i].fdes == (-1))
        {  pups_set_errno(OK);
 
-          ftab[i].fname       = (char *)pups_malloc(LONG_LINE);
-          ftab[i].hname       = (char *)pups_malloc(LONG_LINE);
-          ftab[i].fshadow     = (char *)pups_malloc(LONG_LINE);
+
+          if(ftab[i].fname == (char *)NULL)
+             ftab[i].fname = (char *)pups_malloc(SSIZE);
+
+          if(ftab[i].hname == (char *)NULL)
+             ftab[i].hname = (char *)pups_malloc(SSIZE);
+
+          if(ftab[i].fshadow == (char *)NULL)
+             ftab[i].fshadow = (char *)pups_malloc(SSIZE);
 
           #ifdef SSH_SUPPORT
-          ftab[i].rd_host     = (char *)pups_malloc(LONG_LINE);
-          ftab[i].rd_ssh_port = (char *)pups_malloc(LONG_LINE);
+          if(ftab[i].rd_host == (char *)NULL)
+            ftab[i].rd_host = (char *)pups_malloc(SSIZE);
+
+          if(ftab[i].rd_ssh_port == (char *)NULL)
+             ftab[i].rd_ssh_port = (char *)pups_malloc(SSIZE);
           #endif /*SSH_SUPPORT */
 
-          ftab[i].fs_name     = (char *)pups_malloc(LONG_LINE);
+          if(ftab[i].fs_name == (char *)NULL)
+             ftab[i].fs_name  = (char *)pups_malloc(SSIZE);
 
           ftab[i].fname[0]    = '\0';
           ftab[i].hname[0]    = '\0';
@@ -1325,9 +1263,9 @@ _PUBLIC int pups_find_free_ftab_index(void)
           ftab[i].rd_host[0]  = '\0';
           ftab[i].fs_name[0]  = '\0';
                    
-         #ifdef PTHREAD_SUPPORT
-         (void)pthread_mutex_unlock(&ftab_mutex);
-         #endif /* PTHREAD_SUPPORT */
+          #ifdef PTHREAD_SUPPORT
+          (void)pthread_mutex_unlock(&ftab_mutex);
+          #endif /* PTHREAD_SUPPORT */
 
           return(i);
        }
@@ -1547,19 +1485,7 @@ _PUBLIC int pups_clear_ftab_slot(const _BOOLEAN destroy, const int f_index)
     ftab[f_index].zstream           = (gzFILE *)NULL;
     #endif /* ZLIB_SUPPORT */
 
-    if(destroy == FALSE)
-    {  ftab[f_index].fname       = (char *)NULL;
-       ftab[f_index].hname       = (char *)NULL;
-       ftab[f_index].fshadow     = (char *)NULL;
-
-       #ifdef SSH_SUPPORT
-       ftab[f_index].rd_host     = (char *)NULL;
-       ftab[f_index].rd_ssh_port = (char *)NULL;
-       #endif /* SSH_SUPPORT */
-
-       ftab[f_index].fs_name     = (char *)NULL;
-    }
-    else 
+    if(destroy == TRUE)
     {  ftab[f_index].fname       = (char *)pups_free((void *)ftab[f_index].fname);
        ftab[f_index].hname       = (char *)pups_free((void *)ftab[f_index].hname);
        ftab[f_index].fshadow     = (char *)pups_free((void *)ftab[f_index].fshadow);
@@ -1684,7 +1610,7 @@ _PRIVATE void initftab(int max_files, int stdio_homeostasis)
 
        if(stdio_homeostasis == STDIO_LIVE && strncmp(ftab[i].fname,"<redirected",11) != 0)
        {  switch(i)
-          {     case 0: (void)snprintf(stdio_homeostat_name,SSIZE,"default_fd_homeostat: stdin");
+          {     case 0: (void)snprintf(stdio_homeostat_name,SSIZE,"default_fd_homeostat: stdin ");
                         break;
 
                 case 1: (void)snprintf(stdio_homeostat_name,SSIZE,"default_fd_homeostat: stdout");
@@ -1809,7 +1735,9 @@ _PUBLIC int pups_fd_alive(const int fdes, const char *handler_name, const void *
     #endif /* PTHREAD_SUPPORT */
 
     for(i=0; i<appl_max_files; ++i)
-    {  if(ftab[i].fdes == fdes)
+    {  int ret;
+
+       if(ftab[i].fdes == fdes)
        {  int t_index;
  
           if(ftab[i].creator == FALSE)
@@ -1842,15 +1770,24 @@ _PUBLIC int pups_fd_alive(const int fdes, const char *handler_name, const void *
           /*------------------------------------------*/
 
           if(ftab[i].homeostatic > 0)
-          {  ++ftab[i].homeostatic;
+          {  int ret;
 
-            #ifdef PTHREAD_SUPPORT
-            (void)pthread_mutex_unlock(&ftab_mutex);
-            #endif /* PTHREAD_SUPPORT */
+             ++ftab[i].homeostatic;
+             ret = ftab[i].homeostatic - 1;
+
+             #ifdef PTHREAD_SUPPORT
+             (void)pthread_mutex_unlock(&ftab_mutex);
+             #endif /* PTHREAD_SUPPORT */
 
              pups_set_errno(OK);
-             return(0);
+             return(ret);
           }
+
+
+          /*---------------------*/
+          /* File not live (yet) */
+          /*---------------------*/
+
           else
           {  ftab[i].homeostatic = 1;
              ftab[i].lost_cnt    = 0;
@@ -1894,6 +1831,11 @@ _PUBLIC int pups_fd_alive(const int fdes, const char *handler_name, const void *
              else
                 (void)strlcpy(ftab[i].fshadow,".",SSIZE);
 
+
+             /*----------------*/
+             /* Crypted shadow */
+             /*----------------*/
+
              if(appl_snames_crypted == TRUE)
              {  char fshadow_name[SSIZE] = "";
 
@@ -1928,6 +1870,12 @@ _PUBLIC int pups_fd_alive(const int fdes, const char *handler_name, const void *
                 else
                    (void)snprintf(ftab[i].fshadow,SSIZE,".%s",fshadow_name);
              }
+
+
+             /*------------------*/
+             /* Plaintext shadow */
+             /*------------------*/
+
              else
              {
 
@@ -1951,22 +1899,49 @@ _PUBLIC int pups_fd_alive(const int fdes, const char *handler_name, const void *
              (void)link(ftab[i].fname,ftab[i].fshadow);
           }
 
-          ++ftab[i].homeostatic;
-          (void)strlcpy(ftab[i].hname,handler_name,SSIZE);
-          ftab[i].handler = handler;
 
+          /*--------------------------------------*/
+          /* Increment homeostat protection level */
+          /*--------------------------------------*/
+
+          ++ftab[i].homeostatic;
+
+
+          /*-----------------------------------*/
+          /* Set up virtual time (and payload) */
+          /*-----------------------------------*/
+
+          (void)snprintf(ftab[i].hname,SSIZE,"%s: (%s)",handler_name,ftab[i].fname);
+          ftab[i].handler = handler;
           (void)snprintf(handler_args,SSIZE,"%d",i);
 
-          t_index = pups_setvitimer(handler_name,
+          t_index = pups_setvitimer(ftab[i].hname,
                                     1,VT_CONTINUOUS,10,
                                     handler_args,
-                                    (void *)handler);
+                                    (void *)ftab[i].handler);
+
+          ret = ftab[i].homeostatic - 1;
 
           #ifdef PTHREAD_SUPPORT
           (void)pthread_mutex_unlock(&ftab_mutex);
           #endif /* PTHREAD_SUPPORT */
 
-          if(appl_verbose == TRUE)
+
+          /*--------*/
+          /* Error */
+          /*-------*/
+
+          if(t_index == (-1))
+          {  pups_set_errno(EINVAL);
+             return(-1);
+          }
+
+
+          /*-----*/
+          /* Log */
+          /*-----*/
+
+          else if(appl_verbose == TRUE)
           {  (void)strdate(date);
              (void)fprintf(stderr,"%s %s (%d@%s:%s): \"%s\" is now live (status polling via vtimer %d (payload function: %s)\n",
                                                 date,appl_name,appl_pid,appl_host,appl_owner,ftab[i].fname,t_index,handler_name);
@@ -1974,7 +1949,7 @@ _PUBLIC int pups_fd_alive(const int fdes, const char *handler_name, const void *
           }
 
           pups_set_errno(OK);
-          return(0);
+          return(ret);
        }
     }
 
@@ -2281,23 +2256,41 @@ _PUBLIC int pups_fd_dead(const int fdes)
 
 
     for(i=0; i<appl_max_files; ++i) 
-    {  if(ftab[i].fdes == fdes && ftab[i].homeostatic > 0)
+    {  if(ftab[i].fdes == fdes)
        {  
 
-          /*-------------------------------------------*/
-          /* If the resource is closed then we have to */
-          /* terminate homeostat                       */
-          /*-------------------------------------------*/
-         
-          if(in_close_routine == FALSE && ftab[i].homeostatic > 1)
-          {  --ftab[i].homeostatic;
+          /*--------------*/
+          /* Already dead */
+          /*--------------*/
 
+          if(ftab[i].homeostatic == 0)         
+          {   
              #ifdef PTHREAD_SUPPORT
              (void)pthread_mutex_unlock(&ftab_mutex);
              #endif /* PTHREAD_SUPPORT */
 
              pups_set_errno(PSRP_OK);
              return(0);
+          }
+
+
+          /*---------------------------------------*/
+          /* Decrease homeostatic protection level */
+          /*---------------------------------------*/
+
+          else
+             --ftab[i].homeostatic;
+
+
+          if(in_close_routine == FALSE && ftab[i].homeostatic > 1)
+          {
+
+             #ifdef PTHREAD_SUPPORT
+             (void)pthread_mutex_unlock(&ftab_mutex);
+             #endif /* PTHREAD_SUPPORT */
+
+             pups_set_errno(PSRP_OK);
+             return(ftab[i].homeostatic - 1);
           }
 
 
@@ -2407,6 +2400,41 @@ _PUBLIC void pups_closeall(void)
 
 
 
+/*----------------------------------------------------------------------------
+    Get ftab index (from file descriptor) ...
+----------------------------------------------------------------------------*/
+
+_PUBLIC int pups_get_ftab_index_from_fd(unsigned const int fdes)
+
+{   int i;
+
+    #ifdef PTHREAD_SUPPORT
+    (void)pthread_mutex_lock(&ftab_mutex);
+    #endif /* PTHREAD_SUPPORT */
+
+    for(i=0; i<appl_max_files; ++i)
+    {   if(ftab[i].fdes == fdes)
+        {
+
+           #ifdef PTHREAD_SUPPORT
+           (void)pthread_mutex_unlock(&ftab_mutex);
+            #endif /* PTHREAD_SUPPORT */
+
+            pups_set_errno(OK);
+            return(i);
+        }
+    }
+
+    #ifdef PTHREAD_SUPPORT
+    (void)pthread_mutex_unlock(&ftab_mutex);
+    #endif /* PTHREAD_SUPPORT */
+
+    pups_set_errno(ESRCH);
+    return(-1);
+}
+
+
+
 
 /*----------------------------------------------------------------------------
     Get ftab index (from stream pointer) ...
@@ -2421,14 +2449,12 @@ _PUBLIC int pups_get_ftab_index_from_stream(const FILE *stream)
        return(-1);
     }
 
+    #ifdef PTHREAD_SUPPORT
+    (void)pthread_mutex_lock(&ftab_mutex);
+    #endif /* PTHREAD_SUPPORT */
+
     for(i=0; i<appl_max_files; ++i)
-    {
-
-       #ifdef PTHREAD_SUPPORT
-       (void)pthread_mutex_lock(&ftab_mutex);
-       #endif /* PTHREAD_SUPPORT */
-
-        if(ftab[i].stream == stream)
+    {   if(ftab[i].stream == stream)
         {  
 
            #ifdef PTHREAD_SUPPORT
@@ -2458,7 +2484,7 @@ _PUBLIC int pups_get_ftab_index_from_stream(const FILE *stream)
 ----------------------------------------------------------------------------*/
 
 
-_PUBLIC gzFILE *pup_gzopen(const char *f_name, const char *mode, const int h_state)
+_PUBLIC gzFILE *pups_gzopen(const char *f_name, const char *mode, const int h_state)
 
 {   int i_mode,
         z_index,
@@ -2591,6 +2617,24 @@ _PUBLIC gzFILE *pups_gzclose(const gzFILE *zstream)
 
 
 
+/*-----------------------------------------------------------------------------
+    Check to see if file is hidden ...
+-----------------------------------------------------------------------------*/
+
+_PRIVATE _BOOLEAN pups_hidden_leaf(const char *fname)
+
+{   char leaf[SSIZE]   = ""; 
+
+    (void)strleaf(fname,leaf);
+    if(leaf[0] == '.')
+       return(TRUE);
+
+    return(FALSE);
+}
+
+
+
+
 /*----------------------------------------------------------------------------
     Check for the existence of a file - if it exists, open it, otherwise
     print error code and abort ...
@@ -2617,14 +2661,34 @@ _PUBLIC FILE *pups_fopen(char *f_name, char *mode, int h_state)
     struct statfs  buf;
 
 
+    /*-------------------------*/     
+    /* Disable PUPS/P3 signals */
+    /*-------------------------*/     
+
+    (void)pupshold(ALL_PUPS_SIGS);
+
+
     /*---------------------------*/
     /* Check function parameters */
     /*---------------------------*/
 
     if(f_name == (char *)NULL || mode == (char *)NULL || (h_state != LIVE && h_state != DEAD))
-    {  pups_set_errno(EINVAL);
+    {  (void)pupsrelse(ALL_PUPS_SIGS);
+       pups_set_errno(EINVAL);
        return((FILE *)NULL);
     }
+
+
+    /*------------------------------*/
+    /* Hidden files are not allowed */
+    /*------------------------------*/
+
+    if(pups_hidden_leaf(f_name) == TRUE)
+    {  (void)pupsrelse(ALL_PUPS_SIGS);
+       pups_set_errno(EINVAL);
+       return((FILE *)NULL);
+    }
+
 
     (void)statfs(f_name,&buf);
     if(buf.f_type == ISOFS_SUPER_MAGIC)
@@ -2637,15 +2701,20 @@ _PUBLIC FILE *pups_fopen(char *f_name, char *mode, int h_state)
 
     if(strinp((unsigned long int *)&pos,f_name,"|") == TRUE)
     {  if((stream = pups_fcopen(&f_name[pos+1],shell,mode)) == (FILE *)NULL)
+       {  (void)pupsrelse(ALL_PUPS_SIGS);
           return((FILE *)NULL);
+       }
+
        else
+       {  (void)pupsrelse(ALL_PUPS_SIGS);
           return(stream);
+       }
     }
     else
 
-/*-----------------------------------------------------------------------------
-    Process as a regular file ...
------------------------------------------------------------------------------*/
+    /*---------------------------*/
+    /* Process as a regular file */
+    /*---------------------------*/
 
     {  int i,
            f_index,
@@ -2669,17 +2738,11 @@ _PUBLIC FILE *pups_fopen(char *f_name, char *mode, int h_state)
        /*-----------------------------*/
 
        if(access(f_name,F_OK) == (-1))
-       {  pups_set_errno(EEXIST);
+       {  (void)pupsrelse(ALL_PUPS_SIGS);
+          pups_set_errno(EEXIST);
           return((FILE *)NULL);
        }
 
-
-       /*---------------------------------------------*/     
-       /* Make sure this operation is not interrupted */
-       /* by PUPS signal handlers                     */
-       /*---------------------------------------------*/     
-
-       (void)pupshold(ALL_PUPS_SIGS);
 
        if((f_index = pups_find_free_ftab_index()) == (-1))
        {  (void)pups_clear_ftab_slot(FALSE,f_index);
@@ -2693,8 +2756,6 @@ _PUBLIC FILE *pups_fopen(char *f_name, char *mode, int h_state)
        /* If the file mode is O_DUMMY don't actually open it - simply place the */
        /* file in the file table so it may be homeostatically protected.        */
        /*-----------------------------------------------------------------------*/
-
-
        /*----------------------------------------------------------*/
        /* Stat the file to extract information on permissions and  */
        /* ownership etc from its inode                             */
@@ -2792,7 +2853,7 @@ _PUBLIC FILE *pups_fopen(char *f_name, char *mode, int h_state)
           {  char default_fd_hname[SSIZE] = "";
 
              ftab[f_index].creator = TRUE;
-             (void)snprintf(default_fd_hname,SSIZE,"default_fd_homeostat: %s(%d)",f_name,stream);
+             (void)snprintf(default_fd_hname,SSIZE,"default_fd_homeostat: %s(%d)",f_name,fileno(stream));
              (void)pups_fd_alive(fileno(stream),default_fd_hname,(void *)&pups_default_fd_homeostat);
           }       
 
@@ -2808,8 +2869,15 @@ _PUBLIC FILE *pups_fopen(char *f_name, char *mode, int h_state)
        (void)pthread_mutex_unlock(&ftab_mutex);
        #endif /* PTHREAD_SUPPORT */
 
-       (void)pupsrelse(ALL_PUPS_SIGS);
     }
+
+
+    /*------------------------*/
+    /* Enable PUPS/P3 signals */
+    /*------------------------*/
+
+    (void)pupsrelse(ALL_PUPS_SIGS);
+
 
     pups_set_errno(OK);
     return(stream);
@@ -2897,13 +2965,32 @@ _PUBLIC int pups_open(const char *f_name, const int mode, int h_state)
     struct statfs  buf;
 
 
+    /*-------------------------*/
+    /* Disable PUPS/P3 signals */
+    /*-------------------------*/
+
+    (void)pupshold(ALL_PUPS_SIGS);
+
+
     /*---------------------------*/
     /* Check function parameters */
     /*---------------------------*/
 
     if(f_name == (const char *)NULL || mode < 0 || (h_state != LIVE && h_state != DEAD))
-    {  pups_set_errno(EINVAL);
+    {  (void)pupsrelse(ALL_PUPS_SIGS);
+       pups_set_errno(EINVAL);
        return(-1);
+    }
+
+
+    /*------------------------------*/
+    /* Hidden files are not allowed */
+    /*------------------------------*/
+
+    if(pups_hidden_leaf(f_name) == TRUE)
+    {  (void)pupsrelse(ALL_PUPS_SIGS);
+       pups_set_errno(EINVAL);
+       return((FILE *)NULL);
     }
 
 
@@ -2923,8 +3010,13 @@ _PUBLIC int pups_open(const char *f_name, const int mode, int h_state)
 
     if(strinp((unsigned long int *)&pos,f_name,"|") == TRUE)
     {  if((fdes = pups_copen(&f_name[pos+1],shell,mode)) == (-1))
+       {  (void)pupsrelse(ALL_PUPS_SIGS);
+          pups_set_errno(EEXIST);
           return(-1);
+       }
 
+       (void)pupsrelse(ALL_PUPS_SIGS);
+       pups_set_errno(OK);
        return(fdes);
     }
 
@@ -2956,21 +3048,15 @@ _PUBLIC int pups_open(const char *f_name, const int mode, int h_state)
        /*------------------------------------*/
 
        if(access(f_name,F_OK) == (-1))
-       {  pups_set_errno(EEXIST);
+       {  (void)pupsrelse(ALL_PUPS_SIGS);
+          pups_set_errno(EEXIST);
           return(-1);
        }
 
 
-       /*-----------------------------------------------------*/
-       /* Make sure that PUPS signal handlers cannot get here */
-       /* until we are finished                               */
-       /*-----------------------------------------------------*/
-
-       (void)pupshold(ALL_PUPS_SIGS);
-
        if((f_index = pups_find_free_ftab_index()) == (-1)) 
        {  (void)pupsrelse(ALL_PUPS_SIGS);
-           pups_set_errno(ENFILE);
+          pups_set_errno(ENFILE);
           return(-1);
        }
  
@@ -3096,13 +3182,19 @@ _PUBLIC int pups_open(const char *f_name, const int mode, int h_state)
           (void)snprintf(default_fd_hname,SSIZE,"default_fd_homeostat: (%s) %d",f_name,fdes);
           (void)pups_fd_alive(fdes,default_fd_hname,(void *)&pups_default_fd_homeostat);
        }
-                      
-       (void)pupsrelse(ALL_PUPS_SIGS);
     }
+
 
     #ifdef PTHREAD_SUPPORT
     (void)pthread_mutex_unlock(&ftab_mutex);
     #endif /* PTHREAD_SUPPORT */
+
+
+    /*------------------------*/
+    /* Enable PUPS/P3 signals */
+    /*------------------------*/
+
+    (void)pupsrelse(ALL_PUPS_SIGS);
 
     pups_set_errno(OK);
     return(fdes);
@@ -3121,6 +3213,14 @@ _PUBLIC int pups_close(const int fdes)
         ret,
         my_errno;
 
+
+    /*-------------------------*/
+    /* Disable PUPS/P3 signals */
+    /*-------------------------*/
+
+    (void)pupshold(ALL_PUPS_SIGS);
+
+
     #ifdef PTHREAD_SUPPORT
     (void)pthread_mutex_lock(&ftab_mutex);
     #endif /* PTHREAD_SUPPORT */
@@ -3130,7 +3230,6 @@ _PUBLIC int pups_close(const int fdes)
     {  if(ftab[i].fdes == fdes)
        {  char f_lock_name[SSIZE] = "";
 
-          (void)pupshold(ALL_PUPS_SIGS);
           if(ftab[i].homeostatic > 0 && ftab[i].psrp == FALSE)
              (void)pups_fd_dead(ftab[i].fdes);
 
@@ -3201,7 +3300,9 @@ _PUBLIC int pups_close(const int fdes)
           (void)pthread_mutex_unlock(&ftab_mutex);
           #endif /* PTHREAD_SUPPORT */
 
+          pupsrelse(ALL_PUPS_SIGS);
           pups_set_errno(OK);
+
           return(-1);
        }
     }
@@ -3211,6 +3312,13 @@ _PUBLIC int pups_close(const int fdes)
     #ifdef PTHREAD_SUPPORT
     (void)pthread_mutex_unlock(&ftab_mutex);
     #endif /* PTHREAD_SUPPORT */
+
+
+    /*------------------------*/
+    /* Enable PUPS/P3 signals */
+    /*------------------------*/
+
+    pupsrelse(ALL_PUPS_SIGS);
 
     pups_set_errno(ESRCH);
     return(-1);
@@ -3230,8 +3338,16 @@ _PUBLIC FILE *pups_fclose(const FILE *stream)
 
     FILE *ret = (FILE *)NULL;
 
+
+    /*-------------------------*/
+    /* Disable PUPS/P3 signals */
+    /*-------------------------*/
+
+    (void)pupshold(ALL_PUPS_SIGS);
+
     if(stream == (const FILE *)NULL)
-    {  pups_set_errno(EINVAL);
+    {  (void)pupsrelse(ALL_PUPS_SIGS);
+       pups_set_errno(EINVAL);
        return((FILE *)NULL);
     }
 
@@ -3244,7 +3360,6 @@ _PUBLIC FILE *pups_fclose(const FILE *stream)
     {  if(ftab[i].fdes == fileno(stream))
        {  char f_lock_name[SSIZE] = "";
 
-          (void)pupshold(ALL_PUPS_SIGS);
           if(ftab[i].homeostatic > 0 && ftab[i].psrp == FALSE)
              (void)pups_fd_dead(ftab[i].fdes);
 
@@ -3297,14 +3412,12 @@ _PUBLIC FILE *pups_fclose(const FILE *stream)
 
              if(ftab[i].fifo_pid < 0)
              {  int status;
-
                 (void)pupswaitpid(FALSE,(-ftab[i].fifo_pid),&status);
              }
           }
 
           (void)unlink(ftab[i].fshadow);
           pups_clear_ftab_slot(FALSE,i);
-          (void)pupsrelse(ALL_PUPS_SIGS); 
 
           in_close_routine = FALSE;
 
@@ -3312,6 +3425,7 @@ _PUBLIC FILE *pups_fclose(const FILE *stream)
           (void)pthread_mutex_unlock(&ftab_mutex);
           #endif /* PTHREAD_SUPPORT */
 
+          (void)pupsrelse(ALL_PUPS_SIGS); 
           pups_set_errno(OK);
           return((FILE *)NULL);
        }
@@ -3324,6 +3438,13 @@ _PUBLIC FILE *pups_fclose(const FILE *stream)
     #ifdef PTHREAD_SUPPORT
     (void)pthread_mutex_unlock(&ftab_mutex);
     #endif /* PTHREAD_SUPPORT */
+ 
+
+    /*------------------------*/
+    /* Enable PUPS/P3 signals */
+    /*------------------------*/
+
+    (void)pupsrelse(ALL_PUPS_SIGS);
 
     pups_set_errno(ESRCH);
     return((FILE *)NULL);
@@ -3746,8 +3867,10 @@ _PUBLIC _BOOLEAN strext(const char dm_ch, /* Demarcation character            */
 
 {   size_t s1_index = 0;
 
-    _IMMORTAL size_t s2_index          = 0;  /* Current pointer into arg string */
-    _IMMORTAL char   s2_was[LONG_LINE] = ""; /* Copy of current argument string */
+                                          /*---------------------------------*/
+    _IMMORTAL size_t s2_index      = 0;   /* Current pointer into arg string */
+    _IMMORTAL char   s2_was[SSIZE] = "";  /* Copy of current argument string */
+                                          /*---------------------------------*/
 
 
     /*---------------------------------------------------------*/
@@ -5332,6 +5455,53 @@ _PUBLIC _BOOLEAN strleaf(const char *pathname, char *leaf)
 
 
 /*-----------------------------------------------------------------------------
+    Extract branch from pathname ...
+-----------------------------------------------------------------------------*/
+
+_PUBLIC _BOOLEAN strbranch(const char *pathname, char *branch)
+
+{   unsigned int i;
+    _BOOLEAN     ret = FALSE;
+
+    if(pathname == (char *)NULL || branch == (char *)NULL)
+    {  pups_set_errno(EINVAL);
+       return(-1);
+    }
+
+    for(i=strlen(pathname); i> 0; --i)
+    {  if(pathname[i] == '/')
+       {  ret = TRUE;
+          break;
+       }
+    }
+
+
+    /*--------*/
+    /* Branch */
+    /*--------*/
+
+    if(i > 0)
+    {  (void)strlcpy(branch,pathname,SSIZE);
+       branch[i] = '\0';
+    }
+
+
+    /*-----------*/
+    /* No branch */
+    /*-----------*/
+
+    else
+       (void)strlcpy(branch,pathname,SSIZE);
+
+    pups_set_errno(OK);
+    return(ret);
+}
+
+
+
+
+
+/*-----------------------------------------------------------------------------
    Strip first digit in string (and all characters after it) ...
 -----------------------:------------------------------------------------------*/
 
@@ -5483,10 +5653,10 @@ _PUBLIC _BOOLEAN strpdigit(const char *s, char *stripped)
 
        for(i=0; i<size; ++i)
        {  if(isdigit(s[i]))
-          {  if(stripped[cnt - 1] == '-')
-                stripped[cnt - 1] = '\0';
+          {  if(stripped[cnt] == '-')
+                stripped[cnt]   = '\0';
              else
-                stripped[cnt]     = '\0';
+                stripped[cnt+1] = '\0';
              return(TRUE);
           }
           else if(s[i] == '_' || s[i] == '-' ||  s[i] == '.' || s[i] == '^' || s[i] == '#')
@@ -5905,7 +6075,7 @@ aliased:
       for(j=0; j<=t_args; ++j)
       {     if(args[j]    != (char *)NULL      &&
                args[j][0] == '-'               &&
-              strcmp(swtch,&args[j][1]) == 0    )
+               strcmp(swtch,&args[j][1]) == 0   )
               {  (*cnt)--;
                  argd[j] = TRUE;
                  return((int)j);
@@ -6662,7 +6832,6 @@ _PUBLIC void pups_copytail(int *argc, const char *args[], char *argv[])
        /* Remove the pen flag and pen name from command tail */
        /*----------------------------------------------------*/
 
-       //(*argc) -= 2;
        pups_set_pen(args,argv[0],args[0]);
     }
 
@@ -6944,7 +7113,6 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     else
        (void)strlcpy(appl_bin_name,appl_name,SSIZE);
 
-
     (void)strlcpy(revdate,d_made,SSIZE);
 
 
@@ -6982,11 +7150,38 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     }
 
 
+    /*------------------*/
+    /* Resident process */
+    /*------------------*/
+
+    if(appl_enable_resident == TRUE && (ptr = pups_locate(&init,"resident",argc,args,0)) != NOT_FOUND)
+    {  if(strccpy(appl_argfifo,pups_str_dec(&ptr,&argc,args)) == (char *)INVALID_ARG)
+          pups_error("[resident process] expecting name of command parameter FIFO");
+
+
+       /*-------------------------------*/
+       /* Create command parameter FIFO */
+       /*-------------------------------*/
+
+       if(mkfifo(appl_argfifo,0600) == (-1))
+          pups_error("[resident process] cannot create FIFO");
+
+       appl_resident = TRUE;
+
+       if(appl_verbose == TRUE)
+       {  (void)strdate(date);
+          (void)fprintf(stderr,"%s %s(%d@%s:%s): process is memory resident (argument FIFO \"%s\")\n",
+                                            date,appl_name,appl_pid,appl_host,appl_owner,appl_argfifo);
+          (void)fflush(stderr);
+       }
+    }
+
+
     /*------------------------------------------------------------*/
     /* If verbose switch is set, log status information to stderr */
     /*------------------------------------------------------------*/
 
-    if((ptr = pups_locate(&init,"verbose",argc,args,0)) != NOT_FOUND)
+    if(pups_locate(&init,"verbose",argc,args,0) != NOT_FOUND)
     {  appl_verbose = TRUE;
       (void)pups_get_fd_lock(2,GETLOCK);
 
@@ -7007,7 +7202,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     if(pups_locate(&init,"noseed",argc,args,0) != NOT_FOUND)
     { if(appl_verbose == TRUE)
        {  (void)strdate(date);
-          (void)fprintf(stderr,"%s %s(%d@%s:%s): not seeding random number generator\n",
+          (void)fprintf(stderr,"%s %s (%d@%s:%s): not seeding random number generator\n",
                                            date,appl_name,appl_pid,appl_host,appl_owner);
           (void)fflush(stderr);
        }
@@ -7023,8 +7218,8 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
 
        if(appl_verbose == TRUE)
        {  (void)strdate(date);
-          (void)fprintf(stderr,"%s %s(%d@%s:%s): seeding random number generator with pid [%d]\n",
-                                            date,appl_name,appl_pid,appl_host,appl_owner,appl_pid);
+          (void)fprintf(stderr,"%s %s (%d@%s:%s): seeding random number generator with pid [%d]\n",
+                                             date,appl_name,appl_pid,appl_host,appl_owner,appl_pid);
           (void)fflush(stderr);
        }
     }
@@ -7088,7 +7283,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
                      (void)fflush(stderr);
                   }
 
-                  pups_exit(-1);
+                  pups_exit(255);
                }
                (void)pups_usleep(10000);
           }
@@ -7238,7 +7433,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
                         (void)fflush(stdout);
                      }
 
-                     pups_exit(-1);
+                     pups_exit(255);
                   }
                } while (strlen(appl_password) == 0);
 
@@ -7637,7 +7832,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
                                               date,appl_name,appl_pid,appl_host,appl_owner);
           (void)fflush(stderr);
 
-          exit(-1);
+          exit(255);
        }
     }
     else if(getenv("PUPS_CHILDREN") != (char *)NULL)
@@ -7670,7 +7865,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
                                                      date,appl_name,appl_pid,appl_host,appl_owner);
           (void)fflush(stderr);
 
-          exit(-1);
+          exit(255);
        }
     }
     else if(getenv("PUPS_ORIFICES") != (char *)NULL)
@@ -7703,7 +7898,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
                                                              date,appl_name,appl_pid,appl_host,appl_owner);
           (void)fflush(stderr);
 
-          exit(-1);
+          exit(255);
        }
     }
     else if(getenv("PUPS_VTIMERS") != (char *)NULL)
@@ -7805,7 +8000,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
                                                                date,appl_name,appl_pid,appl_host,appl_owner);
           (void)fflush(stderr);
 
-          exit(-1);
+          exit(255);
        }
     }
     else if(getenv("PUPS_PHEAPS") != (char *)NULL)
@@ -7838,7 +8033,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
                                               date,appl_name,appl_pid,appl_host,appl_owner);
           (void)fflush(stderr);
 
-          exit(-1);
+          exit(255);
        }
     }
     else if(getenv("PUPS_FILES") != (char *)NULL)
@@ -7991,14 +8186,6 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     /*-----------------------------------------------------------*/
 
     if((ptr = pups_locate(&init,"version",argc,args,0)) != NOT_FOUND)
-       versn_flg = TRUE;
-
-
-    /*-------------------------------------*/
-    /* Display program identification tag. */
-    /*-------------------------------------*/
-
-    if(appl_verbose == TRUE || versn_flg == TRUE)
     {  int i,
            pos;
 
@@ -8099,7 +8286,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
 
        if(appl_proprietary) 
        {  (void)fprintf(stderr,"\n%s (C) Tumbling Dice\n",up_appl_name);
-          (void)fprintf(stderr,"All rights reserved 2019\n\n");
+          (void)fprintf(stderr,"All rights reserved 2022\n\n");
        }
        else
        {  (void)fprintf(stderr,"\n%s is free software, covered by the GNU General Public License, and you are\n",up_appl_name);
@@ -8109,8 +8296,13 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
        }
        (void)fflush(stderr);
 
-       if(*argc == 1 && versn_flg == TRUE)
-          pups_exit(-1);
+
+       /*-------------------------------------------------------*/
+       /* Just in case .psrprc file has set appl_verbose = TRUE */
+       /*-------------------------------------------------------*/
+ 
+       appl_verbose = FALSE;
+       pups_exit(255);
     }
 
 
@@ -8439,13 +8631,13 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
        }
     }
     else
-       (void)pups_sighandle(SIGTERM,"exit_handler",(void *)exit_handler, (sigset_t *)&blocked_set);
+       (void)pups_sighandle(SIGTERM,"pups_exit_handler",(void *)pups_exit_handler, (sigset_t *)&blocked_set);
 
 
-    (void)pups_sighandle(SIGINT, "exit_handler",(void *)exit_handler, (sigset_t *)&blocked_set);
-    (void)pups_sighandle(SIGQUIT,"exit_handler",(void *)exit_handler, (sigset_t *)&blocked_set);
-    (void)pups_sighandle(SIGPIPE,"default",     SIG_DFL,              (sigset_t *)NULL);
-    (void)pups_sighandle(SIGALIVE,"ignore",     SIG_IGN,              (sigset_t *)NULL);
+    (void)pups_sighandle(SIGINT, "pups_exit_handler",(void *)pups_exit_handler, (sigset_t *)&blocked_set);
+    (void)pups_sighandle(SIGQUIT,"pups_exit_handler",(void *)pups_exit_handler, (sigset_t *)&blocked_set);
+    (void)pups_sighandle(SIGPIPE,"default",          SIG_DFL,                   (sigset_t *)NULL);
+    (void)pups_sighandle(SIGALIVE,"ignore",          SIG_IGN,                   (sigset_t *)NULL);
 
     #ifdef CRIU_SUPPORT
     (void)pups_sighandle(SIGCHECK,  "ignore",SIG_IGN, (sigset_t *)NULL);
@@ -8457,7 +8649,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     /* Set working directory. */
     /*------------------------*/
 
-    appl_cwd = (char *)pups_malloc(LONG_LINE);
+    appl_cwd = (char *)pups_malloc(SSIZE);
     if((ptr = pups_locate(&init,"cwd",argc,args,0)) != NOT_FOUND)
     {  char cwd[SSIZE]     = "",
             cwdpath[SSIZE] = "",
@@ -8884,7 +9076,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     /* Generate command string. */
     /*--------------------------*/
 
-    appl_cmd_str = (char *)pups_malloc(LONG_LINE);
+    appl_cmd_str = (char *)pups_malloc(SSIZE);
 
     (void)strlcpy(appl_cmd_str,appl_name,SSIZE);
     (void)strlcat(appl_cmd_str," ",SSIZE);
@@ -9797,7 +9989,7 @@ _PUBLIC int pups_get_rdwr_link_file_lock(const int lock_type, const int max_trys
     Set a write (exclusive) link file lock ...
 -------------------------------------------------------------------------------------*/
 
-_PUBLIC int pups_get_link_file_lock(const int max_trys, const char *file_name)
+_PUBLIC int pups_get_link_file_lock(const unsigned int max_trys, const char *file_name)
 
 {   int ret;
 
@@ -10390,7 +10582,9 @@ _PUBLIC _BOOLEAN pups_set_child_name(const int pid, const char *name)
 
     for(i=0; i<MAX_CHILDREN; ++i)
     {  if(chtab[i].pid == pid)
-       {  chtab[i].name = (char *)pups_malloc(LONG_LINE); 
+       {  if(chtab[i].name == (char *)NULL)
+             chtab[i].name = (char *)pups_malloc(SSIZE); 
+
           (void)strlcpy(chtab[i].name,name,SSIZE);
      
           #ifdef PTHREAD_SUPPORT
@@ -10949,7 +11143,7 @@ _PUBLIC void **pups_aalloc(pindex_t rows, pindex_t cols, psize_t size)
     Routine to free memory occupied by a dynamically allocated array ...
 ------------------------------------------------------------------------------*/
 
-_PUBLIC void **xafree(pindex_t rows, void **array)
+_PUBLIC void **pups_afree(pindex_t rows, void **array)
 
 {    int i;
 
@@ -11276,14 +11470,15 @@ _PUBLIC int pups_deregister_entrance_f(const void *func)
     {  if((void *)pups_entrance_f[i] == func)
        {  if(appl_verbose == TRUE) 
           {  strdate(date);
-             (void)fprintf(stderr, "%s %s (%d@%s): Entrance function \"%032s\" (at %016lx virtual) at slot %d deregistered\n",
-                                                                                                                         date,
-                                                                                                                    appl_name,
-                                                                                                                     getpid(),
-                                                                                                                    appl_host,
-                                                                                                      pups_entrance_f_name[i],
-                                                                                                           pups_entrance_f[i],
-                                                                                                                            i);
+             (void)fprintf(stderr, "%s %s (%d@%s:%s): PUPS entrance function \"%032s\" (at %016lx virtual) at slot %d deregistered\n",
+                                                                                                                                 date,
+                                                                                                                            appl_name,
+                                                                                                                             getpid(),
+                                                                                                                            appl_host,
+                                                                                                                           appl_owner,
+                                                                                                              pups_entrance_f_name[i],
+                                                                                                                   pups_entrance_f[i],
+                                                                                                                                    i);
              (void)fflush(stderr);
           }
       
@@ -11424,7 +11619,7 @@ _PUBLIC void pups_t_arg_errs(const _BOOLEAN argd[], const char *args[])
       (void)pups_release_fd_lock(2);
 
     if(parse_failed == TRUE)
-       pups_exit(-1);
+       pups_exit(255);
 
     pups_set_errno(OK);
 }
@@ -11574,14 +11769,15 @@ _PUBLIC int pups_deregister_exit_f(const void *func)
     {  if((void *)pups_exit_f[i] == func)
        {  if(appl_verbose == TRUE) 
           {  strdate(date);
-             (void)fprintf(stderr,"%s %s (%d@%s): Exit function \"%-32s\" (at %016lx virtual) at slot %d deregistered\n",
-                                                                                                                    date,
-                                                                                                               appl_name,
-                                                                                                                getpid(),
-                                                                                                               appl_host,
-                                                                                                     pups_exit_f_name[i],
-                                                                                       (unsigned long int)pups_exit_f[i],
-                                                                                                                       i);
+             (void)fprintf(stderr,"%s %s (%d@%s:%s): PUPS exit function \"%-32s\" (at %016lx virtual) at slot %d deregistered\n",
+                                                                                                                            date,
+                                                                                                                       appl_name,
+                                                                                                                        getpid(),
+                                                                                                                       appl_host,
+                                                                                                                      appl_owner,
+                                                                                                             pups_exit_f_name[i],
+                                                                                               (unsigned long int)pups_exit_f[i],
+                                                                                                                               i);
              (void)fflush(stderr);
           }
       
@@ -11726,11 +11922,15 @@ _PUBLIC int pups_register_abort_f(const char *f_name,
 
            if(appl_verbose == TRUE)
            {  (void)strdate(date);
-              (void)fprintf(stderr,"%s %s (%d@%s:%s): PUPS abortfunction %s (%018x) registered at slot %d\n",
-                                                                date,appl_name,appl_pid,appl_host,appl_owner,
-                                                                                        pups_abort_f_name[i],
-                                                                                             pups_abort_f[i],
-                                                                                                           i);
+              (void)fprintf(stderr,"%s %s (%d@%s:%s): PUPS abort function %s (%018x) registered at slot %d\n",
+                                                                                                         date,
+                                                                                                    appl_name,
+                                                                                                     appl_pid,
+                                                                                                    appl_host,
+                                                                                                   appl_owner,
+                                                                                         pups_abort_f_name[i],
+                                                                                              pups_abort_f[i],
+                                                                                                            i);
               (void)fflush(stderr);
            }
 
@@ -11802,7 +12002,11 @@ _PUBLIC int pups_deregister_abort_f(const void *func)
        {  if(appl_verbose == TRUE)
           {  (void)strdate(date);
              (void)fprintf(stderr,"%s %s (%d@%s:%s): PUPS abort function \"%-32s\" (at %018x virtual) at slot %d deregistered\n",
-                                                                                    date,appl_name,appl_pid,appl_host,appl_owner,
+                                                                                                                            date,
+                                                                                                                       appl_name,
+                                                                                                                        appl_pid,
+                                                                                                                       appl_host,
+                                                                                                                      appl_owner,
                                                                                                             pups_abort_f_name[i],
                                                                                               (unsigned long int)pups_abort_f[i],
                                                                                                                                i);
@@ -11981,7 +12185,8 @@ _PUBLIC int pups_exit(const int exit_code)
 {   int  i,
          lfl_cnt;
 
-    char tunnel_f_name[SSIZE] = "";
+    char tunnel_f_name   [SSIZE] = "",
+         symlink_pathname[SSIZE] = "";
 
 
     #ifdef PTHREAD_SUPPORT
@@ -12016,14 +12221,21 @@ _PUBLIC int pups_exit(const int exit_code)
     #endif /* PTHREAD_SUPPORT */
 
 
-    /*---------------------------------------------------*/
-    /* Stop signal handlers trying to re-enter pups_exit */
-    /*---------------------------------------------------*/
+    /*---------------------------------------*/
+    /* CLear alarm for virtual timer systems */
+    /* and block signals                     */
+    /*---------------------------------------*/
 
-    if(pups_exit_entered == TRUE)
-       return(-1);
-    else
-       pups_exit_entered = TRUE;
+    (void)pups_malarm(0);
+    (void)pupshold(ALL_PUPS_SIGS);
+
+
+    /*-----------------------------*/
+    /* Remove pen symlink (if any) */
+    /*-----------------------------*/
+
+    (void)snprintf(symlink_pathname,SSIZE,"/tmp/%s",appl_name);
+    (void)unlink(symlink_pathname);
 
 
     #ifdef CRIU_SUPPORT
@@ -12045,10 +12257,13 @@ _PUBLIC int pups_exit(const int exit_code)
        {  if(appl_verbose == TRUE)
           {  (void)strdate(date);
              (void)fprintf(stderr,"%s %s (%d@%s:%s): executing exit function \"%-32s\" (slot %d at %016lx virtual)\n",
-                                                                         date,appl_name,appl_pid,appl_host,appl_owner,
+                                                                                                                 date,
+                                                                                                            appl_name,
+                                                                                                   appl_pid,appl_host,
+                                                                                                           appl_owner,
                                                                                                   pups_exit_f_name[i],
                                                                                                                     i,
-                                                                                   (unsigned long int)pups_exit_f[i]);
+                                                                                    (unsigned long int)pups_exit_f[i]);
              (void)fflush(stderr);
           }
 
@@ -12064,29 +12279,6 @@ _PUBLIC int pups_exit(const int exit_code)
     if(psrp_mode == TRUE)
        psrp_exit();
 
-    /*----------------------------------*/
-    /* Trap for segmentation violations */
-    /*----------------------------------*/
-
-    if(appl_etrap == TRUE)
-    {  sigset_t set,
-                old_set;
-
-
-       /*----------------------------------------------------------*/
-       /* SIGTERM must be released so we can terminate the process */
-       /*----------------------------------------------------------*/
-
-       (void)sigfillset(&set);
-       (void)sigdelset(&set,SIGTERM);
-       (void)sigdelset(&set,SIGINT);
-
-       (void)pups_sigprocmask(SIG_SETMASK,&old_set,(sigset_t *)NULL);
-
-       while(1)
-            (void)pups_usleep(100);
-    }
-
 
     /*--------------------------------------------------------------*/
     /* Workaround bug in RedHat 6.0/egcs-1.1.2 which cause problems */
@@ -12094,29 +12286,6 @@ _PUBLIC int pups_exit(const int exit_code)
     /*--------------------------------------------------------------*/
 
     (void)pups_usleep(100);
-
-
-    /*---------------------------------------*/
-    /* CLear alarm for virtual timer systems */
-    /*---------------------------------------*/
-
-    (void)pups_malarm(0);
-    (void)pupshold(ALL_PUPS_SIGS);
-
-
-    /*----------------------------------------------------------*/
-    /* Make sure all PUPS signals are serviced (while ignored)  */
-    /* this stops spurious signals while process is exiting     */
-    /*----------------------------------------------------------*/
-
-    (void)pups_sighandle(SIGINIT, "ignore", SIG_IGN, (sigset_t *)NULL);
-    (void)pups_sighandle(SIGCHAN, "ignore", SIG_IGN, (sigset_t *)NULL);
-    (void)pups_sighandle(SIGPSRP, "ignore", SIG_IGN, (sigset_t *)NULL);
-    (void)pups_sighandle(SIGALRM, "ignore", SIG_IGN, (sigset_t *)NULL);
-    (void)pups_sighandle(SIGALIVE,"ignore", SIG_IGN, (sigset_t *)NULL);
-    (void)pups_sighandle(SIGCHLD ,"ignore", SIG_IGN, (sigset_t *)NULL);
-    (void)pups_sighandle(SIGINT,  "ignore", SIG_IGN, (sigset_t *)NULL);
-    (void)pups_sighandle(SIGCONT, "ignore", SIG_IGN, (sigset_t *)NULL);
 
 
     /*----------------------------------*/
@@ -12352,7 +12521,7 @@ _PUBLIC int pups_exit(const int exit_code)
           (void)fflush(stderr);
        }
 
-       _exit(-1);
+       _exit(255);
     }
 
 
@@ -12387,7 +12556,30 @@ _PUBLIC int pups_exit(const int exit_code)
 
     pups_free_appl_strings();
 
-    if(exit_code != PUPS_DEFER_EXIT)
+
+    /*-----------------------------------*/
+    /* Restart process if it is resident */
+    /*-----------------------------------*/
+
+    if(appl_resident == TRUE)
+       longjmp(appl_resident_restart,1);
+
+
+    /*--------------------------------------*/
+    /* Restore signal handlers if deferred) */
+    /*--------------------------------------*/
+
+    else if(exit_code == PUPS_DEFER_EXIT)
+    {  (void)pupsrelse(ALL_PUPS_SIGS);
+       (void)pups_malarm(vitimer_quantum);
+    }
+
+
+    /*-------------*/
+    /* Really exit */
+    /*-------------*/
+
+    else
        _exit(exit_code);
 }
 
@@ -12643,13 +12835,24 @@ _PRIVATE int pg_leaders_term_handler(const int sig)
     else
 
        /*--------------------------------------------------------------*/
-       /* We get here as a result of sending TERM to our procees group */
+       /* We get here as a result of sending TERM to our process group */
        /* of which we are (the leading!) member                        */
        /*--------------------------------------------------------------*/
 
        _exit(-sig);
  
     (void)kill(0,SIGTERM);
+
+
+    /*-----------------------------*/
+    /* Evict process (if resident) */
+    /*-----------------------------*/
+
+    if(appl_resident == TRUE)
+    {  appl_resident = FALSE;
+       (void)unlink(appl_argfifo);
+    }
+
     pups_exit(-sig);
 }
  
@@ -12756,20 +12959,30 @@ _PRIVATE int pups_cont_handler(int signum)
     Process SIGTERM ...
 -----------------------------------------------------------------------------*/
 
-_PRIVATE int exit_handler(int sig)
+_PRIVATE int pups_exit_handler(int sig)
 
-{   _IMMORTAL _BOOLEAN exit_handler_entered = FALSE;
+{   _IMMORTAL _BOOLEAN pups_exit_handler_entered = FALSE;
 
-    if(exit_handler_entered == TRUE)
+    if(pups_exit_handler_entered == TRUE)
        return(-1);
     else
-       exit_handler_entered = TRUE;
+       pups_exit_handler_entered = TRUE;
  
     if(appl_verbose == TRUE)
     {  (void)strdate(date);
        (void)fprintf(stderr, "%s %s (%d@%s:%s): in exit handler\n",
                       date,appl_name,appl_pid,appl_host,appl_owner); 
        (void)fflush(stderr);
+    }
+
+
+    /*-----------------------------*/
+    /* Evict process (if resident) */
+    /*-----------------------------*/
+
+    if(appl_resident == TRUE)
+    {  appl_resident = FALSE;
+       (void)unlink(appl_argfifo);
     }
 
     pups_exit(-sig);
@@ -12961,7 +13174,9 @@ _PUBLIC char *pups_search_path(const char *pathtype, const char *item)
 _PUBLIC void pups_set_pen(const char *argv[], const char *ben_name, const char *pen_name)
 
 {   int  pid;
-    char exec_pathname[LONG_LINE] = "";
+
+    char exec_pathname   [SSIZE] = "",
+         symlink_pathname[SSIZE] = "";
 
     if(argv     == (const char **)NULL  ||
        ben_name == (const char *) NULL  ||
@@ -12979,9 +13194,24 @@ _PUBLIC void pups_set_pen(const char *argv[], const char *ben_name, const char *
     {  if(strccpy(exec_pathname,pups_search_path("PATH",ben_name)) == (char *)NULL)
           pups_error("[set_pen] failed to resolve ben path");
     }
+
+
+    /*---------------*/
+    /* Absolute path */
+    /*---------------*/
+
     else
        (void)strlcpy(exec_pathname,ben_name,SSIZE);
 
+
+    /*-------------------------------------------*/
+    /* Make sure process calls itself by its pen */
+    /* not its ben                               */
+    /*-------------------------------------------*/
+
+
+    (void)snprintf(symlink_pathname,SSIZE,"/tmp/%s",pen_name);
+    (void)symlink(exec_pathname,symlink_pathname);
 
     #ifdef UTILIB_DEBUG
     (void)fprintf(stderr,"UTILIB PEN EXEC PATH %s\n",exec_pathname);
@@ -12998,7 +13228,7 @@ _PUBLIC void pups_set_pen(const char *argv[], const char *ben_name, const char *
     }
     #endif /* UTILIB_DEBUG */
 
-    (void)execv(exec_pathname,argv);
+    (void)execv(symlink_pathname,argv);
     pups_error("[pups_set_pen] exec failed");
 }
 
@@ -14144,10 +14374,12 @@ _PUBLIC int pups_vt_handler(const int signum)
 {   sigset_t   set;
     int        i;
     time_t     tdum;
-    char       handler_args[LONG_LINE];
+    char       handler_args[SSIZE];
     void       (*handler)(void *, char *args) = NULL;
     vttab_type tinfo;
 
+// CHANGE
+//return 0;
 
     /*----------------------------------*/
     /* Only the root thread can process */
@@ -14324,8 +14556,12 @@ _PUBLIC int pups_setvitimer(const char   *tname,        /* Timer payload name   
     if(tname        == (const char *)NULL  ||
        priority     <  0                   ||
        interval     <  0                   ||
-       handler      == (const char *)NULL   )
+       handler      == (const void *)NULL   )
     {  pups_set_errno(EINVAL);
+
+fprintf(stderr,"BAIL 1\n");
+fflush(stderr);
+
        return(-1);
     }
 
@@ -14336,6 +14572,10 @@ _PUBLIC int pups_setvitimer(const char   *tname,        /* Timer payload name   
 
     if(no_vt_services == TRUE)
     {  pups_set_errno(EACCES);
+
+fprintf(stderr,"BAIL 2\n");
+fflush(stderr);
+
        return(-1);
     }
 
@@ -14351,6 +14591,10 @@ _PUBLIC int pups_setvitimer(const char   *tname,        /* Timer payload name   
     for(i=0; i<appl_max_vtimers; ++i)
     {   if(vttab[i].name != (char *)NULL && strcmp(vttab[i].name,tname) == 0)
         {  pups_set_errno(EEXIST);
+
+fprintf(stderr,"BAIL 3  %s:%s\n",vttab[i].name,tname);
+fflush(stderr);
+
            return(-1);
         }
 
@@ -14367,11 +14611,19 @@ free_timer:
 
     if(mode != VT_ONESHOT && mode != VT_CONTINUOUS)
     {  pups_set_errno(EINVAL);
+
+fprintf(stderr,"BAIL 4\n");
+fflush(stderr);
+
        return(-1);
     }
 
     if(interval <= 0)
     {  pups_set_errno(ERANGE);
+
+fprintf(stderr,"BAIL 5\n");
+fflush(stderr);
+
        return(-1);
     }
 
@@ -14413,6 +14665,10 @@ free_timer:
        vttab[t_index].prescaler   = interval;
     else if(mode != VT_CONTINUOUS)
     {  pups_set_errno(EINVAL);
+
+fprintf(stderr,"BAIL 6\n");
+fflush(stderr);
+
        return(-1);
     }
 
@@ -14421,7 +14677,9 @@ free_timer:
     vttab[t_index].handler        = handler;
 
     if(handler_args != (char *)NULL)
-    {  vttab[t_index].handler_args = (char *)pups_malloc(LONG_LINE);
+    {  if(vttab[t_index].handler_args == (char *)NULL)
+          vttab[t_index].handler_args = (char *)pups_malloc(SSIZE);
+
        (void)strlcpy(vttab[t_index].handler_args,handler_args,SSIZE);
     }
 
@@ -14595,12 +14853,12 @@ _PUBLIC void pups_show_vitimers(const FILE *stream)
         {  if(vttab[i].priority > 0)
            {  if(vttab[i].mode == VT_CONTINUOUS)
                  (void)fprintf(stream,
-                               "    %04d: \"%-48s\" priority %02d, continous mode, interval time %7.4F secs, prescaler %04d, (handler at %016lx virtual)\n",i,
-                                                                                                                                                vttab[i].name,
-                                                                                                                                            vttab[i].priority,
-                                                                                                                        (FTYPE)vttab[i].interval_time / 100.0,
-                                                                                                                                           vttab[i].prescaler,
-                                                                                                                          (unsigned long int)vttab[i].handler);
+                               "    %04d: \"%-48s\" priority %02d, continuous mode, interval time %7.4F secs, prescaler %04d, (handler at %016lx virtual)\n",i,
+                                                                                                                                                 vttab[i].name,
+                                                                                                                                             vttab[i].priority,
+                                                                                                                         (FTYPE)vttab[i].interval_time / 100.0,
+                                                                                                                                            vttab[i].prescaler,
+                                                                                                                           (unsigned long int)vttab[i].handler);
               else
                 (void)fprintf(stream,
                               "    %04d: \"%-48s\" priority %02d, oneshot mode, interval time %7.4F secs, prescaler %04d, (handler at %016lx virtual)\n",i,
@@ -15162,6 +15420,73 @@ _PUBLIC int pups_malarm(const unsigned long int usecs)
 
 
 /*----------------------------------------------------------------------------------------
+    Unhide the branch part of a file pathname (and its shadow) ...
+----------------------------------------------------------------------------------------*/
+
+_PRIVATE _BOOLEAN pups_unhide_pathnames(vttab_type *t_info, char *fname, char *fshadow)
+
+{   char new_fname[SSIZE] = "";
+
+
+    /*------------------*/
+    /* Update file name */
+    /*------------------*/
+
+    if(fname[0] == '.') 
+       (void)snprintf (new_fname,SSIZE,"%s",(char *)&fname[1]);
+    else
+       (void)strep(fname,  new_fname, "/.", "/");
+
+    if(strcmp(fname,new_fname) != 0)
+    {  char branch     [SSIZE] = "",
+            new_branch [SSIZE] = "",
+            leaf       [SSIZE] = "", 
+            new_fshadow[SSIZE] = "";
+
+
+       /*-----------------------*/
+       /* Update file homeostat */
+       /*-----------------------*/
+
+       (void)strlcpy((vttab_type *)t_info->name,new_fname,SSIZE);
+
+
+       /*-----------------*/
+       /* Update filename */
+       /*-----------------*/
+
+       (void)strncpy(fname,new_fname,SSIZE);
+
+
+       /*-------------------------*/
+       /* Update shadow file name */
+       /*-------------------------*/
+
+       (void)strbranch(fshadow,branch);
+       (void)strleaf  (fshadow,leaf);
+
+       if(branch[0] == '.')
+          (void)snprintf (new_fshadow,SSIZE,"%s/%s",(char *)&branch[1],leaf);
+       else
+       {  (void)strep    (branch, new_branch, "/.", "/");
+          (void)snprintf (new_fshadow,SSIZE,"%s/%s",new_branch,leaf);
+       }
+
+       (void)rename (fshadow,new_fshadow);
+       (void)strncpy(fshadow,new_fshadow,SSIZE);
+
+
+
+       return(TRUE);  
+    }
+
+    return(FALSE); 
+}
+
+
+
+
+/*----------------------------------------------------------------------------------------
     Homeostat for stdio (FIFO) redirection ...
 ----------------------------------------------------------------------------------------*/
 
@@ -15607,74 +15932,86 @@ _PUBLIC int pups_default_fd_homeostat(void *t_info, const char *args)
     /* re-create it.                                                              */
     /*----------------------------------------------------------------------------*/
 
-    if(ftab[f_index].named == TRUE && ftab[f_index].fdes != (-1) && access(ftab[f_index].fname,F_OK | R_OK | W_OK) == (-1))
+                                                                     /*------------------------------------------------*/
+    if(ftab[f_index].named                            == TRUE    &&  /* Named file (i.e homeostatically protected      */
+       ftab[f_index].fdes                             != (-1)    &&  /* File is open                                   */
+       access(ftab[f_index].fname,F_OK | R_OK | W_OK) == (-1)     )  /* File is assessible (via is 'given' name)       */
+                                                                     /*------------------------------------------------*/
     {  _BOOLEAN file_found = FALSE;
 
 
-       /*----------------------------------------------------------------------------------*/
-       /* If we have a homeostat to search for the lost object use to try and relocate the */
-       /* file we have just lost -- in the case of FIFO object the homeostat will simply   */
-       /* need to create the object.                                                       */ 
-       /*----------------------------------------------------------------------------------*/
+       /*--------------------------------------------------*/
+       /* If we have a (partially) hidden path - unhide it */
+       /*--------------------------------------------------*/
 
-       if((void *)ftab[f_index].homeostat != (void *)NULL)
-       {  file_found                  =  (*ftab[f_index].homeostat)(ftab[f_index].fdes,LOST_FILE_LOCATE);
-          default_fd_homeostat_action = FALSE;
-       }
+       if(pups_unhide_pathnames((vttab_type *)t_info,ftab[f_index].fname,ftab[f_index].fshadow) == FALSE)
+       {
 
+          /*-------------------------------------------------------------------------------------*/
+          /* If we have a homeostat to search for the lost object use it to try and relocate the */
+          /* file we have just lost -- in the case of FIFO object the homeostat will simply      */
+          /* need to create the object.                                                          */ 
+          /*-------------------------------------------------------------------------------------*/
 
-       /*----------------------------------------------------------------------------------*/
-       /* If we do not have a homeostat or it cannot find file default action is required. */
-       /*----------------------------------------------------------------------------------*/
-
-       ++ftab[f_index].lost_cnt;
-       if(file_found == FALSE)
-       {  if(appl_verbose == TRUE)
-          {  (void)strdate(date);
-             if(ftab[f_index].lost_cnt == 1)
-                (void)fprintf(stderr,"%s %s (%d@%s:%s): %s \"%s\" lost (once) -- recreating\n",date,
-                                                                                          appl_name,
-                                                                                           appl_pid,
-                                                                                          appl_host,
-                                                                                         appl_owner,
-                                                                                        object_type,
-                                                                                ftab[f_index].fname);
-             else
-                (void)fprintf(stderr,"%s %s (%d@%s:%s): %s \"%s\" lost (%d times) -- recreating\n",date,
-                                                                                              appl_name,
-                                                                                               appl_pid,
-                                                                                              appl_host,
-                                                                                             appl_owner,
-                                                                                            object_type,
-                                                                                    ftab[f_index].fname,
-                                                                                 ftab[f_index].lost_cnt);
-
-             (void)fflush(stderr);
+          if((void *)ftab[f_index].homeostat != (void *)NULL)
+          {  file_found                  =  (*ftab[f_index].homeostat)(ftab[f_index].fdes,LOST_FILE_LOCATE);
+             default_fd_homeostat_action = FALSE;
           }
 
 
-          /*------------------------*/
-          /* Recreate the resource. */
-          /*------------------------*/
+          /*----------------------------------------------------------------------------------*/
+          /* If we do not have a homeostat or it cannot find file default action is required. */
+          /*----------------------------------------------------------------------------------*/
 
-          if(strcmp(ftab[f_index].fshadow,"/dev/tty") == 0)
-             (void)symlink(ftab[f_index].fshadow,ftab[f_index].fname);
-          else
-          {  if(link(ftab[f_index].fshadow,ftab[f_index].fname) == (-1))
-             {  if((void *)ftab[f_index].homeostat != (void *)NULL)
-                {  if((*ftab[f_index].homeostat)(ftab[f_index].fdes,LOST_FILE_LOCATE) == FALSE)
+          ++ftab[f_index].lost_cnt;
+          if(file_found == FALSE)
+          {  if(appl_verbose == TRUE)
+             {  (void)strdate(date);
+                if(ftab[f_index].lost_cnt == 1)
+                   (void)fprintf(stderr,"%s %s (%d@%s:%s): %s \"%s\" lost (once) -- recreating\n",date,
+                                                                                             appl_name,
+                                                                                              appl_pid,
+                                                                                             appl_host,
+                                                                                            appl_owner,
+                                                                                           object_type,
+                                                                                   ftab[f_index].fname);
+                else
+                   (void)fprintf(stderr,"%s %s (%d@%s:%s): %s \"%s\" lost (%d times) -- recreating\n",date,
+                                                                                                 appl_name,
+                                                                                                  appl_pid,
+                                                                                                 appl_host,
+                                                                                                appl_owner,
+                                                                                               object_type,
+                                                                                       ftab[f_index].fname,
+                                                                                    ftab[f_index].lost_cnt);
+
+                (void)fflush(stderr);
+             }
+
+
+             /*------------------------*/
+             /* Recreate the resource. */
+             /*------------------------*/
+
+             if(strcmp(ftab[f_index].fshadow,"/dev/tty") == 0)
+                (void)symlink(ftab[f_index].fshadow,ftab[f_index].fname);
+             else
+             {  if(link(ftab[f_index].fshadow,ftab[f_index].fname) == (-1))
+                {  if((void *)ftab[f_index].homeostat != (void *)NULL)
+                   {  if((*ftab[f_index].homeostat)(ftab[f_index].fdes,LOST_FILE_LOCATE) == FALSE)
+                      {  (void)snprintf(errstr,SSIZE,"[pups_default_fd__homeostat] %s \"%s\" lost (and cannot be found) -- exiting",ftab[f_index].hname,ftab[f_index].fname);
+                         pups_error(errstr);
+                      }
+                   }
+                   else
                    {  (void)snprintf(errstr,SSIZE,"[pups_default_fd__homeostat] %s \"%s\" lost (and cannot be found) -- exiting",ftab[f_index].hname,ftab[f_index].fname);
                       pups_error(errstr);
                    }
                 }
-                else
-                {  (void)snprintf(errstr,SSIZE,"[pups_default_fd__homeostat] %s \"%s\" lost (and cannot be found) -- exiting",ftab[f_index].hname,ftab[f_index].fname);
-                   pups_error(errstr);
-                }
              }
-          }
 
-          default_fd_homeostat_action = TRUE;
+             default_fd_homeostat_action = TRUE;
+          }
        }
     }
 
@@ -15686,13 +16023,14 @@ _PUBLIC int pups_default_fd_homeostat(void *t_info, const char *args)
     if(ftab[f_index].named == TRUE && ftab[f_index].fdes != (-1) && access(ftab[f_index].fshadow,F_OK | R_OK | W_OK) == (-1))
     {  if(appl_verbose == TRUE)
        {  strdate(date);
-          (void)fprintf(stderr,"%s %s (%d@%s:%s): %s \"%s\" (shadow) lost -- recreating\n",date,
-                                                                                      appl_name,
-                                                                                       appl_pid,
-                                                                                      appl_host,
-                                                                                     appl_owner,
-                                                                                    object_type,
-                                                                            ftab[f_index].fname);
+          (void)fprintf(stderr,"%s %s (%d@%s:%s): %s \"%s\" (shadow \"%s\") lost -- recreating\n",date,
+                                                                                             appl_name,
+                                                                                              appl_pid,
+                                                                                             appl_host,
+                                                                                            appl_owner,
+                                                                                           object_type,
+                                                                                   ftab[f_index].fname,
+                                                                                 ftab[f_index].fshadow);
           (void)fflush(stderr);
        }
 
@@ -17443,7 +17781,7 @@ _PRIVATE int segbusfpe_handler(int signum)
             (void)pups_usleep(100);
     }
 
-    pups_exit(-1);
+    pups_exit(255);
 }
 
 
@@ -17473,9 +17811,16 @@ _PUBLIC int pups_statkill(const int pid, const int signum)
        return(PUPS_TERMINATED);
 
     procstream = fopen(procstatus,"r");
-    (void)fgets(line,SSIZE,procstream);
-    (void)fgets(line,SSIZE,procstream);
-    (void)fgets(line,SSIZE,procstream);
+
+
+    /*------------------------------------------------*/
+    /* We have to search for the relevant line in the */
+    /* status file as this file is kernel dependent   */
+    /*------------------------------------------------*/
+
+    do {    (void)fgets(line,SSIZE,procstream);
+       } while(strin(line,"State") == FALSE);
+
     (void)fclose(procstream);
 
     if(strin(line,"T") == TRUE)
@@ -18309,7 +18654,7 @@ _PUBLIC void pups_default_parent_homeostat(void *t_info, const char *args)
           (void)fflush(stderr);
        }
 
-       (void)pups_exit(-1);
+       (void)pups_exit(255);
     }
 
     pups_set_errno(OK);
@@ -18319,14 +18664,16 @@ _PUBLIC void pups_default_parent_homeostat(void *t_info, const char *args)
 
 
 /*----------------------------------------------------------------------------------------
-    Set up a "support" child to grab the thread of execution if the parent process
-    is fatally damaged by a dangerous operation ...
+    Enable process homeostat (set up a "support" child to grab the thread of execution if
+    the parent process is fatally damaged by a dangerous operation) ...
 ----------------------------------------------------------------------------------------*/
 
-_PUBLIC int pups_could_be_poisoned(const _BOOLEAN wait_if_poisoned)
+_PUBLIC int pups_process_homeostat_enable(const _BOOLEAN wait_if_damaged)
 
 {   int      child_pid;
-    _BOOLEAN save_appl_verbose = FALSE;
+
+    _BOOLEAN save_appl_verbose   = FALSE,
+             pups_parent_damaged = FALSE;
 
     if((child_pid = pups_fork(FALSE,FALSE)) == 0)
     {  
@@ -18336,6 +18683,7 @@ _PUBLIC int pups_could_be_poisoned(const _BOOLEAN wait_if_poisoned)
        /* support child.                                */
        /*-----------------------------------------------*/
 
+       pups_set_errno(OK); 
        return(child_pid);
     }
 
@@ -18359,15 +18707,15 @@ _PUBLIC int pups_could_be_poisoned(const _BOOLEAN wait_if_poisoned)
     /* child now takes over the computation.                  */
     /*--------------------------------------------------------*/
 
-    appl_verbose  = save_appl_verbose;
-    pups_poisoned = TRUE;
+    appl_verbose        = save_appl_verbose;
+    pups_parent_damaged = TRUE;
 
     if(appl_verbose == TRUE)
     {  (void)strdate(date);
 
-       if(wait_if_poisoned == TRUE)
-          (void)fprintf(stderr,"%s %s (%d@%s:%s): PID %d fatally damaged, support child (PID %d) taking over computation (in wait mode)\n",
-                                                                           date,appl_name,appl_pid,appl_host,appl_owner,appl_ppid,appl_pid);
+       if(wait_if_damaged == TRUE)
+          (void)fprintf(stderr,"%s %s (%d@%s:%s): PID %d fatally damaged, support child (PID %d) taking over computation (wait mode)\n",
+                                                                        date,appl_name,appl_pid,appl_host,appl_owner,appl_ppid,appl_pid);
        else
           (void)fprintf(stderr,"%s %s (%d@%s:%s): PID %d fatally damaged, support child (PID %d) taking over computation\n",
                                                             date,appl_name,appl_pid,appl_host,appl_owner,appl_ppid,appl_pid);
@@ -18375,16 +18723,12 @@ _PUBLIC int pups_could_be_poisoned(const _BOOLEAN wait_if_poisoned)
     }
 
 
-    /*----------------------------------------*/
-    /* Wait if user has requested us to do so */
-    /*----------------------------------------*/
+    /*------------------------*/
+    /* Restart virtual timers */
+    /*------------------------*/
 
-    if(wait_if_poisoned == TRUE)
-    {  while(pups_poisoned == TRUE)
-            pups_usleep(100);
-
-       return(0);
-    }
+    if(vitimer_quantum > 0)
+       (void)pups_malarm(vitimer_quantum);
 
 
     /*----------------------------------------------*/
@@ -18392,6 +18736,17 @@ _PUBLIC int pups_could_be_poisoned(const _BOOLEAN wait_if_poisoned)
     /*----------------------------------------------*/
 
     (void)psrp_rename_channel(appl_name); 
+
+    /*----------------------------------------*/
+    /* Wait if user has requested us to do so */
+    /*----------------------------------------*/
+
+    if(wait_if_damaged == TRUE)
+    {  while(pups_parent_damaged == TRUE)
+            pups_usleep(1000);
+    }
+
+    pups_set_errno(EFAULT);
     return(-1);
 }
 
@@ -18399,10 +18754,10 @@ _PUBLIC int pups_could_be_poisoned(const _BOOLEAN wait_if_poisoned)
 
 
 /*----------------------------------------------------------------------------------------
-    Cancel support child ...
+    Disable process hoemostat (support child)  ...
 ----------------------------------------------------------------------------------------*/
 
-_PUBLIC void pups_not_poisoned(const int child_pid)
+_PUBLIC void pups_process_hoemostat_disable(const int child_pid)
 
 {   
 
@@ -20972,71 +21327,71 @@ _PUBLIC int pups_sysinfo(char *hostname,         // Name of host
 {   FILE *pdes = (FILE *)NULL;
 
     char strdum[SSIZE]   = "",
-         hname[SSIZE]    = "",
-         otype[SSIZE]    = "",
-         oversion[SSIZE] = "",
-         mtype[SSIZE]    = "",
          line[SSIZE]     = "";
 
 
-    /*---------------------------------------*/
-    /* Open pipe to uname command and run it */
-    /*---------------------------------------*/
+    /*---------*/
+    /* Machine */
+    /*---------*/
 
-    if((pdes = popen("uname -a","r")) == (FILE *)NULL)
-    {  pups_set_errno(ENOEXEC);
-       return(-1);
+    if(machtype != (char *)NULL)
+    {  if((pdes = popen("uname --machine","r")) == (FILE *)NULL)
+       {  pups_set_errno(ENOEXEC);
+          return(-1);
+       }
+
+       (void)fgets(line,SSIZE,pdes);
+       (void)pclose(pdes);
+       (void)sscanf(line,"%s",machtype);
     }
 
 
-    /*-------------------------------*/
-    /* Read reply from uname command */
-    /*-------------------------------*/
+    /*------------------*/
+    /* Operating system */
+    /*------------------*/
 
-    (void)fgets(line,SSIZE,pdes);
-
-
-    /*------------*/
-    /* Close pipe */
-    /*------------*/
-
-    (void)pclose(pdes);
-
-
-    /*-------------*/
-    /* Parse reply */
-    /*-------------*/
-
-    (void)sscanf(line,"%s%s%s%s%s%s%s%s%s%s%s%s",otype,
-                                                 hname,
-                                                 oversion,
-                                                 strdum,
-                                                 strdum,
-                                                 strdum,
-                                                 strdum,
-                                                 strdum,
-                                                 strdum,
-                                                 strdum,
-                                                 strdum,
-                                                 mtype);
-
-
-    /*-------------------------------------*/
-    /* Get information requested by caller */
-    /*-------------------------------------*/
-
-    if(hostname != (char *)NULL)
-       (void)strlcpy(hostname,hname,SSIZE);
-                                               
-    
     if(ostype != (char *)NULL)
-       (void)strlcpy(ostype,otype,SSIZE);
+    {  if((pdes = popen("uname --operating-system","r")) == (FILE *)NULL)
+       {  pups_set_errno(ENOEXEC);
+          return(-1);
+       }
+
+       (void)fgets(line,SSIZE,pdes);
+       (void)pclose(pdes);
+       (void)sscanf(line,"%s",ostype);
+    }
+
+
+    /*--------------------------*/
+    /* Operating system version */
+    /*--------------------------*/
 
     if(osversion != (char *)NULL)
-       (void)strlcpy(osversion,oversion,SSIZE);
+    {  if((pdes = popen("uname --kernel-release","r")) == (FILE *)NULL)
+       {  pups_set_errno(ENOEXEC);
+          return(-1);
+       }
 
-    if(machtype != (char *)NULL)
-       (void)strlcpy(machtype,mtype,SSIZE);
+       (void)fgets(line,SSIZE,pdes);
+       (void)pclose(pdes);
+       (void)sscanf(line,"%s",osversion);
+    }
+
+
+    /*----------*/
+    /* Hostname */
+    /*----------*/
+
+    if(hostname != (char *)NULL)
+    {  if((pdes = popen("uname --nodename","r")) == (FILE *)NULL)
+       {  pups_set_errno(ENOEXEC);
+          return(-1);
+       }
+
+       (void)fgets(line,SSIZE,pdes);
+       (void)pclose(pdes);
+       (void)sscanf(line,"%s",hostname);
+    }
 
     pups_set_errno(OK);
     return(0);
@@ -21045,69 +21400,52 @@ _PUBLIC int pups_sysinfo(char *hostname,         // Name of host
 
 
 
-/*------------------------------------------*/
-/* Am I running in docker or LXC container? */
-/*------------------------------------------*/
+/*-----------------------------------------*/
+/* Am I running in container or other sort */
+/* of virtual environment?                 */
+/*-----------------------------------------*/
 
-_PUBLIC _BOOLEAN pups_is_in_container(char *containerType)
+_PUBLIC _BOOLEAN pups_os_is_virtual(char *vmType)
 
-{   char str[SSIZE] = "";
-    FILE *stream    = (FILE *)NULL;
+{   char line[SSIZE] = "";
+    FILE *pstream    = (FILE *)NULL;
 
     pups_set_errno(OK);
 
-    if((stream = fopen("/proc/1/cgroup","r")) == (FILE *)NULL)
-       return(FALSE);
 
-    (void)fgets(str,SSIZE,stream);
-    (void)fclose(stream);
+    /*----------------------------------*/
+    /* Open pstream (with sanity check) */
+    /*----------------------------------*/
+    /*----------------------------------------------*/
+    /* Must add the following line to /etc/sudoers: */
+    /* ALL ALL=NOPASSWD: /sbin/virt-what            */
+    /*----------------------------------------------*/
 
-                                          /*------------------*/
-    if(strin(str,"docker") == TRUE    ||  /* Docker container */
-       strin(str,"lxc")    == TRUE     )  /* LXC container    */
-                                          /*------------------*/
-    {
-
-       /*------------------------------------------------*/
-       /* The caller want to know the name of my sandbox */
-       /*------------------------------------------------*/
-
-       if(containerType != (char *)NULL)
-       {  
-
-          /*------------------*/
-          /* Docker container */
-          /*------------------*/
-
-          if(strin(str,"docker") == 0)
-             (void)strlcpy(containerType,"docker",SSIZE);
-
-
-          /*---------------*/
-          /* LXC container */
-          /*---------------*/
-
-          else if(strin(str,"lxc") == 0)
-             (void)strlcpy(containerType,"lxc",SSIZE);
-
-
-          /*-------------------*/
-          /* Unknown container */
-          /*-------------------*/
-
-          else
-             (void)strlcpy(containerType,"unknown",SSIZE);
-       }             
-
-       return(TRUE);
+    if((pstream = popen("sudo virt-what | head -1","r")) == (FILE *)NULL || vmType == (char *)NULL)
+    {  pups_set_errno(EINVAL);
+       return(-1);
     }
 
+    (void)fgets(line,SSIZE,pstream);
+    (void)sscanf(line,"%s",vmType);
 
-    /*--------------------------------*/
-    /* I am running on full fat Linux */
-    /*--------------------------------*/
+    (void)fclose(pstream); 
 
-    return(FALSE);
+
+    /*-------------------------------*/
+    /* OS is running on "bare metal" */
+    /*-------------------------------*/
+
+    if(strcmp(vmType,"") == 0)
+       return(FALSE);
+
+
+    /*-------------------------------*/
+    /* OS is running in some kind of */
+    /* virtual environment           */
+    /*-------------------------------*/
+
+    return(TRUE);
 }
 
 
@@ -21586,4 +21924,74 @@ _PUBLIC _BOOLEAN pups_can_run_command(const char *cmd)
 
     (void)free((void *)buf);
     return(FALSE);
+}
+
+
+
+/*---------------------------*/
+/* Enable (memory) residency */
+/*---------------------------*/
+
+_PUBLIC void pups_enable_resident(void)
+
+{   appl_enable_resident = TRUE;
+}
+
+
+
+
+/*--------------------------------*/
+/* Get size of directory in bytes */
+/*--------------------------------*/
+
+_PUBLIC off_t pups_dsize(const char *directory_name)
+{
+    off_t directory_size = 0;
+    DIR   *pDir          = (DIR *)NULL;
+
+    if ((pDir = opendir(directory_name)) != (DIR *)NULL)
+    {
+        struct dirent *pDirent = (struct dirent *)NULL;
+
+        /*--------------------------------*/
+	/* Get size of files in directory */
+	/*--------------------------------*/
+
+        while ((pDirent = readdir(pDir)) != (struct dirent *)NULL)
+        {
+            char   buffer[PATH_MAX + 1] = "";
+            struct stat file_stat;
+
+            (void)strcat(strcat(strcpy(buffer, directory_name), "/"), pDirent->d_name);
+
+            if (stat(buffer, &file_stat) == 0)
+                directory_size += file_stat.st_blocks * S_BLKSIZE;
+
+
+	    /*-----------------*/
+	    /* Sub-directory ? */
+	    /*-----------------*/
+
+            if (pDirent->d_type == DT_DIR)
+            {  
+
+	       /*-----*/
+	       /* Yes */
+	       /*-----*/
+
+	       if (strcmp(pDirent->d_name, ".") != 0 && strcmp(pDirent->d_name, "..") != 0)
+                    directory_size += pups_dsize(buffer);
+            }
+        }
+
+        (void) closedir(pDir);
+    }
+
+
+    /*------------------------*/
+    /* Size of directory tree */
+    /* in bytes               */
+    /*------------------------*/
+
+    return(directory_size);
 }

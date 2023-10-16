@@ -1,0 +1,403 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/restart.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------</span>
+<span class="Comment">     Purpose: Restarts checkpoint (via Criu) </span>
+
+<span class="Comment">     Author:  M.A. O'Neill</span>
+<span class="Comment">              Tumbling Dice Ltd</span>
+<span class="Comment">              Gosforth</span>
+<span class="Comment">              Newcastle upon Tyne</span>
+<span class="Comment">              NE3 4RT</span>
+<span class="Comment">              United Kingdom</span>
+
+<span class="Comment">     Version: 2.01 </span>
+<span class="Comment">     Dated:   24th May 2022</span>
+<span class="Comment">     E-mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;stdio.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;bsd/string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stdlib.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/types.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/stat.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;fcntl.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;signal.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Version tag </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define SSAVETAG    </span><span class="Constant">20</span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Version of restarit </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define RESTART_VERSION     </span><span class="Constant">&quot;2.01&quot;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> String size </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define SSIZE                </span><span class="Constant">2048</span><span class="PreProc"> </span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Type definitions </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define _PUBLIC</span>
+<span class="PreProc">#define _PRIVATE             </span><span class="Type">static</span>
+<span class="PreProc">#define _BOOLEAN             </span><span class="Type">unsigned</span><span class="PreProc"> </span><span class="Type">char</span>
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Checkpoint signals </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define SIGCHECK             SIGRTMIN + </span><span class="Constant">11</span>
+<span class="PreProc">#define SIGRESTART           SIGRTMIN + </span><span class="Constant">12</span>
+<span class="PreProc">#define DEFAULT_SIGNAL_DELAY </span><span class="Constant">1</span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Boolean types </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define FALSE                </span><span class="Constant">0</span>
+<span class="PreProc">#define TRUE                 </span><span class="Constant">255</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Variables which are local to this application </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">char</span> buildStr[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Main entry point </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> main(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   <span class="Type">int</span> i,
+        status,
+        child_pid,
+        argd                    = <span class="Constant">1</span>;
+
+    <span class="Type">unsigned</span> <span class="Type">int</span> signal_delay   = DEFAULT_SIGNAL_DELAY;
+
+    <span class="Type">char</span> ssave_dir[SSIZE]       = <span class="Constant">&quot;&quot;</span>,
+         ssave_buildpath[SSIZE] = <span class="Constant">&quot;&quot;</span>,
+         criu_cmd[SSIZE]        = <span class="Constant">&quot;&quot;</span>,
+         ssaveBuildStr[SSIZE]   = <span class="Constant">&quot;&quot;</span>;
+
+    _BOOLEAN do_verbose         = FALSE,
+             do_detach          = FALSE;
+
+    <span class="Type">FILE</span> *stream              = (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Build details for this application </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)snprintf(buildStr,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%d</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">&quot;</span>,getenv(<span class="Constant">&quot;MACHTYPE&quot;</span>),SSAVETAG,<span class="Constant">__DATE__</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Parse command tail </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(argc == <span class="Constant">1</span>)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">   restart version </span><span class="Special">%s</span><span class="Constant"> (built </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,RESTART_VERSION,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;   (C) Tumbling Dice, 2016-2022</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;   Usage: restart [-usage | -help] |</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;                  [-detach]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;                  [-d &lt;SIGRESTART signal delay secs:</span><span class="Special">%d</span><span class="Constant">&gt;]</span><span class="Special">\n</span><span class="Constant">&quot;</span>,DEFAULT_SIGNAL_DELAY);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;                  !-c &lt;checkpoint pathname&gt;!</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;                  [&gt;&amp; &lt;error/status logfile&gt;]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       exit(<span class="Constant">1</span>);
+    }
+
+    <span class="Statement">for</span>(i=<span class="Constant">1</span>; i&lt;argc; ++i)
+    {
+
+       <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Display help information </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(strcmp(argv[i],<span class="Constant">&quot;-usage&quot;</span>) == <span class="Constant">0</span> || strcmp(argv[i],<span class="Constant">&quot;-help&quot;</span>) == <span class="Constant">0</span>)
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">   restart version </span><span class="Special">%s</span><span class="Constant"> (built </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,RESTART_VERSION,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;   (C) Tumbling Dice, 2016-2022</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;   Usage: restart [-usage | -help] |</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;                  [-detach]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;                  [-d &lt;SIGRESTART signal delay secs:</span><span class="Special">%d</span><span class="Constant">&gt;]</span><span class="Special">\n</span><span class="Constant">&quot;</span>,DEFAULT_SIGNAL_DELAY);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;                  !-c &lt;checkpoint pathname&gt;!</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;                  [&gt;&amp; &lt;error/status logfile&gt;]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+          exit(<span class="Constant">1</span>);
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Verbose mode </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(strcmp(argv[i],<span class="Constant">&quot;-verbose&quot;</span>) == <span class="Constant">0</span>)
+       {  do_verbose = TRUE;
+          ++argd;
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Detach restarted process  </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> from controlling terminal </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(strcmp(argv[i],<span class="Constant">&quot;-detach&quot;</span>) == <span class="Constant">0</span>)
+       {  do_detach = TRUE;
+          ++argd;
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Get signal delay </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(argv[i],<span class="Constant">&quot;-d&quot;</span>) == <span class="Constant">0</span>)
+       {  <span class="Statement">if</span>(i == argc - <span class="Constant">1</span> || argv[i+<span class="Constant">1</span>][<span class="Constant">0</span>] == <span class="Constant">'-'</span>)
+          {  <span class="Statement">if</span>(do_verbose == TRUE)
+             {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;ssave: expecting poll time in seconds (integer &gt; 0)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+                (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+             }
+
+             exit(<span class="Constant">255</span>);
+          }
+
+
+          <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Sanity check </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+
+          <span class="Statement">else</span> <span class="Statement">if</span>((sscanf(argv[i+<span class="Constant">1</span>],<span class="Constant">&quot;</span><span class="Special">%ld</span><span class="Constant">&quot;</span>,&amp;signal_delay)) != <span class="Constant">1</span> || signal_delay &lt; <span class="Constant">1</span>)
+          {  <span class="Statement">if</span>(do_verbose == TRUE)
+             {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;ssave: expecting (SIGRESTART) signal delay in seconds (integer &gt; 0)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+                (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+             }
+
+             exit(<span class="Constant">255</span>);
+          }
+
+          ++i;
+          argd += <span class="Constant">2</span>;
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Get checkpoint to resume </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(argv[i],<span class="Constant">&quot;-c&quot;</span>) == <span class="Constant">0</span>)
+       {  <span class="Statement">if</span>(i == argc - <span class="Constant">1</span> || argv[i+<span class="Constant">1</span>][<span class="Constant">0</span>] == <span class="Constant">'-'</span>)
+          {  <span class="Statement">if</span>(do_verbose == TRUE)
+             {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;restart: expecting checkpoint directory name</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+                (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+             }
+
+             exit(<span class="Constant">255</span>);
+          }
+          <span class="Statement">else</span>
+             (<span class="Type">void</span>)strlcpy(ssave_dir,argv[i+<span class="Constant">1</span>],SSIZE);
+
+          ++i;
+          argd += <span class="Constant">2</span>;
+       }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check for unparsed command tail arguments </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">    #ifdef RESTART_DEBUG</span>
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;ARGC: </span><span class="Special">%d</span><span class="Constant"> ARGD: </span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,argc,argd);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> RESTART_DEBUG </span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(argd &lt; argc)
+    {  <span class="Statement">if</span>(do_verbose == TRUE)
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;restart: unparsed command tail arguments (parsed: </span><span class="Special">%d</span><span class="Constant">, found: </span><span class="Special">%d</span><span class="Constant">)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,argc-<span class="Constant">1</span>,argd-<span class="Constant">1</span>);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+
+       exit(<span class="Constant">255</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Does checkpoint exist? </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(strcmp(ssave_dir,<span class="Constant">&quot;&quot;</span>) == <span class="Constant">0</span>)
+    {  <span class="Statement">if</span>(do_verbose == TRUE)
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;restart: checkpoint directory not specified</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+
+       exit(<span class="Constant">255</span>);
+    }
+    <span class="Statement">else</span> <span class="Statement">if</span>(access(ssave_dir,F_OK | R_OK) == (-<span class="Constant">1</span>))
+    {  <span class="Statement">if</span>(do_verbose == TRUE)
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;restart: checkpoint directory </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> not found</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,ssave_dir);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+
+       exit(<span class="Constant">255</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Is checkpoint stale? </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)snprintf(ssave_buildpath,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/build&quot;</span>,ssave_dir);
+    stream = fopen(ssave_buildpath,<span class="Constant">&quot;r&quot;</span>);
+    (<span class="Type">void</span>)fgets(ssaveBuildStr,<span class="Constant">255</span>,stream);
+    (<span class="Type">void</span>)fclose(stream);
+
+<span class="PreProc">    #ifdef RESTART_DEBUG</span>
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;buildStr: </span><span class="Special">%s</span><span class="Constant">   ssaveBuildStr: </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,buildStr,ssaveBuildStr);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> RESTART_DEBUG </span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(strncmp(buildStr,ssaveBuildStr,strlen(buildStr)) != <span class="Constant">0</span>)
+    {  <span class="Statement">if</span>(do_verbose == TRUE)
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;restart: checkpoint directory </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> is stale</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,ssave_dir);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+
+       exit(<span class="Constant">255</span>);
+    }
+
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Detach criu from process once restart complete. This </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> is done if the checkpointed command was running in   </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> the background                                       </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(do_detach == TRUE)
+       (<span class="Type">void</span>)snprintf(criu_cmd,SSIZE,<span class="Constant">&quot;criu --log-file /dev/null --shell-job restore -d -D </span><span class="Special">%s</span><span class="Constant">&quot;</span>,ssave_dir);
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Run checkpointed command in foreground </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)snprintf(criu_cmd,SSIZE,<span class="Constant">&quot;exec criu --log-file /dev/null --shell-job restore -D </span><span class="Special">%s</span><span class="Constant">&quot;</span>,ssave_dir);
+
+
+<span class="PreProc">    #ifdef RESTART_DEBUG</span>
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;CRIU CMD: </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,criu_cmd);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> RESTART_DEBUG </span><span class="Comment">*/</span>
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Restart command must ignore the SIGRESTART </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> it sends to its own process group (which   </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> contains the restarted process tree)       </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)signal(SIGRESTART,<span class="Constant">SIG_IGN</span>);
+
+    <span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Restart command </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(fork() == <span class="Constant">0</span>)
+    {  <span class="Type">char</span> signal_cmd[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+
+       <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Give Criu time to do its magic. This is </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> a horrible kludge. Wre should check for </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> reinstated member(s) of process tree    </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+
+       (<span class="Type">void</span>)sleep(signal_delay);
+
+
+       <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Send SIGRESTART to reinstated process tree </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+
+       (<span class="Type">void</span>)kill(-getppid(),SIGRESTART);
+
+       _exit(<span class="Constant">0</span>);
+    }
+    <span class="Statement">else</span>
+       status = system(criu_cmd);
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Checkpointed command has not restarted </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(WEXITSTATUS(status) == (-<span class="Constant">1</span>))
+    {  <span class="Statement">if</span>(do_verbose == TRUE)
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;restart: problem restarting checkpoint</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+    }
+
+    exit(<span class="Constant">255</span>);
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

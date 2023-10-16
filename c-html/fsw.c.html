@@ -1,0 +1,413 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/fsw.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Purpose: Check status of file system before trying to write data to it.</span>
+
+<span class="Comment">     Author:  M.A. O'Neill</span>
+<span class="Comment">              Tumbling Dice Ltd</span>
+<span class="Comment">              Gosforth</span>
+<span class="Comment">              Newcastle upon Tyne</span>
+<span class="Comment">              NE3 4RT</span>
+<span class="Comment">              United Kingdom</span>
+
+<span class="Comment">    Version: 5.00 </span>
+<span class="Comment">    Dated:   5th October 2023 </span>
+<span class="Comment">    E-mail:  mao@tumblingdice.co.uk </span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;me.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;utils.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;signal.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;psrp.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;vstamp.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Version of fsw </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define FSW_VERSION    </span><span class="Constant">&quot;3.00&quot;</span>
+
+<span class="PreProc">#ifdef BUBBLE_MEMORY_SUPPORT</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;bubble.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> BUBBLE_MEMORY_SUPPORT </span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Get signal mapping appropriate to OS and hardware architecture </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define __DEFINE__</span>
+<span class="PreProc">#if defined(I386) || defined(X86_64)</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sig.linux.x86.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> I386  || X86_64 </span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef ARMV6L</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sig.linux.arm.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> ARMV6L </span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef ARMV7L</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sig.linux.arm.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> ARMV7L </span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef AARCH64</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sig.linux.arm.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> AARCH64 </span><span class="Comment">*/</span>
+<span class="PreProc">#undef __DEFINE__</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Version ID (used by CKPT enabled binaries to discard stale checkpoint</span>
+<span class="Comment">    files) ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;vstamp.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Get application information for slot manager ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Slot information function </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> fsw_slot(<span class="Type">int</span> level)
+{   (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;int app fsw </span><span class="Special">%s</span><span class="Constant">: [ANSI C]</span><span class="Special">\n</span><span class="Constant">&quot;</span>,FSW_VERSION);
+
+    <span class="Statement">if</span>(level &gt; <span class="Constant">1</span>)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;(C) 2005-2022 Tumbling Dice</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Author: M.A. O'Neill</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;File system status filter (built </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+    }
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Application usage function </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> fsw_usage(<span class="Type">void</span>)
+{   (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[-fs_blocks &lt;min fs blocks:128&gt;]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[-homeostatic &lt;output file&gt; [-guard:FALSE]]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[&lt; &lt;input file&gt; &gt; &lt;output file&gt; &gt;&amp; &lt;ASCII log file&gt;]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Signals</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;SIGINIT SIGCHAN SIGPSRP: Process status [PSRP] request (protocol </span><span class="Special">%2.2f</span><span class="Constant">F)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,PSRP_PROTOCOL_VERSION);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;SIGCLIENT: tell client server is about to segment</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+
+<span class="PreProc">    #ifdef CRUI_SUPPORT</span>
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;SIGCHECK SIGRESTART:      checkpoint and restart signals</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> CRIU_SUPPORT </span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;SIGALIVE: check for existence of client on signal dispatch host</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+}
+
+
+
+
+<span class="PreProc">#ifdef SLOT</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;slotman.h&gt;</span>
+_EXTERN <span class="Type">void</span> (* SLOT)() __attribute__ ((aligned(<span class="Constant">16</span>))) = fsw_slot;
+_EXTERN <span class="Type">void</span> (* USE )() __attribute__ ((aligned(<span class="Constant">16</span>))) = fsw_usage;
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> SLOT </span><span class="Comment">*/</span>
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Application build date ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_EXTERN <span class="Type">char</span> appl_build_time[SSIZE] = <span class="Constant">__TIME__</span>;
+_EXTERN <span class="Type">char</span> appl_build_date[SSIZE] = <span class="Constant">__DATE__</span>;
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Private variables required by this application ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+                                              <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span> fs_blocks               = <span class="Constant">128</span>;   <span class="Comment">/*</span><span class="Comment"> Default minimum blocks in file system </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">char</span> output_f_name[SSIZE];           <span class="Comment">/*</span><span class="Comment"> O/P file homeostatically protected    </span><span class="Comment">*/</span>
+_PRIVATE _BOOLEAN output_homeostasis = FALSE; <span class="Comment">/*</span><span class="Comment"> Homeostatic if TRUE                   </span><span class="Comment">*/</span>
+_PRIVATE _BOOLEAN guarding           = FALSE; <span class="Comment">/*</span><span class="Comment"> TRUE if guarding a file resource      </span><span class="Comment">*/</span>
+                                              <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Local prototype function declarations ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PROTOTYPE _PRIVATE <span class="Type">int</span> psrp_process_status(<span class="Type">int</span>, <span class="Type">char</span> *[]);
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Report process status ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> psrp_process_status(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{    (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    File system watcher/migrator status</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+     (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    ===================================</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+     (<span class="Type">void</span>)fflush(psrp_out);
+
+<span class="PreProc">     #ifdef CRIU_SUPPORT</span>
+     (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    Binary is Criu enabled (checkpointable)</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+<span class="PreProc">     #endif</span> <span class="Comment">/*</span><span class="Comment"> CRIU_SUPPORT </span><span class="Comment">*/</span>
+
+     <span class="Statement">if</span>(output_homeostasis == TRUE)
+     {  (<span class="Type">void</span>)fprintf(psrp_out, <span class="Constant">&quot;    fsw (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): protecting output file (</span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                          appl_pid,appl_host,output_f_name);
+        (<span class="Type">void</span>)fflush(psrp_out);
+     }
+
+     <span class="Statement">if</span>(fs_write_blocked == TRUE)
+        (<span class="Type">void</span>)fprintf(psrp_out,
+                <span class="Constant">&quot;    fsw (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): waiting for space on fs (&lt; </span><span class="Special">%d</span><span class="Constant"> blocks)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                              appl_pid,appl_host,fs_blocks);
+     <span class="Statement">else</span>
+     {  <span class="Statement">if</span>(guarding == TRUE)
+           (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    fsw (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): guarding file (</span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,appl_pid,appl_host,output_f_name);
+        <span class="Statement">else</span>
+           (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    fsw (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): writing data</span><span class="Special">\n</span><span class="Constant">&quot;</span>,appl_pid,appl_host);
+     }
+
+     (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+     (<span class="Type">void</span>)fflush(psrp_out);
+
+     <span class="Statement">return</span>(PSRP_OK);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Software I.D. tag (used if CKPT support enabled to discard stale dynamic</span>
+<span class="Comment">    checkpoint files) ...</span>
+<span class="Comment">-------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define VTAG  </span><span class="Constant">3748</span>
+
+<span class="Type">extern</span> <span class="Type">int</span> appl_vtag = VTAG;
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Main entry point ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> pups_main(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+                                    <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+{   <span class="Type">int</span>      bytes_read;            <span class="Comment">/*</span><span class="Comment"> Number of bytes read from stdin </span><span class="Comment">*/</span>
+    <span class="Type">char</span>     line_of_input[SSIZE];  <span class="Comment">/*</span><span class="Comment"> Line buffer                     </span><span class="Comment">*/</span>
+    _BOOLEAN guard = FALSE;         <span class="Comment">/*</span><span class="Comment"> True if we are guarding file    </span><span class="Comment">*/</span>
+                                    <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Wait for PUPS/P3 to initialise </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)psrp_ignore_requests();
+
+    <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Parse command tail </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Do standard initialisations </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+
+    pups_std_init(TRUE,
+                  &amp;argc,
+                  FSW_VERSION,
+                  <span class="Constant">&quot;M.A. O'Neill&quot;</span>,
+                  <span class="Constant">&quot;fsw&quot;</span>,
+                  <span class="Constant">&quot;2023&quot;</span>,
+                  argv);
+
+    (<span class="Type">void</span>)psrp_init(PSRP_STATUS_ONLY  | PSRP_HOMEOSTATIC_STREAMS, &amp;psrp_process_status);
+    (<span class="Type">void</span>)psrp_load_default_dispatch_table();
+    (<span class="Type">void</span>)psrp_accept_requests();
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> We must disable automatic child handling </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+
+    pups_noauto_child();
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Get number of blocks at which the wait state is triggered </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span> ((ptr = pups_locate(&amp;init,<span class="Constant">&quot;fs_blocks&quot;</span>,&amp;argc,args,<span class="Constant">0</span>)) != NOT_FOUND)
+    {  <span class="Statement">if</span>((fs_blocks = pups_i_dec(&amp;ptr,&amp;argc,args)) == INVALID_ARG)
+          pups_error(<span class="Constant">&quot;[fsw] expecting wait state trigger block count&quot;</span>);
+
+       fs_blocks = iabs(fs_blocks);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Protect output file </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span> ((ptr = pups_locate(&amp;init,<span class="Constant">&quot;homeostatic&quot;</span>,&amp;argc,args,<span class="Constant">0</span>)) != NOT_FOUND)
+    {  <span class="Type">int</span>  outdes = (-<span class="Constant">1</span>);
+
+       <span class="Statement">if</span>(strccpy(output_f_name,pups_str_dec(&amp;ptr,&amp;argc,args)) == (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+          pups_error(<span class="Constant">&quot;[fsw] expecting name of output file to protect&quot;</span>);
+
+
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Check that output file actually exists </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(access(output_f_name,F_OK | W_OK) == (-<span class="Constant">1</span>))
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;fsw: output file (</span><span class="Special">%s</span><span class="Constant">) does not exist/is not accessible</span><span class="Special">\n</span><span class="Constant">&quot;</span>,output_f_name);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+          pups_exit(<span class="Constant">255</span>);
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Open dummy descriptor to protected file and start its homeostat </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+       outdes             = pups_open(output_f_name,<span class="Constant">1</span>,LIVE);
+       (<span class="Type">void</span>)pups_creator(outdes);
+       (<span class="Type">void</span>)pups_fd_alive(outdes,<span class="Constant">&quot;default_fd_homeostat&quot;</span>,pups_default_fd_homeostat);
+       output_homeostasis = TRUE;
+
+
+       <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Are we going to stand gaurd over this file after </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> data is written to it?                           </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span> (pups_locate(&amp;init,<span class="Constant">&quot;guard&quot;</span>,&amp;argc,args,<span class="Constant">0</span>) != NOT_FOUND)
+          guard = TRUE;
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check command tail for unparsed arguments </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+    pups_t_arg_errs(argd,args);
+
+
+    (<span class="Type">void</span>)pups_set_fs_hsm_parameters(<span class="Constant">1</span>,fs_blocks,(<span class="Type">char</span> *)<span class="Constant">NULL</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> If fsw is not in a pipeline check space on   </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> filesystem. If sufficient space remains      </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> exit immediately otherwise block until space </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> becomes available                            </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span> (isatty(<span class="Constant">0</span>) == <span class="Constant">1</span> &amp;&amp; isatty(<span class="Constant">1</span>) == <span class="Constant">1</span>)
+    {  (<span class="Type">void</span>)pups_write_homeostat(<span class="Constant">1</span>,(<span class="Type">void</span> *)<span class="Constant">NULL</span>);
+       pups_exit(<span class="Constant">0</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> No input pipe </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">else</span> <span class="Statement">if</span>(isatty(<span class="Constant">0</span>) == <span class="Constant">1</span>)
+       pups_error(<span class="Constant">&quot;[fsw] no file/pipe attached to stdin&quot;</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> No output pipe </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">else</span> <span class="Statement">if</span> (isafile(<span class="Constant">1</span>) != <span class="Constant">1</span>)
+       pups_error(<span class="Constant">&quot;[fsw] no file attached to stdout&quot;</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Read data from stdin and  write to stdout </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">do</span> {
+           bytes_read = read(<span class="Constant">0</span>,line_of_input,SSIZE);
+
+           <span class="Statement">if</span>(bytes_read &gt; <span class="Constant">0</span>)
+           {  (<span class="Type">void</span>)pups_write_homeostat(<span class="Constant">1</span>,(<span class="Type">void</span> *)<span class="Constant">NULL</span>);
+              (<span class="Type">void</span>)write(<span class="Constant">1</span>,line_of_input,bytes_read);
+           }
+
+       } <span class="Statement">while</span>(bytes_read != <span class="Constant">0</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> If we are guarding file persist indefinitely </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(guard == TRUE)
+    {  guarding = TRUE;
+
+      <span class="Statement">while</span>(TRUE)
+           (<span class="Type">void</span>)sched_yield();
+    }
+
+    pups_exit(<span class="Constant">0</span>);
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

@@ -1,0 +1,286 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/lol.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------</span>
+<span class="Comment">     Purpose: tests for owner of lock (being live) </span>
+
+<span class="Comment">     Author:  M.A. O'Neill</span>
+<span class="Comment">              Tumbling Dice Ltd</span>
+<span class="Comment">              Gosforth</span>
+<span class="Comment">              Newcastle upon Tyne</span>
+<span class="Comment">              NE3 4RT</span>
+<span class="Comment">              United Kingdom</span>
+
+<span class="Comment">     Version: 2.01 </span>
+<span class="Comment">     Dated:   24th Ma 2022</span>
+<span class="Comment">     E-mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;stdio.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;signal.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;bsd/string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/types.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/stat.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stdlib.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;xtypes.h&gt;</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Defines which are local to this application ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Version of lol </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define LOL_VERSION </span><span class="Constant">&quot;2.01&quot;</span>
+<span class="PreProc">#define END_STRING  </span><span class="Constant">9999</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> String size </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define SSIZE       </span><span class="Constant">2048</span><span class="PreProc"> </span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Replace multiple chracters in string with given character ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> mchrep(<span class="Type">char</span> rep_ch, <span class="Type">char</span> *ch_to_rep, <span class="Type">char</span> *s1)
+
+{   <span class="Type">int</span> i,
+        j,
+        s1_l,
+        rep_s_l;
+
+    s1_l    = strlen(s1);
+    rep_s_l = strlen(ch_to_rep);
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;s1_l; ++i)
+       <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;rep_s_l; ++j)
+          <span class="Statement">if</span>(s1[i] == ch_to_rep[j] || (ch_to_rep[j] == <span class="Constant">'D'</span> &amp;&amp; isdigit(s1[i])))
+             s1[i] = rep_ch;
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span>
+<span class="Comment">    Routine to extract substrings which are demarkated by a usr defined</span>
+<span class="Comment">    character ...</span>
+<span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+                                    <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span> strext(<span class="Type">char</span> dm_ch,     <span class="Comment">/*</span><span class="Comment"> Demarcation character           </span><span class="Comment">*/</span>
+                    <span class="Type">char</span>   *s1,     <span class="Comment">/*</span><span class="Comment"> Extracted sub string            </span><span class="Comment">*/</span>
+                    <span class="Type">char</span>   *s2)     <span class="Comment">/*</span><span class="Comment"> Argument string                 </span><span class="Comment">*/</span>
+                                    <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+
+{   <span class="Type">int</span> s1_ptr = <span class="Constant">0</span>;
+
+                                    <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+    _PRIVATE <span class="Type">int</span>   s2_ptr = <span class="Constant">0</span>;      <span class="Comment">/*</span><span class="Comment"> Current pointer into arg string </span><span class="Comment">*/</span>
+    _PRIVATE <span class="Type">char</span> *s2_was;          <span class="Comment">/*</span><span class="Comment"> Copy of current argument string </span><span class="Comment">*/</span>
+                                    <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Entry with null parameters forces reset of pointers within strext </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> function                                                          </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(s2 == (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+    {  s2_ptr = <span class="Constant">0</span>;
+       <span class="Statement">return</span>(FALSE);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Save string length for swap test if this is first pass for current </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> extraction string                                                  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(s2_ptr == <span class="Constant">0</span>)
+    {  s2_was = (<span class="Type">char</span> *)malloc(SSIZE);
+       (<span class="Type">void</span>)strlcpy(s2_was,s2,SSIZE);
+    }
+    <span class="Statement">else</span>
+    {
+
+       <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> If extraction string has changed re-initialise </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(strcmp(s2_was,s2) != <span class="Constant">0</span>)
+       {  s2_ptr = <span class="Constant">0</span>;
+          strlcpy(s2_was,s2,SSIZE);
+       }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">  Wind to substring to be extracted </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">while</span>(s2[s2_ptr] == dm_ch &amp;&amp; s2[s2_ptr] != <span class="Special">'\0'</span> &amp;&amp; s2[s2_ptr] != <span class="Special">'\n'</span>)
+          ++s2_ptr;
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> If we have reached the end of the string - reinitialise </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(s2[s2_ptr] == <span class="Special">'\0'</span> || s2[s2_ptr] == <span class="Special">'\n'</span>)
+    {  s2_ptr = <span class="Constant">0</span>;
+       s1[<span class="Constant">0</span>] = <span class="Special">'\0'</span>;
+       (<span class="Type">void</span>)free(s2_was);
+       <span class="Statement">return</span>(FALSE);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Extract substring to next demarcation character </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">while</span>(s2[s2_ptr] != dm_ch &amp;&amp; s2[s2_ptr] != <span class="Special">'\0'</span> &amp;&amp; s2[s2_ptr] != <span class="Special">'\n'</span>)
+          s1[s1_ptr++] = s2[s2_ptr++];
+    s1[s1_ptr] = <span class="Special">'\0'</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> If the end of the extraction string has been reached, reinitialise </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(s2[s2_ptr] == <span class="Special">'\0'</span> || s2[s2_ptr] == <span class="Special">'\n'</span>)
+    {  s2_ptr = <span class="Constant">0</span>;
+       (<span class="Type">void</span>)free(s2_was);
+
+                              <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Statement">return</span>(END_STRING);    <span class="Comment">/*</span><span class="Comment"> Messy but some applications need to know if  </span><span class="Comment">*/</span>
+                              <span class="Comment">/*</span><span class="Comment"> dm_ch was really matched or if we have hit   </span><span class="Comment">*/</span>
+                              <span class="Comment">/*</span><span class="Comment"> the end of the string                        </span><span class="Comment">*/</span>
+                              <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+    }
+
+    <span class="Statement">return</span>(TRUE);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Main entry point to application ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> main(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   <span class="Type">int</span> ret,
+        lock_pid;
+
+    <span class="Type">char</span> tmpstr[SSIZE]    = <span class="Constant">&quot;&quot;</span>,
+         strdum[SSIZE]    = <span class="Constant">&quot;&quot;</span>,
+         next_item[SSIZE] = <span class="Constant">&quot;&quot;</span>,
+         lock_host[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+    <span class="Type">struct</span> stat buf;
+
+    <span class="Statement">if</span>(argv[<span class="Constant">1</span>] == (<span class="Type">char</span> *)<span class="Constant">NULL</span> || strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;-help&quot;</span>) == <span class="Constant">0</span> || strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;-usage&quot;</span>) == <span class="Constant">0</span>)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">lol version </span><span class="Special">%s</span><span class="Constant">, (C) Tumbling Dice 2005-2022 (built </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,LOL_VERSION,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;LOL is free software, covered by the GNU General Public License, and you are</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;welcome to change it and/or distribute copies of it under certain conditions.</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;See the GPL and LGPL licences at www.gnu.org for further details</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;LOL comes with ABSOLUTELY NO WARRANTY</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">Usage: lol [-usage | -help] | &lt;lock/P3/PSRP file name&gt;</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       exit(<span class="Constant">255</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Does this channel/lock actually exist? </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)strlcpy(tmpstr,argv[<span class="Constant">1</span>],SSIZE);
+    <span class="Statement">if</span>(access(tmpstr,F_OK) == (-<span class="Constant">1</span>))
+    {  printf(<span class="Constant">&quot;NOT_FOUND</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stdout</span>);
+
+       exit(<span class="Constant">255</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Do we own this file? </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)lstat(tmpstr,&amp;buf);
+    <span class="Statement">if</span>(buf.st_uid != getuid())
+    {  printf(<span class="Constant">&quot;NOT_OWNER</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       exit(<span class="Constant">255</span>);
+    }
+    (<span class="Type">void</span>)mchrep(<span class="Constant">' '</span>,<span class="Constant">&quot;.#:/&quot;</span>,tmpstr);
+
+    <span class="Statement">do</span> {    ret = strext(<span class="Constant">' '</span>,next_item,tmpstr);
+
+            <span class="Statement">if</span>(sscanf(next_item,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">&quot;</span>,&amp;lock_pid) == <span class="Constant">1</span>)
+            {
+
+               <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment"> Is owner live? </span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+
+               <span class="Statement">if</span>(kill(lock_pid,<span class="Constant">SIGCONT</span>) != (-<span class="Constant">1</span>))
+                  printf(<span class="Constant">&quot;LIVE</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+               <span class="Statement">else</span>
+                  printf(<span class="Constant">&quot;DEAD</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+               (<span class="Type">void</span>)fflush(<span class="Constant">stdout</span>);
+
+               exit(<span class="Constant">0</span>);
+            }
+       } <span class="Statement">while</span>(ret != END_STRING);
+
+    exit(<span class="Constant">255</span>);
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

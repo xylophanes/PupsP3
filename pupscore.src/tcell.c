@@ -9,8 +9,8 @@
              NE3 4RT
              United Kingdom
 
-    Dated:   30th August 2019 
     Version: 2.00
+    Dated:   4th January 2022
     E-mail:  mao@tumblingdice.co.uk
 -------------------------------------------------------------------------------------------------------*/
 
@@ -52,7 +52,7 @@ _PRIVATE void tcell_slot(int level)
 {   (void)fprintf(stderr,"int dynamic app tcell %s: [ANSI C, PUPS MTD D]\n",TCELL_VERSION);
  
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 2003-2019 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 2003-2022 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. ONeill\n");
        (void)fprintf(stderr,"Unlicensed process destructor (PUPS format) (built %s %s)\n\n",__TIME__,__DATE__);
     }
@@ -110,7 +110,7 @@ _EXTERN char appl_build_date[SSIZE] = __DATE__;
     checkpoint files) ...
 -------------------------------------------------------------------------------------------------------*/
 
-#define VTAG  4522
+#define VTAG  4939
 extern int appl_vtag = VTAG;
 
 
@@ -125,7 +125,7 @@ _PRIVATE void violation(void)
 {   (void)fprintf(stdout,"ERROR\n");
     (void)fflush(stdout);
 
-    exit(-1);
+    exit(255);
 }
 
 
@@ -165,7 +165,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
                   TCELL_VERSION,
                   "M.A. O'Neill",
                   "tcell",
-                  "2019",
+                  "2022",
                   argv);
 
 

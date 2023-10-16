@@ -1,0 +1,2343 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/hiplib.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Copyright (C) 1982 Michael Landy, Yoav Cohen, and George Sperling</span>
+
+<span class="Comment">    Disclaimer:  No guarantees of performance accompany this software,</span>
+<span class="Comment">    nor is any responsibility assumed on the part of the authors.  All the</span>
+<span class="Comment">    software has been tested extensively and every effort has been made to</span>
+<span class="Comment">    insure its reliability. </span>
+
+<span class="Comment">    Modified:  M.A. O'Neill</span>
+<span class="Comment">               Tumbling Dice Ltd</span>
+<span class="Comment">               Gosforth</span>
+<span class="Comment">               Newcastle upon Tyne</span>
+<span class="Comment">               NE3 4RT</span>
+<span class="Comment">               United Kingdom</span>
+
+<span class="Comment">    Version:  2.02 </span>
+<span class="Comment">    Dated:    7th January 2022</span>
+<span class="Comment">    E-mail:   mao@tumblingdice.co.uk</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="PreProc">#include </span><span class="Constant">&lt;me.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;utils.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;time.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;errno.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/types.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;pwd.h&gt;</span>
+
+<span class="PreProc">#if defined(TIFF_SUPPORT) &amp;&amp; defined(FLORET_TIFF_SUPPORT)</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;floret.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> TIFF_SUPPORT &amp;&amp; FLORET_TIFF_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="PreProc">#undef   __NOT_LIB_SOURCE__</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;hipl_hdr.h&gt;</span>
+<span class="PreProc">#define  __NOT_LIB_SOURCE__</span>
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Slot and usage functions - used by slot manager ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Slot usage function </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> hiplib_slot(<span class="Type">int</span> level)
+{   (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;lib hiplib </span><span class="Special">%s</span><span class="Constant">: [ANSI C]</span><span class="Special">\n</span><span class="Constant">&quot;</span>,HIPLIB_VERSION);
+
+    <span class="Statement">if</span>(level &gt; <span class="Constant">1</span>)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;(C) 1987-2022 Tumbling Dice</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Author: M.A. O'Neill</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;PUPS/P3 HIPS support library (built </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+    }
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Segment identification for hips support library </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef SLOT</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;slotman.h&gt;</span>
+_EXTERN <span class="Type">void</span> (* SLOT )() __attribute__ ((aligned(<span class="Constant">16</span>))) = hiplib_slot;
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> SLOT </span><span class="Comment">*/</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Functions which are local to this library ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Swap bytes if we have an endian change </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+_PROTOTYPE _PRIVATE <span class="Type">void</span> swap_bytes(_USHORT *);
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Dynamically allocate memory for HIPL data array ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> **hips_fralloc(hipl_hdr *hdr)
+
+{   <span class="Type">int</span>   element_size;
+    <span class="Type">void</span>  **ret = (<span class="Type">void</span> **)<span class="Constant">NULL</span>;
+
+    <span class="Statement">if</span>(hdr == (hipl_hdr *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>((<span class="Type">void</span> **)<span class="Constant">NULL</span>);
+    }
+
+    element_size = hips_pixel_size(hdr-&gt;pixel_format);
+    ret          = (<span class="Type">void</span> *)pups_aalloc(hdr-&gt;rows,hdr-&gt;cols,element_size);
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(ret);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Dynamically allocate data for n rows of HIPL data ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> **hips_nralloc(<span class="Type">int</span> n_rows, hipl_hdr *hdr)
+
+{   <span class="Type">int</span> element_size;
+    <span class="Type">void</span> **ret = (<span class="Type">void</span> **)<span class="Constant">NULL</span>;
+
+    <span class="Statement">if</span>(n_rows &lt; <span class="Constant">0</span> || hdr == (hipl_hdr *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>((<span class="Type">void</span> **)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>(n_rows &gt; hdr-&gt;rows)
+       pups_error(<span class="Constant">&quot;[hips_nralloc] more rows specified than present in image&quot;</span>);
+
+     element_size = hips_pixel_size(hdr-&gt;pixel_format);
+     ret = (<span class="Type">void</span> **)pups_aalloc(n_rows,hdr-&gt;cols,element_size);
+
+     pups_set_errno(OK);
+     <span class="Statement">return</span>(ret);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Create a one line output buffer ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+_PUBLIC <span class="Type">void</span> *hips_ralloc(hipl_hdr *hdr)
+
+{   <span class="Type">int</span>   element_size;
+    <span class="Type">void</span> *ret = (<span class="Type">void</span> *)<span class="Constant">NULL</span>;
+
+    <span class="Statement">if</span>(hdr == (hipl_hdr *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>((<span class="Type">void</span> *)<span class="Constant">NULL</span>);
+    }
+
+    element_size = hips_pixel_size(hdr-&gt;pixel_format);
+    ret = (<span class="Type">void</span> *)pups_calloc(hdr-&gt;cols,element_size);
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(ret);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    desc_massage.c - HIPL Picture Format description massager.</span>
+<span class="Comment">    Michael Landy - 2/2/82</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">char</span> *hips_desc_massage(<span class="Type">char</span> *s)
+
+{  <span class="Type">int</span> len,
+         i,
+         k,
+         beg;
+
+    <span class="Statement">if</span>(s == (<span class="Type">char</span> *)<span class="Constant">NULL</span> || strcmp(s,<span class="Constant">&quot;&quot;</span>) == <span class="Constant">0</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>((<span class="Type">char</span> *)<span class="Constant">NULL</span>);
+    }
+
+    len = strlen(s);
+    beg = <span class="Constant">1</span>;
+
+    <span class="Statement">for</span> (i=<span class="Constant">0</span>;i&lt;len;i++)
+    {   <span class="Statement">if</span> (beg &amp;&amp; s[i] == <span class="Constant">'.'</span> &amp;&amp; s[i+<span class="Constant">1</span>] == <span class="Special">'\n'</span>)
+        {
+            <span class="Statement">for</span> (k=i+<span class="Constant">2</span>;k&lt;=len;k++)
+                s[k-<span class="Constant">2</span>] = s[k];
+            i--;
+            len -= <span class="Constant">2</span>;
+        }
+        <span class="Statement">else</span> <span class="Statement">if</span> (s[i] == <span class="Special">'\n'</span>)
+           beg = <span class="Constant">1</span>;
+        <span class="Statement">else</span>
+           beg = <span class="Constant">0</span>;
+    }
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(s);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    hips_alloc - HIPL Picture Format core allocation.</span>
+<span class="Comment">    Michael Landy 2/1/82</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _BYTE *hips_alloc(<span class="Type">int</span> i,<span class="Type">int</span> j)
+
+{    _BYTE *k = (_BYTE *)<span class="Constant">NULL</span>;
+
+     k = (<span class="Type">char</span> *)pups_calloc(i,j);
+
+     pups_set_errno(OK);
+     <span class="Statement">return</span>(k);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    hips_upd_desc.c - HIPL Picture Format update sequence description</span>
+<span class="Comment">    Michael Landy - 2/1/82</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> hips_upd_desc(hipl_hdr *hdr, <span class="Type">char</span> *txt)
+
+{   <span class="Statement">if</span>(hdr == (hipl_hdr *)<span class="Constant">NULL</span> || txt == (<span class="Type">char</span> *)<span class="Constant">NULL</span> || strcmp(txt,<span class="Constant">&quot;&quot;</span>) == <span class="Constant">0</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>;
+    }
+
+    <span class="Statement">if</span>(strlen(hdr-&gt;seq_desc)+strlen(txt)+<span class="Constant">3</span>*<span class="Statement">sizeof</span>(<span class="Type">char</span>) &gt; SSIZE)
+       pups_error(<span class="Constant">&quot;[hips_upd_desc] image descriptor string too long (max size </span><span class="Special">%d</span><span class="Constant"> bytes)&quot;</span>);
+
+    <span class="Statement">if</span>(txt != (<span class="Type">char</span> *)<span class="Constant">NULL</span> &amp;&amp; strlen(txt) &gt; <span class="Constant">2</span>)
+          (<span class="Type">void</span>)strlcat(hdr-&gt;seq_desc,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>,SSIZE);
+
+    (<span class="Type">void</span>)strlcat(hdr-&gt;seq_desc,hips_desc_massage(txt),SSIZE);
+    <span class="Statement">if</span>(hdr-&gt;seq_desc[strlen(hdr-&gt;seq_desc)-<span class="Constant">1</span>] != <span class="Special">'\n'</span>)
+       (<span class="Type">void</span>)strlcat(hdr-&gt;seq_desc,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>,SSIZE);
+
+    pups_set_errno(OK);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    hips_set_desc - HIPL Picture Format set sequence description</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> hips_set_desc(hipl_hdr *hdr, <span class="Type">char</span> *txt)
+
+{   <span class="Type">char</span> s[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+    <span class="Statement">if</span>(hdr == (hipl_hdr *)<span class="Constant">NULL</span> || txt == (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>;
+    }
+
+    <span class="Statement">if</span>(strlen(txt)+<span class="Constant">3</span>*<span class="Statement">sizeof</span>(<span class="Type">char</span>) &gt; SSIZE)
+       pups_error(<span class="Constant">&quot;[hips_set_desc] image descriptor string too long (max size </span><span class="Special">%d</span><span class="Constant"> bytes)&quot;</span>);
+
+    (<span class="Type">void</span>)strlcpy(hdr-&gt;seq_desc,txt,SSIZE);
+    pups_set_errno(OK);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    read_header.c - HIPL Picture Format Header read</span>
+<span class="Comment">    Michael Landy - 2/1/82</span>
+<span class="Comment">    modified to use read/write 4/26/82</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define LINES      </span><span class="Constant">100</span>
+<span class="PreProc">#define LINELENGTH SSIZE </span>
+
+_PRIVATE <span class="Type">char</span> *ssave[LINES];
+_PRIVATE <span class="Type">int</span>  slmax[LINES];
+_PRIVATE <span class="Type">int</span>  lalloc = <span class="Constant">0</span>;
+
+_PROTOTYPE _PRIVATE <span class="Type">int</span>  hips_dfscanf(<span class="Type">int</span>);
+_PROTOTYPE _PRIVATE <span class="Type">char</span> *hips_getline(<span class="Type">int</span>, <span class="Type">char</span> **, <span class="Type">int</span> *);
+
+
+
+_PUBLIC <span class="Type">void</span> hips_rd_hdr(hipl_hdr *hdr)
+
+{    hips_frd_hdr(<span class="Constant">0</span>,hdr);
+}
+
+
+
+_PUBLIC <span class="Type">void</span> hips_frd_hdr(<span class="Type">int</span> fd, hipl_hdr *hdr)
+
+{
+   <span class="Type">int</span> lineno,
+       i;
+
+   <span class="Type">char</span> strdum[SSIZE]     = <span class="Constant">&quot;&quot;</span>,
+        hips_magic[SSIZE] = <span class="Constant">&quot;&quot;</span>,
+        *s                = (<span class="Type">char</span> *)<span class="Constant">NULL</span>;
+
+    <span class="Statement">if</span>(fd &lt; <span class="Constant">0</span> || hdr == (hipl_hdr *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>;
+    }
+
+    <span class="Statement">if</span>(lalloc &lt; <span class="Constant">1</span>)
+    {  ssave[<span class="Constant">0</span>] = hips_alloc(LINELENGTH, <span class="Statement">sizeof</span> (<span class="Type">char</span>));
+       slmax[<span class="Constant">0</span>] = LINELENGTH;
+       lalloc   = <span class="Constant">1</span>;
+    }
+
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Get HIPS Magic </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)hips_getline(fd,&amp;ssave[<span class="Constant">0</span>],&amp;slmax[<span class="Constant">0</span>]);
+    <span class="Statement">if</span>(strncmp(ssave[<span class="Constant">0</span>],HIPS_MAGIC,strlen(HIPS_MAGIC)) != <span class="Constant">0</span>)
+        pups_error(<span class="Constant">&quot;[hips_frd_hdr] not a HIPS image&quot;</span>);
+
+
+
+    <span class="Comment">/*</span><span class="Comment">------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Get header </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)hips_getline(fd,&amp;ssave[<span class="Constant">0</span>],&amp;slmax[<span class="Constant">0</span>]);
+    <span class="Statement">if</span>(strlen(ssave[<span class="Constant">0</span>])+<span class="Constant">1</span>*<span class="Statement">sizeof</span>(<span class="Type">char</span>) &gt; SSIZE)
+       pups_error(<span class="Constant">&quot;[hips_frd_hdr] orig name too long (max size </span><span class="Special">%d</span><span class="Constant"> bytes)&quot;</span>);
+
+    (<span class="Type">void</span>)hips_getline(fd,&amp;ssave[<span class="Constant">0</span>],&amp;slmax[<span class="Constant">0</span>]);
+    <span class="Statement">if</span>(strlen(ssave[<span class="Constant">0</span>])+<span class="Constant">1</span>*<span class="Statement">sizeof</span>(<span class="Type">char</span>) &gt; SSIZE)
+       pups_error(<span class="Constant">&quot;[hips_frd_hd]: sequence name too long (max size </span><span class="Special">%d</span><span class="Constant"> bytes)&quot;</span>);
+
+    (<span class="Type">void</span>)strlcpy(hdr-&gt;seq_name,ssave[<span class="Constant">0</span>],SSIZE);
+    hdr-&gt;num_frame = hips_dfscanf(fd);
+
+    (<span class="Type">void</span>)hips_getline(fd,&amp;ssave[<span class="Constant">0</span>],&amp;slmax[<span class="Constant">0</span>]);
+    <span class="Statement">if</span>(strlen(ssave[<span class="Constant">0</span>])+<span class="Constant">1</span>*<span class="Statement">sizeof</span>(<span class="Type">char</span>) &gt; SSIZE)
+       pups_error(<span class="Constant">&quot;[hips_frd_hdr] orig date name too long (max size </span><span class="Special">%d</span><span class="Constant"> bytes)&quot;</span>);
+
+    (<span class="Type">void</span>)strlcpy(hdr-&gt;orig_date,ssave[<span class="Constant">0</span>],SSIZE);
+
+    hdr-&gt;rows           = hips_dfscanf(fd);
+    hdr-&gt;cols           = hips_dfscanf(fd);
+    hdr-&gt;bits_per_pixel = hips_dfscanf(fd);
+    hdr-&gt;bit_packing    = hips_dfscanf(fd);
+    hdr-&gt;pixel_format   = hips_dfscanf(fd);
+    lineno              = <span class="Constant">0</span>;
+
+    (<span class="Type">void</span>)hips_getline(fd,&amp;ssave[<span class="Constant">0</span>],&amp;slmax[<span class="Constant">0</span>]);
+    s = ssave[<span class="Constant">0</span>];
+
+    <span class="Statement">while</span>(strlen(s) &gt; <span class="Constant">3</span> &amp;&amp; *(s += strlen(s)-<span class="Constant">3</span>) == <span class="Constant">'|'</span>)
+    {
+       lineno++;
+       <span class="Statement">if</span> (lineno &gt;= LINES)
+          pups_error(<span class="Constant">&quot;[hips_frd_hdr] too many lines in header history&quot;</span>);
+
+       <span class="Statement">if</span>(lineno &gt;= lalloc)
+       {
+          ssave[lineno] = hips_alloc(LINELENGTH, <span class="Statement">sizeof</span> (<span class="Type">char</span>));
+          slmax[lineno] = LINELENGTH;
+          lalloc++;
+       }
+
+       (<span class="Type">void</span>)hips_getline(fd,&amp;ssave[lineno],&amp;slmax[lineno]);
+       s = ssave[lineno];
+    }
+
+    hdr-&gt;seq_history[<span class="Constant">0</span>] = <span class="Special">'\0'</span>;
+    <span class="Statement">for</span> (i=<span class="Constant">0</span>; i&lt;=lineno; i++)
+         (<span class="Type">void</span>)strlcat(hdr-&gt;seq_history,ssave[i],SSIZE);
+
+    lineno = <span class="Constant">0</span>;
+    <span class="Statement">while</span>(strcmp(hips_getline(fd,&amp;ssave[lineno],&amp;slmax[lineno]),<span class="Constant">&quot;.</span><span class="Special">\n</span><span class="Constant">&quot;</span>)) <span class="Comment">// has a .</span>
+    {
+       lineno++;
+       <span class="Statement">if</span> (lineno &gt;= LINES)
+          pups_error(<span class="Constant">&quot;[hips_frd_hdr] too many lines in header desc&quot;</span>);
+
+       <span class="Statement">if</span>(lineno &gt;= lalloc)
+       {
+          ssave[lineno] = hips_alloc(LINELENGTH, <span class="Statement">sizeof</span> (<span class="Type">char</span>));
+          slmax[lineno] = LINELENGTH;
+          lalloc++;
+       }
+    }
+
+    hdr-&gt;seq_desc[<span class="Constant">0</span>] = <span class="Special">'\0'</span>;
+    <span class="Statement">for</span> (i=<span class="Constant">0</span>; i&lt;lineno; i++)
+         (<span class="Type">void</span>)strlcat(hdr-&gt;seq_desc,ssave[i],SSIZE);
+
+    pups_set_errno(OK);
+}
+
+
+_PRIVATE <span class="Type">char</span> *hips_getline(<span class="Type">int</span> fd, <span class="Type">char</span> **s, <span class="Type">int</span> *l)
+
+{
+   <span class="Type">int</span> i,
+       m,
+       ret;
+
+   <span class="Type">char</span> c,
+        *s1  = (<span class="Type">char</span> *)<span class="Constant">NULL</span>,
+        *s2  = (<span class="Type">char</span> *)<span class="Constant">NULL</span>;
+        i    = <span class="Constant">0</span>;
+        s1   = *s;
+        m    = *l;
+
+   <span class="Statement">if</span>(fd &lt; <span class="Constant">0</span> || s == (<span class="Type">char</span> **)<span class="Constant">NULL</span> || l == (<span class="Type">int</span> *)<span class="Constant">NULL</span>)
+   {  pups_set_errno(<span class="Constant">EINVAL</span>);
+      <span class="Statement">return</span>((<span class="Type">char</span> *)<span class="Constant">NULL</span>);
+   }
+
+   <span class="Statement">while</span>((ret = read(fd,&amp;c,<span class="Constant">1</span>)) == <span class="Constant">1</span> &amp;&amp; c != <span class="Special">'\n'</span>)
+   {  <span class="Statement">if</span>(ret &lt; <span class="Constant">0</span>)
+         pups_error(<span class="Constant">&quot;[hips_getline]: invalid file descriptor&quot;</span>);
+
+      <span class="Statement">if</span> (m-- &lt;= <span class="Constant">2</span>)
+      {  <span class="Statement">if</span>(*l &gt; SSIZE)
+            pups_error(<span class="Constant">&quot;[hips_getline] line too long&quot;</span>);
+
+         s2 = hips_alloc(LINELENGTH+*l,<span class="Statement">sizeof</span> (<span class="Type">char</span>));
+         (<span class="Type">void</span>)strlcpy(s2,*s,SSIZE);
+
+         *s  = s2;
+         *l += LINELENGTH;
+         m   = LINELENGTH;
+         s1  = s2 + strlen(s2);
+      }
+
+      *s1++ = c;
+   }
+
+   <span class="Statement">if</span> (c == <span class="Special">'\n'</span>)
+   {  *s1++ = <span class="Special">'\n'</span>;
+      *s1 = <span class="Special">'\0'</span>;
+
+      pups_set_errno(OK);
+      <span class="Statement">return</span>(*s);
+   }
+
+   pups_error(<span class="Constant">&quot;[hips_getline] unexpected EOF while reading header&quot;</span>);
+
+
+   <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+   <span class="Comment">/*</span><span class="Comment"> Stops compiler printing warning </span><span class="Comment">*/</span>
+   <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+
+   <span class="Statement">return</span>((<span class="Type">char</span> *)<span class="Constant">NULL</span>);
+}
+
+
+
+_PRIVATE <span class="Type">int</span> hips_dfscanf(<span class="Type">int</span> fd)
+
+{  <span class="Type">int</span> i;
+
+   <span class="Statement">if</span>(hips_getline(fd,&amp;ssave[<span class="Constant">0</span>],&amp;slmax[<span class="Constant">0</span>]) == (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+      pups_error(<span class="Constant">&quot;[hips_dfscanf]: invalid file descriptor&quot;</span>);
+   <span class="Statement">else</span>
+   {  <span class="Statement">if</span>(sscanf(ssave[<span class="Constant">0</span>],<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">&quot;</span>,&amp;i) == <span class="Constant">1</span>)
+         <span class="Statement">return</span>(i);
+   }
+
+   <span class="Statement">return</span>(-<span class="Constant">1</span>);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    HIPL Picture Format Header write</span>
+<span class="Comment">    Michael Landy - 2/1/82</span>
+<span class="Comment">    modified to use read/write 4/26/82</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PROTOTYPE _PRIVATE <span class="Type">void</span> hips_wstr(<span class="Type">int</span>, <span class="Type">char</span> *);
+_PROTOTYPE _PRIVATE <span class="Type">void</span> hips_wnocr(<span class="Type">int</span>, <span class="Type">char</span> *);
+_PROTOTYPE _PRIVATE <span class="Type">void</span> hips_dfprintf(<span class="Type">int</span>, <span class="Type">int</span>);
+
+_PUBLIC <span class="Type">void</span> hips_wr_hdr(hipl_hdr *hd)
+
+{  hips_fwr_hdr(<span class="Constant">1</span>,hd);
+}
+
+
+
+_PUBLIC <span class="Type">void</span> hips_fwr_hdr(<span class="Type">int</span> fd, hipl_hdr *hdr)
+
+{
+   <span class="Statement">if</span>(fd &lt; <span class="Constant">0</span> || hdr == (hipl_hdr *)<span class="Constant">NULL</span>)
+   {  pups_set_errno(<span class="Constant">EINVAL</span>);
+      <span class="Statement">return</span>;
+   }
+
+
+
+   <span class="Comment">/*</span><span class="Comment">------------</span><span class="Comment">*/</span>
+   <span class="Comment">/*</span><span class="Comment"> HIPS magic </span><span class="Comment">*/</span>
+   <span class="Comment">/*</span><span class="Comment">------------</span><span class="Comment">*/</span>
+
+   hips_wnocr   (fd,HIPS_MAGIC);
+
+
+   <span class="Comment">/*</span><span class="Comment">--------</span><span class="Comment">*/</span>
+   <span class="Comment">/*</span><span class="Comment"> Header </span><span class="Comment">*/</span>
+   <span class="Comment">/*</span><span class="Comment">--------</span><span class="Comment">*/</span>
+
+   hips_wnocr   (fd,hdr-&gt;orig_name);
+   hips_wnocr   (fd,hdr-&gt;seq_name);
+   hips_dfprintf(fd,hdr-&gt;num_frame);
+   hips_wnocr   (fd,hdr-&gt;orig_date);
+   hips_dfprintf(fd,hdr-&gt;rows);
+   hips_dfprintf(fd,hdr-&gt;cols);
+   hips_dfprintf(fd,hdr-&gt;bits_per_pixel);
+   hips_dfprintf(fd,hdr-&gt;bit_packing);
+   hips_dfprintf(fd,hdr-&gt;pixel_format);
+   hips_wstr    (fd,hdr-&gt;seq_history);
+   hips_wstr    (fd,hdr-&gt;seq_desc);
+
+   (<span class="Type">void</span>)write(fd,<span class="Constant">&quot;.</span><span class="Special">\n</span><span class="Constant">&quot;</span>,<span class="Constant">2</span>);
+
+   pups_set_errno(OK);
+}
+
+
+_PRIVATE <span class="Type">void</span> hips_wstr(<span class="Type">int</span> fd, <span class="Type">char</span> *s)
+
+{
+   <span class="Statement">if</span>(write(fd,s,strlen(s)) == (-<span class="Constant">1</span>))
+      pups_error(<span class="Constant">&quot;[hips_wstr]: invalid file descriptor&quot;</span>);
+
+   <span class="Statement">if</span>(s[<span class="Constant">0</span>] == <span class="Special">'\0'</span> || s[strlen(s)-<span class="Constant">1</span>] != <span class="Special">'\n'</span>)
+      (<span class="Type">void</span>)write(fd,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>,<span class="Constant">1</span>);
+}
+
+
+_PRIVATE <span class="Type">void</span> hips_wnocr(<span class="Type">int</span> fd, <span class="Type">char</span> *s)
+
+{  <span class="Type">char</span> *t = (<span class="Type">char</span> *)<span class="Constant">NULL</span>;
+
+   <span class="Statement">if</span>(s == (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+   {  <span class="Statement">if</span>(write(fd,<span class="Constant">&quot;</span><span class="Special">\n\0</span><span class="Constant">&quot;</span>,<span class="Constant">2</span>) == (-<span class="Constant">1</span>))
+         pups_set_errno(<span class="Constant">&quot;[hips_wnocr]: invalid file descriptor&quot;</span>);
+      <span class="Statement">else</span>
+         <span class="Statement">return</span>;
+   }
+   <span class="Statement">else</span>
+      t = s;
+
+   <span class="Statement">while</span> (*t != <span class="Special">'\n'</span> &amp;&amp; *t != <span class="Special">'\0'</span>)
+         (<span class="Type">void</span>)write(fd,(t++),<span class="Constant">1</span>);
+   (<span class="Type">void</span>)write(fd,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>,<span class="Constant">1</span>);
+}
+
+
+_PRIVATE <span class="Type">void</span> hips_dfprintf(<span class="Type">int</span> fd, <span class="Type">int</span> i)
+
+{  <span class="Type">char</span> s[<span class="Constant">50</span>] = <span class="Constant">&quot;&quot;</span>;
+
+   (<span class="Type">void</span>)sprintf(s,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,i);
+   <span class="Statement">if</span>(write(fd,s,strlen(s)) == (-<span class="Constant">1</span>))
+      pups_set_errno(<span class="Constant">&quot;[hips_dfprintf]: invalid file descriptor&quot;</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    initialise HIPL header ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> hips_init_hdr(hipl_hdr *hdr,  <span class="Comment">// HIPL header structure</span>
+                           <span class="Type">char</span>     *onm,  <span class="Comment">// Origin name</span>
+                           <span class="Type">char</span>     *snm,  <span class="Comment">// Sequence name</span>
+                           <span class="Type">int</span>       nfr,  <span class="Comment">// Number of frames [bands]</span>
+                           <span class="Type">char</span>     *odt,  <span class="Comment">// Origin date</span>
+                           <span class="Type">int</span>        rw,  <span class="Comment">// Image rows</span>
+                           <span class="Type">int</span>        cl,  <span class="Comment">// Image cols</span>
+                           <span class="Type">int</span>       bpp,  <span class="Comment">// Bits per pixel</span>
+                           <span class="Type">int</span>       bpk,  <span class="Comment">// Bit packing</span>
+                           <span class="Type">int</span>      pfmt,  <span class="Comment">// Pixel format</span>
+                           <span class="Type">char</span>     *shi,  <span class="Comment">// Sequence history</span>
+                           <span class="Type">char</span>    *desc)  <span class="Comment">// Sequence descriptor</span>
+
+{
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Fix bug in the original version of this software by allocating space for</span>
+<span class="Comment">    string ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+   <span class="Statement">if</span>(onm != (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+     (<span class="Type">void</span>)strlcpy(hdr-&gt;orig_name,onm,SSIZE);
+
+   <span class="Statement">if</span>(snm != (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+      (<span class="Type">void</span>)strlcpy(hdr-&gt;seq_name,snm,SSIZE);
+
+   <span class="Statement">if</span>(shi != (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+      (<span class="Type">void</span>)strlcpy(hdr-&gt;seq_history,shi,SSIZE);
+
+   <span class="Statement">if</span>(odt != (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+      (<span class="Type">void</span>)strlcpy(hdr-&gt;orig_date,odt,SSIZE);
+
+   <span class="Statement">if</span>(shi != (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+      (<span class="Type">void</span>)strlcpy(hdr-&gt;seq_history,shi,SSIZE);
+   <span class="Statement">else</span>
+      (<span class="Type">void</span>)strlcpy(hdr-&gt;seq_history,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>,SSIZE);
+
+   <span class="Statement">if</span>(desc != (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+      (<span class="Type">void</span>)strlcpy(hdr-&gt;seq_desc,hips_desc_massage(desc),SSIZE);
+   <span class="Statement">else</span>
+      (<span class="Type">void</span>)strlcpy(hdr-&gt;seq_desc,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>,SSIZE);
+
+   hdr-&gt;num_frame      = nfr;
+   hdr-&gt;rows           = rw;
+   hdr-&gt;cols           = cl;
+   hdr-&gt;bits_per_pixel = bpp;
+   hdr-&gt;bit_packing    = bpk;
+   hdr-&gt;pixel_format   = pfmt;
+
+
+   pups_set_errno(OK);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to display HIPS header information in text format ... </span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> hips_display_hdr_info(<span class="Type">FILE</span> *stream, hipl_hdr *hdr)
+
+{
+    <span class="Statement">if</span>(stream == (<span class="Type">FILE</span> *)<span class="Constant">NULL</span> || hdr == (hipl_hdr *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    HIPS header information</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    =======================</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    Version magic            : </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,HIPS_MAGIC,<span class="Constant">__DATE__</span>);
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    Orig name                : </span><span class="Special">%s</span><span class="Constant">&quot;</span>,hdr-&gt;orig_name);
+    <span class="Statement">if</span>(strcmp(hdr-&gt;orig_name,<span class="Constant">&quot;&quot;</span>) == <span class="Constant">0</span>)
+       (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    Orig date                : </span><span class="Special">%s</span><span class="Constant">&quot;</span>,hdr-&gt;orig_date);
+    <span class="Statement">if</span>(strcmp(hdr-&gt;orig_date,<span class="Constant">&quot;&quot;</span>) == <span class="Constant">0</span>)
+       (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    Seq name                 : </span><span class="Special">%s</span><span class="Constant">&quot;</span>,hdr-&gt;seq_name);
+    <span class="Statement">if</span>(strcmp(hdr-&gt;seq_name,<span class="Constant">&quot;&quot;</span>) == <span class="Constant">0</span>)
+       (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+
+    <span class="Statement">if</span>(hdr-&gt;num_frame == <span class="Constant">1</span>)
+       (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    Num frame                : </span><span class="Special">%d</span><span class="Constant"> (mono)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,hdr-&gt;num_frame);
+    <span class="Statement">else</span> <span class="Statement">if</span>(hdr-&gt;num_frame == <span class="Constant">3</span>)
+       (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    Num frame                : </span><span class="Special">%d</span><span class="Constant"> (RGB)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,hdr-&gt;num_frame);
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    Num frame                : </span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,hdr-&gt;num_frame);
+
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    rows                     : </span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,hdr-&gt;rows);
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    cols                     : </span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,hdr-&gt;cols);
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    bits per pixel           : </span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,hdr-&gt;bits_per_pixel);
+
+    <span class="Statement">if</span>(hdr-&gt;bit_packing)
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    bit packing              : yes</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    <span class="Statement">else</span>
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    bit packing              : no</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+
+    <span class="Statement">switch</span>(hdr-&gt;pixel_format)
+    {     <span class="Statement">case</span> PFBYTE:      (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    pixel format             : PFBYTE</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+                            <span class="Statement">break</span>;
+
+          <span class="Statement">case</span> PFSHORT:     (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    pixel format             : PFSHORT</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+                            <span class="Statement">break</span>;
+
+          <span class="Statement">case</span> PFINT:       (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    pixel format             : PFINT</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+                            <span class="Statement">break</span>;
+
+          <span class="Statement">case</span> PFLONG:      (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    pixel format             : PFLONG</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+                            <span class="Statement">break</span>;
+
+          <span class="Statement">case</span> PFFLOAT:     (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    pixel format             : PFFLOAT</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+                            <span class="Statement">break</span>;
+
+          <span class="Statement">case</span> PFCOMPLEX:   (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    pixel format             : PFCOMPLEX</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+                            <span class="Statement">break</span>;
+
+          <span class="Statement">case</span> PFASCII:     (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    pixel format             : PFASCII</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+                            <span class="Statement">break</span>;
+
+          <span class="Statement">case</span> PFDOUBLE:    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    pixel format             : PFDOUBLE</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+                            <span class="Statement">break</span>;
+
+          <span class="Statement">case</span> PFDCOMPLEX:  (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    pixel format             : PFDCOMPLEX</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+                            <span class="Statement">break</span>;
+
+          <span class="Statement">default</span>:          (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    pixel format             : unknown</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+                            <span class="Statement">break</span>;
+    }
+
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    sequence history         : </span><span class="Special">%s</span><span class="Constant">&quot;</span>,hdr-&gt;seq_history);
+    <span class="Statement">if</span>(strcmp(hdr-&gt;seq_history,<span class="Constant">&quot;&quot;</span>) == <span class="Constant">0</span>)
+       (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    sequence descriptor      : </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,hdr-&gt;seq_desc);
+    <span class="Statement">if</span>(strcmp(hdr-&gt;seq_desc,<span class="Constant">&quot;&quot;</span>) == <span class="Constant">0</span>)
+       (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+
+    (<span class="Type">void</span>)fflush(stream);
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to read HIPS header from standard input and compute relevant</span>
+<span class="Comment">    quantities ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span>  hips_rd_hdr_info(<span class="Type">int</span> pixel_format,
+                              <span class="Type">int</span>        *rows,
+                              <span class="Type">int</span>        *cols,
+                              <span class="Type">int</span>         *nfr,
+                              hipl_hdr    *hdr)
+
+{   <span class="Statement">return</span>(hips_f_rd_hdr_info(<span class="Constant">0</span>,pixel_format,rows,cols,nfr,hdr));
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to read HIPS header data from file, and to</span>
+<span class="Comment">    compute relevent quantities ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span>  hips_f_rd_hdr_info(<span class="Type">int</span>       fildes,
+                                <span class="Type">int</span> pixel_format,
+                                <span class="Type">int</span>        *rows,
+                                <span class="Type">int</span>        *cols,
+                                <span class="Type">int</span>         *nfr,
+                                hipl_hdr    *hdr)
+
+{
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Read HIPS header from file ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    hips_frd_hdr(fildes,hdr);
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    If pixel type is inconsistent, report it and stop ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(hdr-&gt;pixel_format != pixel_format &amp;&amp; pixel_format != PFANY)
+       pups_error(<span class="Constant">&quot;[hips_f_rd_hdr_info] incorrect pixel format&quot;</span>);
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Return relevent items to caller ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(rows != (<span class="Type">int</span> *)<span class="Constant">NULL</span>)
+       *rows = hdr-&gt;rows;
+
+    <span class="Statement">if</span>(cols != (<span class="Type">int</span> *)<span class="Constant">NULL</span>)
+       *cols = hdr-&gt;cols;
+
+    <span class="Statement">if</span>(nfr != (<span class="Type">int</span> *)<span class="Constant">NULL</span>)
+       *nfr  = hdr-&gt;num_frame;
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(hdr-&gt;pixel_format);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to write HIPS header to standard input - also updates history</span>
+<span class="Comment">    at the same time ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> hips_wr_hdr_info(<span class="Type">char</span>     *application,
+                              <span class="Type">int</span>              argc,
+                              <span class="Type">char</span>          *args[],
+                              <span class="Type">char</span>        *desc_str,
+                              hipl_hdr         *hdr)
+
+{   hips_f_wr_hdr_info(<span class="Constant">1</span>,application,argc,args,desc_str,hdr);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to write HIPS header to file - also updates the</span>
+<span class="Comment">    history at the same time ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> hips_f_wr_hdr_info(<span class="Type">int</span>            fildes,
+                                <span class="Type">char</span>     *application,
+                                <span class="Type">int</span>              argc,
+                                <span class="Type">char</span>          *args[],
+                                <span class="Type">char</span>        *desc_str,
+                                hipl_hdr         *hdr)
+
+{   hips_upd_hdr(hdr,application,argc,args);
+    hips_upd_desc(hdr,desc_str);
+    hips_fwr_hdr(fildes,hdr);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to update HIPS header description ...</span>
+<span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> hips_upd_hdr(hipl_hdr          *hd,
+                          <span class="Type">char</span>     *application,
+                          <span class="Type">int</span>              argc,
+                          <span class="Type">char</span>           **argv)
+
+{   <span class="Type">int</span>  ac,
+         len,
+         i;
+
+    <span class="Type">char</span> **av = (<span class="Type">char</span> **)<span class="Constant">NULL</span>;
+
+    <span class="Type">time_t</span> tm;
+
+    <span class="Statement">if</span>(hd == (hipl_hdr *)<span class="Constant">NULL</span> || application == (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>;
+    }
+
+    av  = argv;
+    ac  = argc;
+    len = <span class="Constant">38</span> + strlen(hd-&gt;seq_history) + strlen(application);
+
+    <span class="Statement">if</span>(ac &gt; <span class="Constant">0</span>)
+    {  <span class="Statement">while</span> (ac--)
+          len += strlen(*(av++)) + <span class="Constant">100</span>;
+    }
+
+    <span class="Statement">if</span> (hd-&gt;seq_history[(len = strlen(hd-&gt;seq_history) - <span class="Constant">1</span>)] != <span class="Special">'\n'</span>)
+    {  hd-&gt;seq_history[<span class="Constant">0</span>] = <span class="Special">'\0'</span>;
+       len = <span class="Constant">0</span>;
+    }
+    <span class="Statement">else</span>
+    {  hd-&gt;seq_history[len++] = <span class="Constant">'|'</span>;
+       hd-&gt;seq_history[len++] = <span class="Special">'\\'</span>;
+       hd-&gt;seq_history[len++] = <span class="Special">'\n'</span>;
+       hd-&gt;seq_history[len]   = <span class="Special">'\0'</span>;
+    }
+
+    <span class="Statement">if</span>(argc &gt; <span class="Constant">0</span> &amp;&amp; argv != (<span class="Type">char</span> **)<span class="Constant">NULL</span>)
+    {  ac = argc;
+       av = argv;
+
+       (<span class="Type">void</span>)strlcat(hd-&gt;seq_history,application,SSIZE);
+       (<span class="Type">void</span>)strlcat(hd-&gt;seq_history,<span class="Constant">&quot; &quot;</span>,        SSIZE);
+
+       <span class="Statement">while</span> (ac--)
+       {     (<span class="Type">void</span>)strlcat(hd-&gt;seq_history,*(av++),SSIZE);
+             (<span class="Type">void</span>)strlcat(hd-&gt;seq_history,<span class="Constant">&quot; &quot;</span>,    SSIZE);
+       }
+
+       strlcat(hd-&gt;seq_history,<span class="Constant">&quot;</span><span class="Special">\&quot;</span><span class="Constant">-D &quot;</span>,SSIZE);
+       tm = (<span class="Type">long</span> <span class="Type">int</span>) time(<span class="Constant">0</span>);
+       (<span class="Type">void</span>)strlcat(hd-&gt;seq_history, (<span class="Type">char</span> *)((<span class="Type">long</span> <span class="Type">int</span>)ctime(&amp;tm)),SSIZE); <span class="Comment">// Was unsigned long </span>
+
+       <span class="Statement">for</span> (i=len;i&lt;strlen(hd-&gt;seq_history);i++)
+       {   <span class="Statement">if</span> (hd-&gt;seq_history[i]==<span class="Special">'\n'</span>)
+              hd-&gt;seq_history[i] = <span class="Constant">' '</span>;
+       }
+
+       hd-&gt;seq_history[strlen(hd-&gt;seq_history)-<span class="Constant">1</span>]  = <span class="Special">'\0'</span>;
+       (<span class="Type">void</span>)strlcat(hd-&gt;seq_history,<span class="Constant">&quot;</span><span class="Special">\&quot;</span><span class="Constant">&quot;</span>, SSIZE);
+       (<span class="Type">void</span>)strlcat(hd-&gt;seq_history,<span class="Constant">&quot; </span><span class="Special">\n</span><span class="Constant">&quot;</span>,SSIZE);
+    }
+
+    pups_set_errno(OK);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Get pixel size in bytes ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> hips_pixel_size(<span class="Type">int</span> pixel_format)
+
+{   pups_set_errno(OK);
+
+    <span class="Statement">switch</span>(pixel_format)
+    {   <span class="Statement">case</span> PFBYTE:     <span class="Statement">return</span>(<span class="Statement">sizeof</span>(_BYTE));
+
+        <span class="Statement">case</span> PFSHORT:    <span class="Statement">return</span>(<span class="Statement">sizeof</span>(<span class="Type">short</span> <span class="Type">int</span>));
+
+        <span class="Statement">case</span> PFINT:      <span class="Statement">return</span>(<span class="Statement">sizeof</span>(<span class="Type">int</span>));
+
+        <span class="Statement">case</span> PFLONG:     <span class="Statement">return</span>(<span class="Statement">sizeof</span>(<span class="Type">long</span> <span class="Type">int</span>));
+
+        <span class="Statement">case</span> PFFLOAT:    <span class="Statement">return</span>(<span class="Statement">sizeof</span>(<span class="Type">float</span>));
+
+        <span class="Statement">case</span> PFDOUBLE:   <span class="Statement">return</span>(<span class="Statement">sizeof</span>(<span class="Type">double</span>));
+
+        <span class="Statement">case</span> PFCOMPLEX:  <span class="Statement">return</span>(<span class="Constant">2</span>*<span class="Statement">sizeof</span>(<span class="Type">float</span>));
+
+        <span class="Statement">case</span> PFDCOMPLEX: <span class="Statement">return</span>(<span class="Constant">2</span>*<span class="Statement">sizeof</span>(<span class="Type">double</span>));
+
+        <span class="Statement">default</span>: pups_error(<span class="Constant">&quot;[hips_pixel_size] unrecognised pixel format&quot;</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Stops compiler from printing warning </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">return</span>(-<span class="Constant">1</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to manipulate a HIPS raster of arbitrary type ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> *hips_access_pixel(<span class="Type">int</span> pixel_size, <span class="Type">int</span> row, <span class="Type">int</span> col, <span class="Type">void</span> **raster)
+
+{    <span class="Type">void</span> *pixel_ptr = (<span class="Type">void</span> *)<span class="Constant">NULL</span>;
+
+
+     <span class="Statement">if</span>(pixel_size &lt; <span class="Constant">0</span> || row &lt; <span class="Constant">0</span> || col &lt; <span class="Constant">0</span> || raster == (<span class="Type">void</span> **)<span class="Constant">NULL</span>)
+     {  pups_set_errno(<span class="Constant">EINVAL</span>);
+        <span class="Statement">return</span>((<span class="Type">void</span> *)<span class="Constant">NULL</span>);
+     }
+
+     <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------</span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> Get a pointer to the specified pixel noting pixel size </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------</span><span class="Comment">*/</span>
+
+     pixel_ptr = (<span class="Type">void</span> *)((<span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>)raster[row] + (<span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>)col*pixel_size);
+
+     pups_set_errno(OK);
+     <span class="Statement">return</span>(pixel_ptr);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to return a HIPS descriptor accociated with a given pixel</span>
+<span class="Comment">    type string ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> hips_output_pixel_type(<span class="Type">char</span> *pixel_type_str)
+
+{
+    <span class="Statement">if</span>(pixel_type_str == (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    These are the acceptable HIPS pixel formats ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    pups_set_errno(OK);
+    <span class="Statement">if</span>(strcmp(pixel_type_str,<span class="Constant">&quot;byte&quot;</span>) == <span class="Constant">0</span>)
+       <span class="Statement">return</span>(PFBYTE);
+
+    <span class="Statement">if</span>(strcmp(pixel_type_str,<span class="Constant">&quot;short&quot;</span>) == <span class="Constant">0</span>)
+       <span class="Statement">return</span>(PFSHORT);
+
+    <span class="Statement">if</span>(strcmp(pixel_type_str,<span class="Constant">&quot;int&quot;</span>) == <span class="Constant">0</span>)
+       <span class="Statement">return</span>(PFINT);
+
+    <span class="Statement">if</span>(strcmp(pixel_type_str,<span class="Constant">&quot;long&quot;</span>) == <span class="Constant">0</span>)
+       <span class="Statement">return</span>(PFLONG);
+
+    <span class="Statement">if</span>(strcmp(pixel_type_str,<span class="Constant">&quot;float&quot;</span>) == <span class="Constant">0</span>)
+       <span class="Statement">return</span>(PFFLOAT);
+
+    <span class="Statement">if</span>(strcmp(pixel_type_str,<span class="Constant">&quot;complex&quot;</span>) == <span class="Constant">0</span>)
+       <span class="Statement">return</span>(PFCOMPLEX);
+
+    <span class="Statement">if</span>(strcmp(pixel_type_str,<span class="Constant">&quot;double&quot;</span>) == <span class="Constant">0</span>)
+       <span class="Statement">return</span>(PFDOUBLE);
+
+    <span class="Statement">if</span>(strcmp(pixel_type_str,<span class="Constant">&quot;dcomplex&quot;</span>) == <span class="Constant">0</span>)
+       <span class="Statement">return</span>(PFDCOMPLEX);
+
+    pups_error(<span class="Constant">&quot;[hips_output_pixel_type] unknown pixel format&quot;</span>);
+    <span class="Statement">return</span>(-<span class="Constant">1</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Return a descriptor string corresponding to a HIPL pixel type ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">char</span> *hips_pixstr(<span class="Type">int</span> hipl_type)
+
+{   <span class="Statement">switch</span>(hipl_type)
+    {   <span class="Statement">case</span> PFBYTE:     <span class="Statement">return</span>(<span class="Constant">&quot;byte&quot;</span>);
+        <span class="Statement">case</span> PFSHORT:    <span class="Statement">return</span>(<span class="Constant">&quot;short&quot;</span>);
+        <span class="Statement">case</span> PFINT:      <span class="Statement">return</span>(<span class="Constant">&quot;int&quot;</span>);
+        <span class="Statement">case</span> PFLONG:     <span class="Statement">return</span>(<span class="Constant">&quot;long&quot;</span>);
+        <span class="Statement">case</span> PFFLOAT:    <span class="Statement">return</span>(<span class="Constant">&quot;float&quot;</span>);
+        <span class="Statement">case</span> PFCOMPLEX:  <span class="Statement">return</span>(<span class="Constant">&quot;complex&quot;</span>);
+        <span class="Statement">case</span> PFDOUBLE:   <span class="Statement">return</span>(<span class="Constant">&quot;double&quot;</span>);
+        <span class="Statement">case</span> PFDCOMPLEX: <span class="Statement">return</span>(<span class="Constant">&quot;dcomplex&quot;</span>);
+
+        <span class="Statement">default</span>: pups_error(<span class="Constant">&quot;[hips_pixtr] unknown pixel type</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    }
+}
+
+
+
+<span class="PreProc">#ifdef TIFF_SUPPORT</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Routines for interconverting between HIPS and TIFF image formats ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;tiff.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;tiffio.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Convert HIPS file to TIFF file ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> hips_to_tiff(_BOOLEAN     do_in_mem,    <span class="Comment">// Force in memory RGB conversion</span>
+                          <span class="Type">int</span>       planarconfig,    <span class="Comment">// Image geometry for TIFF</span>
+                          <span class="Type">int</span>               argc,    <span class="Comment">// Application argument count</span>
+                          <span class="Type">char</span>           *argv[],    <span class="Comment">// Application argument vector</span>
+                          <span class="Type">int</span>   compression_mode,    <span class="Comment">// TIFF compression mode</span>
+                          <span class="Type">char</span>    *hips_filename,    <span class="Comment">// Name of file containing HIPS data</span>
+                          <span class="Type">char</span>    *tiff_filename)    <span class="Comment">// Name of file containing TIFF data</span>
+
+{   <span class="Type">int</span>  i,
+         j,
+         k,
+         rows,
+         cols,
+         bands,
+         fdes,
+         pixel_type,
+         pixel_layers,
+         photint_type,
+         size_in_bytes,
+         rows_per_strip;
+
+    _BYTE *buf                 = (_BYTE *)<span class="Constant">NULL</span>,
+          **bandbuf            = (_BYTE **)<span class="Constant">NULL</span>;
+
+    hipl_hdr hdr;
+    TIFF     *tiff_hdr         = (TIFF *)<span class="Constant">NULL</span>;
+
+    <span class="Type">time_t</span>          clock;
+    <span class="Type">struct</span> tm       *tm        = (<span class="Type">struct</span> tm *)<span class="Constant">NULL</span>;
+    <span class="Type">struct</span> passwd  *pwd        = (<span class="Type">struct</span> passwd *) <span class="Constant">NULL</span>;
+
+    <span class="Type">char</span>   datetime[SSIZE]     = <span class="Constant">&quot;&quot;</span>,
+           eff_seq_desc[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+    <span class="Statement">if</span>(argc          &lt; <span class="Constant">0</span>                ||
+       argv          == (<span class="Type">char</span> **)<span class="Constant">NULL</span>   ||
+       tiff_filename == (<span class="Type">char</span> *) <span class="Constant">NULL</span>    )
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>;
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Open HIPS file </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(hips_filename == (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+       fdes = <span class="Constant">0</span>;
+    <span class="Statement">else</span>
+       fdes = pups_open(hips_filename,<span class="Constant">0</span>,DEAD);
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Read HIPS header </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+    hips_frd_hdr(fdes,&amp;hdr);
+    rows  = hdr.rows;
+    cols  = hdr.cols;
+    bands = hdr.num_frame;
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Create TIFF header/file for writing </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+
+    tiff_hdr = TIFFOpen(tiff_filename,<span class="Constant">&quot;w&quot;</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Test to make sure that we can actually convert the HIPS image to a       </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> TIFF image -- for example we cannot (yet) store arbitrary HIPS sequences </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> as TIFF images, n_frames == 3 implies a HIPS RGB image                   </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> -------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(hdr.num_frame &gt; <span class="Constant">1</span>)
+    {  pixel_layers = hdr.num_frame;
+       photint_type = <span class="Constant">2</span>;
+    }
+    <span class="Statement">else</span>
+    {  pixel_layers = <span class="Constant">1</span>;
+       photint_type = <span class="Constant">1</span>;
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Convert HIPS pixel format to corresponding TIFF sample format </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">switch</span>(hdr.pixel_format)
+    {   <span class="Statement">case</span> PFBYTE:    pixel_type    = <span class="Constant">1</span>;
+                        size_in_bytes = <span class="Constant">1</span>;
+                        <span class="Statement">break</span>;
+
+        <span class="Statement">case</span> PFSHORT:   pixel_type    = <span class="Constant">1</span>;
+                        size_in_bytes = <span class="Constant">2</span>;
+                        <span class="Statement">break</span>;
+
+        <span class="Statement">case</span> PFINT:     pixel_type    = <span class="Constant">1</span>;
+                        size_in_bytes = <span class="Constant">4</span>;
+                        <span class="Statement">break</span>;
+
+
+        <span class="Statement">case</span> PFLONG:    pixel_type    = <span class="Constant">1</span>;
+                        size_in_bytes = <span class="Constant">8</span>;
+                        <span class="Statement">break</span>;
+
+        <span class="Statement">case</span> PFFLOAT:   pixel_type    = <span class="Constant">3</span>;
+                        size_in_bytes = <span class="Constant">4</span>;
+                        <span class="Statement">break</span>;
+
+        <span class="Statement">case</span> PFDOUBLE:  pixel_type    = <span class="Constant">3</span>;
+                        size_in_bytes = <span class="Constant">8</span>;
+                        <span class="Statement">break</span>;
+
+        <span class="Statement">default</span>:        pups_error(<span class="Constant">&quot;[hips_to_tiff] cannot convert pixel format&quot;</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Update HIPS header to indicate that hips2tiff operation has been </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> carried out                                                      </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    hips_upd_hdr(&amp;hdr,appl_name,argc-<span class="Constant">1</span>,argv);
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Get number of rows per strip </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+
+     rows_per_strip = <span class="Constant">8</span>;
+     <span class="Comment">// MAO rows_per_strip = (hdr.cols*hdr.rows*size_in_bytes / 8192) + 1;</span>
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Update tags in TIFF header to reflect information in HIPS header </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set TIFF date field </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)time(&amp;clock);
+    tm = localtime(&amp;clock);
+    (<span class="Type">void</span>)sprintf(datetime,<span class="Constant">&quot;</span><span class="Special">%04d</span><span class="Constant">:</span><span class="Special">%02d</span><span class="Constant">:</span><span class="Special">%02d</span><span class="Constant"> </span><span class="Special">%02d</span><span class="Constant">:</span><span class="Special">%02d</span><span class="Constant">:</span><span class="Special">%02d</span><span class="Constant">&quot;</span>,tm-&gt;tm_year + <span class="Constant">1900</span>,
+                                                               tm-&gt;tm_mon + <span class="Constant">1</span>,
+                                                                  tm-&gt;tm_mday,
+                                                                  tm-&gt;tm_hour,
+                                                                   tm-&gt;tm_min,
+                                                                   tm-&gt;tm_sec);
+    datetime[strlen(datetime)] = <span class="Special">'\0'</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check that we have bilevel image if CCIT group 3/4 compression selected </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(hdr.bits_per_pixel &gt; <span class="Constant">1</span> &amp;&amp; compression_mode == <span class="Constant">2</span>)
+       pups_error(<span class="Constant">&quot;[hips_to_tiff] CCIT group 3/4 compression is only defined for bilevel images&quot;</span>);
+
+
+    pwd = getpwuid(appl_uid);
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;strlen(hdr.seq_desc); ++i)
+    {   <span class="Statement">if</span>(hdr.seq_desc[i] == <span class="Special">'\n'</span>)
+        {  eff_seq_desc[i] = <span class="Special">'\0'</span>;
+           <span class="Statement">break</span>;
+        }
+        <span class="Statement">else</span>
+           eff_seq_desc[i] = hdr.seq_desc[i];
+    }
+
+    (<span class="Type">void</span>)TIFFSetField(tiff_hdr,TIFFTAG_ARTIST,           pwd-&gt;pw_gecos);
+    (<span class="Type">void</span>)TIFFSetField(tiff_hdr,TIFFTAG_DATETIME,         datetime);
+    (<span class="Type">void</span>)TIFFSetField(tiff_hdr,TIFFTAG_IMAGELENGTH,      hdr.rows);
+    (<span class="Type">void</span>)TIFFSetField(tiff_hdr,TIFFTAG_IMAGEWIDTH,       hdr.cols);
+    (<span class="Type">void</span>)TIFFSetField(tiff_hdr,TIFFTAG_BITSPERSAMPLE,    hdr.bits_per_pixel);
+    (<span class="Type">void</span>)TIFFSetField(tiff_hdr,TIFFTAG_SAMPLESPERPIXEL,  pixel_layers);
+    (<span class="Type">void</span>)TIFFSetField(tiff_hdr,TIFFTAG_SAMPLEFORMAT,     pixel_type);
+    (<span class="Type">void</span>)TIFFSetField(tiff_hdr,TIFFTAG_PLANARCONFIG,     planarconfig);
+    (<span class="Type">void</span>)TIFFSetField(tiff_hdr,TIFFTAG_PHOTOMETRIC,      photint_type);
+    (<span class="Type">void</span>)TIFFSetField(tiff_hdr,TIFFTAG_COMPRESSION,      compression_mode);
+    (<span class="Type">void</span>)TIFFSetField(tiff_hdr,TIFFTAG_ROWSPERSTRIP,     rows_per_strip);
+    (<span class="Type">void</span>)TIFFSetField(tiff_hdr,TIFFTAG_PAGENAME,         eff_seq_desc);  <span class="Comment">// MAO to first \n</span>
+    (<span class="Type">void</span>)TIFFSetField(tiff_hdr,TIFFTAG_SOFTWARE,         <span class="Constant">&quot;hips2tiff&quot;</span>);
+    (<span class="Type">void</span>)TIFFSetField(tiff_hdr,TIFFTAG_RESOLUTIONUNIT,   <span class="Constant">1</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Write HIPS image data to TIFF file </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+
+    buf = (_BYTE *)pups_calloc(hdr.cols,pixel_layers*size_in_bytes);
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> We can convert the HIPS image to a TIFF efficiently if resulting TIFF </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> has only one band or is multiband (as opposed to chunky)              </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(pixel_layers == <span class="Constant">1</span> || planarconfig == <span class="Constant">2</span>)
+    {  <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;hdr.rows; ++j)
+       {  (<span class="Type">void</span>)pups_read(fdes,buf,cols*size_in_bytes);
+          (<span class="Type">void</span>)TIFFWriteScanline(tiff_hdr,(tdata_t)buf,j,<span class="Constant">0</span>);
+       }
+    }
+    <span class="Statement">else</span>
+    {
+
+       <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> We are converting an RGB (multiband) HIPS image to a chunky TIFF   </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> this is the worst case scenario as we have to read the entire HIPS </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> image before converting it                                         </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Type">int</span>   cnt,
+             bbcnt;
+
+       _BYTE **bandbuf = (_BYTE **)<span class="Constant">NULL</span>;
+
+
+       <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> If fdes is associated with a seekable device we can </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> read in a multiband image much more efficiently     </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(do_in_mem == TRUE || pups_is_seekable(fdes) == FALSE)
+       {
+
+          <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> No - fdes is associated with a FIFO -- we shall have </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> to do things inefficiently (in terms of memeory      </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+          bandbuf = (_BYTE **)pups_calloc(pixel_layers*rows,<span class="Statement">sizeof</span>(_BYTE *));
+          <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;pixel_layers*rows; ++j)
+          {  bandbuf[j] = (_BYTE *)pups_calloc(cols,size_in_bytes);
+             (<span class="Type">void</span>)pups_read(fdes,bandbuf[j],cols*size_in_bytes);
+          }
+
+
+          <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Convert HIPS data to chunky TIFF format </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+
+          <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;rows; ++i)
+          {  bbcnt = <span class="Constant">0</span>;
+             cnt   = <span class="Constant">0</span>;
+
+
+             <span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> Build a scanline of chunky pixels </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+
+             <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;cols; ++j)
+             {  <span class="Statement">for</span>(k=<span class="Constant">0</span>; k&lt;pixel_layers; ++k)
+                {  (<span class="Type">void</span>)memcpy(&amp;buf[cnt],&amp;bandbuf[k*rows + i][bbcnt],size_in_bytes);
+                    cnt += size_in_bytes;
+                }
+                bbcnt += size_in_bytes;
+             }
+
+
+             <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> Free up band memory we are now finished with -- doing    </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> this means memory shortages caused when converting large </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> files will be acute as opposed to chronic!               </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+
+             <span class="Statement">for</span>(k=<span class="Constant">0</span>; k&lt;pixel_layers; ++k)
+                (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)bandbuf[k*rows + i]);
+
+             <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> We have built up a chunky scanline -- write it out </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+
+             (<span class="Type">void</span>)TIFFWriteScanline(tiff_hdr,(tdata_t)buf,i,<span class="Constant">0</span>);
+          }
+       }
+       <span class="Statement">else</span>
+       {
+
+          <span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> fdes is associated with a seekable device       </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> we can use lseek() to do conversion efficiently </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+
+          <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span> pos;
+
+          bandbuf = (_BYTE **)pups_calloc(pixel_layers,<span class="Statement">sizeof</span>(_BYTE *));
+          <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;pixel_layers; ++i)
+             bandbuf[i] = (_BYTE *)pups_calloc(cols,size_in_bytes);
+
+
+          <span class="Comment">/*</span><span class="Comment">---------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Header offset </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">---------------</span><span class="Comment">*/</span>
+
+          pos = pups_lseek(fdes,<span class="Constant">0</span>,<span class="Constant">SEEK_CUR</span>);
+
+          <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;rows; ++j)
+          {
+
+             <span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> Extract data for next scanline of chunky pixels </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+
+             <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;pixel_layers; ++i)
+             {  (<span class="Type">void</span>)pups_lseek(fdes,pos + i*rows*cols*size_in_bytes + j*cols*size_in_bytes,<span class="Constant">SEEK_SET</span>);
+                (<span class="Type">void</span>)pups_read(fdes,bandbuf[i],cols*size_in_bytes);
+             }
+
+
+             <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> Build scanline of chunky pixels </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+
+             bbcnt = <span class="Constant">0</span>;
+             cnt   = <span class="Constant">0</span>;
+             <span class="Statement">for</span>(k=<span class="Constant">0</span>; k&lt;cols; ++k)
+             {  <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;pixel_layers; ++i)
+                {  (<span class="Type">void</span>)memcpy(&amp;buf[cnt],&amp;bandbuf[i][bbcnt],size_in_bytes);
+                   cnt += size_in_bytes;
+                }
+                bbcnt += size_in_bytes;
+             }
+
+
+             <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> ... and write it to TIFF </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+
+             (<span class="Type">void</span>)TIFFWriteScanline(tiff_hdr,(tdata_t)buf,j,<span class="Constant">0</span>);
+          }
+
+
+          <span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Free memory </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+          <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;pixel_layers; ++i)
+             (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)bandbuf[i]);
+       }
+
+       (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)bandbuf);
+    }
+
+    (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)buf);
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------</span>
+<span class="Comment">    Close HIPS and TIFF files ...</span>
+<span class="Comment">---------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)close(fdes);
+    (<span class="Type">void</span>)TIFFClose(tiff_hdr);
+
+    pups_set_errno(OK);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to TIFF file to HIPS file ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> tiff_to_hips(_BOOLEAN  do_in_mem,    <span class="Comment">// Force in memory RGNB conversion</span>
+                          <span class="Type">int</span>            argc,    <span class="Comment">// Application argument count</span>
+                          <span class="Type">char</span>        *argv[],    <span class="Comment">// Application argument vector</span>
+                          <span class="Type">char</span> *tiff_filename,    <span class="Comment">// Name of file containing TIFF data</span>
+                          <span class="Type">char</span> *hips_filename)    <span class="Comment">// Name of file containing HIPS data</span>
+
+{   <span class="Type">int</span> i,
+        j,
+        k,
+        fdes,
+        rows,
+        cols,
+        pixel_format,
+        tile_width,
+        tile_length,
+        size_in_bytes;
+
+    <span class="Type">short</span> <span class="Type">int</span> bits_per_pixel = <span class="Constant">8</span>,
+              pixel_type     = <span class="Constant">1</span>,
+              pixel_layers   = <span class="Constant">1</span>,
+              planarconfig;
+
+    <span class="Type">char</span> *orig_name          = (<span class="Type">char</span> *)<span class="Constant">NULL</span>,
+         *orig_date          = (<span class="Type">char</span> *)<span class="Constant">NULL</span>,
+         *seq_history        = (<span class="Type">char</span> *)<span class="Constant">NULL</span>,
+         *seq_desc           = (<span class="Type">char</span> *)<span class="Constant">NULL</span>;
+
+    _BYTE *buf               = (_BYTE *)<span class="Constant">NULL</span>,
+          **band_buf         = (_BYTE **)<span class="Constant">NULL</span>;
+
+    <span class="Type">time_t</span>        clock;
+    <span class="Type">struct</span> tm     *tm        = (<span class="Type">struct</span> tm *)<span class="Constant">NULL</span>;
+    <span class="Type">struct</span> passwd *pwd       = (<span class="Type">struct</span> passwd *)<span class="Constant">NULL</span>;
+
+    hipl_hdr hdr;
+    TIFF     *tiff_hdr       = (TIFF *)<span class="Constant">NULL</span>;
+
+    <span class="Statement">if</span>(argc          &lt; <span class="Constant">0</span>   ||
+       argv          == (<span class="Type">char</span> **)<span class="Constant">NULL</span>  ||
+       tiff_filename == (<span class="Type">char</span> *) <span class="Constant">NULL</span>   )
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>;
+    }
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Open TIFF file returning its header </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((tiff_hdr = TIFFOpen(tiff_filename,<span class="Constant">&quot;r&quot;</span>)) == (TIFF *)<span class="Constant">NULL</span>)
+       pups_error(<span class="Constant">&quot;[tiff_to_hips] problem with TIFF file&quot;</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Open HIPS filename </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(hips_filename == (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+       fdes = <span class="Constant">1</span>;
+    <span class="Statement">else</span>
+       fdes = pups_open(hips_filename,<span class="Constant">1</span>,DEAD);
+
+
+<span class="PreProc">    #ifdef FLORET_TIFF_SUPPORT</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> If we have TIFFTAG_PAGENAME set warn the caller that BIOTIFF data will </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> not be converted to HIPS format                                        </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(appl_verbose == TRUE &amp;&amp; TIFFGetField(tiff_hdr,TIFFTAG_FLORET) == <span class="Constant">1</span>)
+    {  (<span class="Type">void</span>)strdate(date);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,
+               <span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): Floret TIFF extensions may be present (and will be discarded when converting to HIPS image</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                                   date,appl_name,appl_pid,appl_host,appl_owner);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    }
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> FLORET_TIFF support </span><span class="Comment">*/</span>
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Get TIFF fields </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)TIFFGetField(tiff_hdr,TIFFTAG_DATETIME,         &amp;orig_date);
+    (<span class="Type">void</span>)TIFFGetField(tiff_hdr,TIFFTAG_IMAGELENGTH,      &amp;rows);
+    (<span class="Type">void</span>)TIFFGetField(tiff_hdr,TIFFTAG_IMAGEWIDTH,       &amp;cols);
+    (<span class="Type">void</span>)TIFFGetField(tiff_hdr,TIFFTAG_BITSPERSAMPLE,    &amp;bits_per_pixel);
+    (<span class="Type">void</span>)TIFFGetField(tiff_hdr,TIFFTAG_SAMPLESPERPIXEL,  &amp;pixel_layers);
+    (<span class="Type">void</span>)TIFFGetField(tiff_hdr,TIFFTAG_SAMPLEFORMAT,     &amp;pixel_type);
+    (<span class="Type">void</span>)TIFFGetField(tiff_hdr,TIFFTAG_PAGENAME,         &amp;seq_desc);
+    (<span class="Type">void</span>)TIFFGetField(tiff_hdr,TIFFTAG_PLANARCONFIG,     &amp;planarconfig);
+
+    orig_name = (<span class="Type">char</span> *)pups_malloc(SSIZE);
+
+    pwd = getpwuid(appl_uid);
+    (<span class="Type">void</span>)strlcpy(orig_name,pwd-&gt;pw_gecos,SSIZE);
+
+    <span class="Statement">if</span>(orig_date == (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+    {  orig_date = (<span class="Type">char</span> *)pups_malloc(SSIZE);
+
+
+       <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Set TIFF date field </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+       (<span class="Type">void</span>)time(&amp;clock);
+       tm = localtime(&amp;clock);
+       (<span class="Type">void</span>)sprintf(orig_date,<span class="Constant">&quot;</span><span class="Special">%04d</span><span class="Constant">:</span><span class="Special">%02d</span><span class="Constant">:</span><span class="Special">%02d</span><span class="Constant"> </span><span class="Special">%02d</span><span class="Constant">:</span><span class="Special">%02d</span><span class="Constant">:</span><span class="Special">%02d</span><span class="Constant">&quot;</span>,tm-&gt;tm_year + <span class="Constant">1900</span>,
+                                                                   tm-&gt;tm_mon + <span class="Constant">1</span>,
+                                                                      tm-&gt;tm_mday,
+                                                                      tm-&gt;tm_hour,
+                                                                       tm-&gt;tm_min,
+                                                                       tm-&gt;tm_sec);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> No sequence descriptor </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(seq_desc == (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+    {  hips_init_hdr(&amp;hdr,
+                     orig_name,
+                     <span class="Constant">&quot;tiff2hips&quot;</span>,
+                     pixel_layers,
+                     orig_date,
+                     rows,
+                     cols,
+                     bits_per_pixel,
+                     <span class="Constant">0</span>,
+                     <span class="Constant">0</span>,
+                     <span class="Constant">&quot;&quot;</span>,
+                     (<span class="Type">char</span> *)<span class="Constant">NULL</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Sequence descriptor </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">else</span>
+       hips_init_hdr(&amp;hdr,
+                     orig_name,
+                     <span class="Constant">&quot;tiff2hips&quot;</span>,
+                     pixel_layers,
+                     orig_date,
+                     rows,
+                     cols,
+                     bits_per_pixel,
+                     <span class="Constant">0</span>,
+                     <span class="Constant">0</span>,
+                     <span class="Constant">&quot;&quot;</span>,
+                     seq_desc);
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Update HIPS header </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+
+    hips_upd_hdr(&amp;hdr,appl_name,argc,argv);
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Convert pixel format </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+
+     <span class="Statement">if</span>(pixel_type == <span class="Constant">1</span>)
+     {  <span class="Statement">switch</span>(hdr.bits_per_pixel)
+        {   <span class="Statement">case</span> <span class="Constant">8</span>:        hdr.pixel_format  = PFBYTE;
+                           size_in_bytes     = <span class="Constant">1</span>;
+                           <span class="Statement">break</span>;
+
+            <span class="Statement">case</span> <span class="Constant">16</span>:       hdr.pixel_format  = PFSHORT;
+                           size_in_bytes     = <span class="Constant">2</span>;
+                           <span class="Statement">break</span>;
+
+            <span class="Statement">case</span> <span class="Constant">32</span>:       hdr.pixel_format  = PFINT;
+                           size_in_bytes     = <span class="Constant">4</span>;
+                           <span class="Statement">break</span>;
+
+            <span class="Statement">case</span> <span class="Constant">64</span>:       hdr.pixel_format  = PFLONG;
+                           size_in_bytes     = <span class="Constant">8</span>;
+
+            <span class="Statement">default</span>:       <span class="Statement">break</span>;
+        }
+    }
+    <span class="Statement">else</span>
+    {  <span class="Statement">switch</span>(hdr.bits_per_pixel)
+       {   <span class="Statement">case</span> <span class="Constant">32</span>:     hdr.pixel_format = PFFLOAT;
+                        size_in_bytes    = <span class="Constant">4</span>;
+                        <span class="Statement">break</span>;
+
+           <span class="Statement">case</span> <span class="Constant">64</span>:     hdr.pixel_format = PFDOUBLE;
+                        size_in_bytes    = <span class="Constant">8</span>;
+                        <span class="Statement">break</span>;
+
+           <span class="Statement">default</span>:     <span class="Statement">break</span>;
+       }
+    }
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Test to see if this is a colour image </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(pixel_layers != <span class="Constant">1</span>)
+       hdr.num_frame = pixel_layers;
+    <span class="Statement">else</span>
+       hdr.num_frame = <span class="Constant">1</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Convert the image one scanline at a time </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+
+    hips_fwr_hdr(fdes,&amp;hdr);
+
+    buf = (_BYTE *)pups_calloc(hdr.cols,pixel_layers*size_in_bytes);
+    <span class="Statement">if</span>(pixel_layers == <span class="Constant">1</span> || planarconfig == <span class="Constant">2</span>)
+    {  <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;pixel_layers*hdr.rows; ++j)
+       {  (<span class="Type">void</span>)TIFFReadScanline(tiff_hdr,(tdata_t)buf,j,i);
+          (<span class="Type">void</span>)write(fdes,buf,hdr.cols*size_in_bytes);
+       }
+    }
+    <span class="Statement">else</span>
+    {
+
+
+       <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> We are going to have to convert a chunky format TIFF </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> to a multiband HIPS image -- lets get on with it and </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> hope we have sufficient memory for this ineffcient   </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> process                                              </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Type">int</span>   cnt,
+             bbcnt;
+
+       _BYTE **bandbuf = (_BYTE **)<span class="Constant">NULL</span>;
+
+
+       <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> If fdes is associated with a seekable device we can  </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> convert chunky TIFF to band HIPS formats efficeintly </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(do_in_mem == TRUE || pups_is_seekable(fdes) == FALSE)
+       {
+
+          <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> fdes is associated with a FIFO -- we are going to have         </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> to do things the American way, e.g. brute force and ignorance! </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+          bandbuf = (_BYTE **)pups_calloc(pixel_layers*rows,<span class="Statement">sizeof</span>(_BYTE *));
+          <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;rows; ++j)
+          {  (<span class="Type">void</span>)TIFFReadScanline(tiff_hdr,(tdata_t)buf,j,<span class="Constant">0</span>);
+
+
+             <span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> Allocate storage for next N layered O/P pixel </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+
+             <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;pixel_layers; ++i)
+                bandbuf[i*rows + j] = (_BYTE *)pups_calloc(cols,size_in_bytes);
+
+
+             <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> Build banded HIPS image map </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+
+             bbcnt = <span class="Constant">0</span>;
+             cnt   = <span class="Constant">0</span>;
+             <span class="Statement">for</span>(k=<span class="Constant">0</span>; k&lt;cols; ++k)
+             {  <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;pixel_layers; ++i)
+                {  (<span class="Type">void</span>)memcpy(&amp;bandbuf[i*rows + j][bbcnt],&amp;buf[cnt],size_in_bytes);
+                   cnt += size_in_bytes;
+                }
+                bbcnt += size_in_bytes;
+             }
+          }
+
+
+          <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Write HIPS image map </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+
+          <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;pixel_layers*rows; ++i)
+          {  (<span class="Type">void</span>)write(fdes,bandbuf[i],cols*size_in_bytes);
+             (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)bandbuf[i]);
+          }
+       }
+       <span class="Statement">else</span>
+       {
+
+          <span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> ... fdes is associated with a seekable device </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> so we can do things effieciently              </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+
+          <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span> pos;
+
+
+          <span class="Comment">/*</span><span class="Comment">---------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Header offset </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">---------------</span><span class="Comment">*/</span>
+
+          pos = pups_lseek(fdes,<span class="Constant">0</span>,<span class="Constant">SEEK_CUR</span>);
+
+          bandbuf = (_BYTE **)pups_calloc(pixel_layers,size_in_bytes);
+          <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;pixel_layers; ++i)
+             bandbuf[i] = (_BYTE *)pups_calloc(cols,size_in_bytes);
+
+          <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;rows; ++i)
+          {  (<span class="Type">void</span>)TIFFReadScanline(tiff_hdr,(tdata_t)buf,i,<span class="Constant">0</span>);
+
+
+             <span class="Comment">/*</span><span class="Comment">---------------------------------------------------</span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> Decompose a chunky scanline into N band scanlines </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment">---------------------------------------------------</span><span class="Comment">*/</span>
+
+             bbcnt = <span class="Constant">0</span>;
+             cnt   = <span class="Constant">0</span>;
+             <span class="Statement">for</span>(k=<span class="Constant">0</span>; k&lt;cols; ++k)
+             {  <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;pixel_layers; ++j)
+                {  (<span class="Type">void</span>)memcpy((<span class="Type">void</span> *)&amp;bandbuf[j][bbcnt],(<span class="Type">void</span> *)&amp;buf[cnt],size_in_bytes);
+                   cnt += size_in_bytes;
+                }
+                bbcnt += size_in_bytes;
+             }
+
+
+             <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> Seek to correct locations in multiband HIPS file and </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> write data to it                                     </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+             <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;pixel_layers; ++j)
+             {
+
+                                      <span class="Comment">/*</span><span class="Comment">--------</span><span class="Comment">*/</span> <span class="Comment">/*</span><span class="Comment">------</span><span class="Comment">*/</span>                  <span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>      <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+                                      <span class="Comment">/*</span><span class="Comment"> Header </span><span class="Comment">*/</span> <span class="Comment">/*</span><span class="Comment"> Band </span><span class="Comment">*/</span>                  <span class="Comment">/*</span><span class="Comment"> Row in band </span><span class="Comment">*/</span>      <span class="Comment">/*</span><span class="Comment"> Pixel in row </span><span class="Comment">*/</span>
+                                      <span class="Comment">/*</span><span class="Comment">--------</span><span class="Comment">*/</span> <span class="Comment">/*</span><span class="Comment">------</span><span class="Comment">*/</span>                  <span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>      <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+
+                (<span class="Type">void</span>)pups_lseek(fdes,pos +        j*rows*cols*size_in_bytes + i*cols*size_in_bytes + k*size_in_bytes,<span class="Constant">SEEK_SET</span>);
+                (<span class="Type">void</span>)write(fdes,bandbuf[j],cols*size_in_bytes);
+             }
+
+             <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;pixel_layers; ++j)
+                (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)bandbuf[j]);
+         }
+
+         (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)bandbuf);
+       }
+    }
+
+    (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)buf);
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Close HIPS and TIFF files </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)close(fdes);
+    (<span class="Type">void</span>)TIFFClose(tiff_hdr);
+
+    pups_set_errno(OK);
+}
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> TIFF_SUPPORT </span><span class="Comment">*/</span>
+
+
+
+
+<span class="PreProc">#ifdef KONTRON_SUPPORT</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------</span>
+<span class="Comment">    Check to see that header matches image specifications ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> img_read_hdr(<span class="Type">int</span> fdes, _BOOLEAN endian_swap, img_hdr_type *img_hdr)
+{
+    _USHORT *hd        = (_USHORT *)<span class="Constant">NULL</span>,
+            n_recs;
+
+    <span class="Type">long</span> <span class="Type">int</span> hdr_size      = <span class="Constant">0L</span>,
+             datatype,
+             startimdata;
+
+    <span class="Statement">if</span>(fdes &lt; <span class="Constant">0</span> || img_hdr == (img_hdr_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>;
+    }
+
+    <span class="Statement">if</span>(pups_read(fdes,&amp;n_recs,<span class="Statement">sizeof</span>(_USHORT)) == (-<span class="Constant">1</span>))
+       pups_error(<span class="Constant">&quot;[img_read_hdr] invalid file descriptor</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+
+    <span class="Statement">if</span>(endian_swap == TRUE)
+       (<span class="Type">void</span>)swap_bytes(&amp;n_recs);
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> We must adjust the header size as we have effectively read hd[0] in order </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> to determine how big the header is                                        </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    hdr_size = (<span class="Type">long</span> <span class="Type">int</span>)(<span class="Constant">128L</span>*n_recs) - <span class="Constant">2</span>;
+    hd       = (_USHORT *)pups_malloc(hdr_size);
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Read the header </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(pups_read(fdes,hd,hdr_size) != hdr_size)
+    {  (<span class="Type">void</span>)close(fdes);
+       pups_error(<span class="Constant">&quot;[img_read_hdr] Incorrect number of pixels read</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check image ID (hd[1],hd[2]) </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(endian_swap == TRUE)
+    {  (<span class="Type">void</span>)swap_bytes(&amp;hd[<span class="Constant">0</span>]);
+       (<span class="Type">void</span>)swap_bytes(&amp;hd[<span class="Constant">1</span>]);
+    }
+
+    <span class="Statement">if</span>(hd[<span class="Constant">0</span>]!=<span class="Constant">0x1247</span> || hd[<span class="Constant">1</span>]!=<span class="Constant">0xb06d</span>)
+    {  (<span class="Type">void</span>)close(fdes);
+       pups_error(<span class="Constant">&quot;[img_read_header] not an IMG file</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    }
+
+    <span class="Statement">if</span>(endian_swap == TRUE)
+    {  (<span class="Type">void</span>)swap_bytes(&amp;hd[<span class="Constant">2</span>]);
+       (<span class="Type">void</span>)swap_bytes(&amp;hd[<span class="Constant">3</span>]);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Read image size (hd[2],hd[3]) </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+
+    img_hdr-&gt;cols  = (<span class="Type">int</span>)hd[<span class="Constant">2</span>];
+    img_hdr-&gt;rows  = (<span class="Type">int</span>)hd[<span class="Constant">3</span>];
+
+    <span class="Statement">if</span>(endian_swap == TRUE)
+       (<span class="Type">void</span>)swap_bytes(&amp;hd[<span class="Constant">5</span>]);
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Read number of images in sequence </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((<span class="Type">int</span>)hd[<span class="Constant">5</span>] != <span class="Constant">1</span>)
+       pups_error(<span class="Constant">&quot;[img_read_hdr] can only have single frame images&quot;</span>);
+    <span class="Statement">else</span>
+       img_hdr-&gt;n_frames = <span class="Constant">1</span>;
+
+    <span class="Statement">if</span>(endian_swap == TRUE)
+    {  (<span class="Type">void</span>)swap_bytes(&amp;hd[<span class="Constant">6</span>]);
+       (<span class="Type">void</span>)swap_bytes(&amp;hd[<span class="Constant">7</span>]);
+    }
+
+    (<span class="Type">void</span>)memcpy(&amp;datatype,hd+<span class="Constant">6</span>,<span class="Constant">4</span>);
+    <span class="Statement">if</span>(datatype==<span class="Constant">0x00003008</span>)
+       img_hdr-&gt;colour = IMG_RGB;
+    <span class="Statement">else</span>
+       img_hdr-&gt;colour = IMG_GREY;
+
+    img_hdr-&gt;size = img_hdr-&gt;rows*img_hdr-&gt;cols;
+
+    <span class="Statement">if</span>(hd[<span class="Constant">9</span>] == <span class="Constant">0x544c</span>)
+    {  (<span class="Type">void</span>)memcpy(&amp;img_hdr-&gt;seeklutdata,hd+<span class="Constant">11</span>,<span class="Constant">4</span>);
+       img_hdr-&gt;has_lut = TRUE;
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Get pointers to the image data arrays </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+    img_hdr-&gt;seekRdata =  <span class="Constant">128L</span> * n_recs;
+    <span class="Statement">if</span>(img_hdr-&gt;colour == IMG_RGB)
+    {  img_hdr-&gt;seekGdata = img_hdr-&gt;seekGdata + img_hdr-&gt;size;
+       img_hdr-&gt;seekBdata = img_hdr-&gt;seekBdata + <span class="Constant">2</span>*img_hdr-&gt;size;
+    }
+
+    pups_set_errno(OK);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------</span>
+<span class="Comment">    Write KONTRON header to file -- this routine will typically be </span>
+<span class="Comment">    used by image processing filters which support the KONTRON image</span>
+<span class="Comment">    format ...</span>
+<span class="Comment">---------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> img_write_hdr(<span class="Type">int</span> fdes, _BOOLEAN endian_swap, img_hdr_type *img_hdr)
+
+{   _USHORT  buf[<span class="Constant">128</span>] = { <span class="Constant">0</span> };
+    <span class="Type">long</span> <span class="Type">int</span> ltmp;
+
+
+    <span class="Statement">if</span>(fdes &lt; <span class="Constant">0</span> || img_hdr == (img_hdr_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>;
+    }
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Number of records in IMG file </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(img_hdr-&gt;colour == IMG_RGB &amp;&amp; img_hdr-&gt;has_lut == TRUE)
+       buf[<span class="Constant">0</span>] = (<span class="Type">short</span>)<span class="Constant">7</span>;
+    <span class="Statement">else</span>
+       buf[<span class="Constant">0</span>] = (<span class="Type">short</span>)<span class="Constant">1</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Magic number for img file </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+    buf[<span class="Constant">1</span>] = (<span class="Type">short</span>)<span class="Constant">0x1247</span>;
+    buf[<span class="Constant">2</span>] = (<span class="Type">short</span>)<span class="Constant">0xb06d</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Image size and sequence size </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+
+    buf[<span class="Constant">3</span>] = (<span class="Type">short</span>)img_hdr-&gt;cols;
+    buf[<span class="Constant">4</span>] = (<span class="Type">short</span>)img_hdr-&gt;rows;
+    buf[<span class="Constant">5</span>] = (<span class="Type">short</span>)<span class="Constant">0x4321</span>;
+    buf[<span class="Constant">6</span>] = (<span class="Type">short</span>)<span class="Constant">1</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Swap bytes in header if changing endianicity </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(endian_swap == TRUE)
+    {  <span class="Type">int</span> i;
+
+       <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">7</span>; ++i)
+          swap_bytes(&amp;buf[i]);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Image datatype </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(img_hdr-&gt;colour == IMG_RGB)
+    {  ltmp = <span class="Constant">0x00003008</span>;
+       (<span class="Type">void</span>)memcpy(buf+<span class="Constant">7</span>,&amp;ltmp,<span class="Constant">4</span>);
+
+       <span class="Statement">if</span>(img_hdr-&gt;has_lut == TRUE)
+          buf[<span class="Constant">10</span>] = <span class="Constant">0x544c</span>;
+    }
+    <span class="Statement">else</span>
+    {  ltmp = <span class="Constant">0L</span>;
+       (<span class="Type">void</span>)memcpy(buf+<span class="Constant">7</span>,&amp;ltmp,<span class="Constant">4</span>);
+       buf[<span class="Constant">10</span>] = <span class="Constant">0</span>;
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Image grey (Red) data offset </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+
+    ltmp =  (<span class="Type">long</span> <span class="Type">int</span>)buf[<span class="Constant">0</span>]*<span class="Constant">128L</span>;
+    (<span class="Type">void</span>)memcpy(buf+<span class="Constant">11</span>,&amp;ltmp,<span class="Constant">4</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Write out green and blue plane offsets (if colour image) </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(img_hdr-&gt;colour == IMG_RGB)
+    {  ltmp = (<span class="Type">long</span> <span class="Type">int</span>)buf[<span class="Constant">0</span>]*<span class="Constant">128L</span> + img_hdr-&gt;size;
+       (<span class="Type">void</span>)memcpy(buf+<span class="Constant">13</span>,&amp;ltmp,<span class="Constant">4</span>);
+
+       ltmp = (<span class="Type">long</span> <span class="Type">int</span>)buf[<span class="Constant">0</span>]*<span class="Constant">128L</span> + <span class="Constant">2L</span>*img_hdr-&gt;size;
+       (<span class="Type">void</span>)memcpy(buf+<span class="Constant">15</span>,&amp;ltmp,<span class="Constant">4</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Write IMG header to file </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(write(fdes,buf,<span class="Constant">128L</span>*buf[<span class="Constant">0</span>]) == (-<span class="Constant">1</span>))
+       pups_error(<span class="Constant">&quot;[img_write_hdr] invalid file descriptor&quot;</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Write LUT to file (if there is one) </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(img_hdr-&gt;has_lut == TRUE)
+      (<span class="Type">void</span>)write(fdes,(_BYTE *)img_hdr-&gt;seeklutdata,<span class="Constant">768L</span>);
+
+    pups_set_errno(OK);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Convert HIPS image to Kontron image ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> hips_to_img(_BOOLEAN endian_swap,   <span class="Comment">// Big or little endian?</span>
+                         <span class="Type">char</span> *hips_filename,    <span class="Comment">// HIPS filename</span>
+                         <span class="Type">char</span>  *img_filename)    <span class="Comment">// Kontron filename</span>
+
+{   <span class="Type">int</span> i,
+        j,
+        fdes  = (-<span class="Constant">1</span>),
+        ides  = (-<span class="Constant">1</span>);
+
+    _BYTE *buf = (_BYTE *)<span class="Constant">NULL</span>;
+
+    hipl_hdr     hdr;
+    img_hdr_type img_hdr;
+
+    <span class="Statement">if</span>(hips_filename == (<span class="Type">char</span> *)<span class="Constant">NULL</span> || img_filename == (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>;
+    }
+
+    <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Open HIPS file </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(hips_filename == (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+       fdes = <span class="Constant">0</span>;
+    <span class="Statement">else</span>
+       fdes = pups_open(hips_filename,<span class="Constant">0</span>,DEAD);
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Read HIPS header </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+    hips_frd_hdr(fdes,&amp;hdr);
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Open img file for writing </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(img_filename == (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+       ides = <span class="Constant">1</span>;
+    <span class="Statement">else</span>
+       ides = pups_open(img_filename,<span class="Constant">1</span>,DEAD);
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Convert HIPS header and write it to img file </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(hdr.pixel_format != PFBYTE)
+       pups_error(<span class="Constant">&quot;[hips_to_img] can only convert byte images to Kontron (img) format&quot;</span>);
+
+    img_hdr.rows = hdr.rows;
+    img_hdr.cols = hdr.cols;
+
+    <span class="Statement">if</span>(hdr.num_frame != <span class="Constant">1</span> &amp;&amp; hdr.num_frame != <span class="Constant">3</span>)
+       pups_error(<span class="Constant">&quot;[hips_to_img] can only convert single frame sequence to Kontron (img) format&quot;</span>);
+    <span class="Statement">else</span>
+       img_hdr.n_frames = <span class="Constant">1</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> # frame HIPS sequence is interpreted as RGB colour image </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(hdr.num_frame == <span class="Constant">3</span>)
+       img_hdr.colour = IMG_RGB;
+    <span class="Statement">else</span>
+       img_hdr.colour = IMG_GREY;
+
+    img_hdr.has_lut = FALSE;
+    (<span class="Type">void</span>)img_write_hdr(ides,endian_swap,&amp;img_hdr);
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Transfer image data from hips to img file </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+    buf = (_BYTE *)pups_calloc(hdr.cols,<span class="Statement">sizeof</span>(_BYTE));
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;hdr.num_frame; ++i)
+    {  <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;hdr.rows; ++j)
+       {  (<span class="Type">void</span>)pups_read(fdes,buf,hdr.cols*<span class="Statement">sizeof</span>(_BYTE));
+          (<span class="Type">void</span>)write(ides,buf,hdr.cols*<span class="Statement">sizeof</span>(_BYTE));
+       }
+    }
+    (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)buf);
+
+    (<span class="Type">void</span>)close(fdes);
+    (<span class="Type">void</span>)close(ides);
+
+    pups_set_errno(OK);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Convert IMG image to HIPS image ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> img_to_hips(_BOOLEAN  endian_swap,    <span class="Comment">// Big or little endian?</span>
+                          <span class="Type">int</span>              argc,    <span class="Comment">// Argument count</span>
+                          <span class="Type">char</span>          *argv[],    <span class="Comment">// Argument vector</span>
+                          <span class="Type">char</span>    *img_filename,    <span class="Comment">// Kontron filename</span>
+                          <span class="Type">char</span>   *hips_filename)    <span class="Comment">// HIPS filename</span>
+
+{   <span class="Type">int</span> i,
+        j,
+        pixel_layers,
+        fdes  = (-<span class="Constant">1</span>),
+        ides  = (-<span class="Constant">1</span>);
+
+    _BYTE *buf = (_BYTE *)<span class="Constant">NULL</span>;
+
+    _BOOLEAN do_close_fdes = FALSE,
+             do_close_des  = FALSE;
+
+    hipl_hdr     hdr;
+    img_hdr_type img_hdr;
+
+    <span class="Type">time_t</span>    clock;
+    <span class="Type">struct</span> tm *tm           = (<span class="Type">struct</span> tm *)<span class="Constant">NULL</span>;
+    <span class="Type">char</span>      datetime[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+    <span class="Statement">if</span>(img_filename == (<span class="Type">char</span> *)<span class="Constant">NULL</span> || hips_filename == (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+        <span class="Statement">return</span>;
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Open HIPS file </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(hips_filename == (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+       fdes = <span class="Constant">1</span>;
+    <span class="Statement">else</span>
+    {  do_close_fdes = TRUE;
+       fdes          = pups_open(hips_filename,<span class="Constant">0</span>,DEAD);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Open img file for reading </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(img_filename == (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+       ides = <span class="Constant">0</span>;
+    <span class="Statement">else</span>
+    {  do_close_des = TRUE;
+       ides         = pups_open(img_filename,<span class="Constant">1</span>,DEAD);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Read IMG header data </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+
+    img_read_hdr(ides,endian_swap,&amp;img_hdr);
+
+    <span class="Statement">if</span>(img_hdr.colour == IMG_RGB)
+       pixel_layers = <span class="Constant">3</span>;
+    <span class="Statement">else</span>
+       pixel_layers = <span class="Constant">1</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Initialise HIPS header and write it to file </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set HIPS date field </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)time(&amp;clock);
+    tm = localtime(&amp;clock);
+    (<span class="Type">void</span>)sprintf(datetime,<span class="Constant">&quot;20</span><span class="Special">%02d</span><span class="Constant">:</span><span class="Special">%02d</span><span class="Constant">:</span><span class="Special">%02d</span><span class="Constant"> </span><span class="Special">%02d</span><span class="Constant">:</span><span class="Special">%02d</span><span class="Constant">:</span><span class="Special">%02d</span><span class="Constant">&quot;</span>,tm-&gt;tm_year,
+                                                             tm-&gt;tm_mon + <span class="Constant">1</span>,
+                                                             tm-&gt;tm_mday,
+                                                             tm-&gt;tm_hour,
+                                                             tm-&gt;tm_min,
+                                                             tm-&gt;tm_sec);
+
+
+    hips_init_hdr(&amp;hdr,
+                  <span class="Constant">&quot;img2hips&quot;</span>,
+                  <span class="Constant">&quot;HIPS&quot;</span>,
+                  pixel_layers,
+                  datetime,
+                  img_hdr.rows,
+                  img_hdr.cols,
+                  <span class="Constant">8</span>,
+                  <span class="Constant">0</span>,
+                  PFBYTE,
+                  <span class="Constant">&quot;&quot;</span>,
+                  <span class="Constant">&quot;&quot;</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Write HIPS header </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+    hips_upd_hdr(&amp;hdr,appl_name,argc,argv);
+    hips_fwr_hdr(fdes,&amp;hdr);
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Transfer image data from img file to hips file </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+
+    buf = (_BYTE *)pups_calloc(hdr.cols,<span class="Statement">sizeof</span>(_BYTE));
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;hdr.num_frame; ++i)
+    {  <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;hdr.rows; ++j)
+       {  (<span class="Type">void</span>)pups_read(ides,buf,hdr.cols*<span class="Statement">sizeof</span>(_BYTE));
+          (<span class="Type">void</span>)write(fdes,buf,hdr.cols*<span class="Statement">sizeof</span>(_BYTE));
+       }
+    }
+    (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)buf);
+
+    <span class="Statement">if</span>(do_close_fdes == TRUE)
+       (<span class="Type">void</span>)pups_close(fdes);
+
+    <span class="Statement">if</span>(do_close_des == TRUE)
+       (<span class="Type">void</span>)pups_close(ides);
+
+    pups_set_errno(OK);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to switch byte sequence ...</span>
+<span class="Comment">-------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> swap_bytes(_USHORT *arg)
+
+{       _USHORT lsb_mask,
+                msb_mask;
+
+
+        <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------</span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> Get least significant and most significant byte masks </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------</span><span class="Comment">*/</span>
+
+        lsb_mask = (*arg) &amp; <span class="Constant">0xff</span>;
+        msb_mask = (*arg) &amp; <span class="Constant">0xff00</span>;
+
+
+        <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> Shift masks left and right arithmetic respectively </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+
+        lsb_mask *= <span class="Constant">0x100</span>;
+        msb_mask /= <span class="Constant">0x100</span>;
+
+
+        <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> Form byte swapped short </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+
+        *arg = lsb_mask + msb_mask;
+}
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> KONTRON_SUPPORT </span><span class="Comment">*/</span>
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

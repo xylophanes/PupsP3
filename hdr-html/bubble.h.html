@@ -1,0 +1,181 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.5.1.src.git/include.libs/bubble.h.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="cpp">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Error { color: #ffffff; background-color: #ff6060; padding-bottom: 1px; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Purpose: Header for bubble memory allocation library.</span>
+
+<span class="Comment">    Author:  M.A. O'Neill</span>
+<span class="Comment">             Tumbling Dice Ltd</span>
+<span class="Comment">             Gosforth</span>
+<span class="Comment">             Newcastle upon Tyne</span>
+<span class="Comment">             NE3 4RT</span>
+<span class="Comment">             United Kingdom</span>
+
+<span class="Comment">    Version: 2.00 </span>
+<span class="Comment">    Dated:   4th January 2022</span>
+<span class="Comment">    E-Mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="PreProc">#ifndef BUBBLE_H</span>
+<span class="PreProc">#define BUBBLE_H</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;stdio.h&gt;</span>
+
+<span class="PreProc">#ifdef PUPS_SUPPORT</span>
+<span class="PreProc">#define __NOT_LIB_SOURCE__</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;xtypes.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;utils.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PUPS_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;setjmp.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/types.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/mman.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/param.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/wait.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;signal.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;malloc.h&gt;</span>
+
+
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;errno.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;dirent.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/stat.h&gt;</span>
+
+<span class="PreProc">#ifdef THREAD_SUPPORT</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;pthread.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> THREAD_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;stdlib.h&gt;</span>
+
+                              <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+<span class="PreProc">#ifndef SYSTEM_C              </span><span class="Comment">/*</span><span class="Comment"> don't include these two </span><span class="Comment">*/</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>           <span class="Comment">/*</span><span class="Comment"> files in system.c       </span><span class="Comment">*/</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> SYSTEM_C </span><span class="Comment">*/</span>         <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;fcntl.h&gt;</span>
+
+
+<span class="PreProc">#define MAXLEN          </span><span class="Constant">1024</span>
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Used to be included from local.h </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define _CKPT_FTABLE_SIZE </span><span class="Constant">1024</span>
+<span class="PreProc">#define GPAGESIZE ((</span><span class="Type">unsigned</span><span class="PreProc"> </span><span class="Type">long</span><span class="PreProc">)(</span><span class="Constant">4096</span><span class="PreProc">))</span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Jmalloc structure - used to be included from typedefs.h </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------</span>
+
+<span class="Comment">   Each memory block has 5 extra 32-bit values associated with it.  If malloc</span>
+<span class="Comment">   returns the pointer p to you, the state really looks like:</span>
+
+<span class="Comment">jmal(p)------&gt;  |------------------------------------------------------------|</span>
+<span class="Comment">                | flink (next malloc block in absolute order)                |</span>
+<span class="Comment">                |------------------------------------------------------------|</span>
+<span class="Comment">                | blink (prev malloc block in absolute order)                |</span>
+<span class="Comment">                |------------------------------------------------------------|</span>
+<span class="Comment">                |------------------------------------------------------------|</span>
+<span class="Comment">                | mmap size (size of mapped region)                          |</span>
+<span class="Comment">                |------------------------------------------------------------|</span>
+<span class="Comment">                | size (size of memory allocated in mapped region)           |</span>
+<span class="Comment">p------------&gt;  |------------------------------------------------------------|</span>
+<span class="Comment">                | space: the memory block                                    |</span>
+<span class="Comment">                |                  ...                                       |</span>
+<span class="Comment">                |                  ...                                       |</span>
+<span class="Comment">                |------------------------------------------------------------|</span>
+
+<span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Definition of the Jmalloc structure </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">typedef</span> <span class="Type">struct</span> jmalloc {
+  <span class="Type">struct</span> jmalloc *flink;
+  <span class="Type">struct</span> jmalloc *blink;
+  <span class="Type">size_t</span>         mmap_size;
+  <span class="Type">size_t</span>         size;
+  <span class="Type">void</span>           *space;
+} *Jmalloc;
+
+
+<span class="PreProc">#ifdef PUPS_SUPPORT</span>
+<span class="PreProc">#ifdef  __STDC__</span>
+<span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> functions in jmalloc.c </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+_PROTOTYPE _PUBLIC <span class="Type">void</span> *mmap_sbrk(<span class="Type">unsigned</span> <span class="Type">long</span>);
+_PROTOTYPE _PUBLIC <span class="Type">int</span>  mallopt(<span class="Type">int</span>, <span class="Type">int</span>);
+_PROTOTYPE _PUBLIC <span class="Type">void</span> jmalloc_usage(<span class="Type">int</span>, <span class="Type">FILE</span> *);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> __STDC__ </span><span class="Comment">*/</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PUPS_SUPPORT </span><span class="Comment">*/</span>
+
+
+                              <span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+<span class="PreProc">#define MUNMAP_THRESHOLD </span><span class="Constant">1</span><span class="PreProc">    </span><span class="Comment">/*</span><span class="Comment"> Memory bubble (minimum) utilisation threshold </span><span class="Comment">*/</span>
+                              <span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Define TRUE and FALSE if we need to </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifndef TRUE</span>
+<span class="PreProc">#define TRUE		</span><span class="Constant">1</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> TRUE /</span>
+
+<span class="Comment">#ifndef FALSE</span>
+<span class="Comment">#define FALSE		0</span>
+<span class="Comment">#endif </span><span class="Error">/</span><span class="Comment">*  FALSE </span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Some macro definitions </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define max(x,y)        (((x) &lt; (y)) ? (y) : (x))</span>
+<span class="PreProc">#define min(x,y)        (((x) &lt; (y)) ? (x) : (y))</span>
+
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> BUBBLE_H </span><span class="Comment">*/</span>
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

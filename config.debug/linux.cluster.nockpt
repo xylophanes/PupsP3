@@ -1,13 +1,13 @@
 #------------------------------------------------------
 # Configuration file for cluster enabled Linux system
-# M.A. O'Neill, Tumbling Dice, 02/09/2019
+# M.A. O'Neill, Tumbling Dice, 2010-2022 
 #------------------------------------------------------
 #
 TARGET_OS
 linux
 
 TARGET_PHMALLOC_CFLAGS
--w -Wfatal-errors -g -D$ARCH -DGLIBC -D_GNU_SOURCE -D_XOPEN_SOURCE -DPTHREAD_SUPPORT -I. -I../include -D__NO_PROTO__
+-w -Wfatal-errors -g -D$ARCH -DGLIBC -D_GNU_SOURCE -D_XOPEN_SOURCE -DPTHREAD_SUPPORT -DFLOAT -I. -I../include -D__NO_PROTO__
 
 #--------------------------------------
 # Architecture dependent compile flags
@@ -24,7 +24,7 @@ TARGET_CFLAGS
 -w -Wfatal-errors -g -rdynamic -I. -I../include.libs -D$ARCH -D_GNU_SOURCE -D_XOPEN_SOURCE -DFTYPE -DPSRP_ENABLED
 -DCHAN_IS_POLL -DSHADOW_SUPPORT -DPERSISTENT_HEAP_SUPPORT -DSOCKET_SUPPORT -DDLL_SUPPORT -DPSRP_AUTHENTICATE
 -DPTHREAD_SUPPORT -DIPV6_SUPPORT -DBUBBLE_MEMORY_SUPPORT -DMAIL_SUPPORT -DZLIB_SUPPORT -DTIFF_SUPPORT
--D__NO_PROTO__ -DHAVE_PROC_FS -DIMMUNE 
+-D__NO_PROTO__ -DHAVE_PROC_FS 
 #-DSECURE -DSEQUENCE_SEED=9999 -DDISK_SERIAL='\"DSN\"' -DVENDOR_MAIL_ADDRESS='\"mao@tumblingdice.co.uk\"'
 
 #-------------------
@@ -48,6 +48,9 @@ $ARCH.linux.cluster
 TARGET_LIBC_LOCATION
 /usr/lib
 
+#---------------------
+# Location of binaries
+#---------------------
 TARGET_INSTALL_DIR
 ../bin.$ARCH.linux.cluster
 

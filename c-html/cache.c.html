@@ -1,0 +1,1716 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/cache.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Purpose: Test (fast) caching library </span>
+
+<span class="Comment">    Author:  M.A. O'Neill</span>
+<span class="Comment">             Tumbling Dice Ltd</span>
+<span class="Comment">             Gosforth</span>
+<span class="Comment">             Newcastle upon Tyne</span>
+<span class="Comment">             NE3 4RT</span>
+<span class="Comment">             United Kingdom</span>
+
+<span class="Comment">    Version: 3.00 </span>
+<span class="Comment">    Dated:   7th January 2022 </span>
+<span class="Comment">    E-mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">-------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define TEST_THREADS</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;me.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;utils.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;netlib.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;psrp.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/file.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/types.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/mman.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;signal.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stdlib.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;vstamp.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;cache.h&gt;</span>
+
+
+<span class="PreProc">#ifdef PTHREAD_SUPPORT</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;tad.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+
+<span class="PreProc">#include </span><span class="Constant">&lt;math.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stdlib.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">*******************************</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Floating point representation </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">*******************************</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;ftype.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">*****************************</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Version of this application </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">*****************************</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define CACHE_VERSION    </span><span class="Constant">&quot;3.00&quot;</span>
+
+<span class="PreProc">#ifdef BUBBLE_MEMORY_SUPPORT</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;bubble.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> BUBBLE_MEMORY_SUPPORT </span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Parse flags </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+<span class="Comment">// Cache read/write options</span>
+<span class="PreProc">#define CACHE_FILE             (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">0</span><span class="PreProc"> )</span>
+<span class="PreProc">#define CMAP_FILE              (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">1</span><span class="PreProc"> )</span>
+<span class="PreProc">#define CACHE_INIT             (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">2</span><span class="PreProc"> )</span>
+<span class="PreProc">#define WCMAP_FILE             (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">3</span><span class="PreProc"> ) </span>
+
+<span class="Comment">// Types of cache test</span>
+<span class="PreProc">#define CACHE_ACCESS_TEST      (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">5</span><span class="PreProc"> ) </span>
+<span class="PreProc">#define CACHE_CORRELATION_TEST (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">6</span><span class="PreProc"> ) </span>
+<span class="PreProc">#define CACHE_RGB              (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">7</span><span class="PreProc"> ) </span>
+<span class="PreProc">#define CACHE_CWRITE           (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">8</span><span class="PreProc"> ) </span>
+
+<span class="Comment">// Cache compression flags</span>
+<span class="PreProc">#define ARCHIVE                (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">9</span><span class="PreProc"> ) </span>
+<span class="PreProc">#define EXTRACT                (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">10</span><span class="PreProc">) </span>
+<span class="PreProc">#define COMPRESS               (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">11</span><span class="PreProc">) </span>
+<span class="PreProc">#define DELETE                 (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">12</span><span class="PreProc">) </span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Computational state flags </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define TEST_PENDING  </span><span class="Constant">1</span>
+<span class="PreProc">#define TEST_RUNNING  </span><span class="Constant">2</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Test definitions </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define CACHE_BLOCKS  </span><span class="Constant">5000</span>
+<span class="PreProc">#define OBJECTS       </span><span class="Constant">3</span>
+<span class="PreProc">#define CACHE_INDEX   </span><span class="Constant">0</span>
+<span class="PreProc">#define OBJECT_INDEX  </span><span class="Constant">0</span>
+<span class="PreProc">#define ROWS          </span><span class="Constant">32</span>
+<span class="PreProc">#define COLS          </span><span class="Constant">32</span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Maximum iterations in soak test </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define DEFAULT_MAXITER    </span><span class="Constant">512</span>
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Default geometric operation parameters </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define DEFAULT_GT_OPS     COLS / </span><span class="Constant">4</span>
+<span class="PreProc">#define DEFAULT_GT_STEP    </span><span class="Constant">4</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Get application information for slot manager ...</span>
+<span class="Comment">------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Slot information function </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> cache_slot(<span class="Type">int</span> level)
+{   (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;int app (PSRP) cache </span><span class="Special">%s</span><span class="Constant">: [ANSI C, PUPS MTD D]</span><span class="Special">\n</span><span class="Constant">&quot;</span>,CACHE_VERSION);
+
+    <span class="Statement">if</span>(level &gt; <span class="Constant">1</span>)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;(C) 2022 Tumbling Dice</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Author: M.A. ONeill</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;(fast) cache test (built </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+    }
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Application usage function </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> cache_usage(<span class="Type">void</span>)
+
+{   (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[-cache_dir &lt;pathname:.&gt;]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[-delete_cache:FALSE]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[-oneshot:FALSE]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[-rgb:FALSE]]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[-show_raw:FALSE]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[-show_2d:FALSE]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[-ctest:FALSE</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;   [-show_correlations:FALSE]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;   [-gt_ops     &lt;n:</span><span class="Special">%d</span><span class="Constant">&gt;]</span><span class="Special">\n</span><span class="Constant">&quot;</span>,COLS/<span class="Constant">4</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;   [-gt_op_step &lt;n:</span><span class="Special">%d</span><span class="Constant">&gt;]</span><span class="Special">\n</span><span class="Constant">&quot;</span>,<span class="Constant">4</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[-rvalues:FALSE]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[-cmap_file   &lt;filename:cache.map&gt; [-extract]                     ] |</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[-wcmap_file  &lt;filename:cache.map&gt; [-archive [-compress] [-delete]]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    [-cache_name   &lt;cache name:cache&gt;  ]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    [-cache_file   &lt;filename:cache.dat&gt;]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    [-cache_name   &lt;cache name:cache&gt;]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    [-cache_blocks &lt;blocks:</span><span class="Special">%d</span><span class="Constant">&gt; [-cache_quanta &lt;n:1&gt;]]</span><span class="Special">\n</span><span class="Constant">&quot;</span>,CACHE_BLOCKS);
+
+<span class="PreProc">#ifndef DAISY_TEST</span>
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    [-objects      &lt;objects:</span><span class="Special">%d</span><span class="Constant">]</span><span class="Special">\n</span><span class="Constant">&quot;</span>,OBJECTS);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> DAISY_TEST </span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[-cache_index  &lt;block:</span><span class="Special">%d</span><span class="Constant">&gt;]</span><span class="Special">\n</span><span class="Constant">&quot;</span>, CACHE_INDEX);
+
+<span class="PreProc">#ifndef DAISY_TEST</span>
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[-object_index &lt;block:</span><span class="Special">%d</span><span class="Constant">&gt;]</span><span class="Special">\n</span><span class="Constant">&quot;</span>, OBJECT_INDEX);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> DAISY_TEST </span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[-object_rows  &lt;rows:</span><span class="Special">%d</span><span class="Constant">&gt;]</span><span class="Special">\n</span><span class="Constant">&quot;</span>,  ROWS);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[-object_cols  &lt;rows:</span><span class="Special">%d</span><span class="Constant">&gt;]</span><span class="Special">\n</span><span class="Constant">&quot;</span>,  COLS);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[&gt;&amp; &lt;ASCII log file&gt;]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Signals</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;SIGINIT SIGCHAN SIGPSRP: Process status [PSRP] request (protocol </span><span class="Special">%5.2f</span><span class="Constant">F)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,PSRP_PROTOCOL_VERSION);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;SIGCLIENT: tell client server is about to segment</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+
+<span class="PreProc">#ifdef CRUI_SUPPORT</span>
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;SIGCHECK SIGRESTART:      checkpoint and restart signals</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> CRIU_SUPPORT </span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;SIGALIVE: check for existence of client on signal dispatch host</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+}
+
+
+
+
+<span class="PreProc">#ifdef SLOT</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;slotman.h&gt;</span>
+_EXTERN <span class="Type">void</span> (* SLOT)() __attribute__ ((aligned(<span class="Constant">16</span>))) = cache_slot;
+_EXTERN <span class="Type">void</span> (* USE )() __attribute__ ((aligned(<span class="Constant">16</span>))) = cache_usage;
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> SLOT </span><span class="Comment">*/</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Application build date ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_EXTERN <span class="Type">char</span> appl_build_time[SSIZE] = <span class="Constant">__TIME__</span>;
+_EXTERN <span class="Type">char</span> appl_build_date[SSIZE] = <span class="Constant">__DATE__</span>;
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Functions which are private to this application ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment"> Cache correlation test </span><span class="Comment">*/</span>
+_PROTOTYPE _PRIVATE <span class="Type">void</span> cache_correlation_test(_BOOLEAN, _BOOLEAN, <span class="Type">int</span>);
+
+<span class="Comment">/*</span><span class="Comment"> Cache access test </span><span class="Comment">*/</span>
+_PROTOTYPE _PRIVATE <span class="Type">void</span> cache_access_test(_BOOLEAN, <span class="Type">int</span>, <span class="Type">int</span>);
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Variables which are private to this application ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+                                                             <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">char</span>     cache_dir_name[SSIZE]  = <span class="Constant">&quot;.&quot;</span>;              <span class="Comment">/*</span><span class="Comment"> Cache directory                        </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">char</span>     cache_file_name[SSIZE] = <span class="Constant">&quot;&quot;</span>;               <span class="Comment">/*</span><span class="Comment"> Cache (memory mapping) file name       </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">char</span>     cmap_file_name[SSIZE]  = <span class="Constant">&quot;&quot;</span>;               <span class="Comment">/*</span><span class="Comment"> Cache map info file mame               </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">char</span>     wcmap_file_name[SSIZE] = <span class="Constant">&quot;&quot;</span>;               <span class="Comment">/*</span><span class="Comment"> Cache map info dump file mame          </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">char</span>     cache_name[SSIZE]      = <span class="Constant">&quot;cache&quot;</span>;          <span class="Comment">/*</span><span class="Comment"> Cache name                             </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>      parse_flags            = <span class="Constant">0</span>;                <span class="Comment">/*</span><span class="Comment"> Command tail parsing flags             </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>      cache_blocks           = CACHE_BLOCKS;     <span class="Comment">/*</span><span class="Comment"> Number of data block in cache          </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>      cache_n_quanta         = <span class="Constant">1</span>;                <span class="Comment">/*</span><span class="Comment"> Number of quanta in cache              </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>      objects                = OBJECTS;          <span class="Comment">/*</span><span class="Comment"> Number of object in each data block    </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>      object_rows            = ROWS;             <span class="Comment">/*</span><span class="Comment"> Row in simulated image matrix          </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>      object_cols            = COLS;             <span class="Comment">/*</span><span class="Comment"> Columns in simulated image matrix      </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>      cache_index            = CACHE_INDEX;      <span class="Comment">/*</span><span class="Comment"> Cache index (block to manipulate       </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>      object_index           = OBJECT_INDEX;     <span class="Comment">/*</span><span class="Comment"> Object index (object to manipulate     </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>      gt_ops                 = DEFAULT_GT_OPS;   <span class="Comment">/*</span><span class="Comment"> Simulated geometric transform ops      </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>      gt_op_step             = DEFAULT_GT_STEP;  <span class="Comment">/*</span><span class="Comment"> Simulated geometric transform ops      </span><span class="Comment">*/</span>
+_PRIVATE FTYPE    *flinarr               = (FTYPE *) <span class="Constant">NULL</span>;   <span class="Comment">/*</span><span class="Comment"> Pointer to simulated data in cache     </span><span class="Comment">*/</span>
+_PRIVATE FTYPE    **flin2Darr            = (<span class="Type">float</span> **)<span class="Constant">NULL</span>;   <span class="Comment">/*</span><span class="Comment"> Pointer to data 2D mapping array       </span><span class="Comment">*/</span>
+                                                             <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef DAISY_TEST</span>
+                                                             <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">char</span>     *mask                  = (<span class="Type">char</span> *)<span class="Constant">NULL</span>;     <span class="Comment">/*</span><span class="Comment"> Pointer to mask data                   </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">char</span>     **mask2Darr            = (<span class="Type">char</span> **) <span class="Constant">NULL</span>;   <span class="Comment">/*</span><span class="Comment"> Pointer to mask 2D mapping array       </span><span class="Comment">*/</span>
+                                                             <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> DAISY_TEST </span><span class="Comment">*/</span>
+
+                                                             <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+_PRIVATE _BOOLEAN do_delete_cache        = FALSE;            <span class="Comment">/*</span><span class="Comment"> If TRUE delete existing cache file     </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>      state_flags            = <span class="Constant">0</span>;                <span class="Comment">/*</span><span class="Comment"> Show current computational state       </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>      iter                   = <span class="Constant">0</span>;                <span class="Comment">/*</span><span class="Comment"> Iteration counter (for soak testing)   </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>      maxiter                = DEFAULT_MAXITER;  <span class="Comment">/*</span><span class="Comment"> Max iterations (for soack testing)     </span><span class="Comment">*/</span>
+_PRIVATE _BOOLEAN raw_object_output      = FALSE;            <span class="Comment">/*</span><span class="Comment"> Display raw object ouput if TRUE       </span><span class="Comment">*/</span>
+_PRIVATE _BOOLEAN mapped_object_output   = FALSE;            <span class="Comment">/*</span><span class="Comment"> Display 2D mapped object ouput if TRUE </span><span class="Comment">*/</span>
+                                                             <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Software I.D. tag (used if CKPT support enabled to discard stale dynamic</span>
+<span class="Comment">    checkpoint files) ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define VTAG   </span><span class="Constant">598</span>
+<span class="Type">extern</span> <span class="Type">int</span> appl_vtag = VTAG;
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Main entry point ...</span>
+<span class="Comment">--------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> pups_main(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   _BOOLEAN looper = FALSE;
+
+<span class="Type">int</span> i;
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Seed random number generator </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)srand48((<span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>)getpid());
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Do not allow PSRP clients to connect until we are initialised </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    psrp_ignore_requests();
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Get standard items form the command tail ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    pups_std_init(TRUE,
+                  &amp;argc,
+                  CACHE_VERSION,
+                  <span class="Constant">&quot;M.A. O'Neill&quot;</span>,
+                  <span class="Constant">&quot;cache&quot;</span>,
+                  <span class="Constant">&quot;2022&quot;</span>,
+                  argv);
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Parse command line </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set cache directory </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((ptr = pups_locate(&amp;init,<span class="Constant">&quot;cache_dir&quot;</span>,&amp;argc,args,<span class="Constant">0</span>)) != NOT_FOUND)
+    {  <span class="Statement">if</span>(strccpy(cache_dir_name,pups_str_dec(&amp;ptr,&amp;argc,args)) == (<span class="Type">char</span> *)INVALID_ARG)
+          pups_error(<span class="Constant">&quot;[cache main] cache directory name expected&quot;</span>);
+
+
+        <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> Check to see if cache directory is valid </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+
+        <span class="Statement">if</span>(access(cache_dir_name,F_OK | R_OK | W_OK) == (-<span class="Constant">1</span>) || chdir(cache_dir_name) == (-<span class="Constant">1</span>))
+        {  (<span class="Type">void</span>)snprintf(errstr,SSIZE,<span class="Constant">&quot;[cache] cannot change directory to&quot;</span>,cache_dir_name);
+           pups_error(errstr);
+        }
+    }
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;cache directory is: </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n</span><span class="Constant">&quot;</span>,cache_dir_name);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Delete any existing  cache before running test </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(pups_locate(&amp;init,<span class="Constant">&quot;delete_cache&quot;</span>,&amp;argc,args,<span class="Constant">0</span>) != NOT_FOUND)
+    {  do_delete_cache = TRUE;
+
+       <span class="Statement">if</span>(appl_verbose == TRUE)
+       {  (<span class="Type">void</span>)printf(<span class="Constant">stderr</span>,<span class="Constant">&quot;existing cache file will be deleted</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Perform one shot test and exit </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(pups_locate(&amp;init,<span class="Constant">&quot;oneshot&quot;</span>,&amp;argc,args,<span class="Constant">0</span>) != NOT_FOUND)
+    {  looper = FALSE;
+
+       <span class="Statement">if</span>(appl_verbose == TRUE)
+       {  (<span class="Type">void</span>)printf(<span class="Constant">stderr</span>,<span class="Constant">&quot;performing one shot cache test</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set cache simulated RGB mode </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(pups_locate(&amp;init,<span class="Constant">&quot;rgb&quot;</span>,&amp;argc,args,<span class="Constant">0</span>) != NOT_FOUND)
+       parse_flags |= CACHE_RGB;
+
+
+<span class="PreProc">    #ifdef DAISY_TEST</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Do simulated) correlation test </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(pups_locate(&amp;init,<span class="Constant">&quot;ctest&quot;</span>,&amp;argc,args,<span class="Constant">0</span>) != NOT_FOUND)
+    {  parse_flags |= CACHE_CORRELATION_TEST;
+
+       <span class="Statement">if</span>(appl_verbose == TRUE)
+       {  <span class="Statement">if</span>(parse_flags &amp; CACHE_RGB)
+             (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;doing simulated RGB correlation test</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          <span class="Statement">else</span>
+             (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;doing simulated monochrome correlation test</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+
+       <span class="Statement">if</span>(pups_locate(&amp;init,<span class="Constant">&quot;show_correlations&quot;</span>,&amp;argc,args,<span class="Constant">0</span>) != NOT_FOUND)
+           parse_flags |= CACHE_CWRITE;
+
+
+       <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Set number of geometric operations </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>((ptr = pups_locate(&amp;init,<span class="Constant">&quot;gt_ops&quot;</span>,&amp;argc,args,<span class="Constant">0</span>)) != NOT_FOUND)
+       {  <span class="Statement">if</span>((gt_ops = pups_i_dec(&amp;ptr,&amp;argc,args)) == (<span class="Type">int</span>)INVALID_ARG || gt_ops &lt; <span class="Constant">0</span>)
+             pups_error(<span class="Constant">&quot;main] number of geomertic operations [&gt;=0] expected&quot;</span>);
+
+          <span class="Statement">if</span>(appl_verbose == TRUE)
+          {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;performing </span><span class="Special">%d</span><span class="Constant"> geometric operations per correlation</span><span class="Special">\n</span><span class="Constant">&quot;</span>,gt_ops);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+          }
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Set number of geometric operations </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>((ptr = pups_locate(&amp;init,<span class="Constant">&quot;gt_op_step&quot;</span>,&amp;argc,args,<span class="Constant">0</span>)) != NOT_FOUND)
+       {  <span class="Statement">if</span>((gt_op_step = pups_i_dec(&amp;ptr,&amp;argc,args)) == (<span class="Type">int</span>)INVALID_ARG || gt_op_step &lt; <span class="Constant">0</span>)
+             pups_error(<span class="Constant">&quot;[cache] geometric operation step [&gt;=0] expected&quot;</span>);
+
+          <span class="Statement">if</span>(appl_verbose == TRUE)
+          {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;geometric operation step is </span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,gt_op_step);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+          }
+       }
+    }
+    <span class="Statement">else</span>
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> DAISY_TEST </span><span class="Comment">*/</span>
+       parse_flags |= CACHE_ACCESS_TEST;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> File to write cache mapping information to </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((ptr = pups_locate(&amp;init,<span class="Constant">&quot;cmap_file&quot;</span>,&amp;argc,args,<span class="Constant">0</span>)) != NOT_FOUND)
+    {  parse_flags |= CMAP_FILE;
+
+       <span class="Statement">if</span>(strccpy(cmap_file_name,pups_str_dec(&amp;ptr,&amp;argc,args)) == (<span class="Type">char</span> *)INVALID_ARG)
+          pups_error(<span class="Constant">&quot;[cache] cache mapping info name expected&quot;</span>);
+       <span class="Statement">else</span> <span class="Statement">if</span>(appl_verbose == TRUE)
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;reading cache mapping info file: </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n</span><span class="Constant">&quot;</span>,cmap_file_name);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Are we going to uncompress </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> cache archive?             </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(pups_locate(&amp;init,<span class="Constant">&quot;extract&quot;</span>,&amp;argc,args,<span class="Constant">0</span>) != NOT_FOUND)
+       {  parse_flags |= EXTRACT;
+
+          <span class="Statement">if</span>(appl_verbose == TRUE)
+          {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;extracting cache</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+          }
+       }
+    }
+    <span class="Statement">else</span>
+    {
+
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Cache file (which will be used to map cache) </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>((ptr = pups_locate(&amp;init,<span class="Constant">&quot;cache_file&quot;</span>,&amp;argc,args,<span class="Constant">0</span>)) != NOT_FOUND)
+       {  parse_flags |= CACHE_FILE;
+
+         <span class="Statement">if</span>(strccpy(cache_file_name,pups_str_dec(&amp;ptr,&amp;argc,args)) == (<span class="Type">char</span> *)INVALID_ARG)
+            pups_error(<span class="Constant">&quot;[cache] cache file name expected&quot;</span>);
+         <span class="Statement">else</span> <span class="Statement">if</span>(appl_verbose == TRUE)
+         {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;cache file (for memory mapping) is: </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n</span><span class="Constant">&quot;</span>,cache_file_name);
+            (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+         }
+       }
+    }
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> File to write copy of heap to </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(pups_locate(&amp;init,<span class="Constant">&quot;rvalues&quot;</span>,&amp;argc,args,<span class="Constant">0</span>) != NOT_FOUND)
+    {  parse_flags |= CACHE_INIT;
+
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;initialising (local heap) cache before writing</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> File to write cache mapping information to </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((ptr = pups_locate(&amp;init,<span class="Constant">&quot;wcmap_file&quot;</span>,&amp;argc,args,<span class="Constant">0</span>)) != NOT_FOUND)
+    {  parse_flags |= WCMAP_FILE;
+
+       <span class="Statement">if</span>(strccpy(wcmap_file_name,pups_str_dec(&amp;ptr,&amp;argc,args)) == (<span class="Type">char</span> *)INVALID_ARG)
+          pups_error(<span class="Constant">&quot;[cache] cache mapping info name expected&quot;</span>);
+       <span class="Statement">else</span> <span class="Statement">if</span>(appl_verbose == TRUE)
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;cache mapping info file: </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n</span><span class="Constant">&quot;</span>,wcmap_file_name);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Are we going to archive cache?       </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(pups_locate(&amp;init,<span class="Constant">&quot;archive&quot;</span>,&amp;argc,args,<span class="Constant">0</span>) != NOT_FOUND)
+       {  parse_flags |= ARCHIVE;
+
+
+          <span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Compress archive </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+          <span class="Statement">if</span>(pups_locate(&amp;init,<span class="Constant">&quot;compress&quot;</span>,&amp;argc,args,<span class="Constant">0</span>) != NOT_FOUND)
+             parse_flags |= COMPRESS;
+
+          <span class="Statement">if</span>(appl_verbose == TRUE)
+          {  <span class="Statement">if</span>(parse_flags &amp; COMPRESS)
+               (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;archiving and compressing cache</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+             <span class="Statement">else</span>
+               (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;archiving cache</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+          }
+
+
+          <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Delete cache and cachemap one archived </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+          <span class="Statement">if</span>(pups_locate(&amp;init,<span class="Constant">&quot;delete&quot;</span>,&amp;argc,args,<span class="Constant">0</span>) != NOT_FOUND)
+          {  parse_flags |= DELETE;
+
+             <span class="Statement">if</span>(appl_verbose == TRUE)
+             {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;deleting cache and cachemap (after archiving them)</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+                (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+             }
+          }
+       }
+    }
+
+
+    <span class="Statement">if</span>(!(parse_flags &amp; CMAP_FILE))
+    {
+
+       <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Set cache name </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>((ptr = pups_locate(&amp;init,<span class="Constant">&quot;cache_name&quot;</span>,&amp;argc,args,<span class="Constant">0</span>)) != NOT_FOUND)
+       {  <span class="Statement">if</span>(strccpy(cache_name,pups_str_dec(&amp;ptr,&amp;argc,args)) == (<span class="Type">char</span> *)INVALID_ARG)
+             pups_error(<span class="Constant">&quot;[cache] cache name expected&quot;</span>);
+          <span class="Statement">else</span> <span class="Statement">if</span>(appl_verbose == TRUE)
+          {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;cache name is: </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n</span><span class="Constant">&quot;</span>,cache_name);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+          }
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Set cache blocks </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>((ptr = pups_locate(&amp;init,<span class="Constant">&quot;cache_blocks&quot;</span>,&amp;argc,args,<span class="Constant">0</span>)) != NOT_FOUND)
+       {  <span class="Statement">if</span>((cache_blocks = pups_i_dec(&amp;ptr,&amp;argc,args)) == (<span class="Type">int</span>)INVALID_ARG)
+             pups_error(<span class="Constant">&quot;[cache] number of blccks in cache [&gt;0] expected&quot;</span>);
+          <span class="Statement">else</span> <span class="Statement">if</span>(appl_verbose == TRUE &amp;&amp; cache_blocks &gt; <span class="Constant">0</span>)
+          {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;number of blocks in cache is: </span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,cache_blocks);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+          }
+          <span class="Statement">else</span> <span class="Statement">if</span>(cache_blocks &lt;= <span class="Constant">0</span>)
+             pups_error(<span class="Constant">&quot;[cache] number of blocks in cache [&gt;0] expected&quot;</span>);
+
+
+          <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Set number of quanta. This ootion  </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> is used when testing dynamic cache </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> resizing.                          </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+
+          <span class="Statement">if</span>((ptr = pups_locate(&amp;init,<span class="Constant">&quot;cache_quanta&quot;</span>,&amp;argc,args,<span class="Constant">0</span>)) != NOT_FOUND)
+          {  <span class="Statement">if</span>((cache_n_quanta = pups_i_dec(&amp;ptr,&amp;argc,args)) == (<span class="Type">int</span>)INVALID_ARG)
+                pups_error(<span class="Constant">&quot;[cache] number of (cache) quanta [&gt;0] expected&quot;</span>);
+             <span class="Statement">else</span> <span class="Statement">if</span>(appl_verbose == TRUE &amp;&amp; cache_n_quanta &gt; <span class="Constant">0</span>)
+             {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;number of cache quanta is: </span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,cache_n_quanta);
+                (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+             }
+             <span class="Statement">else</span> <span class="Statement">if</span>(cache_blocks &lt;= <span class="Constant">0</span>)
+                pups_error(<span class="Constant">&quot;number of cache quanta [&gt;0] expected&quot;</span>);
+          }
+       }
+
+
+<span class="PreProc">       #ifndef DAISY_TEST</span>
+       <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Set objects per cache block </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>((parse_flags &amp; CACHE_ACCESS_TEST) &amp;&amp; (ptr = pups_locate(&amp;init,<span class="Constant">&quot;objects&quot;</span>,&amp;argc,args,<span class="Constant">0</span>)) != NOT_FOUND)
+       {  <span class="Statement">if</span>((objects = pups_i_dec(&amp;ptr,&amp;argc,args)) == (<span class="Type">int</span>)INVALID_ARG)
+             pups_error(<span class="Constant">&quot;[cache] number of blocks in cache [&gt;0] expected&quot;</span>);
+          <span class="Statement">else</span> <span class="Statement">if</span>(appl_verbose == TRUE &amp;&amp; objects &gt; <span class="Constant">0</span>)
+          {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;number of objects per cache block is: </span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,objects);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+          }
+          <span class="Statement">else</span> <span class="Statement">if</span>(objects &lt;= <span class="Constant">0</span>)
+          {  (<span class="Type">void</span>)snprintf(errstr,SSIZE,<span class="Constant">&quot;number of objects per cache black [2-</span><span class="Special">%d</span><span class="Constant">] expected&quot;</span>,MAX_CACHE_BLOCK_OBJECTS);
+             pups_error(errstr);
+          }
+       }
+<span class="PreProc">       #endif</span> <span class="Comment">/*</span><span class="Comment"> DAISY_TEST </span><span class="Comment">*/</span>
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set cache index </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((ptr = pups_locate(&amp;init,<span class="Constant">&quot;cache_index&quot;</span>,&amp;argc,args,<span class="Constant">0</span>)) != NOT_FOUND)
+    {  <span class="Statement">if</span>((cache_index = pups_i_dec(&amp;ptr,&amp;argc,args)) == (<span class="Type">int</span>)INVALID_ARG)
+          pups_error(<span class="Constant">&quot;[cache] cache index [&gt;=0] expected&quot;</span>);
+       <span class="Statement">else</span> <span class="Statement">if</span>(appl_verbose == TRUE &amp;&amp; cache_index &gt;= <span class="Constant">0</span>)
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;cache index is: </span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,cache_index);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+       <span class="Statement">else</span>  <span class="Statement">if</span>(cache_index &lt; <span class="Constant">0</span>)
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;randomly testing </span><span class="Special">%d</span><span class="Constant"> cache blocks</span><span class="Special">\n</span><span class="Constant">&quot;</span>,iabs(cache_index));
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+    }
+
+
+<span class="PreProc">    #ifndef DAISY_TEST</span>
+    <span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set object index </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((parse_flags &amp; CACHE_ACCESS_TEST) &amp;&amp; (ptr = pups_locate(&amp;init,<span class="Constant">&quot;object_index&quot;</span>,&amp;argc,args,<span class="Constant">0</span>)) != NOT_FOUND)
+    {  <span class="Statement">if</span>((object_index = pups_i_dec(&amp;ptr,&amp;argc,args)) == (<span class="Type">int</span>)INVALID_ARG)
+          pups_error(<span class="Constant">&quot;[cache] object index [&gt;= 0] expected&quot;</span>);
+       <span class="Statement">else</span> <span class="Statement">if</span>(appl_verbose == TRUE &amp;&amp; object_index &gt;= <span class="Constant">0</span>)
+       {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;object index is: </span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,object_index);
+          (<span class="Type">void</span>)fflush(psrp_out);
+       }
+       <span class="Statement">else</span> <span class="Statement">if</span>(object_index &lt; <span class="Constant">0</span>)
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;randomly testing </span><span class="Special">%d</span><span class="Constant"> object indexes into each cache block</span><span class="Special">\n</span><span class="Constant">&quot;</span>,iabs(object_index));
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+    }
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> DAISY_TEST </span><span class="Comment">*/</span>
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set object rows - simulates a matrix of data </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((ptr = pups_locate(&amp;init,<span class="Constant">&quot;object_rows&quot;</span>,&amp;argc,args,<span class="Constant">0</span>)) != NOT_FOUND)
+    {  <span class="Statement">if</span>((object_rows = pups_i_dec(&amp;ptr,&amp;argc,args)) == (<span class="Type">int</span>)INVALID_ARG)
+          pups_error(<span class="Constant">&quot;[cache] object rows [&gt;= 1] expected&quot;</span>);
+       <span class="Statement">else</span> <span class="Statement">if</span>(appl_verbose == TRUE &amp;&amp; object_rows &gt;= <span class="Constant">1</span>)
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;object rows: </span><span class="Special">\&quot;</span><span class="Special">%d</span><span class="Special">\&quot;\n</span><span class="Constant">&quot;</span>,object_index);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+       <span class="Statement">else</span> <span class="Statement">if</span>(object_rows &lt;= <span class="Constant">0</span>)
+          pups_error(<span class="Constant">&quot;[cache] object rows [&gt;= 1] expected&quot;</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set object rows - simulates a matrix of data </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((ptr = pups_locate(&amp;init,<span class="Constant">&quot;object_cols&quot;</span>,&amp;argc,args,<span class="Constant">0</span>)) != NOT_FOUND)
+    {  <span class="Statement">if</span>((object_cols = pups_i_dec(&amp;ptr,&amp;argc,args)) == (<span class="Type">int</span>)INVALID_ARG)
+          pups_error(<span class="Constant">&quot;[cache] object cols [&gt;= 1] expected&quot;</span>);
+       <span class="Statement">else</span> <span class="Statement">if</span>(appl_verbose == TRUE &amp;&amp; object_cols &gt;= <span class="Constant">1</span>)
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;object cols: </span><span class="Special">\&quot;</span><span class="Special">%d</span><span class="Special">\&quot;\n</span><span class="Constant">&quot;</span>,object_index);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+       <span class="Statement">else</span> <span class="Statement">if</span>(object_cols &lt;= <span class="Constant">0</span>)
+          pups_error(<span class="Constant">&quot;[cache] object cols [&gt;= 1] expected&quot;</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Show raw object output </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((parse_flags &amp; CACHE_ACCESS_TEST) &amp;&amp; pups_locate(&amp;init,<span class="Constant">&quot;show_raw&quot;</span>,&amp;argc,args,<span class="Constant">0</span>) != NOT_FOUND)
+    {  raw_object_output = TRUE;
+
+       <span class="Statement">if</span>(appl_verbose == TRUE)
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;displaying raw object output</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Show 2D mapped object output </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((parse_flags &amp; CACHE_ACCESS_TEST) &amp;&amp; pups_locate(&amp;init,<span class="Constant">&quot;show_2d&quot;</span>,&amp;argc,args,<span class="Constant">0</span>) != NOT_FOUND)
+    {  mapped_object_output = TRUE;
+
+       <span class="Statement">if</span>(appl_verbose == TRUE)
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;displaying 2D mapped object output</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check command tail for unparsed arguments </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pups_t_arg_errs(argc,argd,args);
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Sanity checks </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(! parse_flags &amp; CMAP_FILE &amp;&amp; cache_index &gt;= cache_blocks)
+    {  (<span class="Type">void</span>)snprintf(errstr,SSIZE,<span class="Constant">&quot;[cache] cache index [</span><span class="Special">%d</span><span class="Constant">] &gt;= cache blocks[</span><span class="Special">%d</span><span class="Constant">]</span><span class="Special">\n</span><span class="Constant">&quot;</span>,cache_index,cache_blocks);
+       pups_error(errstr);
+    }
+    <span class="Statement">else</span> <span class="Statement">if</span>(object_index &gt; objects)
+    {  (<span class="Type">void</span>)snprintf(errstr,SSIZE,<span class="Constant">&quot;[cache] object index [</span><span class="Special">%d</span><span class="Constant">] &gt;= object[</span><span class="Special">%d</span><span class="Constant">]</span><span class="Special">\n</span><span class="Constant">&quot;</span>,object_index,objects);
+       pups_error(errstr);
+    }
+
+    <span class="Statement">if</span>((parse_flags &amp; CACHE_INIT) &amp;&amp; cache_index &lt; <span class="Constant">0</span> || object_index &lt; <span class="Constant">0</span>)
+       pups_error(<span class="Constant">&quot;[cache] cannot initialise cache in iterative test mode&quot;</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Initialise PSRP function dispatch handler </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)psrp_init(PSRP_STATIC_DATABAG | PSRP_HOMEOSTATIC_STREAMS,<span class="Constant">NULL</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> We must define static bindings BEFORE loading the default </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> dispatch table. In the case of static bindings, the only   </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> effect of loading a saved dispatch table is to (possibly)  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> add object aliases                                         </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)psrp_load_default_dispatch_table(<span class="Constant">stderr</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Tell PSRP clients we are ready to service their requests </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+
+    psrp_accept_requests();
+
+
+    <span class="Comment">/*</span><span class="Comment">----------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Run test </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------</span><span class="Comment">*/</span>
+
+    <span class="Statement">do</span> {    <span class="Type">int</span> c_maxiter = <span class="Constant">1</span>,
+                o_maxiter = <span class="Constant">1</span>;
+
+            _BOOLEAN do_pending = FALSE;
+
+            <span class="Statement">while</span>(state_flags &amp; TEST_PENDING)
+            {    <span class="Statement">if</span>(do_pending == FALSE)
+                 {  do_pending = TRUE;
+
+                    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    Next test pending</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+                    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+                 }
+
+                 (<span class="Type">void</span>)pups_usleep(<span class="Constant">100</span>);
+            }
+            do_pending = FALSE;
+
+
+            <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment"> Check to see if we are soak testing </span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+
+            <span class="Statement">if</span>(cache_index &lt; <span class="Constant">0</span>)
+               c_maxiter = iabs(cache_index);
+
+            <span class="Statement">if</span>(object_index &lt; <span class="Constant">0</span>)
+               o_maxiter = iabs(object_index);
+
+            maxiter = o_maxiter*c_maxiter;
+
+            <span class="Statement">if</span>(maxiter == <span class="Constant">1</span>)
+            {
+
+               <span class="Statement">if</span>(parse_flags &amp; CACHE_ACCESS_TEST)
+               {
+
+                  <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment"> Do single cache access test </span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+
+                  <span class="Statement">if</span>(strcmp(cache_file_name,<span class="Constant">&quot;&quot;</span>) != <span class="Constant">0</span>)
+                     (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    Cache is memory mapped (from file </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,cache_file_name);
+                  (<span class="Type">void</span>)fflush(<span class="Constant">stdout</span>);
+
+                  <span class="Statement">if</span>(parse_flags &amp; CACHE_RGB)
+                  {  <span class="Statement">if</span>(parse_flags &amp; WCMAP_FILE)
+                        (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;    Writing RGB cache to </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> ((mapinfo saved to: </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,cache_file_name,wcmap_file_name);
+                     cache_access_test(TRUE,cache_index,object_index);
+                  }
+                  <span class="Statement">else</span>
+                  {  <span class="Statement">if</span>(parse_flags &amp; WCMAP_FILE)
+                        (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">    Writing monochrome cache to </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> ((mapinfo saved to: </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,cache_file_name,wcmap_file_name);
+                     cache_access_test(FALSE,cache_index,object_index);
+                  }
+               }
+
+<span class="PreProc">               #ifdef DAISY_TEST</span>
+               <span class="Statement">else</span> <span class="Statement">if</span>(parse_flags &amp; CACHE_CORRELATION_TEST)
+               {
+
+                  <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment"> Do single cache correlation test </span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+                  <span class="Statement">if</span>(parse_flags &amp; CACHE_RGB)
+                  {  <span class="Statement">if</span>(parse_flags &amp; CMAP_FILE)
+                        (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">    One shot RGB cache correlation test (reading mapinfo from file </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,cmap_file_name);
+                     <span class="Statement">else</span>
+                        (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">    One shot RGB cache correlation test</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+                     (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+                     (<span class="Type">void</span>)cache_correlation_test(FALSE,TRUE, cache_index);
+                  }
+                  <span class="Statement">else</span>
+                  {  <span class="Statement">if</span>(parse_flags &amp; CMAP_FILE)
+                        (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">    One shot monochrome cache correlation test (reading mpainfo from file </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,cmap_file_name);
+                     <span class="Statement">else</span>
+                        (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">    One shot monochrome cache correlation test</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+                     (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+                     (<span class="Type">void</span>)cache_correlation_test(FALSE,FALSE,cache_index);
+                  }
+               }
+<span class="PreProc">               #endif</span> <span class="Comment">/*</span><span class="Comment"> DAISY_TEST </span><span class="Comment">*/</span>
+
+               <span class="Statement">else</span>
+                  pups_error(<span class="Constant">&quot;[cache] unkown test option&quot;</span>);
+            }
+            <span class="Statement">else</span>
+            {
+
+               <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment"> Do iterative soak test </span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+               <span class="Type">int</span> eff_cache_index,
+                   eff_object_index;
+
+               <span class="Statement">if</span>(parse_flags &amp; CACHE_ACCESS_TEST)
+               {  <span class="Statement">if</span>(parse_flags &amp; CACHE_RGB)
+                  {  <span class="Statement">if</span>(parse_flags &amp; CMAP_FILE)
+                        (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">    One shot RGB cache access test (reading mapfrom file </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,cmap_file_name);
+                     <span class="Statement">else</span>
+                        (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">    One shot RGB cache access test</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+                  }
+                  <span class="Statement">else</span>
+                  {  <span class="Statement">if</span>(parse_flags &amp; CMAP_FILE)
+                        (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">    One shot monochrome cache access test (reading mapinfo from file </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,cmap_file_name);
+                     <span class="Statement">else</span>
+                        (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">    One shot monochrome cache access test</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+                  }
+                  (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+               }
+
+<span class="PreProc">               #ifdef DAISY_TEST</span>
+               <span class="Statement">else</span> <span class="Statement">if</span>(parse_flags &amp; CACHE_CORRELATION_TEST)
+               {   <span class="Statement">if</span>(parse_flags &amp; CACHE_RGB)
+                   {  <span class="Statement">if</span>(parse_flags &amp; CMAP_FILE)
+                         (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">    One shot cache RGB correlation test (reading mapinfo from file </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,cmap_file_name);
+                      <span class="Statement">else</span>
+                         (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">    One shot cache RGB correlation test</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+                      (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+                   }
+                   <span class="Statement">else</span>
+                   {  <span class="Statement">if</span>(parse_flags &amp; CMAP_FILE)
+                         (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">    One shot cache monochrome correlation test (reading mapinfo from file </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,cmap_file_name);
+                      <span class="Statement">else</span>
+                         (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">    One shot cache monochrome correlation test</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+                      (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+                   }
+               }
+<span class="PreProc">               #endif</span> <span class="Comment">/*</span><span class="Comment"> DAISY_TEST </span><span class="Comment">*/</span>
+
+               <span class="Statement">else</span>
+                  pups_error(<span class="Constant">&quot;[cache] unkown test option&quot;</span>);
+
+               <span class="Statement">while</span>(iter &lt; maxiter)
+               {
+                    <span class="Statement">if</span>(parse_flags &amp; CACHE_ACCESS_TEST)
+                    {  <span class="Statement">if</span>(o_maxiter &gt; <span class="Constant">1</span>)
+                          eff_object_index = (<span class="Type">int</span>)(drand48()*(<span class="Type">double</span>)objects);
+                       <span class="Statement">else</span>
+                          eff_object_index = object_index;
+
+                       <span class="Statement">if</span>(c_maxiter &gt; <span class="Constant">1</span>)
+                          eff_cache_index = (<span class="Type">int</span>)(drand48()*(<span class="Type">double</span>)cache_blocks);
+                       <span class="Statement">else</span>
+                          eff_cache_index = cache_index;
+
+                       (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">    Cache access test iteration </span><span class="Special">%04d</span><span class="Constant"> (of </span><span class="Special">%04d</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,iter + <span class="Constant">1</span>,maxiter);
+                       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+                       <span class="Statement">if</span>(parse_flags &amp; CACHE_RGB)
+                          cache_access_test(TRUE,eff_cache_index,eff_object_index);
+                       <span class="Statement">else</span>
+                          cache_access_test(FALSE,eff_cache_index,eff_object_index);
+                    }
+
+<span class="PreProc">                    #ifdef DAISY_TEST</span>
+                    <span class="Statement">else</span>
+                    {  eff_cache_index = (<span class="Type">int</span>)(drand48()*(<span class="Type">double</span>)cache_blocks);
+                       eff_cache_index = cache_index;
+
+
+                       <span class="Statement">if</span>(parse_flags &amp; CACHE_RGB)
+                       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">    Cache (RGB) correlation test iteration </span><span class="Special">%04d</span><span class="Constant"> (of </span><span class="Special">%04d</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,iter + <span class="Constant">1</span>,maxiter);
+                          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+                          (<span class="Type">void</span>)cache_correlation_test(TRUE,TRUE, eff_cache_index);
+                       }
+                       <span class="Statement">else</span>
+                       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">    Cache (monochrome) correlation test iteration </span><span class="Special">%04d</span><span class="Constant"> (of </span><span class="Special">%04d</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,iter + <span class="Constant">1</span>,maxiter);
+                          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+                          (<span class="Type">void</span>)cache_correlation_test(TRUE,FALSE,eff_cache_index);
+                       }
+                    }
+<span class="PreProc">                    #endif</span> <span class="Comment">/*</span><span class="Comment"> DAISY_TEST </span><span class="Comment">*/</span>
+
+                    ++iter;
+               }
+            }
+    } <span class="Statement">while</span>(looper == TRUE);
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Exit from PUPS/PSRP application cleaning up any mess it may have created </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    pups_exit(<span class="Constant">0</span>);
+}
+
+
+
+<span class="PreProc">#ifdef DAISY_TEST</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Simulate DAISY correlator </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+                                                                <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+_PRIVATE FTYPE simulate_DAISY_correlation(_BOOLEAN  do_rgb,     <span class="Comment">/*</span><span class="Comment"> TRUE if simulating RGB mode </span><span class="Comment">*/</span>
+                                          <span class="Type">char</span>      *mask,      <span class="Comment">/*</span><span class="Comment"> NVD chip mask               </span><span class="Comment">*/</span>
+                                          FTYPE     *nvd_1,     <span class="Comment">/*</span><span class="Comment"> Simulated NVD image chip #1 </span><span class="Comment">*/</span>
+                                          FTYPE     *nvd_2)     <span class="Comment">/*</span><span class="Comment"> Simulated NVD image chip #2 </span><span class="Comment">*/</span>
+                                                                <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+
+{   <span class="Type">int</span>   k;
+    FTYPE min_sum = <span class="Constant">0.0</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Simulate geometrical operations </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(k=<span class="Constant">0</span>; k&lt;gt_ops*gt_op_step; k+=gt_op_step)
+    {  <span class="Type">int</span>   i;
+       FTYPE sum = <span class="Constant">0.0</span>;
+
+       <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;object_rows; ++i)
+       {   <span class="Type">int</span> j;
+
+           <span class="Statement">if</span>(do_rgb == TRUE)
+           {  <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;object_cols; ++j)
+              {   <span class="Type">int</span> p_index_1,
+                      p_index_2,
+                      p_index_2_r,
+                      band,
+                      eff_j;
+
+                  FTYPE delta = <span class="Constant">0.0</span>;
+
+                  eff_j       = (j + gt_ops) % object_cols;
+                  p_index_1   = object_cols*i + j;
+                  p_index_2   = object_cols*i + eff_j;
+                  p_index_2_r = object_cols   - p_index_2;
+
+                  <span class="Statement">if</span>(mask[p_index_2] == <span class="Constant">'T'</span>)
+                  {  p_index_1 = <span class="Constant">3</span>*(object_rows*i + j);
+                     p_index_2 = <span class="Constant">3</span>*(object_rows*i + eff_j);
+
+
+                     <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+                     <span class="Comment">/*</span><span class="Comment"> Forward rotational arc </span><span class="Comment">*/</span>
+                     <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+                     <span class="Statement">for</span>(band =<span class="Constant">0</span>; band &lt; <span class="Constant">3</span>; ++band)
+                     {
+
+                        <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+                        <span class="Comment">/*</span><span class="Comment"> Forward rotational arc </span><span class="Comment">*/</span>
+                        <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+                        <span class="Statement">if</span>(nvd_2[p_index_2 + band] &gt; <span class="Constant">0.0</span> || nvd_2[p_index_1 + band] &gt; <span class="Constant">0.0</span>)
+                        {
+
+<span class="PreProc">                            #ifdef POW</span>
+                            delta = FABS(POW(nvd_2[p_index_2 + band],<span class="Constant">2</span>) - POW(nvd_1[p_index_1 + band],<span class="Constant">2</span>));
+<span class="PreProc">                            #else</span>
+                            delta = FABS(sqr(nvd_2[p_index_2 + band])   - sqr(nvd_1[p_index_1 + band]));
+<span class="PreProc">                            #endif</span> <span class="Comment">/*</span><span class="Comment"> POW </span><span class="Comment">*/</span>
+                        }
+
+                        <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+                        <span class="Comment">/*</span><span class="Comment"> Reverse (reflected) rotational arc </span><span class="Comment">*/</span>
+                        <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+
+                        <span class="Statement">if</span>(k &gt; <span class="Constant">0</span> &amp;&amp; (nvd_2[p_index_2 + band] &gt; <span class="Constant">0.0</span> || nvd_2[p_index_1 + band] &gt; <span class="Constant">0.0</span>))
+                        {
+<span class="PreProc">                           #ifdef POW</span>
+                           delta += FABS(POW(nvd_2[p_index_2_r + band],<span class="Constant">2</span>) - POW(nvd_1[p_index_1 + band],<span class="Constant">2</span>));
+<span class="PreProc">                           #else</span>
+                           delta += FABS(sqr(nvd_2[p_index_2_r + band])   - sqr(nvd_1[p_index_1 + band]));
+<span class="PreProc">                           #endif</span> <span class="Comment">/*</span><span class="Comment"> POW </span><span class="Comment">*/</span>
+                        }
+
+                        sum += delta;
+                     }
+                  }
+              }
+           }
+           <span class="Statement">else</span>
+           {  <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;object_cols; ++j)
+              {   <span class="Type">int</span> p_index_1,
+                      p_index_2,
+                      p_index_2_r,
+                      eff_j;
+
+                  FTYPE delta = <span class="Constant">0.0</span>;
+
+                  eff_j       = (j + gt_ops) % object_cols;
+                  p_index_1   = object_rows*i + j;
+                  p_index_2   = object_rows*i + eff_j;
+                  p_index_2_r = object_cols   - p_index_2;
+
+                  <span class="Statement">if</span>(mask[p_index_2] == <span class="Constant">'T'</span>)
+                  {
+
+                     <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+                     <span class="Comment">/*</span><span class="Comment"> Forward rotational arc </span><span class="Comment">*/</span>
+                     <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+                     <span class="Statement">if</span>(nvd_2[p_index_1] &gt; <span class="Constant">0.0</span> || nvd_2[p_index_2] &gt; <span class="Constant">0.0</span>)
+                        delta = FABS(POW(nvd_2[p_index_2],<span class="Constant">2</span>) - POW(nvd_1[p_index_1],<span class="Constant">2</span>));
+
+
+                     <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+                     <span class="Comment">/*</span><span class="Comment"> Reverse (reflected) rotational arc </span><span class="Comment">*/</span>
+                     <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+
+                     <span class="Statement">if</span>(k &gt; <span class="Constant">0</span> &amp;&amp; (nvd_2[p_index_1] &gt; <span class="Constant">0.0</span> || nvd_2[p_index_2] &gt; <span class="Constant">0.0</span>))
+                        delta += FABS(POW(nvd_2[p_index_2_r],<span class="Constant">2</span>) - POW(nvd_1[p_index_1],<span class="Constant">2</span>));
+
+                     sum  += delta;
+                  }
+               }
+           }
+
+           <span class="Statement">if</span>(min_sum &gt; sum || min_sum == <span class="Constant">0.0</span>)
+              min_sum = sum;
+       }
+    }
+
+    min_sum = sqrtf(min_sum);
+
+<span class="PreProc">#ifdef CACHE_DEBUG</span>
+(<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;SUM: </span><span class="Special">%f</span><span class="Special">\n</span><span class="Constant">&quot;</span>,min_sum);
+(<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> CACHE_DEBUG </span><span class="Comment">*/</span>
+
+    <span class="Statement">return</span>(min_sum);
+
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Used by correlation test </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">typedef</span> <span class="Type">struct</span> {    <span class="Type">int</span>   index;
+                    FTYPE affinity;
+               } sum_type;
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Compare affinities </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> compare_affinities(sum_type *s_1, sum_type *s_2)
+
+{   <span class="Statement">if</span>(s_1-&gt;affinity &gt; s_2-&gt;affinity)
+       <span class="Statement">return</span>(<span class="Constant">1</span>);
+    <span class="Statement">else</span> <span class="Statement">if</span>(s_1-&gt;affinity &lt; s_2-&gt;affinity)
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Run (fast) cache correlation test </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+                                                              <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">void</span> cache_correlation_test(_BOOLEAN   iterative,    <span class="Comment">/*</span><span class="Comment"> TRUE if iterative test             </span><span class="Comment">*/</span>
+                                     _BOOLEAN      do_rgb,    <span class="Comment">/*</span><span class="Comment"> TRUE if simulating RGB correlation </span><span class="Comment">*/</span>
+                                     <span class="Type">int</span>      cache_index)    <span class="Comment">/*</span><span class="Comment"> Cache index of &quot;unknown&quot; image     </span><span class="Comment">*/</span>
+                                                              <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+
+{   <span class="Type">int</span> i,
+        c_index,
+        n_blocks,
+        n_omp_threads = <span class="Constant">1</span>;
+
+    <span class="Type">double</span> start_time,
+           end_time,
+           delta;
+
+    _IMMORTAL <span class="Type">int</span>    sched_cnt = <span class="Constant">0</span>;
+    _IMMORTAL <span class="Type">double</span> old_delta = <span class="Constant">0.0</span>;
+
+    FTYPE    *nvd_1 = (FTYPE *)<span class="Constant">NULL</span>;
+    sum_type *sum   = (sum_type *)<span class="Constant">NULL</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Initialise cache table </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)cache_table_init();
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Initialise cache </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(parse_flags &amp; CMAP_FILE)
+    {  c_index = cache_init_cache();
+
+       <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Uncompress cache if requested </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(parse_flags &amp; EXTRACT)
+         (<span class="Type">void</span>)cache_extract(cmap_file_name);
+
+       (<span class="Type">void</span>)cache_read_mapinfo(cmap_file_name,c_index);
+       (<span class="Type">void</span>)cache_create(FALSE,<span class="Constant">&quot;&quot;</span>,CACHE_USING_MAPINFO,c_index);
+    }
+    <span class="Statement">else</span>
+    {  c_index = cache_init_cache();
+
+
+       <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Add object to cache </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">       #ifndef DAISY_TEST</span>
+       <span class="Statement">if</span>(do_rgb == TRUE)
+       {  <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;objects; ++i)
+              (<span class="Type">void</span>)cache_add_object(<span class="Constant">3</span>*object_rows*object_cols*<span class="Statement">sizeof</span>(FTYPE),c_index);
+       }
+       <span class="Statement">else</span>
+       {  <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;objects; ++i)
+              (<span class="Type">void</span>)cache_add_object(object_rows*object_cols*<span class="Statement">sizeof</span>(FTYPE),c_index);
+       }
+<span class="PreProc">       #else</span>
+       <span class="Statement">if</span>(do_rgb == TRUE)
+          (<span class="Type">void</span>)cache_add_object(<span class="Constant">3</span>*object_rows*object_cols*<span class="Statement">sizeof</span>(FTYPE),c_index);
+       <span class="Statement">else</span>
+          (<span class="Type">void</span>)cache_add_object(object_rows*object_cols*<span class="Statement">sizeof</span>(FTYPE),c_index);
+
+       (<span class="Type">void</span>)cache_add_object(object_rows*object_cols*<span class="Statement">sizeof</span>(<span class="Type">char</span>),c_index);
+       (<span class="Type">void</span>)cache_add_object(<span class="Constant">100</span>*<span class="Statement">sizeof</span>(<span class="Type">char</span>),c_index);
+<span class="PreProc">       #endif</span> <span class="Comment">/*</span><span class="Comment"> DAISY_TEST </span><span class="Comment">*/</span>
+
+
+       <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Create a cache </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+
+       (<span class="Type">void</span>)cache_create(TRUE,cache_file_name,cache_blocks,c_index);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Create affinity array </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+
+    n_blocks = cache_get_blocks(c_index);
+    sum = (sum_type *)pups_calloc(n_blocks,<span class="Statement">sizeof</span>(sum_type));
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">  Correlate image with rest of cache </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(do_rgb == TRUE)
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    Simulated NVD correlation of (RGB) image </span><span class="Special">%d</span><span class="Constant"> with cache</span><span class="Special">\n</span><span class="Constant">&quot;</span>,cache_index);
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    Simulated NVD correlation of (monochrome) image </span><span class="Special">%d</span><span class="Constant"> with cache</span><span class="Special">\n</span><span class="Constant">&quot;</span>,cache_index);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stdout</span>);
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;    </span><span class="Special">%d</span><span class="Constant"> geometric operation (step is </span><span class="Special">%d</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,gt_ops,gt_op_step);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;    </span><span class="Special">%d</span><span class="Constant"> OMP threads</span><span class="Special">\n</span><span class="Constant">&quot;</span>,omp_get_max_threads());
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+    <span class="Statement">if</span>((nvd_1 = (FTYPE *)cache_access_object(cache_index,<span class="Constant">0</span>,c_index)) == (FTYPE *)<span class="Constant">NULL</span>)
+    {  (<span class="Type">void</span>)snprintf(errstr,SSIZE,<span class="Constant">&quot;[cache_correlation_test] cache index not within cache (</span><span class="Special">%d</span><span class="Constant"> blocks in cache)&quot;</span>,n_blocks);
+       pups_error(errstr);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> OMP parallelised for loop </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> with explcit granularity </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+    n_blocks = cache_get_blocks(c_index);
+    start_time = omp_get_wtime();
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;n_blocks; ++i)
+    {   <span class="Type">char</span>  *mask  = (<span class="Type">char</span> *)<span class="Constant">NULL</span>;
+        FTYPE *nvd_2 = (FTYPE *)<span class="Constant">NULL</span>;
+
+        nvd_2            = (FTYPE *)cache_access_object(i,<span class="Constant">0</span>,c_index);
+        mask             = (<span class="Type">char</span> *) cache_access_object(i,<span class="Constant">1</span>,c_index);
+        sum[i].affinity  = simulate_DAISY_correlation(do_rgb,mask,nvd_1,nvd_2);
+        sum[i].index     = i;
+    }
+
+    end_time = omp_get_wtime();
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Sort the simulated image-image affinities </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)qsort((<span class="Type">void</span> *)sum,n_blocks,<span class="Statement">sizeof</span>(sum_type),(<span class="Type">void</span> *)compare_affinities);
+    <span class="Statement">if</span>(parse_flags &amp; CACHE_CWRITE)
+    {  <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;n_blocks; ++i)
+       {   (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;    </span><span class="Special">%06d</span><span class="Constant"> Image </span><span class="Special">%06d</span><span class="Constant"> correlation with image </span><span class="Special">%06d</span><span class="Constant"> is </span><span class="Special">%9.6f</span><span class="Special">\n</span><span class="Constant">&quot;</span>,i,cache_index,sum[i].index,<span class="Constant">1.0</span> - (sum[i].affinity / sum[n_blocks - <span class="Constant">1</span>].affinity));
+           (<span class="Type">void</span>)fflush(<span class="Constant">stdout</span>);
+       }
+
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stdout</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Time taken to process loop </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    correlation (</span><span class="Special">%d</span><span class="Constant"> blocks) took </span><span class="Special">%6.3f</span><span class="Constant"> seconds</span><span class="Special">\n</span><span class="Constant">&quot;</span>,n_blocks,end_time - start_time);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Destroy cache </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)sum);
+    (<span class="Type">void</span>)cache_destroy(c_index);
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Upate state to show test has run </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+    state_flags = TEST_PENDING;
+
+}
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> DAISY_TEST </span><span class="Comment">*/</span>
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Randomly initialise objects in cache </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> all are simulated NVD's              </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> rinit_cache(<span class="Type">int</span> do_rgb, <span class="Type">int</span> rows, <span class="Type">int</span> cols, <span class="Type">int</span> c_index)
+
+{   <span class="Type">int</span> i,
+        j,
+        k,
+        size,
+        eff_cols;
+
+    <span class="Type">char</span> TorF;
+
+<span class="PreProc">    #ifdef DAISY_TEST</span>
+    <span class="Type">unsigned</span> <span class="Type">char</span> *next_auxdata = (<span class="Type">unsigned</span> <span class="Type">char</span> *)<span class="Constant">NULL</span>;
+    <span class="Type">unsigned</span> <span class="Type">char</span> *next_mask    = (<span class="Type">unsigned</span> <span class="Type">char</span> *)<span class="Constant">NULL</span>;
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> DAISY_TEST </span><span class="Comment">*/</span>
+
+    FTYPE         *next_object  = (FTYPE *)<span class="Constant">NULL</span>;
+
+    <span class="Statement">if</span>(do_rgb == TRUE)
+       eff_cols = <span class="Constant">3</span>*cols;
+    <span class="Statement">else</span>
+       eff_cols = cols;
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;cache_blocks; ++i)
+    {
+
+<span class="PreProc">       #ifndef DAISY_TEST </span>
+       <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;objects; ++j)
+       {   next_object = (FTYPE *)cache_access_object(i,j,c_index);
+           <span class="Statement">for</span>(k=<span class="Constant">0</span>; k&lt;rows*eff_cols; ++k)
+               next_object[k] = <span class="Constant">255.0</span>*(FTYPE)drand48();
+
+<span class="PreProc">#ifdef DEBUG_CACHE</span>
+(<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;OBJECT 0x</span><span class="Special">%010x</span><span class="Constant">  value 0 is </span><span class="Special">%6.3f</span><span class="Special">\n</span><span class="Constant">&quot;</span>,(<span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>)next_object,next_object[<span class="Constant">0</span>]);
+(<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> DEBUG_CACHE </span><span class="Comment">*/</span>
+
+       }
+<span class="PreProc">       #else</span>
+       next_object   = (FTYPE *)cache_access_object(i,<span class="Constant">0</span>,c_index);
+       next_mask     = (<span class="Type">char</span> *) cache_access_object(i,<span class="Constant">1</span>,c_index);
+       next_auxdata  = (<span class="Type">char</span> *) cache_access_object(i,<span class="Constant">2</span>,c_index);
+
+       <span class="Statement">for</span>(k=<span class="Constant">0</span>; k&lt;rows*eff_cols; ++k)
+           next_object[k] = <span class="Constant">255.0</span>*(FTYPE)drand48();
+
+       <span class="Statement">if</span>(i % <span class="Constant">2</span> == <span class="Constant">0</span>)
+          TorF = <span class="Constant">'F'</span>;
+       <span class="Statement">else</span>
+          TorF = <span class="Constant">'T'</span>;
+
+       <span class="Statement">for</span>(k=<span class="Constant">0</span>; k&lt;rows*cols; ++k)
+           next_mask[k]   = <span class="Constant">'T'</span>;
+
+
+       <span class="Statement">for</span>(k=<span class="Constant">0</span>; k&lt;<span class="Constant">100</span>; k+=<span class="Constant">4</span>)
+       {   next_auxdata[k]   = <span class="Constant">'t'</span>;
+           next_auxdata[k+<span class="Constant">1</span>] = <span class="Constant">'w'</span>;
+           next_auxdata[k+<span class="Constant">2</span>] = <span class="Constant">'a'</span>;
+           next_auxdata[k+<span class="Constant">3</span>] = <span class="Constant">'t'</span>;
+       }
+
+<span class="PreProc">#ifdef DEBUG_CACHE</span>
+(<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;OBJECT 0x</span><span class="Special">%010x</span><span class="Constant">  value 0 is </span><span class="Special">%6.3f</span><span class="Special">\n</span><span class="Constant">&quot;</span>,(<span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>)next_object,next_object[<span class="Constant">0</span>]);
+(<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;MASK   0x</span><span class="Special">%010x</span><span class="Constant">  value 0 is </span><span class="Special">%c</span><span class="Special">\n</span><span class="Constant">&quot;</span>,(<span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>)next_mask,  next_mask[<span class="Constant">0</span>]);
+(<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> DEBUG_CACHE </span><span class="Comment">*/</span>
+
+<span class="PreProc">       #endif</span> <span class="Comment">/*</span><span class="Comment"> DAISY_TEST </span><span class="Comment">*/</span>
+
+    }
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Run (fast) cache access test </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> cache_access_test(_BOOLEAN do_rgb, <span class="Type">int</span> cache_index, <span class="Type">int</span> object_index)
+
+{   <span class="Type">int</span> i,
+        c_index,
+        eff_object_cols;
+
+    <span class="Statement">if</span>(do_rgb == TRUE)
+       eff_object_cols = <span class="Constant">3</span>*object_cols;
+    <span class="Statement">else</span>
+       eff_object_cols = object_cols;
+
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Initialise cache table </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)cache_table_init();
+
+    <span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Initialise cache </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(parse_flags &amp; CMAP_FILE)
+    {  c_index = cache_init_cache();
+
+
+       <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Uncompress cache if requested </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(parse_flags &amp; EXTRACT)
+         (<span class="Type">void</span>)cache_extract(cmap_file_name);
+
+       (<span class="Type">void</span>)cache_read_mapinfo(cmap_file_name,c_index);
+       (<span class="Type">void</span>)cache_create(FALSE,<span class="Constant">&quot;&quot;</span>,CACHE_USING_MAPINFO,c_index);
+    }
+    <span class="Statement">else</span>
+    {  c_index = cache_init_cache();
+
+
+       <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Add a couple of objects </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> to the cache            </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">       #ifndef DAISY_TEST</span>
+       <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;objects; ++i)
+          (<span class="Type">void</span>)cache_add_object(object_rows*eff_object_cols*<span class="Statement">sizeof</span>(FTYPE),c_index);
+<span class="PreProc">       #else</span>
+                                                                                    <span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+       (<span class="Type">void</span>)cache_add_object(object_rows*eff_object_cols*<span class="Statement">sizeof</span>(FTYPE),c_index);   <span class="Comment">/*</span><span class="Comment"> NVD array       </span><span class="Comment">*/</span>
+       (<span class="Type">void</span>)cache_add_object(object_rows*    object_cols*<span class="Statement">sizeof</span>(<span class="Type">char</span>), c_index);   <span class="Comment">/*</span><span class="Comment"> NVD mask        </span><span class="Comment">*/</span>
+       (<span class="Type">void</span>)cache_add_object(<span class="Constant">100</span>*<span class="Statement">sizeof</span>(<span class="Type">char</span>),c_index);                            <span class="Comment">/*</span><span class="Comment"> Auxilliary data </span><span class="Comment">*/</span>
+                                                                                    <span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+<span class="PreProc">       #endif</span> <span class="Comment">/*</span><span class="Comment"> DAISY_TEST </span><span class="Comment">*/</span>
+
+
+       <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Create a cache </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(cache_n_quanta == <span class="Constant">1</span>)
+          (<span class="Type">void</span>)cache_create(TRUE,cache_file_name,cache_blocks,c_index);
+       <span class="Statement">else</span>
+       {  <span class="Type">int</span> eff_cache_blocks,
+              cache_quantum;
+
+          <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Test cache resize </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+          <span class="Comment">// Base cache</span>
+          cache_quantum = cache_blocks / cache_n_quanta;
+          (<span class="Type">void</span>)cache_create(TRUE,cache_file_name,cache_quantum,c_index);
+
+          <span class="Comment">// Extend cache</span>
+          cache_blocks = <span class="Constant">0</span>;
+          <span class="Statement">for</span>(i=<span class="Constant">1</span>; i&lt;cache_n_quanta; ++i)
+          {  cache_blocks = cache_quantum + i*cache_quantum;
+             (<span class="Type">void</span>)cache_resize(cache_blocks,c_index);
+
+             (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    </span><span class="Special">%06d</span><span class="Constant">: cache extended to </span><span class="Special">%06d</span><span class="Constant"> blocks (quantum is </span><span class="Special">%06d</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,i,cache_blocks,cache_quantum);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+          }
+
+          <span class="Comment">// Shrink cache</span>
+          cache_blocks -= cache_quantum;
+          (<span class="Type">void</span>)cache_resize(cache_blocks,c_index);
+
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    </span><span class="Special">%06d</span><span class="Constant">: cache shrunk to </span><span class="Special">%06d</span><span class="Constant"> blocks (quantum is </span><span class="Special">%06d</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,i,cache_blocks,cache_quantum);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Print cache statistics </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)cache_display_statistics(<span class="Constant">stderr</span>,c_index);
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Randomly initialise cache if required </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(parse_flags &amp; CACHE_INIT)
+    {  rinit_cache(do_rgb, object_rows,object_cols,c_index);
+       (<span class="Type">void</span>)cache_write(cache_file_name,c_index);
+    }
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Reference an object in cache </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">    #ifdef DAISY_TEST</span>
+    flinarr = (FTYPE *)        cache_access_object(cache_index,<span class="Constant">0</span>,c_index);
+    mask    = (<span class="Type">unsigned</span> <span class="Type">char</span> *)cache_access_object(cache_index,<span class="Constant">1</span>,c_index);
+
+    <span class="Statement">if</span>(appl_verbose == TRUE)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    Cache object block:</span><span class="Special">%d</span><span class="Constant"> (DAISY test)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,cache_index);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    Reference to </span><span class="Special">\&quot;</span><span class="Constant">flinarr</span><span class="Special">\&quot;</span><span class="Constant"> at 0x</span><span class="Special">%010x</span><span class="Constant"> virtual</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,(<span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>)flinarr);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    }
+<span class="PreProc">    #else</span>
+    <span class="Statement">if</span>((flinarr = (FTYPE *)cache_access_object(cache_index,object_index,c_index)) == (FTYPE *)<span class="Constant">NULL</span>)
+    {  (<span class="Type">void</span>)snprintf(errstr,SSIZE,<span class="Constant">&quot;[cache_access_test] object index </span><span class="Special">%d</span><span class="Constant"> not within cache block bounds&quot;</span>,object_index);
+       pups_error(errstr);
+    }
+
+    <span class="Statement">if</span>(appl_verbose == TRUE)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    Cache object block:</span><span class="Special">%04d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,cache_index);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    Reference to </span><span class="Special">\&quot;</span><span class="Constant">flinarr</span><span class="Special">\&quot;</span><span class="Constant"> at 0x</span><span class="Special">%010x</span><span class="Constant"> virtual</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,(<span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>)flinarr);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    }
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> DAISY_OBJECT_ACCESS_TEST </span><span class="Comment">*/</span>
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Display raw object output </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(raw_object_output == TRUE)
+    {  <span class="Type">int</span> cnt = <span class="Constant">0</span>;
+
+<span class="PreProc">       #ifdef DAISY_TEST</span>
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    1D array access test (cache index </span><span class="Special">%d</span><span class="Constant">, DAISY test)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,cache_index,object_index);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+<span class="PreProc">       #else</span>
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    1D array access test (cache index </span><span class="Special">%d</span><span class="Constant">, object index </span><span class="Special">%d</span><span class="Constant">)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,cache_index,object_index);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+<span class="PreProc">       #endif</span> <span class="Comment">/*</span><span class="Comment"> DAISY_TEST </span><span class="Comment">*/</span>
+
+       <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;object_rows*eff_object_cols; ++i)
+       {  <span class="Statement">if</span>(i%eff_object_cols == <span class="Constant">0</span>)
+          { (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    </span><span class="Special">%04d</span><span class="Constant"> flinarr[</span><span class="Special">%04d</span><span class="Constant">]:</span><span class="Special">\t\t</span><span class="Special">%6.3f</span><span class="Special">\n</span><span class="Constant">&quot;</span>,cnt,i,flinarr[i]);
+            (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+            ++cnt;
+          }
+       }
+
+<span class="PreProc">       #ifdef DAISY_TEST</span>
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       cnt = <span class="Constant">0</span>;
+       <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;object_rows*object_cols; ++i)
+       {  <span class="Statement">if</span>(i%object_cols == <span class="Constant">0</span>)
+          { (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    </span><span class="Special">%04d</span><span class="Constant"> mask[</span><span class="Special">%04d</span><span class="Constant">]:</span><span class="Special">\t\t</span><span class="Special">%c</span><span class="Special">\n</span><span class="Constant">&quot;</span>,cnt,i,mask[i]);
+            (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+            ++cnt;
+          }
+       }
+<span class="PreProc">       #endif</span> <span class="Comment">/*</span><span class="Comment"> DAISY_TEST </span><span class="Comment">*/</span>
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Display output of object mapped onto </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> a 2D array                           </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(mapped_object_output == TRUE)
+    {  <span class="Type">int</span> cnt = <span class="Constant">0</span>;
+
+
+       <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Map 2D array onto object memory </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+
+       flin2Darr = (FTYPE **)cache_map_2D_array(flinarr,object_rows,eff_object_cols,<span class="Statement">sizeof</span>(FTYPE));
+
+<span class="PreProc">       #ifdef DAISY_TEST</span>
+       mask2Darr = (FTYPE **)cache_map_2D_array(mask   ,object_rows,object_cols,    <span class="Statement">sizeof</span>(<span class="Type">char</span>));
+
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    2D array access test (cache index </span><span class="Special">%d</span><span class="Constant">, DAISY test</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,cache_index);
+<span class="PreProc">       #else</span>
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    2D array access test (cache index </span><span class="Special">%d</span><span class="Constant">, object index </span><span class="Special">%d</span><span class="Constant">)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,cache_index,object_index);
+<span class="PreProc">       #endif</span> <span class="Comment">/*</span><span class="Comment"> DAISY_TEST </span><span class="Comment">*/</span>
+
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;object_rows; ++i)
+       {  <span class="Type">int</span> j;
+
+          <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;eff_object_cols; ++j)
+          {  <span class="Statement">if</span>(j == <span class="Constant">0</span>)
+             { (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    </span><span class="Special">%04d</span><span class="Constant"> flin2Darr[</span><span class="Special">%04d</span><span class="Constant">][</span><span class="Special">%04d</span><span class="Constant">]:</span><span class="Special">\t\t</span><span class="Special">%6.3f</span><span class="Special">\n</span><span class="Constant">&quot;</span>,cnt,i,j,flin2Darr[i][j]);
+               (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+               ++cnt;
+             }
+          }
+       }
+
+<span class="PreProc">       #ifdef DAISY_TEST</span>
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       cnt = <span class="Constant">0</span>;
+       <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;object_rows; ++i)
+       {  <span class="Type">int</span> j;
+
+          <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;object_cols; ++j)
+          {  <span class="Statement">if</span>(j == <span class="Constant">0</span>)
+             { (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    </span><span class="Special">%04d</span><span class="Constant"> mask2Darr[</span><span class="Special">%04d</span><span class="Constant">][</span><span class="Special">%04d</span><span class="Constant">]:</span><span class="Special">\t\t</span><span class="Special">%c</span><span class="Special">\n</span><span class="Constant">&quot;</span>,cnt,i,j,mask2Darr[i][j]);
+               (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+             }
+          }
+       }
+<span class="PreProc">       #endif</span> <span class="Comment">/*</span><span class="Comment"> DAISY_TEST </span><span class="Comment">*/</span>
+
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Write cache map if requsted to do so </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(parse_flags &amp; WCMAP_FILE)
+    {  (<span class="Type">void</span>)cache_write_mapinfo(wcmap_file_name,c_index);
+
+
+       <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Compress archive if requested </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(parse_flags &amp; ARCHIVE)
+       {  _BOOLEAN archive_compress = FALSE,
+                   archive_delete   = FALSE;
+
+          <span class="Statement">if</span>(parse_flags &amp; COMPRESS)
+             archive_compress = TRUE;
+
+          <span class="Statement">if</span>(parse_flags &amp; DELETE)
+             archive_delete = TRUE;
+
+          (<span class="Type">void</span>)cache_archive(archive_compress,
+                              archive_delete,
+                              wcmap_file_name);
+       }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Destroy cache </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)cache_destroy(c_index);
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Upate state to show test has run </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+    state_flags = TEST_PENDING;
+}
+
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

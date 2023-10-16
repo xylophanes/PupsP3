@@ -1,0 +1,214 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.5.1.src.git/include.libs/netlib.h.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="cpp">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Purpose: distributed programming library. Note almost all functions in</span>
+<span class="Comment">             this library are #ifdef'd. There are two sets, one for a</span>
+<span class="Comment">             generic POSIX enviroment and one with minimal functionality</span>
+<span class="Comment">             for non POSIX environments.</span>
+
+<span class="Comment">    Author:  M.A. O'Neill</span>
+<span class="Comment">             Tumbling Dice Ltd</span>
+<span class="Comment">             Gosforth</span>
+<span class="Comment">             Newcastle upon Tyne</span>
+<span class="Comment">             NE3 4RT</span>
+<span class="Comment">             United Kingdom</span>
+
+<span class="Comment">    Version: 5.00 </span>
+<span class="Comment">    Dated:   4th January 2022</span>
+<span class="Comment">    E-Mail:  mao@tumblingdice.co.uk </span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifndef NETLIB_H</span>
+<span class="PreProc">#define NETLIB_H</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Keep c2man happy </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;c2man.h&gt;</span>
+
+<span class="PreProc">#ifndef __C2MAN__</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;utils.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;signal.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;setjmp.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;errno.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> __C2MAN </span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">*********</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Version </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">*********</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define NETLIB_VERSION    </span><span class="Constant">&quot;5.00&quot;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> String size </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define SSIZE              </span><span class="Constant">2048</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Define dummy flag (which is set when we want blocking I/O) </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifndef O_BLOCK</span>
+<span class="PreProc">#define O_BLOCK </span><span class="Constant">0</span>
+<span class="PreProc">#endif</span>
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Return codes from pidname parser </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define NOT_PARSED    </span><span class="Constant">0</span><span class="PreProc">                </span><span class="Comment">// Failed to parse pidname</span>
+<span class="PreProc">#define PARSED        </span><span class="Constant">1</span><span class="PreProc">                </span><span class="Comment">// Parsed fully qualified pidname</span>
+<span class="PreProc">#define PARSED_LOCAL  </span><span class="Constant">2</span><span class="PreProc">                </span><span class="Comment">// Parsed local pidname</span>
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> xsystem control flags - note that whether these flags are honoured </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> is in part a function of the shell used by the xsystem routine     </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define PUPS_STREAMS_DETACHED (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">0</span><span class="PreProc">) </span><span class="Comment">// stdio detached from caller</span>
+<span class="PreProc">#define PUPS_WAIT_FOR_CHILD   (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">1</span><span class="PreProc">) </span><span class="Comment">// Wait for child before return</span>
+<span class="PreProc">#define PUPS_ERROR_EXIT       (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">2</span><span class="PreProc">) </span><span class="Comment">// Exit exec shell on first err</span>
+<span class="PreProc">#define PUPS_READ_FIFO        (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">3</span><span class="PreProc">) </span><span class="Comment">// Create a read FIFO from child</span>
+<span class="PreProc">#define PUPS_WRITE_FIFO       (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">4</span><span class="PreProc">) </span><span class="Comment">// Create write FIFO to child</span>
+<span class="PreProc">#define PUPS_RW_FIFO          (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">5</span><span class="PreProc">) </span><span class="Comment">// Create r/w FIFO to child</span>
+<span class="PreProc">#define PUPS_NEW_SESSION      (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">6</span><span class="PreProc">) </span><span class="Comment">// Run child in new session </span>
+<span class="PreProc">#define PUPS_NOAUTO_CLEAN     (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">7</span><span class="PreProc">) </span><span class="Comment">// Don't automatically wait for child</span>
+<span class="PreProc">#define PUPS_OBITUARY         (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">8</span><span class="PreProc">) </span><span class="Comment">// Log death of child process</span>
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Stdio closure codes for pipeline detach function </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define CLOSE_STDIN           (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">0</span><span class="PreProc">) </span><span class="Comment">// Close standard input</span>
+<span class="PreProc">#define CLOSE_STDOUT          (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">1</span><span class="PreProc">) </span><span class="Comment">// Close standard output</span>
+<span class="PreProc">#define CLOSE_STDERR          (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">2</span><span class="PreProc">) </span><span class="Comment">// Close standard error</span>
+<span class="PreProc">#define NEW_PGRP              (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">3</span><span class="PreProc">) </span><span class="Comment">// Detach from pipeline process group</span>
+
+
+<span class="PreProc">#ifdef __NOT_LIB_SOURCE__</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Public variables exported by this application </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+
+_EXPORT _BOOLEAN    use_nodel;         <span class="Comment">// Nodel toggle</span>
+_EXPORT <span class="Type">jmp_buf</span>     ch_jmp_buf;        <span class="Comment">// Channel err handlrr</span>
+_EXPORT <span class="Type">int</span>         rstat_timeout;     <span class="Comment">// Timeout rstat</span>
+
+<span class="PreProc">#else</span>
+<span class="PreProc">#   undef  _EXPORT</span>
+<span class="PreProc">#   define _EXPORT</span>
+<span class="PreProc">#endif</span>
+
+<span class="Comment">// Extended command processor routine</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_system(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">int</span> *);
+
+<span class="Comment">// Open a command descriptor</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_copen(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Close command descriptor</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_cclose(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Open a command stream</span>
+_PROTOTYPE _EXPORT <span class="Type">FILE</span> *pups_fcopen(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Close command stream</span>
+_PROTOTYPE _EXPORT <span class="Type">FILE</span> *pups_fcclose(<span class="Type">const</span> <span class="Type">FILE</span> *);
+
+
+<span class="PreProc">#ifdef ZLIB_SUPPORT</span>
+
+<span class="Comment">// Open a command zstream */</span>
+_PROTOTYPE _EXPORT gzFILE *pups_gzcopen(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Close command zstream */</span>
+_PROTOTYPE _EXPORT gzFILE *pups_gzcclose(<span class="Type">const</span> gzFILE *);
+
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> ZLIB_SUPPORT </span><span class="Comment">*/</span>
+
+
+<span class="Comment">// Extended command processor routine [version 2]</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_system2(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">int</span> *, <span class="Type">int</span> *, <span class="Type">int</span> *, <span class="Type">int</span> *);
+
+<span class="Comment">// Open a set command descriptors bound to pipeline [version 2]</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_copen2(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">int</span> *, <span class="Type">int</span> *, <span class="Type">int</span> *, <span class="Type">int</span> *);  <span class="Comment">/*</span><span class="Comment"> MAO </span><span class="Comment">*/</span>
+
+<span class="Comment">// Open a set of streams bound to pipeline [version 2]</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_fcopen2(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">int</span> *, <span class="Type">FILE</span> *, <span class="Type">FILE</span> *, <span class="Type">FILE</span> *);  <span class="Comment">/*</span><span class="Comment"> MAO </span><span class="Comment">*/</span>
+
+<span class="Comment">// Close stdio descriptors</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> detach_from_pipeline(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Relay signal to process running on remote host</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_rkill(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Disable automatic killing of pipestream on the closure of </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> associated descriptor                                     </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_pipestream_kill_disable(<span class="Type">const</span> <span class="Type">int</span>);
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Enable automatic killing of pipestream on the closure of </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> associated descriptor                                    </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_pipestream_kill_enable(<span class="Type">const</span> <span class="Type">int</span>);
+
+
+<span class="PreProc">#ifdef _CPLUSPLUS</span>
+<span class="PreProc">#   undef  _EXPORT</span>
+<span class="PreProc">#   define _EXPORT </span><span class="Type">extern</span><span class="PreProc"> C</span>
+<span class="PreProc">#else</span>
+<span class="PreProc">#   undef  _EXPORT</span>
+<span class="PreProc">#   define _EXPORT </span><span class="Type">extern</span>
+<span class="PreProc">#endif</span>
+
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> Network support library </span><span class="Comment">*/</span>
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

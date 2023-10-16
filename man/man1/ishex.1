@@ -1,4 +1,4 @@
-.TH ISHEX 1 "22 February 2005" "PUPSP3 build tools" "PUPSP3 build tools"
+.TH ISHEX 1 "22nd February 2005" "PUPSP3 build tools" "PUPSP3 build tools"
 
 .SH NAME
 ISHEX \- test to see if string is a hexadecimal number 
@@ -7,7 +7,7 @@ ISHEX \- test to see if string is a hexadecimal number
 .SH SYNOPSIS
 .B ishex 
 .I string 
->& <log file>
+[2> <log file>]
 .br
 
 .SH DESCRIPTION
@@ -21,6 +21,18 @@ If not, the string
 .B FALSE
 is printed to
 .I standard output 
+.br
+
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
 .br
 
 .SH ENVIRONMENT VARIABLES

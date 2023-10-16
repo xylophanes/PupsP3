@@ -1,0 +1,632 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/hashlib.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Purpose: Portable hash access library.</span>
+
+<span class="Comment">    Author:  M.A. O'Neill</span>
+<span class="Comment">             Tumbling Dice Ltd</span>
+<span class="Comment">             Gosforth</span>
+<span class="Comment">             Newcastle upon Tyne</span>
+<span class="Comment">             NE3 4RT</span>
+<span class="Comment">             United Kingdom</span>
+
+<span class="Comment">    Version: 3.00 </span>
+<span class="Comment">    Dated:   4th January 2022</span>
+<span class="Comment">    E-Mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;me.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;utils.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;casino.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;errno.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stdlib.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Do not expand _EXTERN for this library ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#undef   __NOT_LIB_SOURCE__</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;hash.h&gt;</span>
+<span class="PreProc">#define  __NOT_LIB_SOURCE__</span>
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Slot and usage functions - used by slot manager ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Slot usage function </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> hashlib_slot(<span class="Type">int</span> level)
+{   (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;lib hashlib </span><span class="Special">%s</span><span class="Constant">: [ANSI C]</span><span class="Special">\n</span><span class="Constant">&quot;</span>,HASH_VERSION);
+
+    <span class="Statement">if</span>(level &gt; <span class="Constant">1</span>)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;(C) 1995-2022 Tumbling Dice</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Author: M.A. O'Neill</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;PUPS/P3 hash storage library (built </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+    }
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Segment identification for hash library </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef SLOT</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;slotman.h&gt;</span>
+_EXTERN <span class="Type">void</span> (* SLOT )() __attribute__ ((aligned(<span class="Constant">16</span>))) = hashlib_slot;
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> SLOT </span><span class="Comment">*/</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Private variables used by the hashing library </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef PTHREAD_SUPPORT</span>
+pthread_mutex_t hash_table_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Prototypes of functions private to this library ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Routine to generate hashing key </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+
+_PROTOTYPE _PRIVATE <span class="Type">int</span> hash_key(<span class="Type">int</span>, hash_table_type *);
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Generate hash key ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> hash_key(<span class="Type">int</span> h_index, hash_table_type *hash_table)
+
+{   <span class="Type">int</span> w;
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Seed random number generator so that random number produced </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> is a function of the index                                  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    r_init = (<span class="Type">long</span>)(-h_index);
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Generate hash key </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+    w = (<span class="Type">int</span>)(ran1()*(FTYPE)(hash_table-&gt;size - <span class="Constant">1</span>));
+    <span class="Statement">return</span>(w);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Create a hash table object ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC hash_table_type *hash_table_create(<span class="Type">int</span> size, <span class="Type">char</span> *name)
+
+{   <span class="Type">int</span> i;
+    hash_table_type *hash_table = (hash_table_type *)<span class="Constant">NULL</span>;
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Only the root thread can process </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> PSRP requests                    </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(pupsthread_is_root_thread() == FALSE)
+       pups_error(<span class="Constant">&quot;[hash_table_create] attempt by non root thread to perform PUPS/P3 hash operation&quot;</span>);
+
+    <span class="Statement">if</span>(size &lt; <span class="Constant">0</span> || name == (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>((hash_table_type *)<span class="Constant">NULL</span>);
+    }
+
+<span class="PreProc">    #ifdef PTHREAD_SUPPORT</span>
+    (<span class="Type">void</span>)pthread_mutex_lock(&amp;hash_table_mutex);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((hash_table = (hash_table_type *)pups_malloc(<span class="Statement">sizeof</span>(hash_table_type))) == (hash_table_type *)<span class="Constant">NULL</span>)
+       pups_error(<span class="Constant">&quot;[hash_table_create] cannot allocate memory [hash_table]&quot;</span>);
+
+    <span class="Statement">if</span>((hash_table-&gt;hashentry = (hash_type *)pups_calloc(size,<span class="Statement">sizeof</span>(hash_type))) == (hash_type *)<span class="Constant">NULL</span>)
+       pups_error(<span class="Constant">&quot;[hash_table_create] cannot allocate memory [hash_entry array] &quot;</span>);
+
+    hash_table-&gt;size  = size;
+    (<span class="Type">void</span>)strlcpy(hash_table-&gt;name,name,SSIZE);
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Initialise the object status </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;size; ++i)
+    {   hash_table-&gt;hashentry[i].size   = <span class="Constant">0</span>;
+        hash_table-&gt;hashentry[i].used   = <span class="Constant">0</span>;
+        hash_table-&gt;hashentry[i].index  = (<span class="Type">int</span>   *)<span class="Constant">NULL</span>;
+        hash_table-&gt;hashentry[i].object = (<span class="Type">void</span> **)<span class="Constant">NULL</span>;
+    }
+
+<span class="PreProc">    #ifdef PTHREAD_SUPPORT</span>
+    (<span class="Type">void</span>)pthread_mutex_unlock(&amp;hash_table_mutex);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(hash_table);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Destroy a hash table object ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC hash_table_type *hash_table_destroy(hash_table_type *hash_table)
+
+{   <span class="Type">int</span> i;
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Only the root thread can process </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> PSRP requests                    </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(pupsthread_is_root_thread() == FALSE)
+       pups_error(<span class="Constant">&quot;[hash_table_destroy] attempt by non root thread to perform PUPS/P3 hash operationy&quot;</span>);
+
+    <span class="Statement">if</span>(hash_table == (hash_table_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>((hash_table_type *)<span class="Constant">NULL</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Free all memory associated with the hash table </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">    #ifdef PTHREAD_SUPPORT</span>
+    (<span class="Type">void</span>)pthread_mutex_lock(&amp;hash_table_mutex);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;hash_table-&gt;size; ++i)
+    {  (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)hash_table-&gt;hashentry[i].index);
+       (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)hash_table-&gt;hashentry[i].object);
+    }
+
+    (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)hash_table);
+
+<span class="PreProc">    #ifdef PTHREAD_SUPPORT</span>
+    (<span class="Type">void</span>)pthread_mutex_unlock(&amp;hash_table_mutex);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>((hash_table_type *)<span class="Constant">NULL</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Return object at a given location ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> hash_get_object(<span class="Type">int</span> h_index, <span class="Type">void</span> *object, <span class="Type">char</span> *object_type, hash_table_type *hash_table)
+
+{   <span class="Type">int</span> i,
+        hash_index;
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check parameters </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(h_index       &lt;   <span class="Constant">0</span>                  ||
+       object      == (<span class="Type">void</span> *)<span class="Constant">NULL</span>          ||
+       object_type == (<span class="Type">char</span> *)<span class="Constant">NULL</span>          ||
+       hash_table  == (hash_table_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+<span class="PreProc">    #ifdef PTHREAD_SUPPORT</span>
+    (<span class="Type">void</span>)pthread_mutex_lock(&amp;hash_table_mutex);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Get index into the tables of hashed data </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+
+    hash_index = hash_key(h_index,hash_table);
+
+<span class="PreProc">    #ifdef HASHLIB_DEBUG</span>
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Hash key </span><span class="Special">%d</span><span class="Constant"> (from index </span><span class="Special">%d</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,hash_index,h_index);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> HASHLIB_DEBUG </span><span class="Comment">*/</span>
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Follow hash chain until we find index which corresponds </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> the index we are looking for. Note that we have strong  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> type checking: the object types MUST match              </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;hash_table-&gt;hashentry[hash_index].size; ++i)
+    {   <span class="Statement">if</span>(hash_table-&gt;hashentry[hash_index].index[i] == h_index &amp;&amp; strcmp(hash_table-&gt;hashentry[hash_index].object_type[i],object_type) == <span class="Constant">0</span>)
+        {  (<span class="Type">void</span>)memcpy(object,hash_table-&gt;hashentry[hash_index].object[i],hash_table-&gt;hashentry[hash_index].object_size[i]);
+
+<span class="PreProc">           #ifdef HASHLIB_DEBUG</span>
+           (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Hash key </span><span class="Special">%d</span><span class="Constant">: extract OK</span><span class="Special">\n</span><span class="Constant">&quot;</span>,hash_index);
+           (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+<span class="PreProc">           #endif</span> <span class="Comment">/*</span><span class="Comment"> HASHLIB_DEBUG </span><span class="Comment">*/</span>
+
+<span class="PreProc">           #ifdef PTHREAD_SUPPORT</span>
+           (<span class="Type">void</span>)pthread_mutex_unlock(&amp;hash_table_mutex);
+<span class="PreProc">           #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+           pups_set_errno(OK);
+           <span class="Statement">return</span>(<span class="Constant">0</span>);
+        }
+    }
+
+<span class="PreProc">    #ifdef PTHREAD_SUPPORT</span>
+    (<span class="Type">void</span>)pthread_mutex_unlock(&amp;hash_table_mutex);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+    pups_set_errno(<span class="Constant">ESRCH</span>);
+    <span class="Statement">return</span>(-<span class="Constant">1</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Put object in hash table ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> hash_put_object(<span class="Type">int</span> h_index, <span class="Type">void</span> *object, <span class="Type">char</span> *object_type, <span class="Type">int</span> object_size, hash_table_type *hash_table)
+
+{   <span class="Type">int</span> i,
+        hash_index,
+        chain_index;
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check parameters </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(h_index    &lt;  <span class="Constant">0</span>                    ||
+      object      == (<span class="Type">void</span> *)<span class="Constant">NULL</span>         ||
+      object_type == (<span class="Type">char</span> *)<span class="Constant">NULL</span>         ||
+      object_size &lt; <span class="Constant">0</span>                     ||
+      hash_table == (hash_table_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+<span class="PreProc">    #ifdef PTHREAD_SUPPORT</span>
+    (<span class="Type">void</span>)pthread_mutex_lock(&amp;hash_table_mutex);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Get hash key for index </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+    hash_index = hash_key(h_index,hash_table);
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Try and find a free slot at insertion location </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;hash_table-&gt;hashentry[hash_index].size; ++i)
+    {  <span class="Statement">if</span>(hash_table-&gt;hashentry[hash_index].index[i] == (-<span class="Constant">1</span>))
+       {
+
+           <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> Record type of object </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+
+           (<span class="Type">void</span>)strlcpy(hash_table-&gt;hashentry[hash_index].object_type[i],object_type,SSIZE);
+
+
+           <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> We may need to change amount of memory dynamically allocated to object </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+           <span class="Statement">if</span>(hash_table-&gt;hashentry[hash_index].object_size[i] != object_size)
+           {  hash_table-&gt;hashentry[hash_index].object[i]      = (<span class="Type">void</span> *)realloc((<span class="Type">void</span> *)hash_table-&gt;hashentry[hash_index].object[i],object_size);
+              hash_table-&gt;hashentry[hash_index].object_size[i] = object_size;
+           }
+
+
+           <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> Store the object in the hash table </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+
+           (<span class="Type">void</span>)memcpy(hash_table-&gt;hashentry[hash_index].object[i],object,object_size);
+           hash_table-&gt;hashentry[hash_index].index[i] = h_index;
+
+           ++hash_table-&gt;hashentry[hash_index].used;
+
+<span class="PreProc">           #ifdef PTHREAD_SUPPORT</span>
+           (<span class="Type">void</span>)pthread_mutex_unlock(&amp;hash_table_mutex);
+<span class="PreProc">           #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="PreProc">           #ifdef HASHLIB_DEBUG</span>
+           (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Used </span><span class="Special">%d</span><span class="Constant">: Insert at hash </span><span class="Special">%d</span><span class="Constant">, chain </span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,h_index,hash_index,i);
+           (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+<span class="PreProc">           #endif</span> <span class="Comment">/*</span><span class="Comment"> HASHLIB_DEBUG </span><span class="Comment">*/</span>
+
+           pups_set_errno(OK);
+           <span class="Statement">return</span>(<span class="Constant">0</span>);
+       }
+
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Insert object into hash table extending hash chain </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> for the insertion location                         </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+
+    chain_index = hash_table-&gt;hashentry[hash_index].used;
+
+    <span class="Statement">if</span>(hash_table-&gt;hashentry[hash_index].size == hash_table-&gt;hashentry[hash_index].used)
+    {  hash_table-&gt;hashentry[hash_index].size += ALLOC_QUANTUM;
+
+       hash_table-&gt;hashentry[hash_index].object_type  = (<span class="Type">char</span> **)pups_realloc((<span class="Type">void</span> *)hash_table-&gt;hashentry[hash_index].object_type,
+                                                                          hash_table-&gt;hashentry[hash_index].size*<span class="Statement">sizeof</span>(<span class="Type">char</span> *));
+       <span class="Statement">if</span>(hash_table-&gt;hashentry[hash_index].object_type == (<span class="Type">char</span> **)<span class="Constant">NULL</span>)
+          pups_error(<span class="Constant">&quot;[hash_put_object] failed to extend hash chain (cannot reallocate memory [extend object_type array])&quot;</span>);
+
+       hash_table-&gt;hashentry[hash_index].object = (<span class="Type">void</span> **)pups_realloc((<span class="Type">void</span> *)hash_table-&gt;hashentry[hash_index].object,
+                                                                    hash_table-&gt;hashentry[hash_index].size*<span class="Statement">sizeof</span>(<span class="Type">void</span> *));
+
+       <span class="Statement">if</span>(hash_table-&gt;hashentry[hash_index].object == (<span class="Type">void</span> **)<span class="Constant">NULL</span>)
+          pups_error(<span class="Constant">&quot;[hash_put_object] failed to extend hash chain (cannot reallocate memory [extend object array])&quot;</span>);
+
+       hash_table-&gt;hashentry[hash_index].index = (<span class="Type">int</span> *)  pups_realloc((<span class="Type">void</span> *)hash_table-&gt;hashentry[hash_index].index,
+                                                                   hash_table-&gt;hashentry[hash_index].size*<span class="Statement">sizeof</span>(<span class="Type">int</span>));
+
+       <span class="Statement">if</span>(hash_table-&gt;hashentry[hash_index].index == (<span class="Type">int</span> *)<span class="Constant">NULL</span>)
+          pups_error(<span class="Constant">&quot;[hash_put_object] failed to extend hash chain (cannot allocate memory [extend index array])&quot;</span>);
+
+       hash_table-&gt;hashentry[hash_index].object_size  = (<span class="Type">int</span> *)  pups_realloc((<span class="Type">void</span> *)hash_table-&gt;hashentry[hash_index].object_size,
+                                                                             hash_table-&gt;hashentry[hash_index].size*<span class="Statement">sizeof</span>(<span class="Type">int</span>));
+       <span class="Statement">if</span>(hash_table-&gt;hashentry[hash_index].object_size == (<span class="Type">int</span> *)<span class="Constant">NULL</span>)
+          pups_error(<span class="Constant">&quot;[hash_put_object] failed to extend hash chain (cannot reallocate memory [extend object_size array])&quot;</span>);
+    }
+
+    <span class="Statement">if</span>((hash_table-&gt;hashentry[hash_index].object_type[chain_index] = (<span class="Type">void</span> *)pups_malloc(SSIZE)) == (<span class="Type">void</span> *)<span class="Constant">NULL</span>)
+       pups_error(<span class="Constant">&quot;[hash_put_object] failed to extend hash chain (cannot allocate memory [object type])&quot;</span>);
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)strlcpy(hash_table-&gt;hashentry[hash_index].object_type[chain_index],object_type,SSIZE);
+
+    <span class="Statement">if</span>((hash_table-&gt;hashentry[hash_index].object[chain_index] = (<span class="Type">void</span> *)pups_malloc(object_size)) ==(<span class="Type">void</span> *)<span class="Constant">NULL</span>)
+       pups_error(<span class="Constant">&quot;[hash_put_object] failed to extend hash chain (cannot allocate memory [object])&quot;</span>);
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)memcpy(hash_table-&gt;hashentry[hash_index].object[chain_index],object,object_size);
+
+    hash_table-&gt;hashentry[hash_index].index[chain_index]       = h_index;
+    hash_table-&gt;hashentry[hash_index].object_size[chain_index] = object_size;
+
+    ++hash_table-&gt;hashentry[hash_index].used;
+
+<span class="PreProc">    #ifdef HASHLIB_DEBUG</span>
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">: Insert at hash </span><span class="Special">%d</span><span class="Constant">, chain </span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,index,hash_index,chain_index);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> HASHLIB_DEBUG </span><span class="Comment">*/</span>
+
+<span class="PreProc">    #ifdef PTHREAD_SUPPORT</span>
+    (<span class="Type">void</span>)pthread_mutex_unlock(&amp;hash_table_mutex);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to delete object from hash table ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> hash_delete_object(<span class="Type">int</span> h_index, hash_table_type *hash_table)
+
+{   <span class="Type">int</span> i,
+        hash_index;
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check parameters </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(h_index    &lt;  <span class="Constant">0</span>                     ||
+       hash_table == (hash_table_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+<span class="PreProc">    #ifdef PTHREAD_SUPPORT</span>
+    (<span class="Type">void</span>)pthread_mutex_lock(&amp;hash_table_mutex);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Get index into the tables of hashed data </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+
+    hash_index = hash_key(h_index,hash_table);
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;hash_table-&gt;hashentry[hash_index].size; ++i)
+    {  <span class="Statement">if</span>(hash_table-&gt;hashentry[hash_index].index[i] == h_index)
+       {  hash_table-&gt;hashentry[hash_index].index[i]       = (-<span class="Constant">1</span>);
+          hash_table-&gt;hashentry[hash_index].object_size[i] = (-<span class="Constant">1</span>);
+          (<span class="Type">void</span>)strlcpy(hash_table-&gt;hashentry[hash_index].object_type[i],<span class="Constant">&quot;&quot;</span>,SSIZE);
+
+          --hash_table-&gt;hashentry[hash_index].used;
+
+<span class="PreProc">          #ifdef PTHREAD_SUPPORT</span>
+          (<span class="Type">void</span>)pthread_mutex_unlock(&amp;hash_table_mutex);
+<span class="PreProc">          #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+          pups_set_errno(OK);
+          <span class="Statement">return</span>(<span class="Constant">0</span>);
+       }
+    }
+
+<span class="PreProc">    #ifdef PTHREAD_SUPPORT</span>
+    (<span class="Type">void</span>)pthread_mutex_unlock(&amp;hash_table_mutex);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+    pups_set_errno(<span class="Constant">ESRCH</span>);
+    <span class="Statement">return</span>(-<span class="Constant">1</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Return current hash statistics ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> hash_show_stats(<span class="Type">FILE</span> *stream, _BOOLEAN full_stats, hash_table_type *hash_table)
+
+{   <span class="Type">int</span> i,
+        j,
+        cnt        = <span class="Constant">0</span>,
+        object_cnt = <span class="Constant">0</span>,
+        chain_sum  = <span class="Constant">0</span>;
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Only the root thread can process </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> PSRP requests                    </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(pupsthread_is_root_thread() == FALSE)
+       pups_error(<span class="Constant">&quot;[hash_show_stats] attempt by non root thread to perform PUPS/P3 hash operation&quot;</span>);
+
+    <span class="Statement">if</span>(stream == (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>               ||
+        hash_table == (hash_table_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+<span class="PreProc">    #ifdef PTHREAD_SUPPORT</span>
+    (<span class="Type">void</span>)pthread_mutex_lock(&amp;hash_table_mutex);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    Hash table </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n\n</span><span class="Constant">&quot;</span>,hash_table-&gt;name);
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;hash_table-&gt;size; ++i)
+    {  <span class="Statement">if</span>(hash_table-&gt;hashentry[i].used &gt; <span class="Constant">0</span>)
+       {  (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    </span><span class="Special">%04d</span><span class="Constant">: chain length: </span><span class="Special">%04d</span><span class="Constant">, links free: </span><span class="Special">%04d</span><span class="Constant">&quot;</span>,i,
+                                                    hash_table-&gt;hashentry[i].size,
+                                                    hash_table-&gt;hashentry[i].size - hash_table-&gt;hashentry[i].used);
+
+          object_cnt = <span class="Constant">0</span>;
+          <span class="Statement">for</span>(j=<span class="Constant">1</span>; j&lt;hash_table-&gt;hashentry[i].size; ++j)
+          {  <span class="Statement">if</span>(hash_table-&gt;hashentry[i].object[j] != hash_table-&gt;hashentry[i].object[j-<span class="Constant">1</span>])
+                ++object_cnt;
+          }
+
+
+          <span class="Statement">if</span>(object_cnt &gt; <span class="Constant">1</span>)
+             (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot; (</span><span class="Special">%04d</span><span class="Constant"> objects in chain)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,object_cnt);
+          <span class="Statement">else</span>
+             (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot; (</span><span class="Special">%04d</span><span class="Constant"> object in chain)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,<span class="Constant">1</span>);
+          (<span class="Type">void</span>)fflush(stream);
+
+          <span class="Statement">if</span>(full_stats == TRUE &amp;&amp; hash_table-&gt;hashentry[i].used &gt; <span class="Constant">0</span>)
+          {  (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    types: &quot;</span>);
+             <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;hash_table-&gt;hashentry[i].size; ++j)
+             {  <span class="Statement">if</span>(hash_table-&gt;hashentry[i].object_type[j] != (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+                {  <span class="Statement">if</span>(j != <span class="Constant">0</span> &amp;&amp; j % <span class="Constant">5</span> == <span class="Constant">0</span>)
+                      (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot; </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">    &quot;</span>,hash_table-&gt;hashentry[i].object_type[j]);
+                   <span class="Statement">else</span>
+                      (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot; </span><span class="Special">%s</span><span class="Constant">&quot;</span>,hash_table-&gt;hashentry[i].object_type[j]);
+                }
+             }
+
+             (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+             (<span class="Type">void</span>)fflush(stream);
+          }
+
+          chain_sum += object_cnt;
+          ++cnt;
+       }
+    }
+
+    <span class="Statement">if</span>(cnt &gt; <span class="Constant">0</span>)
+       (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">    </span><span class="Special">%04d</span><span class="Constant"> hash table entries (</span><span class="Special">%04d</span><span class="Constant"> slots free)  [utilisation </span><span class="Special">%4.2F</span><span class="Constant"> percent]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,
+                                                                                                             cnt,
+                                                                                                hash_table-&gt;size,
+                                                                  <span class="Constant">100.0</span>*(FTYPE)chain_sum/(FTYPE)hash_table-&gt;size);
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    hash table is empty (</span><span class="Special">%04d</span><span class="Constant"> slots free)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,hash_table-&gt;size);
+    (<span class="Type">void</span>)fflush(stream);
+
+<span class="PreProc">    #ifdef PTHREAD_SUPPORT</span>
+    (<span class="Type">void</span>)pthread_mutex_unlock(&amp;hash_table_mutex);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+    pups_set_errno(OK);
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

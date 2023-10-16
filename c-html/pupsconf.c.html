@@ -1,0 +1,509 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/pupsconf.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span>
+<span class="Comment">    Purpose: Tool to configure P3 Makefiles for different</span>
+<span class="Comment">             architectures.</span>
+
+<span class="Comment">    Author:  M.A. O'Neill</span>
+<span class="Comment">             Tumbling Dice Ltd</span>
+<span class="Comment">             Gosforth</span>
+<span class="Comment">             Newcastle upon Tyne</span>
+<span class="Comment">             NE3 4RT</span>
+<span class="Comment">             United Kingdom</span>
+
+<span class="Comment">    Version: 2.01 </span>
+<span class="Comment">    Dated:   24th May 2022</span>
+<span class="Comment">    E-mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;stdio.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stdlib.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;signal.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;bsd/string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/types.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/stat.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;fcntl.h&gt;</span>
+
+
+<span class="PreProc">#ifdef SECURE</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sed_securicor.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> SECURE </span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Version of pupsconf </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define PUPSCONF_VERSION    </span><span class="Constant">&quot;2.01&quot;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> String size </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define SSIZE               </span><span class="Constant">2048</span><span class="PreProc"> </span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Boolean flags </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef TRUE</span>
+<span class="PreProc">#undef TRUE</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> TRUE </span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef FALSE </span>
+<span class="PreProc">#undef FALSE </span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> FALSE </span><span class="Comment">*/</span>
+
+<span class="PreProc">#define TRUE      </span><span class="Constant">255</span>
+<span class="PreProc">#define FALSE     </span><span class="Constant">0</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Authentication methods </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define USE_DISK_SERIAL    </span><span class="Constant">1</span>
+<span class="PreProc">#define USE_SOFT_DONGLE    </span><span class="Constant">2</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Default config dir (if non supplied via make) </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifndef DEFAULT_CONFIGDIR</span>
+<span class="PreProc">#define DEFAULT_CONFIGDIR </span><span class="Constant">&quot;../config&quot;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> DEFAULT_CONFIGDIR </span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Functions which are private to this application </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">static</span> <span class="Type">int</span> strin    (<span class="Type">char</span> *, <span class="Type">char</span> *);
+<span class="Type">static</span> <span class="Type">int</span> ecryptstr(<span class="Type">int</span>, <span class="Type">char</span> *, <span class="Type">char</span> *);
+<span class="Type">static</span> <span class="Type">int</span> error    (<span class="Type">char</span> *);
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Main entry point </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+<span class="Type">int</span> main(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   <span class="Type">int</span> i,
+        start                        = <span class="Constant">1</span>,
+        ddes                         = (-<span class="Constant">1</span>),
+        auth_method                  = USE_DISK_SERIAL,
+        m_names                      = <span class="Constant">0</span>;
+
+    <span class="Type">FILE</span> *pstream                    = (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>,
+         *cstream                    = (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>,
+         *ostream                    = (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>;
+
+    <span class="Type">char</span> m_d_name[SSIZE]             = <span class="Constant">&quot;&quot;</span>,
+         next_m_s_frag[SSIZE]        = <span class="Constant">&quot;&quot;</span>,
+         m_s_name[SSIZE]             = <span class="Constant">&quot;&quot;</span>,
+         tmpfile[SSIZE]              = <span class="Constant">&quot;&quot;</span>,
+         sed_c_frag[SSIZE]           = <span class="Constant">&quot;&quot;</span>,
+         sed_command[SSIZE]          = <span class="Constant">&quot;&quot;</span>,
+         appl_dongle_filename[SSIZE] = <span class="Constant">&quot;&quot;</span>,
+         appl_dongle[SSIZE]          = <span class="Constant">&quot;&quot;</span>,
+         disk_serial[SSIZE]          = <span class="Constant">&quot;&quot;</span>,
+         hd_device[SSIZE]            = <span class="Constant">&quot;&quot;</span>,
+         config_target[SSIZE]        = <span class="Constant">&quot;&quot;</span>,
+         m_d_namelist[<span class="Constant">256</span>][SSIZE]    = { <span class="Constant">&quot;&quot;</span> };
+
+<span class="PreProc">    #ifdef SECURE</span>
+<span class="PreProc">    #ifdef LINUX</span>
+    <span class="Type">struct</span> hd_driveid disk_info;
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> LINUX </span><span class="Comment">*/</span>
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> SECURE </span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(argc &lt; <span class="Constant">4</span> || strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;-help&quot;</span>) == <span class="Constant">0</span> || strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;-usage&quot;</span>) == <span class="Constant">0</span>)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">pupsconf version </span><span class="Special">%s</span><span class="Constant">, (C) Tumbling Dice 2002-2022 (built </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,PUPSCONF_VERSION,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;PUPSCONF is free software, covered by the GNU General Public License, and you are</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;welcome to change it and/or distribute copies of it under certain conditions.</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;See the GPL and LGPL licences at www.gnu.org for further details</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;PUPSCONF comes with ABSOLUTELY NO WARRANTY</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">usage: pupsconf [-usage | -help] | [-cdir &lt;configuration directory:../config&gt;]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;                !&lt;target&gt; &lt;buildfile.in&gt; &lt;buildfile&gt;!</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+
+
+<span class="PreProc">       #ifdef SECURE</span>
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;                  [sdongle &lt;dongle file name&gt;] | [dserial &lt;serial number&gt;]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Environmental variables (secure mode): USE_SOFT_DONGLE &lt;dongle file&gt;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;                                       USE_DISK_SERIAL (default)</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+<span class="PreProc">       #endif</span> <span class="Comment">/*</span><span class="Comment"> SECURE </span><span class="Comment">*/</span>
+
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">Default config directory is: </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n\n</span><span class="Constant">&quot;</span>,DEFAULT_CONFIGDIR);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       exit(<span class="Constant">255</span>);
+    }
+
+    <span class="Statement">if</span>(strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;-cdir&quot;</span>) == <span class="Constant">0</span>)
+    {  start = <span class="Constant">3</span>;
+       (<span class="Type">void</span>)snprintf(config_target,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/</span><span class="Special">%s</span><span class="Constant">&quot;</span>,argv[<span class="Constant">2</span>],argv[<span class="Constant">3</span>]);
+    }
+    <span class="Statement">else</span> <span class="Statement">if</span>(getenv(<span class="Constant">&quot;P3_CONFDIR&quot;</span>) == (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+       (<span class="Type">void</span>)snprintf(config_target,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/</span><span class="Special">%s</span><span class="Constant">&quot;</span>,DEFAULT_CONFIGDIR,argv[<span class="Constant">1</span>]);
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)snprintf(config_target,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/</span><span class="Special">%s</span><span class="Constant">&quot;</span>,getenv(<span class="Constant">&quot;P3_CONFDIR&quot;</span>),argv[<span class="Constant">1</span>]);
+
+
+<span class="PreProc">#ifdef DEBUG  </span>
+fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;P3_CONFDIR: </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,getenv(<span class="Constant">&quot;P3_CONFDIR&quot;</span>));
+fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;TARGET: </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,argv[<span class="Constant">1</span>]);
+fflush(<span class="Constant">stderr</span>);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> DEBUG </span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((cstream = fopen(config_target,<span class="Constant">&quot;r&quot;</span>)) == (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;pupsconf: cannot find configuration file for target </span><span class="Special">%s</span><span class="Constant"> (pathname is </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,argv[start],config_target);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       (<span class="Type">void</span>)kill(<span class="Constant">0</span>,<span class="Constant">SIGTERM</span>);
+       exit(<span class="Constant">255</span>);
+    }
+    <span class="Statement">else</span>
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    Configuring </span><span class="Special">%s</span><span class="Constant"> for </span><span class="Special">%s</span><span class="Constant"> system</span><span class="Special">\n</span><span class="Constant">&quot;</span>,argv[start+<span class="Constant">1</span>],argv[start]);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    }
+
+<span class="PreProc">    #ifdef SECURE</span>
+    <span class="Statement">if</span>(getenv(<span class="Constant">&quot;USE_SOFT_DONGLE&quot;</span>) != (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+    {  (<span class="Type">void</span>)strlcpy(appl_dongle_filename,getenv(<span class="Constant">&quot;USE_SOFT_DONGLE&quot;</span>),SSIZE);
+       auth_method = USE_SOFT_DONGLE;
+    }
+    <span class="Statement">else</span>
+    {
+
+       <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Default authentication method </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+
+       auth_method = USE_DISK_SERIAL;
+
+
+       <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Has the user supplied an explicit serial number to be used? </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(getenv(<span class="Constant">&quot;USE_DISK_SERIAL&quot;</span>) != (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+          (<span class="Type">void</span>)strlcpy(disk_serial,getenv(<span class="Constant">&quot;USE_DISK_SERIAL&quot;</span>),SSIZE);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Do we have a explicit disk serial number of soft dongle file? </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(argc &gt; start + <span class="Constant">3</span>)
+    {  <span class="Statement">if</span>(strcmp(argv[start + <span class="Constant">3</span>],<span class="Constant">&quot;dserial&quot;</span>) == <span class="Constant">0</span>)
+       {  <span class="Statement">if</span>(argc == start + <span class="Constant">5</span>)
+             (<span class="Type">void</span>)strlcpy(disk_serial,argv[start + <span class="Constant">4</span>],SSIZE);
+       }
+       <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(argv[start + <span class="Constant">3</span>],<span class="Constant">&quot;sdongle&quot;</span>) == <span class="Constant">0</span>)
+       {  <span class="Statement">if</span>(argc == start + <span class="Constant">5</span>)
+          {  <span class="Type">int</span> itmp;
+
+             <span class="Statement">if</span>(sscanf(argv[start + <span class="Constant">4</span>],<span class="Constant">&quot;</span><span class="Special">%x</span><span class="Constant">&quot;</span>,&amp;itmp) != <span class="Constant">1</span>)
+                (<span class="Type">void</span>)strlcpy(appl_dongle_filename,argv[start + <span class="Constant">4</span>],SSIZE);
+             <span class="Statement">else</span>
+                (<span class="Type">void</span>)snprintf(appl_dongle,SSIZE,<span class="Constant">&quot;</span><span class="Special">%x</span><span class="Constant">&quot;</span>,itmp);
+          }
+       }
+       <span class="Statement">else</span>
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;pupsconf: expecting either </span><span class="Special">\&quot;</span><span class="Constant">dserial</span><span class="Special">\&quot;</span><span class="Constant"> or </span><span class="Special">\&quot;</span><span class="Constant">sdongle</span><span class="Special">\&quot;\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+          (<span class="Type">void</span>)kill(<span class="Constant">0</span>,<span class="Constant">SIGTERM</span>);
+          exit(<span class="Constant">255</span>);
+       }
+    }
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> SECURE </span><span class="Comment">*/</span>
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check that we can actually access the target file </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(access(argv[start + <span class="Constant">1</span>],R_OK) == (-<span class="Constant">1</span>))
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;pupsconf: cannot find target </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,argv[start + <span class="Constant">1</span>]);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       exit(<span class="Constant">255</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Main macro substitution loop -- get dummy name and string to be </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> substituted and build an appropriate sed command                </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)strlcpy(sed_command,<span class="Constant">&quot;sed </span><span class="Special">\&quot;</span><span class="Constant">&quot;</span>,SSIZE);
+    <span class="Statement">do</span> {    <span class="Statement">do</span> {   (<span class="Type">void</span>)fgets(m_d_name,SSIZE,cstream);
+               } <span class="Statement">while</span>(m_d_name[<span class="Constant">0</span>] == <span class="Constant">'#'</span> || m_d_name[<span class="Constant">0</span>] == <span class="Special">'\n'</span>);
+            m_d_name[strlen(m_d_name) - <span class="Constant">1</span>] = <span class="Special">'\0'</span>;
+
+            <span class="Statement">if</span>(strcmp(m_d_name,<span class="Constant">&quot;end&quot;</span>) == <span class="Constant">0</span> || strcmp(m_d_name,<span class="Constant">&quot;END&quot;</span>) == <span class="Constant">0</span>)
+               <span class="Statement">goto</span> run_sed_command;
+
+
+            <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment"> Move to next macro ignoring comments and empty lines </span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+            <span class="Statement">do</span> {   (<span class="Type">void</span>)fgets(next_m_s_frag,<span class="Constant">255</span>,cstream);
+               } <span class="Statement">while</span>(next_m_s_frag[<span class="Constant">0</span>] == <span class="Constant">'#'</span> || next_m_s_frag[<span class="Constant">0</span>] == <span class="Special">'\n'</span>);
+
+
+            <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment"> Extract macro substitution text </span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+
+            next_m_s_frag[strlen(next_m_s_frag) - <span class="Constant">1</span>] = <span class="Special">'\0'</span>;
+            (<span class="Type">void</span>)strlcpy(m_s_name,next_m_s_frag,SSIZE);
+            <span class="Statement">do</span> {   (<span class="Type">void</span>)fgets(next_m_s_frag,<span class="Constant">255</span>,cstream);
+
+                   <span class="Statement">if</span>(next_m_s_frag[<span class="Constant">0</span>] != <span class="Constant">'#'</span> &amp;&amp; next_m_s_frag[<span class="Constant">0</span>] != <span class="Special">'\n'</span>)
+                   {  next_m_s_frag[strlen(next_m_s_frag) - <span class="Constant">1</span>] = <span class="Special">'\0'</span>;
+                      (<span class="Type">void</span>)strlcat(m_s_name,<span class="Constant">&quot; &quot;</span>,          SSIZE);
+                      (<span class="Type">void</span>)strlcat(m_s_name,next_m_s_frag,SSIZE);
+                   }
+
+               } <span class="Statement">while</span>(next_m_s_frag[<span class="Constant">0</span>] != <span class="Constant">'#'</span> &amp;&amp; next_m_s_frag[<span class="Constant">0</span>] != <span class="Special">'\n'</span>);
+
+            <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;m_names; ++i)
+            {  <span class="Statement">if</span>(strin(m_d_name,m_d_namelist[i]) == TRUE)
+               {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;pupsconf: macro name </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> (in </span><span class="Special">%s</span><span class="Constant">) not unique</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                          m_d_namelist[i],
+                                                                            config_target);
+                  (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+                  (<span class="Type">void</span>)kill(<span class="Constant">0</span>,<span class="Constant">SIGTERM</span>);
+                  exit(<span class="Constant">255</span>);
+               }
+            }
+
+            (<span class="Type">void</span>)strlcpy(m_d_namelist[m_names],m_d_name,SSIZE);
+
+            <span class="Statement">if</span>(strcmp(m_s_name,<span class="Constant">&quot;no&quot;</span>) == <span class="Constant">0</span> || strcmp(m_s_name,<span class="Constant">&quot;none&quot;</span>) == <span class="Constant">0</span>)
+               (<span class="Type">void</span>)snprintf(sed_c_frag,SSIZE,<span class="Constant">&quot; s!</span><span class="Special">%s</span><span class="Constant">!!g;&quot;</span>,m_d_name);
+            <span class="Statement">else</span>
+               (<span class="Type">void</span>)snprintf(sed_c_frag,SSIZE,<span class="Constant">&quot; s!</span><span class="Special">%s</span><span class="Constant">!</span><span class="Special">%s</span><span class="Constant">!g;&quot;</span>,m_d_name,m_s_name);
+
+
+<span class="PreProc">            #ifdef DEBUG</span>
+            (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;CMD: </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,sed_command);
+            (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;FRAG: </span><span class="Special">%s</span><span class="Constant"> [ </span><span class="Special">%s</span><span class="Constant"> ] (</span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,m_d_name,m_s_name,sed_c_frag);
+            (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+<span class="PreProc">            #endif</span> <span class="Comment">/*</span><span class="Comment"> DEBUG </span><span class="Comment">*/</span>
+
+            (<span class="Type">void</span>)strlcat(sed_command,sed_c_frag,SSIZE);
+            ++m_names;
+       } <span class="Statement">while</span>(<span class="Constant">1</span>);
+
+<span class="Statement">run_sed_command</span>:
+
+    <span class="Statement">if</span>(access(argv[start + <span class="Constant">2</span>],F_OK | R_OK | W_OK) == (-<span class="Constant">1</span>))
+       (<span class="Type">void</span>)creat(argv[start + <span class="Constant">2</span>],<span class="PreProc">0</span><span class="Constant">644</span>);
+    <span class="Statement">if</span>((ostream = fopen(argv[start + <span class="Constant">2</span>],<span class="Constant">&quot;w&quot;</span>)) == (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;pupsconf: cannot open </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n</span><span class="Constant">&quot;</span>,ostream);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       exit(<span class="PreProc">0</span><span class="Constant">1</span>);
+    }
+
+    (<span class="Type">void</span>)fprintf(ostream,<span class="Constant">&quot;# Build file generated automatically by pupsconf (version 1.0)</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(ostream,<span class="Constant">&quot;# do not edit</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+
+    (<span class="Type">void</span>)fclose(ostream);
+
+    (<span class="Type">void</span>)snprintf(tmpfile,SSIZE,<span class="Constant">&quot;</span><span class="Special">\&quot;</span><span class="Constant"> &lt;</span><span class="Special">%s</span><span class="Constant"> &gt;</span><span class="Special">%s</span><span class="Constant">&quot;</span>,argv[start + <span class="Constant">1</span>],argv[start + <span class="Constant">2</span>]);
+    (<span class="Type">void</span>)strlcat(sed_command,tmpfile,SSIZE);
+    (<span class="Type">void</span>)system(sed_command);
+
+
+<span class="PreProc">    #ifdef SECURE</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> If we have a disk serial in the build specification probe disk for </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> its serial number.                                                 </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)strlcpy(hd_device,HD_DEVICE,SSIZE);
+
+    <span class="Statement">if</span>(auth_method &amp; USE_DISK_SERIAL)
+    {
+
+       <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Default case - probe build disk for its serial number </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Comment">//if(strcmp(disk_serial,&quot;&quot;) == 0)</span>
+       <span class="Statement">if</span>(strcmp(hd_device,<span class="Constant">&quot;/dev/dummy&quot;</span>) != <span class="Constant">0</span>)
+       {  <span class="Statement">if</span>((ddes = open(hd_device,<span class="Constant">0</span>)) == (-<span class="Constant">1</span>))
+          {  <span class="Type">char</span> errstr[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+             (<span class="Type">void</span>)snprintf(errstr,SSIZE,<span class="Constant">&quot;securicor: cannot open </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> to authorise application</span><span class="Special">\n</span><span class="Constant">&quot;</span>,hd_device);
+             (<span class="Type">void</span>)error(errstr);
+          }
+
+          (<span class="Type">void</span>)ioctl(ddes,HDIO_GET_IDENTITY,(<span class="Type">void</span> *)&amp;disk_info);
+          (<span class="Type">void</span>)close(ddes);
+          (<span class="Type">void</span>)ecryptstr(SEQUENCE_SEED,disk_info.serial_no,disk_serial);
+       }
+
+       (<span class="Type">void</span>)snprintf(sed_command,SSIZE,<span class="Constant">&quot;sed s/DSN/</span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant">/g &lt; </span><span class="Special">%s</span><span class="Constant"> &gt;$$; mv $$ </span><span class="Special">%s</span><span class="Constant">&quot;</span>,
+                                    disk_serial,argv[start + <span class="Constant">2</span>],argv[start + <span class="Constant">2</span>]);
+
+       (<span class="Type">void</span>)system(sed_command);
+    }
+    <span class="Statement">else</span> <span class="Statement">if</span>(auth_method &amp; USE_SOFT_DONGLE)
+    {  <span class="Type">struct</span> stat stat_buf;
+
+
+       <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Default case - used (random) inode from specified soft dongle file to authenticate </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(strcmp(appl_dongle,<span class="Constant">&quot;&quot;</span>) == <span class="Constant">0</span>)
+       {  <span class="Statement">if</span>((ddes = open(appl_dongle_filename,<span class="Constant">0</span>)) == (-<span class="Constant">1</span>))
+          {  <span class="Type">char</span> errstr[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+             (<span class="Type">void</span>)snprintf(errstr,SSIZE,<span class="Constant">&quot;securicor: cannot open </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> to authorise application</span><span class="Special">\n</span><span class="Constant">&quot;</span>,appl_dongle_filename);
+             (<span class="Type">void</span>)error(errstr);
+          }
+
+          (<span class="Type">void</span>)fstat(ddes,&amp;stat_buf);
+          (<span class="Type">void</span>)snprintf(appl_dongle,SSIZE,<span class="Constant">&quot;</span><span class="Special">%x</span><span class="Constant">&quot;</span>,stat_buf.st_ino);
+          (<span class="Type">void</span>)close(ddes);
+       }
+
+       (<span class="Type">void</span>)snprintf(sed_command,SSIZE,<span class="Constant">&quot;sed s/DSN/</span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant">/g &lt; </span><span class="Special">%s</span><span class="Constant"> &gt;$$; mv $$ </span><span class="Special">%s</span><span class="Constant">&quot;</span>,
+                                    appl_dongle,argv[start + <span class="Constant">2</span>],argv[start + <span class="Constant">2</span>]);
+
+       (<span class="Type">void</span>)system(sed_command);
+    }
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> SECURE </span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    Build file for target </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> generated in </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant"> macros)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                  argv[start + <span class="Constant">1</span>],argv[start + <span class="Constant">2</span>],m_names);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+    exit(<span class="Constant">0</span>);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Look for the occurence of string s2 within string s1 ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">static</span> <span class="Type">int</span> strin(<span class="Type">char</span> *s1, <span class="Type">char</span> *s2)
+
+{   <span class="Type">int</span> i,
+        cmp_size,
+        chk_limit;
+
+    <span class="Statement">if</span>(strlen(s2) &gt; strlen(s1))
+       <span class="Statement">return</span>(FALSE);
+
+    chk_limit = strlen(s1) - strlen(s2) + <span class="Constant">1</span>;
+    cmp_size  = strlen(s2);
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;chk_limit; ++i)
+       <span class="Statement">if</span>(strncmp(&amp;s1[i],s2,cmp_size) == <span class="Constant">0</span>)
+          <span class="Statement">return</span>(TRUE);
+
+    <span class="Statement">return</span>(FALSE);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Encrypt a string ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">static</span> <span class="Type">int</span> ecryptstr(<span class="Type">int</span> seed, <span class="Type">char</span> *plaintext, <span class="Type">char</span> *cipher)
+
+{   <span class="Type">int</span> i;
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Encrypt string </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)srand(seed);
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;strlen(plaintext); ++i)
+    {   cipher[i] = (<span class="Type">unsigned</span> <span class="Type">char</span>)((<span class="Type">int</span>)plaintext[i] ^ rand());
+
+        <span class="Statement">while</span>((<span class="Type">int</span>)cipher[i] &lt; <span class="Constant">60</span> || (<span class="Type">int</span>)cipher[i] &gt; <span class="Constant">85</span>)
+              cipher[i] = (<span class="Type">unsigned</span> <span class="Type">char</span>)((<span class="Type">int</span>)cipher[i] ^ rand());
+    }
+
+    cipher[i] = <span class="Special">'\0'</span>;
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Error handler ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">static</span> <span class="Type">int</span> error(<span class="Type">char</span> *error_string)
+
+{  <span class="Type">char</span> hostname[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+   (<span class="Type">void</span>)gethostname(hostname,SSIZE);
+   (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    ERROR pupsconf (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">)]: </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,getpid(),hostname,error_string);
+   (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+   exit(<span class="Constant">255</span>);
+}
+
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

@@ -1,0 +1,56 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.5.1.src.git/pupscore.src/unexport_pupsp3_sig.csh.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="csh">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Statement { color: #af5f00; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">#!/bin/tcsh</span>
+<span class="Comment">#</span>
+<span class="Comment">######################################</span>
+<span class="Comment"># Unexport P3 signal mappings for csh </span>
+<span class="Comment"># (C) M.A O'Neill, Tumbling Dice 2023</span>
+<span class="Comment">######=###############################</span>
+
+<span class="Comment">#-----------------------</span>
+<span class="Comment"># Unexport signal mappings</span>
+<span class="Comment">#-----------------------</span>
+
+<span class="Statement">unsetenv</span> PUPSP3_SIGEVENT
+<span class="Statement">unsetenv</span> PUPSP3_SIGPSRP
+<span class="Statement">unsetenv</span> PUPSP3_SIGCHAN
+<span class="Statement">unsetenv</span> PUPSP3_SIGINIT
+<span class="Statement">unsetenv</span> PUPSP3_SIGCLIENT
+<span class="Statement">unsetenv</span> PUPSP3_SIGTHREAD
+<span class="Statement">unsetenv</span> PUPSP3_SIGSLAVE
+<span class="Statement">unsetenv</span> PUPSP3_SIGCHECK
+<span class="Statement">unsetenv</span> PUPSP3_SIGRESTART
+<span class="Statement">unsetenv</span> PUPSP3_SIGALIVE
+<span class="Statement">unsetenv</span> PUPSP3_SIGTHREADSTOP
+<span class="Statement">unsetenv</span> PUPSP3_SIGTHREADRESTART
+<span class="Statement">unsetenv</span> PUPSP3_SIGCRITICAL
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

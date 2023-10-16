@@ -1,0 +1,423 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/farm.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Purpose: Start a homogenous farm of processes</span>
+
+<span class="Comment">    Author:  M.A. O'Neill</span>
+<span class="Comment">             Tumbling Dice Ltd</span>
+<span class="Comment">             Gosforth</span>
+<span class="Comment">             Newcastle upon Tyne</span>
+<span class="Comment">             NE3 4RT</span>
+<span class="Comment">             United Kingdom</span>
+
+<span class="Comment">    Version: 2.03</span>
+<span class="Comment">    Dated:   24th May 2022</span>
+<span class="Comment">    E-mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;stdio.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;xtypes.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;signal.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/types.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/wait.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;bsd/string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stdlib.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Defines which are private to this application ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Version of farm </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define FARM_VERSION     </span><span class="Constant">&quot;2.03&quot;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> String size </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define SSIZE            </span><span class="Constant">20148</span><span class="PreProc"> </span>
+
+
+<span class="PreProc">#define MAX_PIDS         </span><span class="Constant">1024</span><span class="PreProc"> </span>
+<span class="PreProc">#define END_STRING       (-</span><span class="Constant">1</span><span class="PreProc">)</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Look for the occurence of string s2 within string s1 ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _BOOLEAN strin(<span class="Type">char</span> *s1, <span class="Type">char</span> *s2)
+
+{   <span class="Type">int</span> i,
+        cmp_size,
+        chk_limit;
+
+    <span class="Statement">if</span>(strlen(s2) &gt; strlen(s1))
+       <span class="Statement">return</span>(FALSE);
+
+    chk_limit = strlen(s1) - strlen(s2) + <span class="Constant">1</span>;
+    cmp_size  = strlen(s2);
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;chk_limit; ++i)
+       <span class="Statement">if</span>(strncmp(&amp;s1[i],s2,cmp_size) == <span class="Constant">0</span>)
+          <span class="Statement">return</span>(TRUE);
+
+    <span class="Statement">return</span>(FALSE);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to extract substrings which are demarkated by a usr defined</span>
+<span class="Comment">    character ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+                                      <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+_PRIVATE _BOOLEAN strext(<span class="Type">char</span> dm_ch,  <span class="Comment">/*</span><span class="Comment"> Demarcation character                </span><span class="Comment">*/</span>
+                         <span class="Type">char</span>   *s1,  <span class="Comment">/*</span><span class="Comment"> Extracted sub string                 </span><span class="Comment">*/</span>
+                         <span class="Type">char</span>   *s2)  <span class="Comment">/*</span><span class="Comment"> Argument string                      </span><span class="Comment">*/</span>
+                                      <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+{   <span class="Type">int</span> s1_ptr = <span class="Constant">0</span>;
+
+                                      <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+    _IMMORTAL <span class="Type">int</span>  s2_ptr = <span class="Constant">0</span>;        <span class="Comment">/*</span><span class="Comment"> Current pointer into arg string      </span><span class="Comment">*/</span>
+    _IMMORTAL <span class="Type">char</span> *s2_was;           <span class="Comment">/*</span><span class="Comment"> Copy of current argument string      </span><span class="Comment">*/</span>
+                                      <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Entry with null parameters forces reset of pointers within strext </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> function                                                          </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(s2 == (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+    {  s2_ptr = <span class="Constant">0</span>;
+       <span class="Statement">return</span>(FALSE);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Save string length for swap test if this is first pass for current </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> extraction string                                                  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(s2_ptr == <span class="Constant">0</span>)
+    {  s2_was = (<span class="Type">char</span> *)malloc((<span class="Type">size_t</span>)SSIZE);
+       (<span class="Type">void</span>)strlcpy(s2_was,s2,SSIZE);
+    }
+    <span class="Statement">else</span>
+    {
+
+       <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> If extraction string has changed re-initialise </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(strcmp(s2_was,s2) != <span class="Constant">0</span>)
+       {  s2_ptr = <span class="Constant">0</span>;
+          strlcpy(s2_was,s2,SSIZE);
+       }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Wind to substring to be extracted </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">while</span>(s2[s2_ptr] == dm_ch &amp;&amp; s2[s2_ptr] != <span class="Special">'\0'</span> &amp;&amp; s2[s2_ptr] != <span class="Special">'\n'</span>)
+          ++s2_ptr;
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> If we have reached the end of the string - reinitialise </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(s2[s2_ptr] == <span class="Special">'\0'</span> || s2[s2_ptr] == <span class="Special">'\n'</span>)
+    {  s2_ptr = <span class="Constant">0</span>;
+       s1[<span class="Constant">0</span>] = <span class="Special">'\0'</span>;
+       free(s2_was);
+       <span class="Statement">return</span>(FALSE);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Extract substring to next demarcation character </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">while</span>(s2[s2_ptr] != dm_ch &amp;&amp; s2[s2_ptr] != <span class="Special">'\0'</span> &amp;&amp; s2[s2_ptr] != <span class="Special">'\n'</span>)
+          s1[s1_ptr++] = s2[s2_ptr++];
+    s1[s1_ptr] = <span class="Special">'\0'</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> If the end of the extraction string has been reached, reinitialise </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(s2[s2_ptr] == <span class="Special">'\0'</span> || s2[s2_ptr] == <span class="Special">'\n'</span>)
+    {  s2_ptr = <span class="Constant">0</span>;
+       free(s2_was);
+
+                              <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Statement">return</span>(END_STRING);    <span class="Comment">/*</span><span class="Comment"> Messy but some applications need to know if  </span><span class="Comment">*/</span>
+                              <span class="Comment">/*</span><span class="Comment"> dm_ch was really matched or if we have hit   </span><span class="Comment">*/</span>
+                              <span class="Comment">/*</span><span class="Comment"> the end of the string                        </span><span class="Comment">*/</span>
+                              <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+    }
+
+    <span class="Statement">return</span>(TRUE);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Execls - routine to overlay and execute a command string ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> execls(<span class="Type">char</span> *command)
+
+{   <span class="Type">int</span> ret,
+          j,
+          i = <span class="Constant">0</span>;
+
+    <span class="Type">char</span>     exec_command[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+    _BOOLEAN looper;
+
+
+    <span class="Statement">if</span>(command == (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+
+    (<span class="Type">void</span>)snprintf(exec_command,SSIZE,<span class="Constant">&quot;exec </span><span class="Special">%s</span><span class="Constant">&quot;</span>,command);
+    ret = execlp(<span class="Constant">&quot;bash&quot;</span>,<span class="Constant">&quot;bash&quot;</span>,<span class="Constant">&quot;-c&quot;</span>,exec_command,(<span class="Type">char</span> *)<span class="Constant">NULL</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> We should not get here </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">return</span>(-<span class="Constant">1</span>);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Handler for failed exec attempts ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> current_index;
+_PRIVATE <span class="Type">int</span>  pid[MAX_PIDS] = { (-<span class="Constant">1</span>) };
+_PRIVATE <span class="Type">int</span> exec_handler(<span class="Type">int</span> signum)
+
+{   pid[current_index] = (-<span class="Constant">1</span>);
+    (<span class="Type">void</span>)signal(<span class="Constant">SIGUSR1</span>,(<span class="Type">void</span> *)&amp;exec_handler);
+}
+
+
+<span class="Type">int</span> term_handler(<span class="Type">int</span> signum)
+
+{   (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;terminated</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Main entry point for program ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">char</span> hostname[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+_PUBLIC <span class="Type">int</span> main(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   <span class="Type">int</span> i,
+        n_procs,
+        status,
+        cnt             = <span class="Constant">0</span>;
+
+    <span class="Type">char</span> command[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+    _BOOLEAN verbose    = FALSE;
+
+    (<span class="Type">void</span>)gethostname(hostname,SSIZE);
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check and decode command tail </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(argc &lt; <span class="Constant">3</span> || argc &gt; <span class="Constant">4</span>)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">farm version </span><span class="Special">%s</span><span class="Constant">, (C) Tumbling Dice 2002-2022 (built </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,FARM_VERSION,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;FARM is free software, covered by the GNU General Public License, and you are</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;welcome to change it and/or distribute copies of it under certain conditions.</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;See the GPL and LGPL licences at www.gnu.org for further details</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;FARM comes with ABSOLUTELY NO WARRANTY</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;usage: farm [-verbose] &lt;n processes in farm&gt; &lt;command name&gt;</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       exit(<span class="Constant">255</span>);
+    }
+
+    <span class="Statement">if</span>(argc == <span class="Constant">4</span>)
+    {  <span class="Statement">if</span>(strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;-verbose&quot;</span>) != <span class="Constant">0</span>)
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">farm version </span><span class="Special">%s</span><span class="Constant">, (C) Tumbling Dice 2022 (built </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,FARM_VERSION,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;FARM is free software, covered by the GNU General Public License, and you are</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;welcome to change it and/or distribute copies of it under certain conditions.</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;See the GpL and LGPL licences at www.gnu.org for further details</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;FARM comes with ABSOLUTELY NO WARRANTY</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;usage: farm [-verbose] &lt;n processes in farm&gt; &lt;command name&gt;</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+          exit(<span class="Constant">255</span>);
+       }
+
+       verbose = TRUE;
+       (<span class="Type">void</span>)sscanf(argv[<span class="Constant">2</span>],<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">&quot;</span>,&amp;n_procs);
+       (<span class="Type">void</span>)strlcpy(command,argv[<span class="Constant">3</span>],SSIZE);
+    }
+    <span class="Statement">else</span>
+    {  verbose = FALSE;
+       (<span class="Type">void</span>)sscanf(argv[<span class="Constant">1</span>],<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">&quot;</span>,&amp;n_procs);
+       (<span class="Type">void</span>)strlcpy(command,argv[<span class="Constant">2</span>],SSIZE);
+    }
+
+    <span class="Statement">if</span>(n_procs &gt; MAX_PIDS)
+    {  <span class="Statement">if</span>(verbose == TRUE)
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;farm (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): too many processes in farm (maximum of </span><span class="Special">%d</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,getpid(),hostname,MAX_PIDS);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+
+       exit(<span class="Constant">255</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Start farm </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;n_procs; ++i)
+    {
+
+       <span class="Statement">if</span>((pid[i] = fork()) == <span class="Constant">0</span>)
+       {  <span class="Statement">if</span>(execls(command) == (-<span class="Constant">1</span>))
+          {  <span class="Statement">if</span>(verbose == TRUE)
+             {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;farm (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): failed to exec instance </span><span class="Special">%d</span><span class="Constant"> of command </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n</span><span class="Constant">&quot;</span>,getpid(),hostname,i,command);
+                (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+             }
+
+             (<span class="Type">void</span>)killpg(<span class="Constant">0</span>,<span class="Constant">SIGTERM</span>);
+             exit(<span class="Constant">255</span>);
+          }
+       }
+       <span class="Statement">else</span> <span class="Statement">if</span>(pid[i] == <span class="Constant">0</span>)
+       {  <span class="Statement">if</span>(verbose == TRUE)
+          {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;farm (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): fork (</span><span class="Special">%d</span><span class="Constant">) failed</span><span class="Special">\n</span><span class="Constant">&quot;</span>,getpid(),hostname,i);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+          }
+
+          (<span class="Type">void</span>)killpg(<span class="Constant">0</span>,<span class="Constant">SIGTERM</span>);
+          exit(<span class="Constant">255</span>);
+       }
+    }
+
+    <span class="Statement">if</span>(verbose == TRUE)
+    {  <span class="Statement">if</span>(n_procs == <span class="Constant">1</span>)
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;farm (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): 1 instance of </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> launched</span><span class="Special">\n</span><span class="Constant">&quot;</span>,getpid(),hostname,command);
+       <span class="Statement">else</span>
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;farm (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): </span><span class="Special">%d</span><span class="Constant"> instances of </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> launched</span><span class="Special">\n</span><span class="Constant">&quot;</span>,getpid(),hostname,n_procs,command);
+
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Wait for children to complete if we are a foreground process </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)signal(<span class="Constant">SIGUSR1</span>,(<span class="Type">void</span> *)exec_handler);
+    (<span class="Type">void</span>)signal(<span class="Constant">SIGTERM</span>,(<span class="Type">void</span> *)term_handler);
+    <span class="Statement">do</span> {   <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;n_procs; ++i)
+           {  <span class="Statement">if</span>(pid[i] != (-<span class="Constant">1</span>))
+              {  <span class="Type">int</span> ret;
+
+                 ret = waitpid(pid[i],&amp;status,WNOHANG);
+
+
+                 <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+                 <span class="Comment">/*</span><span class="Comment"> Did the child die of old age? </span><span class="Comment">*/</span>
+                 <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+
+                 <span class="Statement">if</span>(ret &gt; <span class="Constant">0</span>)
+                 {  <span class="Statement">if</span>((WIFSIGNALED(status) &amp;&amp; WTERMSIG(status) != <span class="Constant">SIGSEGV</span>) || WEXITSTATUS(status) == (-<span class="Constant">1</span>))
+                    {  <span class="Statement">if</span>(verbose == TRUE)
+                       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;farm (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): launching replacement for (lost) instance </span><span class="Special">%d</span><span class="Constant"> of command </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n</span><span class="Constant">&quot;</span>,
+                                                                                                    getpid(),hostname,i,command);
+                          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+                       }
+
+                       current_index = i;
+                       <span class="Statement">if</span>((pid[i] = fork()) == <span class="Constant">0</span>)
+                       {  <span class="Statement">if</span>(execls(command) == (-<span class="Constant">1</span>))
+                          {  <span class="Statement">if</span>(verbose == TRUE)
+                             {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;farm (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): failed to launch replacement for (lost) instance </span><span class="Special">%d</span><span class="Constant"> of command </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n</span><span class="Constant">&quot;</span>,
+                                                                                                                 getpid(),hostname,i,command);
+                                (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+                             }
+
+                             (<span class="Type">void</span>)kill(getppid(),<span class="Constant">SIGUSR1</span>);
+                             _exit(<span class="Constant">255</span>);
+                          }
+                       }
+                    }
+                    <span class="Statement">else</span>
+                       ++cnt;
+                  }
+               }
+
+               (<span class="Type">void</span>)usleep(<span class="Constant">100</span>);
+           }
+       } <span class="Statement">while</span>(cnt &lt; n_procs);
+
+    exit(<span class="Constant">0</span>);
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

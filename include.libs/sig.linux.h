@@ -8,8 +8,8 @@
              NE3 4RT
              United Kingdom
 
-    Dated:   26th September 2019 
     Version: 2.00 
+    Dated:   4th January 2022
     E-mail:  mao@tumblingdice.co.uk
 ------------------------------------------------------------------------------------------*/
 

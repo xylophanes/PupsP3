@@ -9,8 +9,8 @@
              NE3 4RT
              United Kingdom
 
-    Dated:   8th June 2018 
     Version: 1.16
+    Dated:   4th January 2022
     E-Mail:  mao@tumblingdice.co.uk
 ------------------------------------------------------------------------------*/
 
@@ -46,7 +46,7 @@ _PRIVATE void casino_slot(int level)
 {   (void)fprintf(stderr,"lib casino %s: [ANSI C]\n",CASINO_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 1985-2018 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 1985-2022 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
        (void)fprintf(stderr,"PUPS/P3 random number generator library (built %s %s)\n\n",__TIME__,__DATE__);
     }

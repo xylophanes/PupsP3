@@ -8,8 +8,8 @@
              NE3 4RT
              United Kingdom
 
-    Version: 2.00 
-    Dated:   27th September 2019 
+    Version: 2.02 
+    Dated:   4th January 2022
     E-mail:  mao@tumblingdice.co.uk
 ----------------------------------------------------------------------------*/
 
@@ -62,7 +62,7 @@ _PRIVATE void dlllib_slot(int level)
 {   (void)fprintf(stderr,"lib dlllib %s: [ANSI C]\n",DLL_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 1999-2019 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 1999-2022 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
        (void)fprintf(stderr,"PUPS/P3 DLL support library (built %s %s)\n\n",__TIME__,__DATE__);
        (void)fflush(stderr);
@@ -587,7 +587,8 @@ _PUBLIC void *pups_bind_orifice_handle(const char *dll_name,            // Name 
 
           (void)snprintf(info_handle_name,SSIZE,"%s_info",orifice_name);
           if((info_handle = dlsym(dll_handle,info_handle_name)) != (void *)NULL)
-          {  ortab[index].orifice_info = (char *)pups_malloc(LONG_LINE);
+          {  if(ortab[index].orifice_info == (char *)NULL)
+                ortab[index].orifice_info = (char *)pups_malloc(SSIZE);
              (void)strlcpy(ortab[index].orifice_info,*(char **)info_handle,SSIZE);
           }
 
@@ -597,13 +598,16 @@ _PUBLIC void *pups_bind_orifice_handle(const char *dll_name,            // Name 
           /* DLL into the orifice table                            */
           /*-------------------------------------------------------*/
 
-          ortab[index].orifice_name      = (char *)pups_malloc(SSIZE);
+          if(ortab[index].orifice_name == (char )NULL)
+             ortab[index].orifice_name  = (char *)pups_malloc(SSIZE);
           (void)strlcpy(ortab[index].orifice_name,     (char *)orifice_name,SSIZE);
 
-          ortab[index].dll_name          = (char *)pups_malloc(SSIZE);
+          if(ortab[index].dll_name == (char )NULL)
+             ortab[index].dll_name = (char *)pups_malloc(SSIZE);
           (void)strlcpy(ortab[index].dll_name,         (char *)dll_name,SSIZE);
 
-          ortab[index].orifice_prototype = (char *)pups_malloc(SSIZE); 
+          if(ortab[index].orifice_prototype == (char )NULL)
+             ortab[index].orifice_prototype = (char *)pups_malloc(SSIZE); 
           (void)strlcpy(ortab[index].orifice_prototype,(char *)orifice_prototype,SSIZE);
 
           ortab[index].dll_handle        = dll_handle;

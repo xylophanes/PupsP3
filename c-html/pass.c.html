@@ -1,0 +1,1725 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/pass.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Purpose: Process which piggybacks a conventional UNIX application and allows it to use</span>
+<span class="Comment">             PUPS/PSRP services without a rewrite. </span>
+
+<span class="Comment">    Author:  M.A. O'Neill</span>
+<span class="Comment">             Tumbling Dice Ltd</span>
+<span class="Comment">             Gosforth</span>
+<span class="Comment">             Newcastle upon Tyne</span>
+<span class="Comment">             NE3 4RT</span>
+<span class="Comment">             United Kingdom</span>
+
+<span class="Comment">    Version: 2.00 </span>
+<span class="Comment">    Dated:   4th January 2022</span>
+<span class="Comment">    E-mail:  mao@@tumblingdice.co.uk</span>
+<span class="Comment">-------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="PreProc">#include </span><span class="Constant">&lt;me.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;utils.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;netlib.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;psrp.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;ctype.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/file.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/types.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/stat.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/mman.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;hipl_hdr.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;signal.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;errno.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;vstamp.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stdlib.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;fcntl.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;dirent.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stdlib.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Version of pass </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define PASS_VERSION    </span><span class="Constant">&quot;2.00&quot;</span>
+
+
+<span class="PreProc">#ifdef BUBBLE_MEMORY_SUPPORT</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;bubble.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> BUBBLE_MEMORY_SUPPORT </span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Get signal mapping appropriate to OS and hardware architecture </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define __DEFINE__</span>
+<span class="PreProc">#if defined(I386) || defined(X86_64)</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sig.linux.x86.h&gt;</span>
+<span class="PreProc">#endif</span>
+
+<span class="PreProc">#ifdef ARMV6L</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sig.linux.arm.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> ARMV6L </span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef ARMV7L</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sig.linux.arm.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> ARMV7L </span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef AARCH64</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sig.linux.arm.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> AARCH64 </span><span class="Comment">*/</span>
+<span class="PreProc">#undef __DEFINE__</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Get application information for slot manager ...</span>
+<span class="Comment">------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Slot information function </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> pass_slot(<span class="Type">int</span> level)
+{   (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;int dynamic app (PSRP) pass </span><span class="Special">%s</span><span class="Constant">: [ANSI C, PUPS MTD D]</span><span class="Special">\n</span><span class="Constant">&quot;</span>,PASS_VERSION);
+
+    <span class="Statement">if</span>(level &gt; <span class="Constant">1</span>)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;(C) 2005-2022 Tumbling Dice</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Author: M.A. O'Neill</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;PUPS/PSRP service server-client (built </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+    }
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Application usage function </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> pass_usage(<span class="Type">void</span>)
+
+{   (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[-payload &lt;payload command pipeline&gt;]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[-sdir &lt;sensitive directory:PEN&gt;]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[-multithreaded | -stdio]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[-fifos]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[-tag &lt;tagname&gt;]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[-lyosome &lt;lifetime:60 seconds&gt;]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[&gt;&amp; &lt;ASCII log file&gt;]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Signals</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;SIGINIT SIGCHAN SIGPSRP: Process status [PSRP] request (protocol </span><span class="Special">%4.2F</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,PSRP_PROTOCOL_VERSION);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;SIGCLIENT: tell client server is about to segment</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+
+<span class="PreProc">    #ifdef CRUI_SUPPORT</span>
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;SIGCHECK SIGRESTART:      checkpoint and restart signals</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> CRIU_SUPPORT </span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;SIGALIVE: check for existence of client on signal dispatch host</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+}
+
+
+<span class="PreProc">#ifdef SLOT</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;slotman.h&gt;</span>
+_EXTERN <span class="Type">void</span> (* SLOT)() __attribute__ ((aligned(<span class="Constant">16</span>))) = pass_slot;
+_EXTERN <span class="Type">void</span> (* USE )() __attribute__ ((aligned(<span class="Constant">16</span>))) = pass_usage;
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> SLOT </span><span class="Comment">*/</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Application build date ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_EXTERN <span class="Type">char</span> appl_build_time[SSIZE] = <span class="Constant">__TIME__</span>;
+_EXTERN <span class="Type">char</span> appl_build_date[SSIZE] = <span class="Constant">__DATE__</span>;
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Public variables and function pointers used by this application ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Functions which are private to this application ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Comment">// Restore (lost) sensitive directory </span>
+_PROTOTYPE _PRIVATE <span class="Type">void</span> restore_sdir(<span class="Type">char</span> *);
+
+<span class="Comment">// Is next item in thread table? </span>
+_PROTOTYPE _PRIVATE _BOOLEAN in_thread_table(<span class="Type">char</span> *);
+
+<span class="Comment">// Get a slot in the thread table/</span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> get_thread_index(<span class="Type">char</span> *, <span class="Type">int</span> *);
+
+<span class="Comment">// Set sentitive directory O/P file type</span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> pass_set_sdir_ftype(<span class="Type">int</span>, <span class="Type">char</span> *[]);
+
+<span class="Comment">// Set sensitive directory O/P mode</span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> pass_set_sdir_omode(<span class="Type">int</span>, <span class="Type">char</span> *[]);
+
+<span class="Comment">// Set lyosome lifetime (in seconds)</span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> pass_set_sdir_lyosome_lifetime(<span class="Type">int</span>, <span class="Type">char</span> *[]);
+
+<span class="Comment">// Remove junk (at exit)</span>
+_PROTOTYPE _PRIVATE <span class="Type">void</span> remove_junk(<span class="Type">char</span> *);
+
+<span class="Comment">// Hoemeostat for sensitive directory </span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> sdir_homeostat(<span class="Type">void</span> *, <span class="Type">char</span> *);
+
+<span class="Comment">// Set command pipeline string</span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> pass_set_command_pipeline(<span class="Type">int</span>, <span class="Type">char</span> *[]);
+
+<span class="Comment">// Set sensitive directory processing tag</span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> pass_set_sdir_tag(<span class="Type">int</span>, <span class="Type">char</span> *[]);
+
+<span class="Comment">// Set processing mode for input data (in sensitive directory mode)</span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> pass_set_sdir_pmode(<span class="Type">int</span>, <span class="Type">char</span> *[]);
+
+<span class="Comment">// Payload homeostat -- montors status of payload command pipeline</span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> payload_homeostat(<span class="Type">void</span> *, <span class="Type">char</span> *);
+
+<span class="Comment">// Relay data to payload (from PASS server sensitive directory)</span>
+_PROTOTYPE _PRIVATE <span class="Type">void</span> sdir_loop(<span class="Type">char</span> *, <span class="Type">char</span> *);
+
+<span class="Comment">// Relay data to payload (from PASS server stdio)</span>
+_PROTOTYPE _PRIVATE <span class="Type">void</span> stdio_loop(<span class="Type">char</span> *);
+
+<span class="Comment">// Display current process status (via PSRP client)</span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> psrp_process_status(<span class="Type">int</span>, <span class="Type">char</span> *[]);
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Variables which are private to this module ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+                                                <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------</span><span class="Comment">*/</span>
+_PRIVATE _BOOLEAN child_terminated = FALSE;     <span class="Comment">/*</span><span class="Comment"> TRUE if child has been terminated                   </span><span class="Comment">*/</span>
+_PRIVATE _BOOLEAN stdio_output     = FALSE;     <span class="Comment">/*</span><span class="Comment"> TRUE if (serial) sdir O/P to stdio (not sdir)       </span><span class="Comment">*/</span>
+_PRIVATE _BOOLEAN pass_master      = FALSE;     <span class="Comment">/*</span><span class="Comment"> TRUE if we are the master PASS server               </span><span class="Comment">*/</span>
+_PRIVATE _BOOLEAN sdir_mode        = FALSE;     <span class="Comment">/*</span><span class="Comment"> TRUE if in senistive directory mode                 </span><span class="Comment">*/</span>
+_PRIVATE _BOOLEAN in_stdio_loop    = TRUE;      <span class="Comment">/*</span><span class="Comment"> TRUE if stdio loop (noit using sensitive directory) </span><span class="Comment">*/</span>
+_PRIVATE _BOOLEAN thread_slot_wait = FALSE;     <span class="Comment">/*</span><span class="Comment"> TRUE if waiting for thread slot (sdir par. mode)    </span><span class="Comment">*/</span>
+_PRIVATE _BOOLEAN multithreaded    = FALSE;     <span class="Comment">/*</span><span class="Comment"> TRUE if application is multithreaded                </span><span class="Comment">*/</span>
+_PRIVATE _BOOLEAN use_fifos        = FALSE;     <span class="Comment">/*</span><span class="Comment"> TRUE if sdir O/P to FIFO's                          </span><span class="Comment">*/</span>
+_PRIVATE _BOOLEAN sdir_wait        = FALSE;     <span class="Comment">/*</span><span class="Comment"> TRUE if waiting for file re-use in sdir             </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">char</span>     tag[SSIZE]       = <span class="Constant">&quot;notset&quot;</span>;  <span class="Comment">/*</span><span class="Comment"> Processing tag (for sdir)                           </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">char</span>     sdir[SSIZE]      = <span class="Constant">&quot;&quot;</span>;        <span class="Comment">/*</span><span class="Comment"> Sensitive directory                                 </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>      child_pid        = (-<span class="Constant">1</span>);      <span class="Comment">/*</span><span class="Comment"> PID of command pipeline exec shell                  </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>      thread[SSIZE]    = {(-<span class="Constant">1</span>)};    <span class="Comment">/*</span><span class="Comment"> PID of next slave PASS server                       </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>      threads          = <span class="Constant">1</span>;         <span class="Comment">/*</span><span class="Comment"> Number of currently executing threads               </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>      t_index          = <span class="Constant">0</span>;         <span class="Comment">/*</span><span class="Comment"> Index of next thread in thread table                </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>      payload_cnt      = <span class="Constant">0</span>;         <span class="Comment">/*</span><span class="Comment"> Number of payloads executed                         </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>      lyosome_lifetime = <span class="Constant">60</span>;        <span class="Comment">/*</span><span class="Comment"> Lyosome lifetime (in seconds)                       </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>      losome           = (-<span class="Constant">1</span>);      <span class="Comment">/*</span><span class="Comment"> PID of sdir O/P lyosome process                     </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>      lesome           = (-<span class="Constant">1</span>);      <span class="Comment">/*</span><span class="Comment"> PID of sdir error/log lyosome process               </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">char</span>     command_pipeline[SSIZE] = <span class="Constant">&quot;&quot;</span>; <span class="Comment">/*</span><span class="Comment"> Payload command pipeline                            </span><span class="Comment">*/</span>
+                                                <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">char</span>     iname[SSIZE]     = <span class="Constant">&quot;&quot;</span>;
+_PRIVATE <span class="Type">char</span>     sdipath[SSIZE]   = <span class="Constant">&quot;&quot;</span>;
+_PRIVATE <span class="Type">char</span>     sdopath[SSIZE]   = <span class="Constant">&quot;&quot;</span>;
+_PRIVATE <span class="Type">char</span>     sdepath[SSIZE]   = <span class="Constant">&quot;&quot;</span>;
+
+                                                         <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">DIR</span>      *dirp            = (<span class="Type">DIR</span> *)<span class="Constant">NULL</span>;        <span class="Comment">/*</span><span class="Comment"> Sensitive directory stream                 </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">char</span>     *tsname[SSIZE]   = { (<span class="Type">char</span> *) <span class="Constant">NULL</span> };  <span class="Comment">/*</span><span class="Comment"> List of sdir input files being processed   </span><span class="Comment">*/</span>
+                                                         <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Software I.D. tag (used if CRIU support enabled to discard stale dynamic</span>
+<span class="Comment">    checkpoint files) ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define VTAG  </span><span class="Constant">4586</span>
+
+<span class="Type">extern</span> <span class="Type">int</span> appl_vtag = VTAG;
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Main - decode command tail then interpolate using parameters supplied by user ...</span>
+<span class="Comment">--------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> pups_main(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Wait for PUPS/P3 to initialise </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)psrp_ignore_requests();
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Get standard items form the command tail </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+
+
+    pg_leader = TRUE;
+    pups_std_init(TRUE,
+                  &amp;argc,
+                  PASS_VERSION,
+                  <span class="Constant">&quot;M.A. O'Neill&quot;</span>,
+                  <span class="Constant">&quot;(PSRP) pass&quot;</span>,
+                  <span class="Constant">&quot;2022&quot;</span>,
+                  argv);
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Register exit function </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pups_register_exit_f(<span class="Constant">&quot;remove_junk&quot;</span>,(<span class="Type">void</span> *)&amp;remove_junk,<span class="Constant">NULL</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Get name of process which is to served by the PUPS/PSRP PASS server   </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> A UNIX filter (or filter pipeline) is expected, e.g. input on stdin   </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> output on stdout, error on stderr. This pipeline is passed to a shell </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> which is slaved to current process.                                   </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((ptr = pups_locate(&amp;init,<span class="Constant">&quot;payload&quot;</span>,&amp;argc,args,<span class="Constant">0</span>)) != NOT_FOUND)
+    {  <span class="Statement">if</span>(strccpy(command_pipeline,pups_str_dec(&amp;ptr,&amp;argc,args)) == (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+          pups_error(<span class="Constant">&quot;[pass] expecting name of command pipeline&quot;</span>);
+
+       <span class="Statement">if</span>(appl_verbose == TRUE)
+       {  (<span class="Type">void</span>)strdate(date);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): payload pipeline: </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                  date,appl_name,appl_pid,appl_host,appl_owner,command_pipeline);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+    }
+    <span class="Statement">else</span>
+       pups_error(<span class="Constant">&quot;[pass] PASS server must have a payload command pipeline&quot;</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Do we have a sensitive directory? </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((ptr = pups_locate(&amp;init,<span class="Constant">&quot;sdir&quot;</span>,&amp;argc,args,<span class="Constant">0</span>)) != NOT_FOUND)
+    {  <span class="Statement">if</span>(strccpy(sdir,pups_str_dec(&amp;ptr,&amp;argc,args)) == (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+       {  <span class="Type">int</span>  i;
+          <span class="Type">char</span> sdir_etag[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+
+          <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Get name of sensitive directory from environment </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+
+          (<span class="Type">void</span>)snprintf(sdir_etag,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">_SDIR&quot;</span>,appl_name);
+
+          <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;strlen(sdir_etag); ++i)
+             sdir_etag[i] = toupper(sdir_etag[i]);
+
+          <span class="Statement">if</span>(getenv(sdir_etag) != (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+             (<span class="Type">void</span>)strlcpy(sdir,getenv(sdir_etag),SSIZE);
+          <span class="Statement">else</span>
+          {
+
+             <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> Sensitive directory is the same as the application name </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+
+             (<span class="Type">void</span>)strlcpy(sdir,appl_name,SSIZE);
+          }
+       }
+
+       <span class="Statement">if</span>(strcmp(sdir,<span class="Constant">&quot;.&quot;</span>) == <span class="Constant">0</span>)
+          pups_error(<span class="Constant">&quot;[pass] sensitive directory cannot be current working directory&quot;</span>);
+
+       <span class="Statement">if</span>(access(sdir,F_OK | R_OK | W_OK) == <span class="Constant">0</span>)
+       {  <span class="Type">char</span> errstr[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+          (<span class="Type">void</span>)snprintf(errstr,SSIZE,<span class="Constant">&quot;[pass] sensitive directory </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> already exists&quot;</span>,sdir);
+          pups_error(errstr);
+       }
+       <span class="Statement">else</span>
+          (<span class="Type">void</span>)mkdir(sdir,<span class="PreProc">0</span><span class="Constant">700</span>);
+
+       sdir_mode = TRUE;
+
+       <span class="Statement">if</span>(appl_verbose == TRUE)
+       {  (<span class="Type">void</span>)strdate(date);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): sensitive directory is </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n</span><span class="Constant">&quot;</span>,
+                                  date,appl_name,appl_pid,appl_host,appl_owner,sdir);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Is O/P from payload pipeline to be written to FIFOS? </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(pups_locate(&amp;init,<span class="Constant">&quot;fifos&quot;</span>,&amp;argc,args,<span class="Constant">0</span>) != NOT_FOUND)
+       {  use_fifos = TRUE;
+
+          <span class="Statement">if</span>(appl_verbose == TRUE)
+          {  (<span class="Type">void</span>)strdate(date);
+             (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): sensitive directory output nodes are FIFO's</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                        date,appl_name,appl_pid,appl_host,appl_owner);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+          }
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Are itmes in the sensitive directory to be processed in parallel? </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(pups_locate(&amp;init,<span class="Constant">&quot;multithreaded&quot;</span>,&amp;argc,args,<span class="Constant">0</span>) != NOT_FOUND)
+       {  multithreaded = TRUE;
+
+          <span class="Statement">if</span>(appl_verbose == TRUE)
+          {  (<span class="Type">void</span>)strdate(date);
+             (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): input to sensitive directory processed in parallel</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                               date,appl_name,appl_pid,appl_host,appl_owner);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+          }
+
+          threads = (-<span class="Constant">1</span>);
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> (Serial) O/P to stdio </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(pups_locate(&amp;init,<span class="Constant">&quot;stdio&quot;</span>,&amp;argc,args,<span class="Constant">0</span>) != NOT_FOUND)
+       {  stdio_output = TRUE;
+
+          <span class="Statement">if</span>(appl_verbose == TRUE)
+          {  (<span class="Type">void</span>)strdate(date);
+             (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): output of data and error/log to stdio enabled</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                          date,appl_name,appl_pid,appl_host,appl_owner);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+          }
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Processing tag </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(pups_locate(&amp;init,<span class="Constant">&quot;tag&quot;</span>,&amp;argc,args,<span class="Constant">0</span>) != NOT_FOUND)
+       {  <span class="Statement">if</span>(strccpy(tag,pups_str_dec(&amp;ptr,&amp;argc,args)) == (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+             pups_error(<span class="Constant">&quot;[pass] expecting processing tag&quot;</span>);
+
+          <span class="Statement">if</span>(appl_verbose == TRUE)
+          {  (<span class="Type">void</span>)strdate(date);
+             (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): sensitive directory processing tag is </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> (only filenames containing tag will be processed)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                                                       date,appl_name,appl_pid,appl_host,appl_owner,tag);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+          }
+       }
+       <span class="Statement">else</span>
+       {  <span class="Statement">if</span>(appl_verbose == TRUE)
+          {  (<span class="Type">void</span>)strdate(date);
+             (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): no processing tag (any sensitive directory file will be processed)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                           date,appl_name,appl_pid,appl_host,appl_owner,tag);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+          }
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Lyosome lifetime </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>((ptr = pups_locate(&amp;init,<span class="Constant">&quot;lifetime&quot;</span>,&amp;argc,args,<span class="Constant">0</span>)) != NOT_FOUND)
+       {  <span class="Statement">if</span>((lyosome_lifetime = pups_i_dec(&amp;ptr,&amp;argc,args)) == (<span class="Type">int</span>)INVALID_ARG)
+             pups_error(<span class="Constant">&quot;[pass] expecting lyosome lifetime (in seconds)&quot;</span>);
+       }
+
+       <span class="Statement">if</span>(appl_verbose == TRUE)
+       {  (<span class="Type">void</span>)strdate(date);
+          <span class="Statement">if</span>(lyosome_lifetime == <span class="Constant">60</span>)
+             (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): lyosome lifetime is </span><span class="Special">%d</span><span class="Constant"> seconds (default)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                    date,appl_name,appl_pid,appl_host,appl_owner,lyosome_lifetime);
+          <span class="Statement">else</span>
+             (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): lyosome lifetime is </span><span class="Special">%d</span><span class="Constant"> seconds</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                          date,appl_name,appl_pid,appl_host,appl_owner,lyosome_lifetime);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+
+    }
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Complain about any unparsed arguments </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+    pups_t_arg_errs(argd,args);
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Initialise PSRP function dispatch handler - note that the embryo is fully dynamic and prepared</span>
+<span class="Comment">    to import both dynamic functions and data objects ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    psrp_init(PSRP_STATIC_FUNCTION | PSRP_STATIC_DATABAG | PSRP_HOMEOSTATIC_STREAMS,<span class="Constant">NULL</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Attach static functions which can be accessed from PSRP client </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)psrp_attach_static_function(<span class="Constant">&quot;status&quot;</span>,  (<span class="Type">void</span> *)&amp;psrp_process_status);
+    (<span class="Type">void</span>)psrp_attach_static_function(<span class="Constant">&quot;tag&quot;</span>,     (<span class="Type">void</span> *)&amp;pass_set_sdir_tag);
+    (<span class="Type">void</span>)psrp_attach_static_function(<span class="Constant">&quot;pmode&quot;</span>,   (<span class="Type">void</span> *)&amp;pass_set_sdir_pmode);
+    (<span class="Type">void</span>)psrp_attach_static_function(<span class="Constant">&quot;omode&quot;</span>,   (<span class="Type">void</span> *)&amp;pass_set_sdir_omode);
+    (<span class="Type">void</span>)psrp_attach_static_function(<span class="Constant">&quot;ftype&quot;</span>,   (<span class="Type">void</span> *)&amp;pass_set_sdir_ftype);
+    (<span class="Type">void</span>)psrp_attach_static_function(<span class="Constant">&quot;lifetime&quot;</span>,(<span class="Type">void</span> *)&amp;pass_set_sdir_lyosome_lifetime);
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> We must define static bindings BEFORE loading the default </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> dispatch table. In the case of static bindings, the only  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> effect of loading a saved dispatch table is to (possibly) </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> add object aliases                                        </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)psrp_load_default_dispatch_table();
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Tell PSRP clients we are ready to service their requests </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+
+    psrp_accept_requests();
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Main loop of the PASS server. If sdir is set wait for files which are moved into the sensitive</span>
+<span class="Comment">    directory, otherwise wait for data to appear on stdin ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(sdir_mode == TRUE)
+       sdir_loop(sdir,command_pipeline);
+    <span class="Statement">else</span>
+       stdio_loop(command_pipeline);
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Exit from PUPS/PSRP application cleaning up any mess it may have created </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    pups_exit(<span class="Constant">0</span>);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Execute command pipeline feeding data to/from PASS server stdio ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> stdio_loop(<span class="Type">char</span> *command_pipeline)
+
+{   <span class="Type">int</span> nb,
+        cin  = (-<span class="Constant">1</span>),
+        cout = (-<span class="Constant">1</span>),
+        cerr = (-<span class="Constant">1</span>);
+
+    _BYTE buf[<span class="Constant">512</span>] = <span class="Constant">&quot;&quot;</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Execute the command pipeline as a child process </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(pups_system2(command_pipeline,shell,PUPS_ERROR_EXIT,&amp;child_pid,&amp;cin,&amp;cout,&amp;cerr) == (-<span class="Constant">1</span>))
+       pups_error(<span class="Constant">&quot;[pass] failed to launch payload pipeline&quot;</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Start homeostats </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pups_setvitimer(<span class="Constant">&quot;payload_homeostat&quot;</span>,<span class="Constant">1</span>,VT_CONTINUOUS,<span class="Constant">1</span>,<span class="Constant">NULL</span>,(<span class="Type">void</span> *)payload_homeostat);
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Main loop of PASS server relaying data to payload pipeline </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> We may need to use select system call if this proves to be </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> too slow                                                   </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)fcntl(<span class="Constant">0</span>,   F_SETFL, fcntl(<span class="Constant">0</span>,   F_GETFL,<span class="Constant">0</span>) | O_NONBLOCK);
+    (<span class="Type">void</span>)fcntl(cout,F_SETFL, fcntl(cout,F_GETFL,<span class="Constant">0</span>) | O_NONBLOCK);
+    (<span class="Type">void</span>)fcntl(cerr,F_SETFL, fcntl(cerr,F_GETFL,<span class="Constant">0</span>) | O_NONBLOCK);
+
+    <span class="Statement">while</span>(TRUE)
+    {   errno=<span class="Constant">0</span>; nb = read(<span class="Constant">0</span>,buf,<span class="Constant">512</span>);
+        <span class="Statement">if</span>(nb == <span class="Constant">0</span>)
+           (<span class="Type">void</span>)close(cin);
+
+        <span class="Statement">if</span>(nb &gt; <span class="Constant">0</span>)
+           (<span class="Type">void</span>)write(cin,buf,nb);
+
+        nb = read(cout,buf,<span class="Constant">512</span>);
+        <span class="Statement">if</span>(nb &gt; <span class="Constant">0</span>)
+           (<span class="Type">void</span>)write(<span class="Constant">1</span>,buf,nb);
+
+        nb = read(cerr,buf,<span class="Constant">512</span>);
+        <span class="Statement">if</span>(nb &gt; <span class="Constant">0</span>)
+           (<span class="Type">void</span>)write(<span class="Constant">2</span>,buf,nb);
+
+        pups_usleep(<span class="Constant">100</span>);
+    }
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Execute command pipeline feeding data to/from PSRP server sensitive directory ...</span>
+<span class="Comment">--------------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> sdir_loop(<span class="Type">char</span> *sdir, <span class="Type">char</span> *command_pipeline)
+
+{   <span class="Type">struct</span> dirent *next_item = (<span class="Type">struct</span> dirent *)<span class="Constant">NULL</span>;
+
+    <span class="Type">int</span> nb,
+        cin        = (-<span class="Constant">1</span>),
+        cout       = (-<span class="Constant">1</span>),
+        cerr       = (-<span class="Constant">1</span>),
+        sdin       = (-<span class="Constant">1</span>),
+        sdout      = (-<span class="Constant">1</span>),
+        sderr      = (-<span class="Constant">1</span>);
+
+    _BYTE buf[<span class="Constant">512</span>] = <span class="Constant">&quot;&quot;</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Start sensitive directory homeostat </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pups_setvitimer(<span class="Constant">&quot;sdir_homeostat&quot;</span>,<span class="Constant">1</span>,VT_CONTINUOUS,<span class="Constant">1</span>,<span class="Constant">NULL</span>,(<span class="Type">void</span> *)sdir_homeostat);
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Wait for data to be put in the sensitive directory </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+
+    dirp = opendir(sdir);
+
+    <span class="Statement">do</span> {    next_item = readdir(dirp);
+
+
+            <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment"> If we have reached the end of the directory </span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment"> simply rewind                               </span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+
+            <span class="Statement">if</span>(next_item == (<span class="Type">struct</span> dirent *)<span class="Constant">NULL</span>)
+            {  (<span class="Type">void</span>)rewinddir(dirp);
+               next_item = readdir(dirp);
+            }
+
+            <span class="Statement">if</span>((next_item                       != (<span class="Type">struct</span> dirent *)<span class="Constant">NULL</span>                       &amp;&amp;
+                strcmp(next_item-&gt;d_name,<span class="Constant">&quot;.&quot;</span>)   != <span class="Constant">0</span> &amp;&amp; strcmp(next_item-&gt;d_name,<span class="Constant">&quot;..&quot;</span>) != <span class="Constant">0</span>)   &amp;&amp;
+                strin(next_item-&gt;d_name,<span class="Constant">&quot;.out&quot;</span>) != TRUE                                        &amp;&amp;
+                strin(next_item-&gt;d_name,<span class="Constant">&quot;.err&quot;</span>) != TRUE                                        &amp;&amp;
+                in_thread_table(next_item-&gt;d_name) == FALSE                                    &amp;&amp;
+                (strcmp(tag,<span class="Constant">&quot;notset&quot;</span>) == <span class="Constant">0</span> || strin(next_item-&gt;d_name,tag) == TRUE)             )
+            {  <span class="Type">char</span> lyosome_command[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+               <span class="Statement">if</span>(appl_verbose == TRUE)
+               {  (<span class="Type">void</span>)strdate(date);
+                  <span class="Statement">if</span>(pass_master == FALSE)
+                     (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): processing </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> (in serial mode)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                     date,appl_name,appl_pid,appl_host,appl_owner,next_item-&gt;d_name);
+                  <span class="Statement">else</span>
+                     (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): processing </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> (in multithreaded mode)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                            date,appl_name,appl_pid,appl_host,appl_owner,next_item-&gt;d_name);
+                  (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+               }
+
+
+               <span class="Statement">if</span>(multithreaded == TRUE)
+               {
+
+                  <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment"> Fork off a new relay process for each new item </span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment"> in the sensitive directory. We shall act as a  </span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment"> master for these processess                    </span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+
+                  pass_master = TRUE;
+
+                  threads = get_thread_index(next_item-&gt;d_name,&amp;t_index);
+                  <span class="Statement">if</span>((thread[t_index] = pups_fork(FALSE,FALSE)) == <span class="Constant">0</span>)
+                  {
+
+                      <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+                      <span class="Comment">/*</span><span class="Comment"> Restart homeostats </span><span class="Comment">*/</span>
+                      <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+
+                      (<span class="Type">void</span>)pups_clearvitimer(<span class="Constant">&quot;psrp_homeostat&quot;</span>);
+                      (<span class="Type">void</span>)pups_malarm(<span class="Constant">1</span>);
+
+
+                      <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+                      <span class="Comment">/*</span><span class="Comment"> We are slave and cannot interact with PSRP clients </span><span class="Comment">*/</span>
+                      <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+
+                      pass_master = FALSE;
+                      appl_pid    = getpid();
+
+                      <span class="Comment">//(void)closeall((FILE *)NULL);</span>
+
+                      (<span class="Type">void</span>)strlcpy(iname,next_item-&gt;d_name,SSIZE);
+                      (<span class="Type">void</span>)snprintf(sdipath,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/</span><span class="Special">%s</span><span class="Constant">&quot;</span>,sdir,next_item-&gt;d_name);
+                      sdin = pups_open(sdipath,<span class="Constant">0</span>,LIVE);
+
+                      (<span class="Type">void</span>)snprintf(sdopath,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/</span><span class="Special">%s</span><span class="Constant">.out&quot;</span>,sdir,next_item-&gt;d_name);
+                      <span class="Statement">if</span>(stdio_output == FALSE &amp;&amp; access(sdopath,F_OK | R_OK | W_OK) != (-<span class="Constant">1</span>))
+                      {  <span class="Statement">if</span>(appl_verbose == TRUE)
+                         {  (<span class="Type">void</span>)strdate(date);
+                            (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): ouput file for </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> already exists -- waiting</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                         date,appl_name,appl_pid,appl_host,appl_owner,next_item-&gt;d_name);
+                            (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+                         }
+
+                         sdir_wait = TRUE;
+                         <span class="Statement">while</span>(access(sdopath,F_OK | R_OK | W_OK) != (-<span class="Constant">1</span>))
+                              pups_usleep(<span class="Constant">100</span>);
+                         sdir_wait = FALSE;
+                      }
+
+                      <span class="Statement">if</span>(stdio_output == FALSE &amp;&amp; access(sdepath,F_OK | R_OK | W_OK) != (-<span class="Constant">1</span>))
+                      {  <span class="Statement">if</span>(appl_verbose == TRUE)
+                         {  (<span class="Type">void</span>)strdate(date);
+                            (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): error/log file for </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> already exists -- waiting</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                             date,appl_name,appl_pid,appl_host,appl_owner,next_item-&gt;d_name);
+                            (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+                         }
+
+                         sdir_wait = TRUE;
+                         <span class="Statement">while</span>(access(sdepath,F_OK | R_OK | W_OK) != (-<span class="Constant">1</span>))
+                               pups_usleep(<span class="Constant">100</span>);
+                         sdir_wait = FALSE;
+                      }
+
+                      <span class="Statement">if</span>(use_fifos == TRUE)
+                      {  (<span class="Type">void</span>)mkfifo(sdopath,<span class="PreProc">0</span><span class="Constant">600</span>);
+                          sdout = pups_open(sdopath,<span class="Constant">2</span>,LIVE);
+                      }
+                      <span class="Statement">else</span> <span class="Statement">if</span>(stdio_output == TRUE)
+                         sdout = pups_open(<span class="Constant">&quot;/dev/tty&quot;</span>,<span class="Constant">1</span>,LIVE);
+                      <span class="Statement">else</span>
+                      {  (<span class="Type">void</span>)pups_creat(sdopath,<span class="PreProc">0</span><span class="Constant">600</span>);
+                         sdout = pups_open(sdopath,<span class="Constant">1</span>,LIVE);
+                      }
+
+                      (<span class="Type">void</span>)snprintf(sdepath,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/</span><span class="Special">%s</span><span class="Constant">.err&quot;</span>,sdir,next_item-&gt;d_name);
+                      <span class="Statement">if</span>(access(sdepath,F_OK | R_OK | W_OK) != (-<span class="Constant">1</span>))
+                      {  <span class="Statement">if</span>(appl_verbose == TRUE)
+                         {  (<span class="Type">void</span>)strdate(date);
+                            (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): error/log file for </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> already exists -- aborting</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                              date,appl_name,appl_pid,appl_host,appl_owner,next_item-&gt;d_name);
+                            (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+                         }
+
+                         exit(<span class="Constant">255</span>);
+                      }
+
+                      <span class="Statement">if</span>(use_fifos == TRUE)
+                      {  (<span class="Type">void</span>)mkfifo(sdepath,<span class="PreProc">0</span><span class="Constant">600</span>);
+                          sderr = pups_open(sdepath,<span class="Constant">2</span>,LIVE);
+                      }
+                      <span class="Statement">else</span> <span class="Statement">if</span>(stdio_output == TRUE)
+                         sderr = pups_open(<span class="Constant">&quot;/dev/tty&quot;</span>,<span class="Constant">1</span>,LIVE);
+                      <span class="Statement">else</span>
+                      {  (<span class="Type">void</span>)pups_creat(sdepath,<span class="PreProc">0</span><span class="Constant">600</span>);
+                         sderr = pups_open(sdepath,<span class="Constant">1</span>,LIVE);
+                      }
+
+
+                      <span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+                      <span class="Comment">/*</span><span class="Comment"> Execute the command pipeline as a child process </span><span class="Comment">*/</span>
+                      <span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+
+                      <span class="Statement">if</span>(pups_system2(command_pipeline,shell,PUPS_ERROR_EXIT,&amp;child_pid,&amp;cin,&amp;cout,&amp;cerr) == (-<span class="Constant">1</span>))
+                      {
+
+                         <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------</span><span class="Comment">*/</span>
+                         <span class="Comment">/*</span><span class="Comment"> Enter idle loop until we have a new payload command pipeline </span><span class="Comment">*/</span>
+                         <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------</span><span class="Comment">*/</span>
+
+                         <span class="Statement">while</span>(strcmp(command_pipeline,<span class="Constant">&quot;idle&quot;</span>) == <span class="Constant">0</span>)
+                               (<span class="Type">void</span>)pups_usleep(<span class="Constant">100</span>);
+                      }
+
+
+                      <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------</span><span class="Comment">*/</span>
+                      <span class="Comment">/*</span><span class="Comment"> Start payload homeostat (for exec shell of command pipeline) </span><span class="Comment">*/</span>
+                      <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------</span><span class="Comment">*/</span>
+
+                      (<span class="Type">void</span>)pups_setvitimer(<span class="Constant">&quot;payload_homeostat&quot;</span>,<span class="Constant">1</span>,VT_CONTINUOUS,<span class="Constant">1</span>,<span class="Constant">NULL</span>,(<span class="Type">void</span> *)&amp;payload_homeostat);
+
+                      (<span class="Type">void</span>)fcntl(sdin,F_SETFL, fcntl(sdin,F_GETFL,<span class="Constant">0</span>) | O_NONBLOCK);
+                      (<span class="Type">void</span>)fcntl(cout,F_SETFL, fcntl(cout,F_GETFL,<span class="Constant">0</span>) | O_NONBLOCK);
+                      (<span class="Type">void</span>)fcntl(cerr,F_SETFL, fcntl(cerr,F_GETFL,<span class="Constant">0</span>) | O_NONBLOCK);
+
+                      <span class="Statement">do</span> {     nb = read(sdin,buf,<span class="Constant">512</span>);
+                               <span class="Statement">if</span>(nb == <span class="Constant">0</span>)
+                                  (<span class="Type">void</span>)close(cin);
+
+                               <span class="Statement">if</span>(nb &gt; <span class="Constant">0</span>)
+                                  (<span class="Type">void</span>)write(cin,buf,nb);
+
+                               nb = read(cout,buf,<span class="Constant">512</span>);
+                               <span class="Statement">if</span>(nb &gt; <span class="Constant">0</span>)
+                                 (<span class="Type">void</span>)write(sdout,buf,nb);
+
+                               nb = read(cerr,buf,<span class="Constant">512</span>);
+                               <span class="Statement">if</span>(nb &gt; <span class="Constant">0</span>)
+                                  (<span class="Type">void</span>)write(sderr,buf,nb);
+
+                               (<span class="Type">void</span>)pups_usleep(<span class="Constant">100</span>);
+                          } <span class="Statement">while</span>(child_terminated == FALSE);
+
+
+                       <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+                       <span class="Comment">/*</span><span class="Comment"> Remove input file </span><span class="Comment">*/</span>
+                       <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+                       (<span class="Type">void</span>)close(cout);
+                       (<span class="Type">void</span>)close(cerr);
+                       (<span class="Type">void</span>)pups_close(sdin);
+                       (<span class="Type">void</span>)pups_close(sdout);
+                       (<span class="Type">void</span>)pups_close(sderr);
+
+
+                       <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+                       <span class="Comment">/*</span><span class="Comment"> Reset looper switch for relay loop </span><span class="Comment">*/</span>
+                       <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+
+                       child_terminated = FALSE;
+
+
+                       <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+                       <span class="Comment">/*</span><span class="Comment"> Increment number of payloads executed </span><span class="Comment">*/</span>
+                       <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+                       ++payload_cnt;
+
+                       <span class="Statement">if</span>(stdio_output == FALSE)
+                       {
+
+                          <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+                          <span class="Comment">/*</span><span class="Comment"> Start lyosomes to remove .out and .err files </span><span class="Comment">*/</span>
+                          <span class="Comment">/*</span><span class="Comment"> after given time period                      </span><span class="Comment">*/</span>
+                          <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+
+                          (<span class="Type">void</span>)snprintf(lyosome_command,SSIZE,<span class="Constant">&quot;lyosome -lifetime 60 </span><span class="Special">%s</span><span class="Constant">&quot;</span>,sdopath);
+                          <span class="Statement">if</span>((losome = pups_fork(FALSE,FALSE)) == <span class="Constant">0</span>)
+                          {  (<span class="Type">void</span>)setsid();
+                             (<span class="Type">void</span>)pups_execls(lyosome_command);
+
+                             exit(<span class="Constant">255</span>);
+                          }
+
+                          (<span class="Type">void</span>)snprintf(lyosome_command,SSIZE,<span class="Constant">&quot;lyosome -lifetime 60 </span><span class="Special">%s</span><span class="Constant">&quot;</span>,sdepath);
+                          <span class="Statement">if</span>((lesome = pups_fork(FALSE,FALSE)) == <span class="Constant">0</span>)
+                          {  (<span class="Type">void</span>)setsid();
+                             (<span class="Type">void</span>)pups_execls(lyosome_command);
+
+                             exit(<span class="Constant">255</span>);
+                          }
+                       }
+
+                       exit(<span class="Constant">0</span>);
+                  }
+                  <span class="Statement">else</span>
+                  {  <span class="Statement">if</span>(kill(child_pid,SIGALIVE) != (-<span class="Constant">1</span>))
+
+
+                        <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+                        <span class="Comment">/*</span><span class="Comment"> Start payload homeostat (for next slave pass server) </span><span class="Comment">*/</span>
+                        <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+                        (<span class="Type">void</span>)pups_setvitimer(<span class="Constant">&quot;slavepass_homeostat&quot;</span>,<span class="Constant">1</span>,VT_CONTINUOUS,<span class="Constant">1</span>,<span class="Constant">NULL</span>,(<span class="Type">void</span> *)&amp;payload_homeostat);
+                  }
+               }
+               <span class="Statement">else</span>
+               {
+
+                  <span class="Comment">/*</span><span class="Comment">---------------------------------------------------</span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment"> Process items in the sensitive directory serially </span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment">---------------------------------------------------</span><span class="Comment">*/</span>
+
+                  (<span class="Type">void</span>)strlcpy(iname,next_item-&gt;d_name,SSIZE);
+                  (<span class="Type">void</span>)snprintf(sdipath,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/</span><span class="Special">%s</span><span class="Constant">&quot;</span>,sdir,next_item-&gt;d_name);
+                  sdin = pups_open(sdipath,<span class="Constant">0</span>,LIVE);
+
+                  (<span class="Type">void</span>)snprintf(sdopath,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/</span><span class="Special">%s</span><span class="Constant">.out&quot;</span>,sdir,next_item-&gt;d_name);
+                  <span class="Statement">if</span>(stdio_output == FALSE &amp;&amp; access(sdopath,F_OK | R_OK | W_OK) != (-<span class="Constant">1</span>))
+                  {  <span class="Statement">if</span>(appl_verbose == TRUE)
+                     {  (<span class="Type">void</span>)strdate(date);
+                        (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): ouput file for </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> already exists -- waiting</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                     date,appl_name,appl_pid,appl_host,appl_owner,next_item-&gt;d_name);
+                        (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+                     }
+
+                     sdir_wait = TRUE;
+                     <span class="Statement">while</span>(access(sdopath,F_OK | R_OK | W_OK) != (-<span class="Constant">1</span>))
+                          pups_usleep(<span class="Constant">100</span>);
+                     sdir_wait = FALSE;
+                  }
+
+                  <span class="Statement">if</span>(use_fifos == TRUE)
+                  {  (<span class="Type">void</span>)mkfifo(sdopath,<span class="PreProc">0</span><span class="Constant">600</span>);
+                      sdout = pups_open(sdopath,<span class="Constant">2</span>,LIVE);
+                  }
+                  <span class="Statement">else</span> <span class="Statement">if</span>(stdio_output == TRUE)
+                     sdout = pups_open(<span class="Constant">&quot;/dev/tty&quot;</span>,<span class="Constant">1</span>,LIVE);
+                  <span class="Statement">else</span>
+                  {  (<span class="Type">void</span>)pups_creat(sdopath,<span class="PreProc">0</span><span class="Constant">600</span>);
+                      sdout = pups_open(sdopath,<span class="Constant">1</span>,LIVE);
+                  }
+
+                  (<span class="Type">void</span>)snprintf(sdepath,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/</span><span class="Special">%s</span><span class="Constant">.err&quot;</span>,sdir,next_item-&gt;d_name);
+                  <span class="Statement">if</span>(stdio_output == FALSE &amp;&amp; access(sdepath,F_OK | R_OK | W_OK) != (-<span class="Constant">1</span>))
+                  {  <span class="Statement">if</span>(appl_verbose == TRUE)
+                     {  (<span class="Type">void</span>)strdate(date);
+                        (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): error/log file for </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> already exists -- waiting</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                         date,appl_name,appl_pid,appl_host,appl_owner,next_item-&gt;d_name);
+                        (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+                     }
+
+                     sdir_wait = TRUE;
+                     <span class="Statement">while</span>(access(sdepath,F_OK | R_OK | W_OK) != (-<span class="Constant">1</span>))
+                          pups_usleep(<span class="Constant">100</span>);
+                     sdir_wait = FALSE;
+                  }
+
+                  <span class="Statement">if</span>(use_fifos == TRUE)
+                  {  (<span class="Type">void</span>)mkfifo(sdepath,<span class="PreProc">0</span><span class="Constant">600</span>);
+                      sderr = pups_open(sdepath,<span class="Constant">2</span>,LIVE);
+                  }
+                  <span class="Statement">else</span> <span class="Statement">if</span>(stdio_output == TRUE)
+                     sderr = pups_open(<span class="Constant">&quot;/dev/tty&quot;</span>,<span class="Constant">1</span>,LIVE);
+                  <span class="Statement">else</span>
+                  {  (<span class="Type">void</span>)pups_creat(sdepath,<span class="PreProc">0</span><span class="Constant">600</span>);
+                      sderr = pups_open(sdepath,<span class="Constant">1</span>,LIVE);
+                  }
+
+
+                  <span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment"> Execute the command pipeline as a child process </span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+
+                  <span class="Statement">if</span>(pups_system2(command_pipeline,shell,PUPS_ERROR_EXIT,&amp;child_pid,&amp;cin,&amp;cout,&amp;cerr) == (-<span class="Constant">1</span>))
+                  {
+
+                     <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------</span><span class="Comment">*/</span>
+                     <span class="Comment">/*</span><span class="Comment"> Enter idle loop until we have a new payload command pipeline </span><span class="Comment">*/</span>
+                     <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------</span><span class="Comment">*/</span>
+
+                     <span class="Statement">while</span>(strcmp(command_pipeline,<span class="Constant">&quot;idle&quot;</span>) == <span class="Constant">0</span>)
+                           (<span class="Type">void</span>)pups_usleep(<span class="Constant">100</span>);
+                  }
+
+                  (<span class="Type">void</span>)fcntl(sdin,F_SETFL, fcntl(sdin,F_GETFL,<span class="Constant">0</span>) | O_NONBLOCK);
+                  (<span class="Type">void</span>)fcntl(cout,F_SETFL, fcntl(cout,F_GETFL,<span class="Constant">0</span>) | O_NONBLOCK);
+                  (<span class="Type">void</span>)fcntl(cerr,F_SETFL, fcntl(cerr,F_GETFL,<span class="Constant">0</span>) | O_NONBLOCK);
+
+
+                  <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------</span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment"> Start payload homeostat (for exec shell of command pipeline) </span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------</span><span class="Comment">*/</span>
+
+                  (<span class="Type">void</span>)pups_setvitimer(<span class="Constant">&quot;payload_homeostat&quot;</span>,<span class="Constant">1</span>,VT_CONTINUOUS,<span class="Constant">1</span>,<span class="Constant">NULL</span>,(<span class="Type">void</span> *)&amp;payload_homeostat);
+
+                  <span class="Statement">do</span> {     nb = read(sdin,buf,<span class="Constant">512</span>);
+                           <span class="Statement">if</span>(nb == <span class="Constant">0</span>)
+                              (<span class="Type">void</span>)close(cin);
+
+                           <span class="Statement">if</span>(nb &gt; <span class="Constant">0</span>)
+                              (<span class="Type">void</span>)write(cin,buf,nb);
+
+                           nb = read(cout,buf,<span class="Constant">512</span>);
+                           <span class="Statement">if</span>(nb &gt; <span class="Constant">0</span>)
+                              (<span class="Type">void</span>)write(sdout,buf,nb);
+
+                           nb = read(cerr,buf,<span class="Constant">512</span>);
+                           <span class="Statement">if</span>(nb &gt; <span class="Constant">0</span>)
+                              (<span class="Type">void</span>)write(sderr,buf,nb);
+
+                           (<span class="Type">void</span>)pups_usleep(<span class="Constant">10</span>);
+                      } <span class="Statement">while</span>(child_terminated == FALSE);
+
+
+                  <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment"> Remove input file </span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+                  (<span class="Type">void</span>)close(cout);
+                  (<span class="Type">void</span>)close(cerr);
+                  (<span class="Type">void</span>)pups_close(sdin);
+                  (<span class="Type">void</span>)pups_close(sdout);
+                  (<span class="Type">void</span>)pups_close(sderr);
+
+
+                  <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment"> Reset looper switch for relay loop </span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+
+                  child_terminated = FALSE;
+
+
+                  <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment"> Increment number of payloads executed </span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+                  ++payload_cnt;
+
+                  <span class="Statement">if</span>(stdio_output == FALSE)
+                  {
+
+                     <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+                     <span class="Comment">/*</span><span class="Comment"> Start lyosomes to remove .out and .err files </span><span class="Comment">*/</span>
+                     <span class="Comment">/*</span><span class="Comment"> after given time period                      </span><span class="Comment">*/</span>
+                     <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+
+                     (<span class="Type">void</span>)snprintf(lyosome_command,SSIZE,<span class="Constant">&quot;lyosome -lifetime </span><span class="Special">%d</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">&quot;</span>,lyosome_lifetime,sdopath);
+                     <span class="Statement">if</span>((losome = pups_fork(FALSE,FALSE)) == <span class="Constant">0</span>)
+                     {   (<span class="Type">void</span>)setsid();
+                         (<span class="Type">void</span>)pups_execls(lyosome_command);
+
+                         exit(<span class="Constant">0</span>);
+                     }
+
+                     (<span class="Type">void</span>)snprintf(lyosome_command,SSIZE,<span class="Constant">&quot;lyosome -lifetime </span><span class="Special">%d</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">&quot;</span>,lyosome_lifetime,sdepath);
+                     <span class="Statement">if</span>((lesome = pups_fork(FALSE,FALSE)) == <span class="Constant">0</span>)
+                     {   (<span class="Type">void</span>)setsid();
+                         (<span class="Type">void</span>)pups_execls(lyosome_command);
+
+                         exit(<span class="Constant">0</span>);
+                     }
+                  }
+               }
+            }
+
+            (<span class="Type">void</span>)pups_usleep(<span class="Constant">100</span>);
+         } <span class="Statement">while</span>(TRUE);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Homeostat which checks that payload (shell) is still alive ...</span>
+<span class="Comment">--------------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> payload_homeostat(<span class="Type">void</span> *t_info, <span class="Type">char</span> *args)
+
+{   <span class="Statement">if</span>(sdir_mode == FALSE)
+    {  <span class="Statement">if</span>(kill(child_pid,SIGALIVE) == (-<span class="Constant">1</span>))
+       {  <span class="Statement">if</span>(appl_verbose == TRUE)
+          {  (<span class="Type">void</span>)strdate(date);
+             (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): payload pipeline has terminated -- PASS server exiting</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                   date,appl_name,appl_pid,appl_host,appl_owner);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+          }
+
+          pups_exit(<span class="Constant">0</span>);
+       }
+    }
+
+    <span class="Statement">if</span>(pass_master == TRUE)
+    {  <span class="Statement">if</span>(kill(thread[t_index],SIGALIVE) == (-<span class="Constant">1</span>))
+       {  thread[t_index] = (-<span class="Constant">1</span>);
+          tsname[t_index] = (<span class="Type">char</span> *)pups_free((<span class="Type">void</span> *)tsname[t_index]);
+          --threads;
+
+
+          <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Remove junk associated with last (multithreaded) child </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------</span><span class="Comment">*/</span>
+
+          (<span class="Type">void</span>)unlink(sdipath);
+          (<span class="Type">void</span>)unlink(sdopath);
+          (<span class="Type">void</span>)unlink(sdepath);
+
+
+          <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Clear payload homeostat </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+
+          (<span class="Type">void</span>)pups_clearvitimer(<span class="Constant">&quot;slavepass_homeostat&quot;</span>);
+       }
+    }
+    <span class="Statement">else</span>
+    {  <span class="Statement">if</span>(child_pid != (-<span class="Constant">1</span>) &amp;&amp; kill(child_pid,SIGALIVE) == (-<span class="Constant">1</span>))
+       {  child_terminated = TRUE;
+          child_pid        = (-<span class="Constant">1</span>);
+
+
+          <span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Remove junk associated with last (serial) child </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+
+          (<span class="Type">void</span>)unlink(sdipath);
+
+
+          <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Clear payload homeostat </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+
+          (<span class="Type">void</span>)pups_clearvitimer(<span class="Constant">&quot;payload_homeostat&quot;</span>);
+
+          <span class="Statement">if</span>(appl_verbose == TRUE)
+          {  (<span class="Type">void</span>)strdate(date);
+             (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): payload pipeline has terminated -- PASS server waiting for new input</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                                 date,appl_name,appl_pid,appl_host,appl_owner);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+          }
+       }
+    }
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Homeostat which removes unwanted files from sensitive directory -- anything which does not match the</span>
+<span class="Comment">    filter tag is removed ...</span>
+<span class="Comment">---------------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> sdir_homeostat(<span class="Type">void</span> *t_info, <span class="Type">char</span> *args)
+
+{   <span class="Type">DIR</span> *dirp                = (<span class="Type">DIR</span> *)<span class="Constant">NULL</span>;
+    <span class="Type">struct</span> dirent *next_item = (<span class="Type">struct</span> dirent *)<span class="Constant">NULL</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> If lyosomes have finished reset PID's </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(kill(losome,SIGALIVE) == (-<span class="Constant">1</span>))
+       losome = (-<span class="Constant">1</span>);
+
+    <span class="Statement">if</span>(kill(lesome,SIGALIVE) == (-<span class="Constant">1</span>))
+       lesome = (-<span class="Constant">1</span>);
+
+    <span class="Statement">if</span>(access(sdir,F_OK | R_OK | W_OK) == (-<span class="Constant">1</span>))
+       restore_sdir(sdir);
+
+    dirp = opendir(sdir);
+    <span class="Statement">do</span> {    next_item = readdir(dirp);
+
+            <span class="Statement">if</span>(next_item != (<span class="Type">struct</span> dirent *)<span class="Constant">NULL</span>                                &amp;&amp;
+               strcmp(next_item-&gt;d_name,<span class="Constant">&quot;.&quot;</span>)   != <span class="Constant">0</span>                              &amp;&amp;
+               strcmp(next_item-&gt;d_name,<span class="Constant">&quot;..&quot;</span>)  != <span class="Constant">0</span>                              &amp;&amp;
+               strin(next_item-&gt;d_name,<span class="Constant">&quot;.out&quot;</span>) != TRUE                           &amp;&amp;
+               strin(next_item-&gt;d_name,<span class="Constant">&quot;.err&quot;</span>) != TRUE                           &amp;&amp;
+               (strcmp(tag,<span class="Constant">&quot;notset&quot;</span>) != <span class="Constant">0</span> &amp;&amp;strin(next_item-&gt;d_name,tag) == FALSE))
+            {  <span class="Type">char</span> pathname[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+               (<span class="Type">void</span>)snprintf(pathname,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/</span><span class="Special">%s</span><span class="Constant">&quot;</span>,sdir,next_item-&gt;d_name);
+               (<span class="Type">void</span>)unlink(pathname);
+
+               <span class="Statement">if</span>(appl_verbose == TRUE)
+               {  (<span class="Type">void</span>)strdate(date);
+                  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> removed from sensitive directory </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> (does not match tag </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                 date,appl_name,appl_pid,appl_host,appl_owner,next_item-&gt;d_name,sdir,tag);
+                  (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+               }
+            }
+        } <span class="Statement">while</span>(next_item != (<span class="Type">struct</span> dirent *)<span class="Constant">NULL</span>);
+
+    (<span class="Type">void</span>)closedir(dirp);
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Set processing tag for sensitive directory. Any file containing this tag which appear in the sensitive</span>
+<span class="Comment">    directory will be processed ...</span>
+<span class="Comment">---------------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> pass_set_sdir_tag(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   <span class="Statement">if</span>(sdir_mode == FALSE)
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">no sensitive directory (cannot set processing tag)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+    <span class="Statement">if</span>(argc == <span class="Constant">1</span>)
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">current tag (for sensitive directory </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> is </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant">)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,sdir,tag);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+    <span class="Statement">if</span>(strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;help&quot;</span>) == <span class="Constant">0</span> || strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;usage&quot;</span>) == <span class="Constant">0</span> || argc != <span class="Constant">2</span>)
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">Usage  tag [help | usage] [&lt;processing tag:</span><span class="Special">%s</span><span class="Constant">&gt;]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,tag);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+    (<span class="Type">void</span>)strlcpy(tag,argv[<span class="Constant">1</span>],SSIZE);
+
+    (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant"> tag (for sensitive directory </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> set to </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n\n</span><span class="Constant">&quot;</span>,sdir,tag);
+    (<span class="Type">void</span>)fflush(psrp_out);
+
+    <span class="Statement">return</span>(PSRP_OK);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Set lifetime for lyosome function ... </span>
+<span class="Comment">---------------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> pass_set_sdir_lyosome_lifetime(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   <span class="Type">int</span> i_tmp;
+
+    <span class="Statement">if</span>(sdir_mode == FALSE)
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">no sensitive directory (cannot set lyosome lifetime)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+    <span class="Statement">if</span>(argc == <span class="Constant">1</span>)
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">current lyosome lifetime (for sensitive directory </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> is </span><span class="Special">%d</span><span class="Constant"> seconds)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,sdir,lyosome_lifetime);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+    <span class="Statement">if</span>(strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;help&quot;</span>) == <span class="Constant">0</span> || strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;usage&quot;</span>) == <span class="Constant">0</span> || argc != <span class="Constant">2</span>)
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">Usage  tag [help | usage] [&lt;lifetime in seconds&gt; | default]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,tag);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+    <span class="Statement">if</span>(strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;default&quot;</span>) == <span class="Constant">0</span>)
+       lyosome_lifetime = <span class="Constant">60</span>;
+    <span class="Statement">else</span>
+    {  <span class="Statement">if</span>(sscanf(argv[<span class="Constant">1</span>],<span class="Constant">&quot;&amp;d&quot;</span>,&amp;i_tmp) != <span class="Constant">1</span> || i_tmp &lt; <span class="Constant">0</span>)
+       {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">lifetime must be a (positive) integer</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,tag);
+          (<span class="Type">void</span>)fflush(psrp_out);
+
+          <span class="Statement">return</span>(PSRP_OK);
+       }
+       <span class="Statement">else</span>
+          lyosome_lifetime = i_tmp;
+    }
+
+    <span class="Statement">if</span>(lyosome_lifetime == <span class="Constant">60</span>)
+       (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">lyosome lifetime (for sensitive directory </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> set to </span><span class="Special">%d</span><span class="Constant"> seconds (default)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,sdir,lyosome_lifetime);
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">lyosome lifetime (for sensitive directory </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> set to </span><span class="Special">%d</span><span class="Constant"> seconds</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,sdir,lyosome_lifetime);
+
+    (<span class="Type">void</span>)fflush(psrp_out);
+
+    <span class="Statement">return</span>(PSRP_OK);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Set sensitive directory processing model. Currently multithreaded and serial modes are supported ...</span>
+<span class="Comment">---------------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> pass_set_sdir_pmode(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   <span class="Statement">if</span>(sdir_mode == FALSE)
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">no sensitive directory (cannot set processing mode)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+    <span class="Statement">if</span>(argc == <span class="Constant">1</span>)
+    {  <span class="Statement">if</span>(multithreaded == FALSE)
+          (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">current processing mode for sdir </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> is </span><span class="Special">\&quot;</span><span class="Constant">serial</span><span class="Special">\&quot;\n\n</span><span class="Constant">&quot;</span>,sdir);
+       <span class="Statement">else</span>
+          (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">current processing mode for sdir </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> is </span><span class="Special">\&quot;</span><span class="Constant">multithreaded</span><span class="Special">\&quot;\n\n</span><span class="Constant">&quot;</span>,sdir);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+    <span class="Statement">if</span>(strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;help&quot;</span>) == <span class="Constant">0</span> || strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;usage&quot;</span>) == <span class="Constant">0</span> || argc != <span class="Constant">2</span>)
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">Usage  sdpm [help | usage] [serial | multithreaded | parallel]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,tag);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+    <span class="Statement">if</span>(strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;serial&quot;</span>) == <span class="Constant">0</span>)
+    {  multithreaded = FALSE;
+
+       (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant"> mode (for processing sensitive directory input serial)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(psrp_out);
+    }
+    <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;parallel&quot;</span>) == <span class="Constant">0</span>)
+    {  multithreaded = TRUE;
+
+       (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant"> mode (for processing sensitive directory input multithreaded)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(psrp_out);
+    }
+    <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;multithreaded&quot;</span>) == <span class="Constant">0</span>)
+    {  multithreaded = TRUE;
+
+       (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant"> mode (for processing sensitive directory input multithreaded)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(psrp_out);
+    }
+    <span class="Statement">else</span>
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">expecting </span><span class="Special">\&quot;</span><span class="Constant">serial</span><span class="Special">\&quot;</span><span class="Constant">, </span><span class="Special">\&quot;</span><span class="Constant">parallel</span><span class="Special">\&quot;</span><span class="Constant"> or </span><span class="Special">\&quot;</span><span class="Constant">multithreaded</span><span class="Special">\&quot;\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(psrp_out);
+    }
+
+    <span class="Statement">return</span>(PSRP_OK);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Set output mode (for sdir) ...</span>
+<span class="Comment">---------------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> pass_set_sdir_omode(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   <span class="Statement">if</span>(sdir_mode == FALSE)
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">no sensitive directory (cannot set sdir O/P mode)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+    <span class="Statement">if</span>(argc == <span class="Constant">1</span>)
+    {  <span class="Statement">if</span>(stdio_output == TRUE)
+          (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">current payload O/P (for sensitive directory </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> is sent to stdout and stderr</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,sdir);
+       <span class="Statement">else</span>
+          (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">current payload O/P (for sensitive directory </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> is sent to sensitive directory</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,sdir);
+
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+    <span class="Statement">if</span>(strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;help&quot;</span>) == <span class="Constant">0</span> || strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;usage&quot;</span>) == <span class="Constant">0</span> || argc != <span class="Constant">2</span>)
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">Usage  sdpm [help | usage] [stdio | sdir | default]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+    <span class="Statement">if</span>(strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;stdio&quot;</span>) == <span class="Constant">0</span>)
+    {  stdio_output = TRUE;
+
+       (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">sensitive directory O/P sent to stdout and stderr</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(psrp_out);
+    }
+    <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;sdir&quot;</span>) == <span class="Constant">0</span>)
+    {  stdio_output = FALSE;
+
+       (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">sensitive directory O/P sent to sensitive directory</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(psrp_out);
+    }
+    <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;default&quot;</span>) == <span class="Constant">0</span>)
+    {  stdio_output = FALSE;
+
+       (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">sensitive directory O/P sent to default location (sensitive directory)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(psrp_out);
+    }
+    <span class="Statement">else</span>
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">expecting </span><span class="Special">\&quot;</span><span class="Constant">stdio</span><span class="Special">\&quot;</span><span class="Constant">, </span><span class="Special">\&quot;</span><span class="Constant">sdir</span><span class="Special">\&quot;</span><span class="Constant"> or </span><span class="Special">\&quot;</span><span class="Constant">default</span><span class="Special">\&quot;\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(psrp_out);
+    }
+
+    <span class="Statement">return</span>(PSRP_OK);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Set output file mode (for sdir) ...</span>
+<span class="Comment">---------------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> pass_set_sdir_ftype(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   <span class="Statement">if</span>(sdir_mode == FALSE)
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">no sensitive directory (cannot set sdir file type)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+    <span class="Statement">if</span>(stdio_output == TRUE)
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">output being sent to stderr and stdin (cannot set sdir file type)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+    <span class="Statement">if</span>(argc == <span class="Constant">1</span>)
+    {  <span class="Statement">if</span>(use_fifos == TRUE)
+          (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">current O/P file type (for sensitive directory </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> is FIFO</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,sdir);
+       <span class="Statement">else</span>
+          (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">current O/P file type (for sensitive directory </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> is REGF</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,sdir);
+
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+    <span class="Statement">if</span>(strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;help&quot;</span>) == <span class="Constant">0</span> || strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;usage&quot;</span>) == <span class="Constant">0</span> || argc != <span class="Constant">2</span>)
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">Usage  sdpm [help | usage] [fifo | regf | default]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+    <span class="Statement">if</span>(strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;fifo&quot;</span>) == <span class="Constant">0</span>)
+    {  use_fifos = TRUE;
+
+       (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">sensitive directory O/P file type set to FIFO</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(psrp_out);
+    }
+    <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;regf&quot;</span>) == <span class="Constant">0</span>)
+    {  use_fifos = FALSE;
+
+       (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">sensitive directory O/P file type set to REGF</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(psrp_out);
+    }
+    <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;default&quot;</span>) == <span class="Constant">0</span>)
+    {  use_fifos = FALSE;
+
+       (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">sensitive directory O/P file type set to default (REGF)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(psrp_out);
+    }
+    <span class="Statement">else</span>
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">expecting </span><span class="Special">\&quot;</span><span class="Constant">fifo</span><span class="Special">\&quot;</span><span class="Constant">, </span><span class="Special">\&quot;</span><span class="Constant">regf</span><span class="Special">\&quot;</span><span class="Constant"> or </span><span class="Special">\&quot;</span><span class="Constant">default</span><span class="Special">\&quot;\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(psrp_out);
+    }
+
+    <span class="Statement">return</span>(PSRP_OK);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Set sensitive directory processing model. Currently multithreaded and serial modes are supported ...</span>
+<span class="Comment">---------------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> pass_set_command_pipeline(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   <span class="Statement">if</span>(sdir_mode == FALSE)
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">no sensitive directory (cannot set command pipeline)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+    <span class="Statement">if</span>(argc == <span class="Constant">1</span>)
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">current command pipeline is </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n\n</span><span class="Constant">&quot;</span>,command_pipeline);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+    <span class="Statement">if</span>(strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;help&quot;</span>) == <span class="Constant">0</span> || strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;usage&quot;</span>) == <span class="Constant">0</span> || argc != <span class="Constant">2</span>)
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">Usage  sdcp [help | usage] &lt;command pipeline&gt;</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+    (<span class="Type">void</span>)strlcpy(command_pipeline,argv[<span class="Constant">1</span>],SSIZE);
+
+    (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;command pipeline is now </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n\n</span><span class="Constant">&quot;</span>,command_pipeline);
+    (<span class="Type">void</span>)fflush(psrp_out);
+
+    <span class="Statement">return</span>(PSRP_OK);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Report process status ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> psrp_process_status(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{    (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    PASS server status status</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+     (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    =========================</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+     (<span class="Type">void</span>)fflush(psrp_out);
+
+<span class="PreProc">#if defined(CRIU_SUPPORT)</span>
+        (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    Binary is Criu enabled (checkpointable)</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> CRIU_SUPPORT </span><span class="Comment">*/</span>
+
+     <span class="Comment">/*</span><span class="Comment"> I/O mode information </span><span class="Comment">*/</span>
+     <span class="Statement">if</span>(sdir_mode == TRUE)
+     {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    I/O mode              : sdir (data read from sensitive directory)</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+        (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    sensitive directory is: </span><span class="Special">%s</span><span class="Constant"> (processing tag is </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,sdir,tag);
+        <span class="Statement">if</span>(multithreaded == TRUE)
+        {  <span class="Statement">if</span>(thread_slot_wait == TRUE)
+              (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    processing mode       : multithreaded (waiting for free thread slot)</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+           <span class="Statement">else</span>
+              (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    processing mode       : multithreaded</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+           <span class="Statement">if</span>(threads == (-<span class="Constant">1</span>))
+              (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    Active payload threads: 0</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+           <span class="Statement">else</span>
+              (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    Active payload threads: </span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,threads);
+        }
+        <span class="Statement">else</span>
+           (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    processing mode       : serial</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+
+        <span class="Statement">if</span>(stdio_output == TRUE)
+           (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    output/log file type  : stdio (stdout and stderr)</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+        <span class="Statement">else</span> <span class="Statement">if</span>(use_fifos == TRUE)
+           (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    output/log file type  : FIFO</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+        <span class="Statement">else</span>
+           (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    output/log file type  : REGF</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+
+        <span class="Statement">if</span>(lyosome_lifetime == <span class="Constant">60</span>)
+           (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    Lyosome lifetime      : 60 seconds (default)</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+        <span class="Statement">else</span>
+           (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    Lyosome lifetime      : </span><span class="Special">%d</span><span class="Constant"> seconds</span><span class="Special">\n</span><span class="Constant">&quot;</span>,lyosome_lifetime);
+        (<span class="Type">void</span>)fflush(psrp_out);
+
+        <span class="Statement">if</span>(multithreaded == FALSE)
+        {  <span class="Statement">if</span>(losome != (-<span class="Constant">1</span>) || lesome != (-<span class="Constant">1</span>))
+              (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    Lyosome processe s    : active (protecting </span><span class="Special">%s</span><span class="Constant">.out; </span><span class="Special">%s</span><span class="Constant">.err</span><span class="Special">\n</span><span class="Constant">&quot;</span>,iname,iname);
+           <span class="Statement">else</span>
+              (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    Lyosome processes     : inactive</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+           (<span class="Type">void</span>)fflush(psrp_out);
+        }
+
+        <span class="Statement">if</span>(multithreaded == FALSE)
+        {  <span class="Statement">if</span>(stdio_output == FALSE &amp;&amp; sdir_wait == TRUE)
+              (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    sdir wait             : TRUE (waiting to reuse name </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,iname);
+           <span class="Statement">else</span>
+              (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    sdir wait             : FALSE</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+           (<span class="Type">void</span>)fflush(psrp_out);
+        }
+     }
+     <span class="Statement">else</span>
+     {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    I/O mode              : stdio (data read from stdio)</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+        (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    processing mode       : serial</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+     }
+
+
+     <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> Current payload pipeline/command </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+     <span class="Statement">if</span>(multithreaded == FALSE)
+     {  <span class="Statement">if</span>(threads == <span class="Constant">1</span>)
+           (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    Payload pipeline      : </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> (1 concurrent thread, </span><span class="Special">%d</span><span class="Constant"> payload(s) processed)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                                     command_pipeline,payload_cnt);
+        <span class="Statement">else</span>
+           (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    Payload pipeline      : </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant"> concurrent threads, </span><span class="Special">%d</span><span class="Constant"> payload(s) processed)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                               command_pipeline,threads,payload_cnt);
+        (<span class="Type">void</span>)fflush(psrp_out);
+     }
+
+     (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+     (<span class="Type">void</span>)fflush(psrp_out);
+
+     <span class="Statement">return</span>(PSRP_OK);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Remove junk (at exit)  ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> remove_junk(<span class="Type">char</span> *arg_str)
+
+{   <span class="Type">char</span> sdir_command[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Terminate any active lyosome processes </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(losome != (-<span class="Constant">1</span>))
+       (<span class="Type">void</span>)kill(losome,<span class="Constant">SIGTERM</span>);
+
+    <span class="Statement">if</span>(lesome != (-<span class="Constant">1</span>))
+       (<span class="Type">void</span>)kill(lesome,<span class="Constant">SIGTERM</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Remove sensitive directory (and any files in it) </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)snprintf(sdir_command,SSIZE,<span class="Constant">&quot;rm -rf </span><span class="Special">%s</span><span class="Constant">&quot;</span>,sdir);
+    (<span class="Type">void</span>)system(sdir_command);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------------</span>
+<span class="Comment">    Get thread index ...</span>
+<span class="Comment">--------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> get_thread_index(<span class="Type">char</span> *in_name, <span class="Type">int</span> *t_index)
+
+{   <span class="Type">int</span> i;
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Find free entry in thread index  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> We may have to wait until a slot </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> in the thread table is available </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(threads &gt; <span class="Constant">256</span>)
+    {  <span class="Statement">if</span>(appl_verbose == TRUE)
+       {  (<span class="Type">void</span>)strdate(date);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): thread table full -- waiting for slot</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                               date,appl_name,appl_pid,appl_host,appl_owner);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+
+       thread_slot_wait = TRUE;
+    }
+
+    <span class="Statement">while</span>(threads &gt; <span class="Constant">256</span>)
+         (<span class="Type">void</span>)pups_usleep(<span class="Constant">100</span>);
+    thread_slot_wait = FALSE;
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> We have a slot -- lets find it! </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">256</span>; ++i)
+    {  <span class="Statement">if</span>(thread[i] == (-<span class="Constant">1</span>))
+       {  *t_index = i;
+          tsname[i] = (<span class="Type">char</span> *)pups_malloc(SSIZE);
+          (<span class="Type">void</span>)strlcpy(tsname[i],in_name,SSIZE);
+
+          ++threads;
+          <span class="Statement">return</span>(i);
+       }
+    }
+
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> We should not get here </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+    pups_error(<span class="Constant">&quot;[update_thread_index] thread slot allocation failed&quot;</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------------</span>
+<span class="Comment">    Is next item in the thread table  ...</span>
+<span class="Comment">--------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _BOOLEAN in_thread_table(<span class="Type">char</span> *item)
+
+{   <span class="Type">int</span> i;
+
+    <span class="Statement">if</span>(multithreaded == FALSE)
+       <span class="Statement">return</span>(FALSE);
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">256</span>; ++i)
+    {  <span class="Statement">if</span>(tsname[i] != (<span class="Type">char</span> *)<span class="Constant">NULL</span> &amp;&amp; strcmp(tsname[i],item) == <span class="Constant">0</span>)
+          <span class="Statement">return</span>(TRUE);
+    }
+
+    <span class="Statement">return</span>(FALSE);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------</span>
+<span class="Comment">    Restore the sensitive directory ...</span>
+<span class="Comment">---------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> restore_sdir(<span class="Type">char</span> *sdir)
+
+{    (<span class="Type">void</span>)mkdir(sdir,<span class="PreProc">0</span><span class="Constant">700</span>);
+     dirp = opendir(sdir);
+
+     <span class="Statement">if</span>(appl_verbose == TRUE)
+     {  (<span class="Type">void</span>)strdate(date);
+        (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): sensitive directory </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> lost -- restoring</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                               date,appl_name,appl_pid,appl_host,appl_owner,sdir);
+        (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+     }
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

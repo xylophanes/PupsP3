@@ -9,7 +9,7 @@
              United Kingdom
 
     Version: 2.00 
-    Dated:   30th August 2019 
+    Dated:   26th January 2022
     E-mail:  mao@tumblingdice.co.uk
 -------------------------------------------------------------------------------------------------------*/
 
@@ -81,7 +81,7 @@ _PRIVATE void protect_slot(int level)
 {   (void)fprintf(stderr,"int [PUPS/PSRP] application protect %s: [ANSI C, PUPS/PSRP]\n",PROTECT_VERSION);
  
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 2005-2019 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 2005-2022 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
        (void)fprintf(stderr,"File and directory protector (built %s %s)\n\n",__TIME__,__DATE__);
     }
@@ -207,7 +207,7 @@ _PRIVATE int child_pid;                              /* PID of child bud process
     checkpoint files) ...
 -------------------------------------------------------------------------------------------------------*/
 
-#define VTAG  3339
+#define VTAG  3749
 extern int appl_vtag = VTAG;
 
 
@@ -344,7 +344,7 @@ refork:
                   PROTECT_VERSION,
                   "M.A. O'Neill",
                   "protect",
-                  "2019",
+                  "2022",
                   argv);
 
 
@@ -489,7 +489,7 @@ refork:
              }
           }
 
-          pups_exit(-1);
+          pups_exit(255);
        }
        else
        {  FILE *stream = (FILE *)NULL;
@@ -567,7 +567,7 @@ refork:
 
        if(access(file_name,F_OK | R_OK | W_OK) == (-1))
        {  if(do_defer == FALSE)
-              pups_exit(-1);
+              pups_exit(255);
           else
           {  if(appl_verbose == TRUE)
              {  (void)strdate(date);
@@ -738,7 +738,7 @@ _PRIVATE void scan_directory(char *dir_name)
                                 date,appl_name,appl_pid,appl_host,appl_owner,file_name);
           (void)fflush(stderr);
 
-          pups_exit(-1);
+          pups_exit(255);
        }
     }
 

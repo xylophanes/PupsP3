@@ -1,0 +1,405 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/connected.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span>
+<span class="Comment">   Purpose: daemon which looks to see if local network is connected</span>
+<span class="Comment">            to the Internet. If local network is connected, then it</span>
+<span class="Comment">            starts name resolution services for host.</span>
+
+<span class="Comment">    Author:  M.A. O'Neill</span>
+<span class="Comment">             Tumbling Dice Ltd</span>
+<span class="Comment">             Gosforth</span>
+<span class="Comment">             Newcastle upon Tyne</span>
+<span class="Comment">             NE3 4RT</span>
+<span class="Comment">             United Kingdom</span>
+
+<span class="Comment">   Version: 2.02</span>
+<span class="Comment">   Dated:   24th May 2022</span>
+<span class="Comment">   E-mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;stdio.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;setjmp.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;signal.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;netdb.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/socket.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;netinet/in.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;arpa/inet.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;bsd/string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stdlib.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span>
+<span class="Comment">    Definitions used by this application ...</span>
+<span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Version of connected </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+<span class="PreProc">#define CONNECTED_VERSION    </span><span class="Constant">&quot;2.02&quot;</span><span class="PreProc"> </span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> String size </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define SSIZE                </span><span class="Constant">2048</span><span class="PreProc"> </span>
+
+
+<span class="PreProc">#define INTERNET_UNREACHABLE </span><span class="Constant">0</span>
+<span class="PreProc">#define INTERNET_REACHABLE   </span><span class="Constant">1</span>
+<span class="PreProc">#define PING_TIMEOUT         </span><span class="Constant">5</span><span class="PreProc"> </span>
+<span class="PreProc">#define NET_UMASK            </span><span class="Constant">0xff</span>
+
+<span class="PreProc">#ifndef PUPS_SUPPORT</span>
+<span class="PreProc">#define _BOOLEAN             </span><span class="Type">int</span>
+<span class="PreProc">#define _PRIVATE             </span><span class="Type">static</span>
+<span class="PreProc">#define _PUBLIC</span>
+
+<span class="PreProc">#ifdef FALSE</span>
+<span class="PreProc">#undef FALSE</span>
+<span class="PreProc">#endif</span>
+<span class="PreProc">#define FALSE                </span><span class="Constant">0</span>
+
+<span class="PreProc">#ifdef TRUE</span>
+<span class="PreProc">#undef TRUE </span>
+<span class="PreProc">#endif</span>
+<span class="PreProc">#define TRUE                 </span><span class="Constant">255</span>
+
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PUPS_SUPPORT </span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span>
+<span class="Comment">    Variables which are private to this application ...</span>
+<span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE sigjmp_buf env;
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span>
+<span class="Comment">    Handler for (SIGALRM) timeouts ...</span>
+<span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> alarm_handler(<span class="Type">int</span> signo)
+
+{   (<span class="Type">void</span>)siglongjmp(env,<span class="Constant">1</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span>
+<span class="Comment">    Main entry point to application ...</span>
+<span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> main(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   <span class="Type">int</span> i,
+        ping_timeout = PING_TIMEOUT,
+        cnt          = <span class="Constant">0</span>;
+
+    _BOOLEAN state = INTERNET_UNREACHABLE;
+
+    <span class="Type">char</span> line[SSIZE]         = <span class="Constant">&quot;&quot;</span>,
+         hostname[SSIZE]     = <span class="Constant">&quot;&quot;</span>,
+         nameserver[SSIZE]   = <span class="Constant">&quot;&quot;</span>,
+         upscript[SSIZE]     = <span class="Constant">&quot;&quot;</span>,
+         downscript[SSIZE]   = <span class="Constant">&quot;&quot;</span>,
+         ping_command[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+    <span class="Type">FILE</span> *ping_stream        = (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Daemon runs in its own process group </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)setsid();
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check that we actually have resolv.up and resolv.down files </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(access(<span class="Constant">&quot;/etc/resolv.up&quot;</span>,F_OK | R_OK | W_OK) == (-<span class="Constant">1</span>) &amp;&amp; access(<span class="Constant">&quot;/etc/resolv.down&quot;</span>,F_OK | R_OK | W_OK) == (-<span class="Constant">1</span>))
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;connected: cannot find </span><span class="Special">\&quot;</span><span class="Constant">/etc/resolv.up</span><span class="Special">\&quot;</span><span class="Constant"> or </span><span class="Special">\&quot;</span><span class="Constant">/etc/resolv.down</span><span class="Special">\&quot;</span><span class="Constant"> -- aborting</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       exit(<span class="Constant">255</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Get the I.P. address of the remote nameserver we are </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> supposed to query.                                   </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(argc != <span class="Constant">4</span>)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">Connected version </span><span class="Special">%s</span><span class="Constant">, (C) Tumbling Dice, 2002-2022 (built </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,CONNECTED_VERSION,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">Usage: connected &lt;nameserver&gt; &lt;upscript&gt; &lt;downscript&gt; [&lt;ping timeout&gt;]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;CONNECTED is free software, covered by the GNU General Public License, and you are</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;welcome to change it and/or distribute copies of it under certain conditions.</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;See the GPL and LGPL licences at www.gnu.org for further details</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;CONNECTED comes with ABSOLUTELY NO WARRANTY</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       exit(<span class="Constant">255</span>);
+    }
+    <span class="Statement">else</span>
+    {  <span class="Type">char</span> netname[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+       <span class="Type">unsigned</span> <span class="Type">long</span> nameserver_address,
+                     host_address;
+
+       <span class="Type">struct</span> in_addr ns_addr;
+       in_addr_t      ns_net;
+
+       <span class="Type">struct</span> netent *host_netent = (<span class="Type">struct</span> netent *)<span class="Constant">NULL</span>;
+
+
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> If this is a name convert to an I.P. address </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>((ns_net = inet_network(argv[<span class="Constant">1</span>])) != <span class="Constant">0</span>)
+          (<span class="Type">void</span>)strlcpy(nameserver,argv[<span class="Constant">1</span>],SSIZE);
+       <span class="Statement">else</span>
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;connected: address is not in I.P. format</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+          exit(<span class="Constant">255</span>);
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Check that the address we are monitoring is not on our local network </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> (if it is it is a waste of time looking at it!)                      </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(getdomainname(netname,SSIZE) == (-<span class="Constant">1</span>))
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;connected: could not get local network number</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+          exit(<span class="Constant">255</span>);
+       }
+       <span class="Statement">else</span>
+       {  <span class="Statement">if</span>((host_netent = getnetbyname(netname)) == (<span class="Type">struct</span> netent *)<span class="Constant">NULL</span>)
+          {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;connected: could not get network number for local host</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+            exit(<span class="Constant">255</span>);
+          }
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Assumes local network is class C </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(abs((<span class="Type">unsigned</span> <span class="Type">long</span>)ns_net - host_netent-&gt;n_net) &lt;= NET_UMASK)
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;connected: nameserver I.P. address is local</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+          exit(<span class="Constant">255</span>);
+       }
+
+       (<span class="Type">void</span>)strlcpy(upscript,argv[<span class="Constant">2</span>],SSIZE);
+       (<span class="Type">void</span>)strlcpy(downscript,argv[<span class="Constant">3</span>],SSIZE);
+
+       <span class="Statement">if</span>(access(upscript,F_OK | R_OK | W_OK) == (-<span class="Constant">1</span>))
+       {  <span class="Statement">if</span>(access(<span class="Constant">&quot;/etc/connected.d/connected.upscript&quot;</span>,F_OK | R_OK | W_OK) == (-<span class="Constant">1</span>))
+          {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;connected: cannot find script to run when gateway comes up</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+             exit(<span class="Constant">255</span>);
+          }
+          <span class="Statement">else</span>
+             (<span class="Type">void</span>)strlcpy(upscript,<span class="Constant">&quot;/etc/connected.d/connected.upscript&quot;</span>,SSIZE);
+       }
+
+       <span class="Statement">if</span>(access(downscript,F_OK | R_OK | W_OK) == (-<span class="Constant">1</span>))
+       {  <span class="Statement">if</span>(access(<span class="Constant">&quot;/etc/connected.d/connected.downscript&quot;</span>,F_OK | R_OK | W_OK) == (-<span class="Constant">1</span>))
+          {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;connected: cannot find script to run when gateway goes down</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+             exit(<span class="Constant">255</span>);
+          }
+          <span class="Statement">else</span>
+             (<span class="Type">void</span>)strlcpy(upscript,<span class="Constant">&quot;/etc/connected.d/connected.downscript&quot;</span>,SSIZE);
+       }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Are we using a non-default ping timeout? </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(argc == <span class="Constant">5</span>)
+    {  <span class="Statement">if</span>(sscanf(argv[<span class="Constant">5</span>],<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">&quot;</span>,&amp;ping_timeout) != <span class="Constant">1</span>)
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;connected: expecting ping timeout (in seconds)</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+          exit(<span class="Constant">255</span>);
+       }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Display startup options </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)gethostname(hostname,SSIZE);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;connected (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): querying nameserver </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,getpid(),hostname,nameserver);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;connected (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): upscript </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n</span><span class="Constant">&quot;</span>,getpid(),hostname,upscript);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;connected (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): downscript </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n</span><span class="Constant">&quot;</span>,getpid(),hostname,downscript);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;connected (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): ping timeout is </span><span class="Special">%d</span><span class="Constant"> seconds</span><span class="Special">\n</span><span class="Constant">&quot;</span>,getpid(),hostname,ping_timeout);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Main loop -- try to ping nameserver -- once name server </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> is pingable bring up resolv.conf                        </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)snprintf(ping_command,SSIZE,<span class="Constant">&quot;csh -c </span><span class="Special">\&quot;</span><span class="Constant">ping </span><span class="Special">%s</span><span class="Constant"> |&amp; cat</span><span class="Special">\&quot;</span><span class="Constant">&quot;</span>,nameserver);
+    <span class="Statement">if</span>((ping_stream = popen(ping_command,<span class="Constant">&quot;r&quot;</span>)) == (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;connected: failed to start </span><span class="Special">\&quot;</span><span class="Constant">ping</span><span class="Special">\&quot;</span><span class="Constant"> command</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       exit(<span class="Constant">255</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Initally assume Internet gateway is down </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)system(downscript);
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Make sure ping command is launched before we read data from pipe </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)sleep(<span class="Constant">5</span>);
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;connected: (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): started</span><span class="Special">\n</span><span class="Constant">&quot;</span>,getpid(),hostname);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Main loop -- mointor Internet gateway status </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">while</span>(TRUE)
+    {
+
+       <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Wait for Internet connection to come up </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">do</span> {    (<span class="Type">void</span>)fgets(line,SSIZE,ping_stream);
+
+
+               <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment"> If we get an unknown host here -- abort </span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+
+               <span class="Statement">if</span>(strncmp(line,<span class="Constant">&quot;ping: unknown host&quot;</span>,strlen(<span class="Constant">&quot;ping: unknown host&quot;</span>)) == <span class="Constant">0</span>)
+               {  (<span class="Type">void</span>)pclose(ping_stream);
+
+                  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;connected: unknown host (</span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,nameserver);
+                  (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+                  exit(<span class="Constant">255</span>);
+               }
+
+               (<span class="Type">void</span>)usleep(<span class="Constant">100</span>);
+          } <span class="Statement">while</span>(strncmp(line,<span class="Constant">&quot;From&quot;</span>,<span class="Constant">4</span>) == <span class="Constant">0</span> || strncmp(line,<span class="Constant">&quot;PING&quot;</span>,<span class="Constant">4</span>) == <span class="Constant">0</span>);
+
+       state = INTERNET_REACHABLE;
+       (<span class="Type">void</span>)system(upscript);
+
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;connected: (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): gateway to Internet up (running upscript </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                    getpid(),hostname,upscript);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+
+       <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Flush ping buffer </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">do</span> {    (<span class="Type">void</span>)fgets(line,SSIZE,ping_stream);
+          } <span class="Statement">while</span>(strncmp(line,<span class="Constant">&quot;From&quot;</span>,<span class="Constant">4</span>) == <span class="Constant">0</span>);
+
+
+       <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Wait for Internet connection to go down </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">do</span> {    <span class="Statement">if</span>(sigsetjmp(env,<span class="Constant">1</span>) == <span class="Constant">0</span>)
+               {  (<span class="Type">void</span>)signal(<span class="Constant">SIGALRM</span>,(<span class="Type">void</span> *)&amp;alarm_handler);
+                  (<span class="Type">void</span>)alarm(ping_timeout);
+                  (<span class="Type">void</span>)fgets(line,SSIZE,ping_stream);
+                  (<span class="Type">void</span>)alarm(<span class="Constant">0</span>);
+                  (<span class="Type">void</span>)signal(<span class="Constant">SIGALRM</span>,<span class="Constant">SIG_DFL</span>);
+               }
+               <span class="Statement">else</span>
+                  state = INTERNET_UNREACHABLE;
+
+               (<span class="Type">void</span>)usleep(<span class="Constant">100</span>);
+          } <span class="Statement">while</span>(state == INTERNET_REACHABLE);
+
+       (<span class="Type">void</span>)system(downscript);
+
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;connected: (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): gateway to Internet down (running downscript </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                      getpid(),hostname,downscript);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+
+       <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Flush ping buffer </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">do</span> {    (<span class="Type">void</span>)fgets(line,SSIZ,ping_stream);
+          } <span class="Statement">while</span>(strncmp(line,<span class="Constant">&quot;From&quot;</span>,<span class="Constant">4</span>) != <span class="Constant">0</span>);
+    }
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

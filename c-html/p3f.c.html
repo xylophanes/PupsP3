@@ -1,0 +1,413 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/p3f.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------</span>
+<span class="Comment">     Purpose: Test to see if a given process is PUPS/P3 aware.</span>
+
+<span class="Comment">     Author:  M.A. O'Neill</span>
+<span class="Comment">              Tumbling Dice Ltd</span>
+<span class="Comment">              Gosforth</span>
+<span class="Comment">              Newcastle upon Tyne</span>
+<span class="Comment">              NE3 4RT</span>
+<span class="Comment">              United Kingdom</span>
+
+<span class="Comment">     Version: 2.01 </span>
+<span class="Comment">     Dated:   24th May 2022</span>
+<span class="Comment">     E-mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;stdio.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;bsd/string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stdlib.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;signal.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;dirent.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;xtypes.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/types.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/stat.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------</span>
+<span class="Comment">     Get signal mapping appropriate to OS and hardware architecture ...</span>
+<span class="Comment">------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define __DEFINE__</span>
+<span class="PreProc">#if defined(I386) || defined(X86_64)</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sig.linux.x86.h&gt;</span>
+<span class="PreProc">#endif</span>
+
+<span class="PreProc">#ifdef ARMV6L</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sig.linux.arm.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> ARMV6L </span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef ARMV7L</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sig.linux.arm.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> ARMV7L </span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef AARCH64</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sig.linux.arm.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> AARCH64 </span><span class="Comment">*/</span>
+<span class="PreProc">#undef __DEFINE__</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------------</span>
+<span class="Comment">    Defines which are local to this application ...</span>
+<span class="Comment">-----------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Version of p3f </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define P3F_VERSION    </span><span class="Constant">&quot;2.01&quot;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> String size </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define SSIZE          </span><span class="Constant">2048</span><span class="PreProc"> </span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------------</span>
+<span class="Comment">    Convert (local) pidname to list of matching PIDS ... </span>
+<span class="Comment">----------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> local_pname_to_pid(<span class="Type">FILE</span>      *stream,
+                                _BOOLEAN  binname,
+                                _BOOLEAN  *is_pid,
+                                <span class="Type">char</span>     *pidname)
+
+
+{  <span class="Type">int</span>  pid,
+        cnt                 = <span class="Constant">0</span>,
+        looper              = TRUE;
+
+   <span class="Type">char</span> strdum[SSIZE]       = <span class="Constant">&quot;&quot;</span>,
+        cmdline[SSIZE]      = <span class="Constant">&quot;&quot;</span>,
+        ps_cmd[SSIZE]       = <span class="Constant">&quot;&quot;</span>;
+
+   <span class="Type">FILE</span>          *pstream   = (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>;
+   <span class="Type">DIR</span>           *dirp      = (<span class="Type">DIR</span> *)<span class="Constant">NULL</span>;
+   <span class="Type">struct</span> dirent *next_item = (<span class="Type">struct</span> dirent *)<span class="Constant">NULL</span>;
+
+
+   <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------</span><span class="Comment">*/</span>
+   <span class="Comment">/*</span><span class="Comment"> If pname is numeric (e.g. a PID) simply convert it and return </span><span class="Comment">*/</span>
+   <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------</span><span class="Comment">*/</span>
+
+   *is_pid = TRUE;
+   <span class="Statement">if</span>(sscanf(pidname,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">&quot;</span>,&amp;pid) == <span class="Constant">1</span>)
+   {  <span class="Statement">if</span>(pid &lt;= <span class="Constant">1</span>)
+      {  <span class="Statement">if</span>(stream != (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>)
+         {  (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;freeze: </span><span class="Special">%d</span><span class="Constant"> is not a valid PID</span><span class="Special">\n</span><span class="Constant">&quot;</span>,pid);
+            (<span class="Type">void</span>)fflush(stream);
+         }
+
+         <span class="Statement">return</span>(-<span class="Constant">1</span>);
+      }
+
+      <span class="Statement">return</span>(pid);
+   }
+   <span class="Statement">else</span>
+      *is_pid = FALSE;
+
+   dirp = opendir(<span class="Constant">&quot;/proc&quot;</span>);
+
+
+   <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+   <span class="Comment">/*</span><span class="Comment"> Scan proc filesystem for pidname </span><span class="Comment">*/</span>
+   <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+   <span class="Statement">while</span>((next_item = readdir(dirp)) != (<span class="Type">struct</span> dirent *)<span class="Constant">NULL</span>)
+   {
+
+        <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> Is next item a process (sub)directory? </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+        <span class="Statement">if</span>(sscanf(next_item-&gt;d_name,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">&quot;</span>,&amp;pid) == <span class="Constant">1</span>)
+        {    <span class="Type">int</span> i,
+                 nb,
+                 fdes = (-<span class="Constant">1</span>);
+
+           <span class="Type">char</span> procpidpath[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+           <span class="Statement">if</span>(binname == TRUE)
+           {  (<span class="Type">void</span>)snprintf(procpidpath,SSIZE,<span class="Constant">&quot;/proc/</span><span class="Special">%d</span><span class="Constant">/cmdline&quot;</span>,pid);
+              fdes = open(procpidpath,<span class="Constant">0</span>);
+              nb   = read(fdes,cmdline,SSIZE);
+              cmdline[nb] = <span class="Special">'\0'</span>;
+              (<span class="Type">void</span>)close(fdes);
+           }
+           <span class="Statement">else</span>
+           {  <span class="Comment">/*</span><span class="Comment"> Get name of binary </span><span class="Comment">*/</span>
+              (<span class="Type">void</span>)snprintf(procpidpath,SSIZE,<span class="Constant">&quot;/proc/</span><span class="Special">%d</span><span class="Constant">/exe&quot;</span>,pid);
+              (<span class="Type">void</span>)readlink(procpidpath,cmdline,SSIZE);
+           }
+
+
+           <span class="Comment">/*</span><span class="Comment">------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> Strip path </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">------------</span><span class="Comment">*/</span>
+
+           <span class="Statement">for</span>(i=strlen(cmdline); i&gt;<span class="Constant">0</span>; --i)
+           {   <span class="Statement">if</span>(cmdline[i] == <span class="Constant">'/'</span>)
+                  <span class="Statement">goto</span> stripped;
+           }
+
+<span class="Statement">stripped</span>:
+
+           <span class="Statement">if</span>(strncmp(cmdline,pidname,strlen(pidname)) == <span class="Constant">0</span> || strncmp(&amp;cmdline[i+<span class="Constant">1</span>],pidname,strlen(pidname)) == <span class="Constant">0</span>)
+           {  <span class="Statement">if</span>(cnt == <span class="Constant">1</span>)
+              {  (<span class="Type">void</span>)closedir(dirp);
+
+                 <span class="Statement">if</span>(stream != (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>)
+                 {  (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;freeze: process </span><span class="Special">%s</span><span class="Constant"> is not uniquely named</span><span class="Special">\n</span><span class="Constant">&quot;</span>,pidname);
+                    (<span class="Type">void</span>)fflush(stream);
+                 }
+
+                 <span class="Statement">return</span>(-<span class="Constant">1</span>);
+              }
+              <span class="Statement">else</span>
+                 <span class="Statement">return</span>(pid);
+              ++cnt;
+           }
+        }
+   }
+
+   <span class="Statement">return</span>(-<span class="Constant">1</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------</span>
+<span class="Comment">    Look for the occurence of string s2 within string s1 ...</span>
+<span class="Comment">------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _BOOLEAN strin(<span class="Type">char</span> *s1, <span class="Type">char</span> *s2)
+
+{   <span class="Type">int</span> i,
+        cmp_size,
+        chk_limit;
+
+    <span class="Statement">if</span>(strlen(s2) &gt; strlen(s1))
+       <span class="Statement">return</span>(FALSE);
+
+    chk_limit = strlen(s1) - strlen(s2) + <span class="Constant">1</span>;
+    cmp_size  = strlen(s2);
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;chk_limit; ++i)
+    {  <span class="Statement">if</span>(strncmp(&amp;s1[i],s2,cmp_size) == <span class="Constant">0</span>)
+          <span class="Statement">return</span>(TRUE);
+    }
+
+    <span class="Statement">return</span>(FALSE);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------------</span>
+<span class="Comment">    Is our process P3 aware ...</span>
+<span class="Comment">-----------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _BOOLEAN p3_aware(<span class="Type">int</span> pid, <span class="Type">char</span> *chan_dir)
+
+{   <span class="Type">DIR</span>           *dirp         = (<span class="Type">DIR</span> *)<span class="Constant">NULL</span>;
+    <span class="Type">struct</span> dirent *next_item    = (<span class="Type">struct</span> dirent *)<span class="Constant">NULL</span>;
+    <span class="Type">char</span>          pidstr[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Asdsuming default P3 patchboard here! </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+    dirp = opendir(chan_dir);
+    (<span class="Type">void</span>)snprintf(pidstr,SSIZE,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">&quot;</span>,pid);
+
+    <span class="Statement">while</span>((next_item = readdir(dirp)) != (<span class="Type">struct</span> dirent *)<span class="Constant">NULL</span>)
+    {   <span class="Statement">if</span>(strcmp(next_item-&gt;d_name,<span class="Constant">&quot;.&quot;</span>) != <span class="Constant">0</span> &amp;&amp; strcmp(next_item-&gt;d_name,<span class="Constant">&quot;..&quot;</span>) != <span class="Constant">0</span>)
+        {  <span class="Statement">if</span>(strin(next_item-&gt;d_name,<span class="Constant">&quot;psrp&quot;</span>) == TRUE &amp;&amp; strin(next_item-&gt;d_name,pidstr) == TRUE)
+           {  (<span class="Type">void</span>)closedir(dirp);
+              <span class="Statement">return</span>(TRUE);
+           }
+        }
+    }
+
+    (<span class="Type">void</span>)closedir(dirp);
+    <span class="Statement">return</span>(FALSE);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------------</span>
+<span class="Comment">    Main entry point ...</span>
+<span class="Comment">-----------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> main(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   <span class="Type">int</span> i,
+        decoded    = <span class="Constant">0</span>,
+        start      = <span class="Constant">1</span>,
+        target_pid = (-<span class="Constant">1</span>);
+
+    <span class="Type">char</span> chan_name[SSIZE] = <span class="Constant">&quot;/tmp&quot;</span>,
+         hostname[SSIZE]  = <span class="Constant">&quot;&quot;</span>,
+         chan_dir[SSIZE]  = <span class="Constant">&quot;&quot;</span>;
+
+    _BOOLEAN do_verbose = FALSE,
+             is_pid     = FALSE;
+
+    (<span class="Type">void</span>)gethostname(hostname,SSIZE);
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;argc; ++i)
+    {  <span class="Statement">if</span>(argc == <span class="Constant">1</span> || strcmp(argv[i],<span class="Constant">&quot;-help&quot;</span>) == <span class="Constant">0</span> || strcmp(argv[i],<span class="Constant">&quot;-usage&quot;</span>) == <span class="Constant">0</span>)
+       { (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">p3f version </span><span class="Special">%s</span><span class="Constant">, (C) Tumbling Dice 2011-2022 (built </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,P3F_VERSION,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+         (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;P3F is free software, covered by the GNU General Public License, and you are</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+         (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;welcome to change it and/or distribute copies of it under certain conditions.</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+         (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;See the GPL and LGPL licences at www.gnu.org for further details</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+         (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;P3F comes with ABSOLUTELY NO WARRANTY</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+         (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">Usage: p3f [-usage | -help] | [-verbose] [-pchan &lt;PSRP channel name:/tmp&gt;] !&lt;PID&gt; | &lt;PID name&gt;! [&gt;&amp; &lt;error/status log&gt;</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+         (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+         exit(<span class="Constant">1</span>);
+       }
+       <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(argv[i],<span class="Constant">&quot;-verbose&quot;</span>) == <span class="Constant">0</span>)
+       {  do_verbose == TRUE;
+          ++decoded;
+          ++start;
+       }
+       <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(argv[i],<span class="Constant">&quot;-pchan&quot;</span>) == <span class="Constant">0</span>)
+       {  <span class="Type">struct</span> stat buf;
+
+          <span class="Statement">if</span>(i == argc - <span class="Constant">1</span> || argv[i+<span class="Constant">1</span>][<span class="Constant">0</span>] == <span class="Constant">'-'</span>)
+          {  <span class="Statement">if</span>(do_verbose == TRUE)
+             {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;p3f (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): expecting name of PSRP channel directory</span><span class="Special">\n</span><span class="Constant">&quot;</span>,getpid(),hostname);
+                (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+             }
+
+             exit(<span class="Constant">255</span>);
+          }
+
+          (<span class="Type">void</span>)strlcpy(chan_name,argv[i+<span class="Constant">1</span>],SSIZE);
+
+
+          <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Does channel directory actually exist? </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+          <span class="Statement">if</span>(access(chan_dir,F_OK | R_OK | W_OK) == (-<span class="Constant">1</span>))
+          {  <span class="Statement">if</span>(do_verbose == TRUE)
+             {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;p3f (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): PSRP channel directory </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> does not exist</span><span class="Special">\n</span><span class="Constant">&quot;</span>,getpid(),hostname,chan_dir);
+                (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+             }
+
+             exit(<span class="Constant">255</span>);
+          }
+
+
+          <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Is channel directory actually a directory? </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+
+          (<span class="Type">void</span>)stat(chan_dir,&amp;buf);
+          <span class="Statement">if</span>(! S_ISDIR(buf.st_mode))
+          {  <span class="Statement">if</span>(do_verbose == TRUE)
+             {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;p3f (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> is not a directory</span><span class="Special">\n</span><span class="Constant">&quot;</span>,getpid(),hostname,chan_dir);
+                (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+             }
+
+             exit(<span class="Constant">255</span>);
+          }
+
+          decoded += <span class="Constant">1</span>;
+          start   += <span class="Constant">1</span>;
+       }
+    }
+
+    <span class="Statement">if</span>(argc - decoded &gt; <span class="Constant">1</span>)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">p3f version </span><span class="Special">%s</span><span class="Constant">, (C) Tumbling Dice 2011-2022 (built </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,P3F_VERSION,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;P3F is free software, covered by the GNU General Public License, and you are</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;welcome to change it and/or distribute copies of it under certain conditions.</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;See the GPL and LGPL licences at www.gnu.org for further details</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;P3F comes with ABSOLUTELY NO WARRANTY</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">Usage: p3f [-usage | -help] | [-verbose] [-pchan &lt;PSRP channel name:/tmp&gt;] !&lt;PID&gt; | &lt;PID name&gt;! [&gt;&amp; &lt;error/status log&gt;</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+        exit(<span class="Constant">255</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Is target PID a process name? if so get corresponding PID </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((target_pid = local_pname_to_pid(<span class="Constant">stderr</span>,FALSE,&amp;is_pid,argv[start+<span class="Constant">1</span>])) == (-<span class="Constant">1</span>))
+       exit(<span class="Constant">255</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Is our target a P3 aware process? </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(p3_aware(target_pid,chan_dir) == FALSE)
+    {  <span class="Statement">if</span>(do_verbose == TRUE)
+       {  <span class="Statement">if</span>(is_pid == TRUE)
+             (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;p3f (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): process </span><span class="Special">%d</span><span class="Constant"> is not P3 aware</span><span class="Special">\n</span><span class="Constant">&quot;</span>,getpid(),hostname,target_pid);
+          <span class="Statement">else</span>
+             (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;p3f (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): process </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">) is not P3 aware</span><span class="Special">\n</span><span class="Constant">&quot;</span>,getpid(),hostname,argv[start+<span class="Constant">1</span>],target_pid);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+
+       exit(<span class="Constant">255</span>);
+    }
+    <span class="Statement">else</span> <span class="Statement">if</span>(do_verbose == TRUE)
+    {  <span class="Statement">if</span>(is_pid == TRUE)
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;p3f (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): process </span><span class="Special">%d</span><span class="Constant"> is P3 aware</span><span class="Special">\n</span><span class="Constant">&quot;</span>,getpid(),hostname,target_pid);
+       <span class="Statement">else</span>
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;p3f (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): process </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">) is P3 aware</span><span class="Special">\n</span><span class="Constant">&quot;</span>,getpid(),hostname,argv[start+<span class="Constant">1</span>],target_pid);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    }
+
+    exit(<span class="Constant">0</span>);
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

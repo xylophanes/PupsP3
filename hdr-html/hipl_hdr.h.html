@@ -1,0 +1,322 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.5.1.src.git/include.libs/hipl_hdr.h.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="cpp">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------- </span>
+<span class="Comment">    Header for the HIPS library.</span>
+
+<span class="Comment">    Author:  M.A. O'Neill</span>
+<span class="Comment">             Tumbling Dice Ltd</span>
+<span class="Comment">             Gosforth</span>
+<span class="Comment">             Newcastle upon Tyne</span>
+<span class="Comment">             NE3 4RT</span>
+<span class="Comment">             United Kingdom</span>
+
+<span class="Comment">    Version: 2.02 </span>
+<span class="Comment">    Dated:   7th January 2022</span>
+<span class="Comment">    E-Mail:  mao@tumblingdice.co.uk </span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="PreProc">#ifndef HIPL_H</span>
+<span class="PreProc">#define HIPL_H</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Keep c2man happy </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;c2man.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">*********</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Version </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">*********</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define HIPLIB_VERSION  </span><span class="Constant">&quot;2.02&quot;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> String size </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define SSIZE </span><span class="Constant">2048</span>
+
+
+<span class="PreProc">#ifndef __C2MAN__</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/types.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;fcntl.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;utils.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> __C2MAN__ </span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Routines for accessing elements of arrays of known pixel type </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Access an element if a HIPS row array </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define H_R_ACC(row_arr, i, size) (</span><span class="Type">void</span><span class="PreProc"> *)((key_t)row_arr      + (key_t)i*size)</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Access an element if a HIPS frame array </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define H_F_ACC(frame_arr, i, j, size) (</span><span class="Type">void</span><span class="PreProc"> *)((key_t)frame_arr[i] + (key_t)j*size)</span>
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Definition of the constants required by this library </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define HIPS_MAGIC </span><span class="Constant">&quot;PUPSP3-HIPS-1.00&quot;</span>
+
+<span class="PreProc">#define PFBYTE     </span><span class="Constant">0</span>
+<span class="PreProc">#define PFSHORT    </span><span class="Constant">1</span>
+<span class="PreProc">#define PFINT      </span><span class="Constant">2</span>
+<span class="PreProc">#define PFLONG     </span><span class="Constant">6</span>
+<span class="PreProc">#define PFFLOAT    </span><span class="Constant">3</span>
+<span class="PreProc">#define PFCOMPLEX  </span><span class="Constant">4</span>
+<span class="PreProc">#define PFASCII    </span><span class="Constant">5</span>
+<span class="PreProc">#define PFDOUBLE   </span><span class="Constant">7</span>
+<span class="PreProc">#define PFDCOMPLEX </span><span class="Constant">8</span>
+
+<span class="PreProc">#define PFQUAD1    </span><span class="Constant">11</span>
+<span class="PreProc">#define PFBHIST    </span><span class="Constant">12</span>
+<span class="PreProc">#define PFSPAN     </span><span class="Constant">13</span>
+<span class="PreProc">#define PLOT3D     </span><span class="Constant">24</span>
+
+<span class="PreProc">#define PFAHC      </span><span class="Constant">400</span>
+<span class="PreProc">#define PFOCT      </span><span class="Constant">401</span>
+<span class="PreProc">#define PFBT       </span><span class="Constant">402</span>
+<span class="PreProc">#define PAHC3      </span><span class="Constant">403</span>
+<span class="PreProc">#define PFBQ       </span><span class="Constant">404</span>
+<span class="PreProc">#define PFRLED     </span><span class="Constant">500</span>
+<span class="PreProc">#define PFRLEB     </span><span class="Constant">501</span>
+<span class="PreProc">#define PFRLEW     </span><span class="Constant">502</span>
+
+<span class="PreProc">#define PFIBYTE    </span><span class="Constant">601</span><span class="PreProc">   </span>
+<span class="PreProc">#define PFISHORT   </span><span class="Constant">602</span>
+<span class="PreProc">#define PFIINT     </span><span class="Constant">603</span>
+<span class="PreProc">#define PFIFLOAT   </span><span class="Constant">604</span>
+<span class="PreProc">#define PFICOMPLEX </span><span class="Constant">605</span>
+<span class="PreProc">#define PFIASCII   </span><span class="Constant">606</span>
+<span class="PreProc">#define PFIDOUBLE  </span><span class="Constant">607</span>
+
+<span class="PreProc">#define PFANY      </span><span class="Constant">999</span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Bit packing formats </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define MSBFIRST   </span><span class="Constant">1</span>
+<span class="PreProc">#define LSBFIRST   </span><span class="Constant">2</span>
+
+
+
+<span class="Type">typedef</span> <span class="Type">struct</span>
+{
+   <span class="Type">char</span>   orig_name[SSIZE];     <span class="Comment">// The originator of this sequence </span>
+   <span class="Type">char</span>   seq_name[SSIZE];      <span class="Comment">// The name of this sequence </span>
+   <span class="Type">int</span>    num_frame;            <span class="Comment">// The number of frames in this sequence </span>
+   <span class="Type">char</span>   orig_date[SSIZE];     <span class="Comment">// The date the sequence was originated</span>
+   <span class="Type">int</span>    rows;                 <span class="Comment">// The number of rows in each image </span>
+   <span class="Type">int</span>    cols;                 <span class="Comment">// The number of columns in each image</span>
+   <span class="Type">int</span>    bits_per_pixel;       <span class="Comment">// The number of significant bits per pixel </span>
+   <span class="Type">int</span>    bit_packing;          <span class="Comment">// Nonzero if bits were packed contiguously</span>
+   <span class="Type">int</span>    pixel_format;         <span class="Comment">// The format of each pixel, see below </span>
+   <span class="Type">char</span>   seq_history[SSIZE];   <span class="Comment">// The sequence's history of transformations </span>
+   <span class="Type">char</span>   seq_desc[SSIZE];      <span class="Comment">// Descriptive information </span>
+} hipl_hdr;
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Complex data type </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+<span class="Type">typedef</span> <span class="Type">struct</span> {   <span class="Type">float</span> real,
+                         imag;
+               }   <span class="Type">complex</span>;
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Constants exported by the library hiplib </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef __NOT_LIB_SOURCE__</span>
+
+<span class="PreProc">#else</span> <span class="Comment">/*</span><span class="Comment"> Export external variables </span><span class="Comment">*/</span>
+<span class="PreProc">#   undef  _EXPORT</span>
+<span class="PreProc">#   define _EXPORT</span>
+<span class="PreProc">#endif</span>
+
+<span class="PreProc">#define   FBUFLIMIT </span><span class="Constant">30000</span>
+<span class="PreProc">#ifdef IMG_SUPPORT</span>
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Kontron (IMG) format </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define IMG_GREY    </span><span class="Constant">1</span>
+<span class="PreProc">#define IMG_RGB     </span><span class="Constant">2</span>
+
+<span class="Type">typedef</span> <span class="Type">struct</span> {    <span class="Type">int</span>      rows;           <span class="Comment">// Rows in image </span>
+                    <span class="Type">int</span>      cols;           <span class="Comment">// Columns in image </span>
+                    <span class="Type">int</span>      n_frames;       <span class="Comment">// Images in sequence </span>
+                    <span class="Type">int</span>      colour;         <span class="Comment">// RGB or GREY </span>
+                    <span class="Type">long</span> <span class="Type">int</span> datatype;       <span class="Comment">// Image datatype </span>
+                    <span class="Type">long</span> <span class="Type">int</span> seeklutdata;    <span class="Comment">// Image RGB LUT offset</span>
+                    <span class="Type">long</span> <span class="Type">int</span> seekRdata;      <span class="Comment">// Offset to grey (RGB red) data </span>
+                    <span class="Type">long</span> <span class="Type">int</span> seekGdata;      <span class="Comment">// Offset to RGB green data </span>
+                    <span class="Type">long</span> <span class="Type">int</span> seekBdata;      <span class="Comment">// Offset to RGB blue data </span>
+                    <span class="Type">long</span>     size;           <span class="Comment">// Image size (in pixels)</span>
+                    _BOOLEAN has_lut;        <span class="Comment">// TRUE if image has LUT</span>
+                    _BYTE    lut[<span class="Constant">768</span>];       <span class="Comment">// RGB look up table </span>
+               } img_hdr_type;
+
+<span class="PreProc">#endif</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Functions and procedures which work on the hipl_header data type ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Comment">// Get HIPS header from stdin</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span>  hips_rd_hdr_info(<span class="Type">int</span>, <span class="Type">int</span> *, <span class="Type">int</span> *, <span class="Type">int</span> *, hipl_hdr *);
+
+<span class="Comment">// Display HIPS header information in textual format</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span>  hips_display_hdr_info(<span class="Type">FILE</span> *, hipl_hdr *);
+
+<span class="Comment">// Get HIPS header from file </span>
+_PROTOTYPE _EXPORT <span class="Type">int</span>  hips_f_rd_hdr_info(<span class="Type">int</span>, <span class="Type">int</span>, <span class="Type">int</span> *, <span class="Type">int</span> *, <span class="Type">int</span> *, hipl_hdr *);
+
+<span class="Comment">// Write HIPS header to stdout</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> hips_wr_hdr_info(<span class="Type">char</span> *, <span class="Type">int</span>, <span class="Type">char</span> *[], <span class="Type">char</span> *, hipl_hdr *);
+
+
+<span class="Comment">// Write HIPS header to file</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> hips_f_wr_hdr_info(<span class="Type">int</span>, <span class="Type">char</span> *, <span class="Type">int</span>, <span class="Type">char</span> *[], <span class="Type">char</span> *, hipl_hdr *);
+
+<span class="Comment">// Read HIPS header</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> hips_rd_hdr(hipl_hdr *);
+
+<span class="Comment">// Read HIPS header from file</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> hips_frd_hdr(<span class="Type">int</span>, hipl_hdr *);
+
+<span class="Comment">// Write hips header</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> hips_wr_hdr(hipl_hdr *);
+
+<span class="Comment">// Write HIPS header to file </span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> hips_fwr_hdr(<span class="Type">int</span>, hipl_hdr *);
+
+<span class="Comment">// Initialise HIPS header</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> hips_init_hdr  (hipl_hdr *, <span class="Type">char</span> *, <span class="Type">char</span> *, <span class="Type">int</span>, <span class="Type">char</span> *, <span class="Type">int</span>, <span class="Type">int</span>, <span class="Type">int</span>, <span class="Type">int</span>, <span class="Type">int</span>, <span class="Type">char</span> *, <span class="Type">char</span> *);
+
+<span class="Comment">// Skip frame of data</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> hips_frame_skip(<span class="Type">int</span>, <span class="Type">int</span>, hipl_hdr *);
+
+<span class="Comment">// Update the header descriptor</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> hips_upd_hdr(hipl_hdr *, <span class="Type">char</span> *, <span class="Type">int</span>, <span class="Type">char</span> **);
+
+<span class="Comment">// Update the sequence discriptor</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> hips_upd_desc(hipl_hdr *, <span class="Type">char</span> *);
+
+<span class="Comment">// Set header descriptor</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> hips_set_desc(hipl_hdr *, <span class="Type">char</span> *);
+
+<span class="Comment">// Allocate memory for a frame</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> **hips_fralloc(hipl_hdr *);
+
+<span class="Comment">// Allocate memory for n rows of image</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> **hips_nralloc(<span class="Type">int</span>, hipl_hdr *);
+
+<span class="Comment">// Allocate memory for one image row</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> *hips_ralloc(hipl_hdr *);
+
+<span class="Comment">// Pread routine to read correctly from a pipe </span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pipe_pread(<span class="Type">int</span>, <span class="Type">void</span> *, <span class="Type">int</span>);
+
+<span class="Comment">// Routine to return size of pixel in bytes</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> hips_pixel_size(<span class="Type">int</span>);
+
+<span class="Comment">// Routine to decode a pixel output type</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> hips_output_pixel_type(<span class="Type">char</span> *);
+
+<span class="Comment">// Routine to return type string corresponding to a HIPL pixel format</span>
+_PROTOTYPE _EXPORT <span class="Type">char</span> *hips_pixstr(<span class="Type">int</span>);
+
+<span class="Comment">// Routine to destroy HIPS header datastructure</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> hips_destroy_hdr(hipl_hdr *);
+
+
+<span class="PreProc">#ifdef TIFF_SUPPORT</span>
+<span class="Comment">// Convert a HIPS file to a TIFF file</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> hips_to_tiff(_BOOLEAN, <span class="Type">int</span>, <span class="Type">int</span>, <span class="Type">char</span> **, <span class="Type">int</span>, <span class="Type">char</span> *, <span class="Type">char</span> *);
+
+<span class="Comment">// Convert a TIFF file to a HIPS file</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> tiff_to_hips(_BOOLEAN, <span class="Type">int</span>, <span class="Type">char</span> **, <span class="Type">char</span> *, <span class="Type">char</span> *);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> TIFF_SUPPORT </span><span class="Comment">*/</span>
+
+
+<span class="PreProc">#ifdef IMG_SUPPORT</span>
+<span class="Comment">// Read Kontron IMG image</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> img_read_hdr(<span class="Type">int</span>  fdes, _BOOLEAN, img_hdr_type *);
+
+<span class="Comment">// Write Kontron IMG image</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> img_write_hdr(<span class="Type">int</span> fdes, _BOOLEAN, img_hdr_type *);
+
+<span class="Comment">// Convert Kontron IMG image to HIPS image</span>
+_PUBLIC <span class="Type">void</span> img_to_hips(_BOOLEAN, <span class="Type">int</span>, <span class="Type">char</span> *[], <span class="Type">char</span> *, <span class="Type">char</span> *);
+
+<span class="Comment">// Convert HIPS image to Kontron IMG image</span>
+_PUBLIC <span class="Type">void</span> hips_to_img(_BOOLEAN, <span class="Type">char</span> *, <span class="Type">char</span> *);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> IMG_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef _CPLUSPLUS</span>
+<span class="PreProc">#   undef  _EXPORT</span>
+<span class="PreProc">#   define _EXPORT </span><span class="Type">extern</span><span class="PreProc"> C</span>
+<span class="PreProc">#else</span>
+<span class="PreProc">#   undef  _EXPORT</span>
+<span class="PreProc">#   define _EXPORT </span><span class="Type">extern</span>
+<span class="PreProc">#endif</span>
+
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> HIPL_H </span><span class="Comment">*/</span>
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

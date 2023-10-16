@@ -1,0 +1,155 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.5.1.src.git/include.libs/xtypes.h.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="cpp">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------- </span>
+<span class="Comment">    Header for extended type definitions used by PUPS.</span>
+
+<span class="Comment">    Author:  M.A. O'Neill</span>
+<span class="Comment">             Tumbling Dice Ltd</span>
+<span class="Comment">             Gosforth</span>
+<span class="Comment">             Newcastle upon Tyne</span>
+<span class="Comment">             NE3 4RT</span>
+<span class="Comment">             United Kingdom</span>
+
+<span class="Comment">    Version: 2.00 </span>
+<span class="Comment">    Dated:   4th January 2022</span>
+<span class="Comment">    E-Mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifndef XTYPES_H</span>
+<span class="PreProc">#define XTYPES_H</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> The definitions that follow enable the PUPS libraries and other </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> things written by me to compile - Mark O'Neill                  </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef __BOOLEAN__</span>
+
+<span class="PreProc">#ifndef TRUE</span>
+<span class="Type">typedef</span> <span class="Type">enum</span> {    FALSE,
+                  TRUE
+             } Boolean;
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> __BOOLEAN__ </span><span class="Comment">*/</span>
+
+<span class="PreProc">#else</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Define FALSE and TRUE if they are not aready defined </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="PreProc">#ifndef FALSE</span>
+<span class="PreProc">#    define FALSE </span><span class="Constant">0</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> FALSE </span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifndef TRUE</span>
+<span class="PreProc">#    define TRUE  </span><span class="Constant">1</span><span class="PreProc"> </span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment">TRUE </span><span class="Comment">*/</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> __BOOLEAN__ </span><span class="Comment">*/</span>
+
+<span class="PreProc">#define NO_CHECKPOINTING (-</span><span class="Constant">1234</span><span class="PreProc">)</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Define PUBLIC and PRIVATE a la Tannenbaum </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define _PROTOTYPE                    </span><span class="Comment">// Prototype declarator</span>
+<span class="PreProc">#define _PRIVATE  </span><span class="Type">static</span><span class="PreProc">              </span><span class="Comment">// Define private to local library </span>
+<span class="PreProc">#define _PUBLIC                       </span><span class="Comment">// Define a public function of library </span>
+<span class="PreProc">#define _PROTECTED                    </span><span class="Comment">// Define a protected function of library</span>
+<span class="PreProc">#define _IMPORT   </span><span class="Type">extern</span><span class="PreProc">              </span><span class="Comment">// Define function/var as imported</span>
+<span class="PreProc">#define _IMMORTAL </span><span class="Type">static</span><span class="PreProc">              </span><span class="Comment">// Variable exists between function calls</span>
+<span class="PreProc">#define _EXTERN   </span><span class="Type">extern</span><span class="PreProc">              </span><span class="Comment">// Define a variable as external</span>
+<span class="PreProc">#define _EXPORT   </span><span class="Type">extern</span><span class="PreProc">              </span><span class="Comment">// Header export variable definition</span>
+<span class="PreProc">#define _BOOLEAN  </span><span class="Type">int</span><span class="PreProc">                 </span><span class="Comment">// Define the Boolean type</span>
+<span class="PreProc">#define _BYTE     </span><span class="Type">unsigned</span><span class="PreProc"> </span><span class="Type">char</span><span class="PreProc">       </span><span class="Comment">// Definition of byte type</span>
+<span class="PreProc">#define _DYNAMIC                      </span><span class="Comment">// Dynamic object identifier</span>
+<span class="PreProc">#define _WRITEABLE                    </span><span class="Comment">// Writeable protected type modifier</span>
+<span class="PreProc">#define _REAL     </span><span class="Type">double</span><span class="PreProc">              </span><span class="Comment">// Real variable</span>
+<span class="PreProc">#define _USHORT   </span><span class="Type">unsigned</span><span class="PreProc"> </span><span class="Type">short</span><span class="PreProc">      </span><span class="Comment">// Unsigned short</span>
+<span class="PreProc">#define _ULONG    </span><span class="Type">unsigned</span><span class="PreProc"> </span><span class="Type">long</span><span class="PreProc">       </span><span class="Comment">// Unsigned long</span>
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Transformed dynamic I/O types produced by slink </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define _DYNAMIC_IMPORT </span><span class="Type">static</span>
+<span class="PreProc">#define _DYNAMIC_EXPORT</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Some common type definitions </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">typedef</span> <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span> psize_t;   <span class="Comment">// Used to set the contents of a pointer</span>
+<span class="Type">typedef</span> <span class="Type">unsigned</span> <span class="Type">int</span>      pindex_t;  <span class="Comment">// Used for array indexing</span>
+<span class="Type">typedef</span> <span class="Type">unsigned</span> <span class="Type">int</span>      des_t;     <span class="Comment">// File descriptor type</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Standard dummy variable declarations </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define CHDUM </span><span class="Special">'\0'</span>
+<span class="PreProc">#define IDUM  (</span><span class="Type">int</span><span class="PreProc">)</span><span class="Constant">0</span>
+<span class="PreProc">#define DDUM  (</span><span class="Type">double</span><span class="PreProc">)</span><span class="Constant">0.0</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> This statement defines whether the compiler to be used is ANSI or   </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> C++ - this is required so that c++ compilers see the correct token  </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> for turning off argument checking                                   </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> --------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef _CPLUSPLUS</span>
+<span class="PreProc">#   define __UDEF_ARGS__ ...</span>
+<span class="PreProc">#else</span>
+<span class="PreProc">#   define __UDEF_ARGS__</span>
+<span class="PreProc">#endif</span>
+
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> XTYPES_H </span><span class="Comment">*/</span>
+
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

@@ -1,11 +1,11 @@
-#-----------------------------------------------------------------------
+#-----------------------------------------
 # Makefile for PSRP client on Linux system
-# M.A. O'Neill, Tumbling Dice 23/01/2018
-#-----------------------------------------------------------------------
+# M.A. O'Neill, Tumbling Dice 04/01/2022
+#------------------------------------------
 
-CFLAGS		=	TARGET_CFLAGS TARGET_ARCHDEPCFLAGS -DSLAVED_COMMANDS -finline-functions -fopenmp -ffast-math
-LDFLAGS		=	TARGET_LDFLAGS TARGET_ARCHDEPLDFLAGS -lgomp
-CC		=	gcc
+CFLAGS		= TARGET_CFLAGS TARGET_ARCHDEPCFLAGS -DSLAVED_COMMANDS -finline-functions -fopenmp -ffast-math
+LDFLAGS		= TARGET_LDFLAGS TARGET_ARCHDEPLDFLAGS -lgomp
+CC		= gcc
 
 psrp:		psrp.o $(LIBS)
 		@vtagup VTAG psrp.c
@@ -22,9 +22,22 @@ psrp.c:		../include.libs/utils.h    ../include.libs/slotman.h			\
 		../include.libs/casino.h   ../include.libs/dll.h
 
 
+#--------------
+# Clean section
+#--------------
+
 .PHONY:		clean
 clean:
 		@rm *.o psrp
+
+.PHONY:		cleanall
+cleanall:
+		@rm *.o psrp
+
+
+#----------------
+# Install section
+#----------------
 
 .PHONY:		install
 install:
@@ -34,6 +47,11 @@ install:
 .PHONY:		unstripped
 unstripped:
 		@cp -f psrp TARGET_INSTALL_DIR/psrp
+
+
+#------------------
+# Uninstall section
+#------------------
 
 .PHONY:		uninstall
 uninstall:      

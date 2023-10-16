@@ -7,7 +7,7 @@ UPCASE \- convert argument string to upper case
 .SH SYNOPSIS
 .B upcase 
 .I string 
->& <log file>
+[2> <log file>]
 .br
 
 .SH DESCRIPTION
@@ -16,6 +16,18 @@ converts argument
 .I string
 to upper case and then prints the result to
 .I standard output.
+.br
+
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
 .br
 
 .SH ENVIRONMENT VARIABLES

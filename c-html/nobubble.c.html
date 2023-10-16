@@ -1,0 +1,61 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/nobubble.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------------</span>
+<span class="Comment">    Purpose: provide null interfaces to bubble library components called by P3</span>
+<span class="Comment">             when bubble support is disabled.</span>
+
+<span class="Comment">    Author: M.A. O'Neill</span>
+<span class="Comment">            Tumbling Dice</span>
+<span class="Comment">            Gosforth</span>
+<span class="Comment">            Tyne and Wear</span>
+<span class="Comment">            NE3 4RT</span>
+
+<span class="Comment">    Version: 1.00</span>
+<span class="Comment">    Dated:   4th January 2022</span>
+<span class="Comment">    E-mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">-----------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;stdio.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stdlib.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;me.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Dummy jmalloc_usage() routine </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> jmalloc_usage(<span class="Type">void</span>)
+{
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

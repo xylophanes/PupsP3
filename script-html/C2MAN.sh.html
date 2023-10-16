@@ -1,0 +1,113 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.5.1.src.git/pupscore.src/C2MAN.sh.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="bash">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">#!/bin/bash</span>
+<span class="Comment">#</span>
+<span class="Comment">#-------------------------------------------------------------------------------------</span>
+<span class="Comment">#  Generate stub man page documentation from a C or C++ source using c2man application</span>
+<span class="Comment">#  (C) M.A. O'Neill 2009-2023</span>
+<span class="Comment">#</span>
+<span class="Comment">#  $1 is source file to generate man page from.</span>
+<span class="Comment">#  $2 is name of man page file.</span>
+<span class="Comment">#-------------------------------------------------------------------------------------</span>
+<span class="Comment">#</span>
+
+
+<span class="Comment">#---------------------------</span>
+<span class="Comment"># Display usage information</span>
+<span class="Comment">#---------------------------</span>
+
+<span class="Statement">if </span><span class="Statement">[</span> <span class="PreProc">$1</span> <span class="Statement">=</span> <span class="Constant">&quot;usage&quot;</span><span class="Statement">]</span>  || <span class="Statement">[</span> <span class="PreProc">$1</span> <span class="Statement">=</span> <span class="Constant">&quot;help&quot;</span> <span class="Statement">]</span> ;  <span class="Statement">then</span>
+	<span class="Statement">echo</span>
+	<span class="Statement">echo</span><span class="Constant"> </span><span class="Statement">&quot;</span><span class="Constant">CM2MAN version 1.00</span><span class="Statement">&quot;</span>
+	<span class="Statement">echo</span><span class="Constant"> </span><span class="Statement">&quot;</span><span class="Constant">(C) M.A. O'Neill, Tumbling Dice, 2009-2023</span><span class="Statement">&quot;</span>
+	<span class="Statement">echo</span><span class="Constant"> </span><span class="Statement">&quot;&quot;</span>
+	<span class="Statement">echo</span><span class="Constant"> </span><span class="Statement">&quot;</span><span class="Constant">Usage CM2MAN &lt;source C file name&gt; !&lt;man file name&gt;</span><span class="Statement">&quot;</span>
+	<span class="Statement">echo</span><span class="Constant"> </span><span class="Statement">&quot;&quot;</span>
+
+	<span class="Statement">exit</span> <span class="Constant">1</span>
+
+
+<span class="Comment">#---------------</span>
+<span class="Comment"># Display banner </span>
+<span class="Comment">#---------------</span>
+
+<span class="Statement">else</span>
+
+	<span class="Statement">echo</span><span class="Constant"> </span><span class="Statement">&quot;</span><span class="Constant">C2MAN version 1.00</span><span class="Statement">&quot;</span>
+	<span class="Statement">echo</span><span class="Constant"> </span><span class="Statement">&quot;</span><span class="Constant">(C) M.A. O'Neill, Tumbling Dice, 2009-2023</span><span class="Statement">&quot;</span>
+	<span class="Statement">echo</span><span class="Constant"> </span><span class="Statement">&quot;&quot;</span>
+<span class="Statement">fi</span>
+
+
+<span class="Comment">#-------------------------------------------</span>
+<span class="Comment"># Named output file specified for &quot;man&quot; page</span>
+<span class="Comment">#-------------------------------------------</span>
+
+<span class="Statement">if </span><span class="Statement">[</span> <span class="Statement">&quot;</span><span class="PreProc">$2</span><span class="Statement">&quot;</span> <span class="Statement">!=</span> <span class="Statement">&quot;&quot;</span> <span class="Statement">]</span> ; <span class="Statement">then</span>
+
+	<span class="Statement">if </span><span class="Statement">[</span> <span class="Statement">-e</span> <span class="PreProc">$2</span> <span class="Statement">]</span> ;  <span class="Statement">then</span>
+		<span class="Statement">rm</span> <span class="PreProc">$2</span>
+	<span class="Statement">fi</span>
+
+	c2man <span class="Special">-DPSRP_AUTHENTICATE</span> <span class="Special">-DCKPT_SUPPORT</span> <span class="Special">-DSOCKET_SUPPORT</span> <span class="Special">-DPERSISTENT_HEAP_SUPPORT</span>  <span class="Special">-DPTHREAD_SUPPORT</span> <span class="Special">-DDLL_SUPPORT</span> <span class="Special">-I</span>. <span class="Statement">-g</span> <span class="Special">-ln</span> <span class="Statement">-n</span> <span class="PreProc">$1</span> <span class="Statement">-o</span>- <span class="Statement">&gt;</span> <span class="PreProc">$2</span>
+
+	<span class="Statement">if </span><span class="Statement">[</span> <span class="Statement">&quot;</span><span class="PreProc">$?</span><span class="Statement">&quot;</span> <span class="Statement">!=</span> <span class="Constant">0</span> <span class="Statement">]</span> ; <span class="Statement">then</span>
+		<span class="Statement">echo</span><span class="Constant"> </span><span class="Statement">&quot;&quot;</span>
+		<span class="Statement">echo</span><span class="Constant"> </span><span class="Statement">&quot;</span><span class="Constant">    ERROR: problem with c2man command</span>
+<span class="Constant">		echo </span><span class="Statement">&quot;&quot;</span>
+
+<span class="Constant">		exit 255</span>
+<span class="Constant">	fi</span>
+
+
+<span class="Constant">#-----------------------------------</span>
+<span class="Constant"># Default output file for </span><span class="Statement">&quot;</span><span class="Constant">man</span><span class="Statement">&quot;</span><span class="Constant"> page</span>
+<span class="Constant">#-----------------------------------</span>
+
+<span class="Constant">else</span>
+<span class="Constant">	c2man -DPSRP_AUTHENTICATE -DCKPT_SUPPORT -DSOCKET_SUPPORT DPERSISTENT_HEAP_SUPPORT  -DPTHREAD_SUPPORT -DDLL_SUPPORT -I. -g -ln -n </span><span class="PreProc">$1</span>
+
+<span class="Constant">	if [ </span><span class="Statement">&quot;</span><span class="PreProc">$?</span><span class="Statement">&quot;</span><span class="Constant"> != 0 ] ; then</span>
+<span class="Constant">		echo </span><span class="Statement">&quot;&quot;</span>
+<span class="Constant">		echo </span><span class="Statement">&quot;</span><span class="Constant">    ERROR: problem with c2man command</span>
+		<span class="Statement">echo</span><span class="Constant"> </span><span class="Statement">&quot;&quot;</span>
+
+		<span class="Statement">exit</span> <span class="Constant">255</span>
+	<span class="Statement">fi</span>
+<span class="Statement">fi</span>
+
+<span class="Statement">exit</span> <span class="Constant">0</span>
+
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

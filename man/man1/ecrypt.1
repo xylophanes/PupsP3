@@ -7,7 +7,7 @@ ECRYPT \- symmetric (8 rotor) enigma code encrytor
 .SH SYNOPSIS
 .B encrypt 
 .B [-usage | -help]
-< <plaintext> 1> <cipher> 2> <log file>
+!< <plaintext> 1>! [1> <cipher>] [2> <log file>]
 .br
 
 .SH DESCRIPTION
@@ -30,7 +30,6 @@ will write the contents of the file
 unchanged to standard ouput.
 .br
 
-
 .SH OPTIONS
 
 .B -usage | -help
@@ -46,6 +45,22 @@ to seed the random number generator
 .I rand(3)
 used by
 .I ecrypt(1).
+.br
+
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
+.br
+
+.SH ENVIRONMENT VARIABLES
+None.
 .br
 
 .SH ENVIRONMENT VARIABLES

@@ -1,0 +1,1734 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.5.1.src.git/include.libs/utils.h.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="cpp">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Error { color: #ffffff; background-color: #ff6060; padding-bottom: 1px; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------- </span>
+<span class="Comment">    Header for the standard utilities library.</span>
+
+<span class="Comment">    Author:  M.A. O'Neill</span>
+<span class="Comment">             Tumbling Dice Ltd</span>
+<span class="Comment">             Gosforth</span>
+<span class="Comment">             Newcastle upon Tyne</span>
+<span class="Comment">             NE3 4RT</span>
+<span class="Comment">             United Kingdom</span>
+
+<span class="Comment">    Version: 7.17</span>
+<span class="Comment">    Dated:   3rd November 2022</span>
+<span class="Comment">    E-Mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="PreProc">#ifndef UTILS_H</span>
+<span class="PreProc">#define UTILS_H</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Keep c2man happy </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;c2man.h&gt;</span>
+
+<span class="PreProc">#ifndef __C2MAN__</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;signal.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;setjmp.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;time.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;termios.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stdarg.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/types.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/socket.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/ioctl.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/mount.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;netinet/in.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;net/if.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;netdb.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;arpa/inet.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;setjmp.h&gt;</span>
+
+
+<span class="PreProc">#ifdef _OPENMP</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;omp.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> _OPENMP </span><span class="Comment">*/</span>
+
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> __C2MAN__ </span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">*********</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Version </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">*********</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define UTILIB_VERSION              </span><span class="Constant">&quot;7.17&quot;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> String size </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define SSIZE                       </span><span class="Constant">2048</span>
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Floating point representation </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;ftype.h&gt;</span>
+
+
+<span class="PreProc">#ifdef SECURE</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sed_securicor.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> SECURE </span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Default resource allocations (for an application to run) </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define BOGOMIP_SCALING              </span><span class="Constant">10000.0</span>
+<span class="PreProc">#define PUPS_DEFAULT_MIN_CPU         </span><span class="Constant">2.0</span><span class="PreProc"> </span>
+<span class="PreProc">#define PUPS_DEFAULT_MIN_MEM         </span><span class="Constant">10000</span>
+<span class="PreProc">#define PUPS_DEFAULT_RESOURCE_WAIT   </span><span class="Constant">3600</span>
+<span class="PreProc">#define PUPS_IGNORE_MIN_MEM          (-</span><span class="Constant">1</span><span class="PreProc">)</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Checkpooint flags </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define CKPT_INCREMENTAL    (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">0</span><span class="PreProc">)</span>
+<span class="PreProc">#define CKPT_EXIT           (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">1</span><span class="PreProc">) </span>
+<span class="PreProc">#define CKPT_VERBOSE        (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">2</span><span class="PreProc">) </span>
+<span class="PreProc">#define CKPT_WRAP_FILES     (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">3</span><span class="PreProc">) </span>
+<span class="PreProc">#define CKPT_CHILDREN       (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">4</span><span class="PreProc">) </span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Checkpoint return type </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define CKPT_DONE           (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">0</span><span class="PreProc">)</span>
+<span class="PreProc">#define CKPT_RESTART        (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">1</span><span class="PreProc">)</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> File copy flags </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define PUPS_FILE_COPY      (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">0</span><span class="PreProc">) </span>
+<span class="PreProc">#define PUPS_FILE_MOVE      (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">1</span><span class="PreProc">) </span>
+<span class="PreProc">#define COPY_BUF_SIZE       </span><span class="Constant">32768</span><span class="PreProc"> </span>
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> File transfer modes (for pups_scp) </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define FROMC        </span><span class="Constant">1</span><span class="PreProc">  </span><span class="Comment">// Copy from remote </span>
+<span class="PreProc">#define FROMX        </span><span class="Constant">2</span><span class="PreProc">  </span><span class="Comment">// Transfer from remote</span>
+<span class="PreProc">#define TOC          </span><span class="Constant">3</span><span class="PreProc">  </span><span class="Comment">// Copy to remote </span>
+<span class="PreProc">#define TOX          </span><span class="Constant">4</span><span class="PreProc">  </span><span class="Comment">// Transfer to remote </span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Support for compressing streams </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef ZLIB_SUPPORT</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;zlib.h&gt;</span>
+<span class="PreProc">#define  gzFILE gzFile</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> SUPPORT_ZLIB </span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Quantum for PUPS virtual interval timers (in microseconds) </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define VITIMER_QUANTUM    </span><span class="Constant">100000</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Backtrack exit code (from SIGSEGV backtracker) </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define PUPS_BACKTRACK     (-</span><span class="Constant">9999</span><span class="PreProc">)</span>
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Link file lock types </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define LOCK               </span><span class="Constant">1</span><span class="PreProc">  </span>
+<span class="PreProc">#define EXLOCK             </span><span class="Constant">1</span><span class="PreProc">  </span>
+<span class="PreProc">#define WRLOCK             </span><span class="Constant">2</span>
+<span class="PreProc">#define RDLOCK             </span><span class="Constant">4</span>
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> pups_lockf lock operations </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define PUPS_UNLOCK        </span><span class="Constant">0</span>
+<span class="PreProc">#define PUPS_RDLOCK        (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">0</span><span class="PreProc">)</span>
+<span class="PreProc">#define PUPS_TRY_RDLOCK    (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">1</span><span class="PreProc">) </span>
+<span class="PreProc">#define PUPS_WRLOCK        (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">2</span><span class="PreProc">) </span>
+<span class="PreProc">#define PUPS_TRY_WRLOCK    (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">3</span><span class="PreProc">) </span>
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Wait forever (to acquire lock) </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define WAIT_FOREVER       (-</span><span class="Constant">1</span><span class="PreProc">)</span>
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Try lock (but don't wait if it cannot be acquired) </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define TRYLOCK            </span><span class="Constant">0</span>
+
+
+<span class="PreProc">#ifdef BUBBLE_MEMORY_SUPPORT</span>
+
+<span class="PreProc">#define pups_main bubble_target</span>
+_EXTERN _BOOLEAN checkpointing;
+
+<span class="PreProc">#else</span>
+<span class="PreProc">#define pups_main main</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> BUBBLE_MEMORY_SUPPORT </span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Maximum number of (concurrent) locks per process </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define PUPS_MAX_LOCKS   </span><span class="Constant">512</span><span class="PreProc"> </span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Maximum number of flock locks per process </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define PUPS_MAX_FLOCKS  </span><span class="Constant">512</span><span class="PreProc"> </span>
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Defer process exit when pups_exit() is called </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define PUPS_DEFER_EXIT   </span><span class="Constant">9999</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Offset used in PUPS file protection mode </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define PUPS_PROT_OFFSET  (-</span><span class="Constant">1000</span><span class="PreProc">)</span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Load averages </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define LOAD_AVERAGE_1     </span><span class="Constant">1</span>
+<span class="PreProc">#define LOAD_AVERAGE_2     </span><span class="Constant">2</span>
+<span class="PreProc">#define LOAD_AVERAGE_3     </span><span class="Constant">3</span>
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Error code to return if no error </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#undef  OK</span>
+<span class="PreProc">#define OK                 </span><span class="Constant">0</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Define homeostasis revocation flags </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define PUPS_HPROT_NOREVOKE  </span><span class="Constant">0</span>
+<span class="PreProc">#define PUP_HPROT_REVOKE     </span><span class="Constant">1</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Version control </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define NO_VERSION_CONTROL (-</span><span class="Constant">1</span><span class="PreProc">)</span>
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Memory allocator options </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define MALLOC_DUMB         </span><span class="Constant">0</span><span class="PreProc">  </span><span class="Comment">// Ordinary xmalloc semantics</span>
+<span class="PreProc">#define MALLOC_HOMEOSTATIC  </span><span class="Constant">1</span><span class="PreProc">  </span><span class="Comment">// Homeostatic xmalloc semantics</span>
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> These definitions are used by initftab() for stdio homeostat </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> initialisation                                               </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> -------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define STDIO_DEAD          </span><span class="Constant">1</span><span class="PreProc">  </span><span class="Comment">// Use standard fork call</span>
+<span class="PreProc">#define STDIO_LIVE          </span><span class="Constant">2</span><span class="PreProc">  </span><span class="Comment">// Use virtual fork call</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Signals to be held by pupshold function </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define ALL_PUPS_SIGS       </span><span class="Constant">1</span>
+<span class="PreProc">#define PSRP_SIGS           </span><span class="Constant">2</span>
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> File system object lock states </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define GETLOCK             (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">1</span><span class="PreProc">) </span>
+<span class="PreProc">#define TSTLOCK             (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">2</span><span class="PreProc">) </span>
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Dynamic homeostat states </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define FILE_RELOCATE       (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">0</span><span class="PreProc">)</span>
+<span class="PreProc">#define HOST_RENAME         (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">1</span><span class="PreProc">) </span>
+<span class="PreProc">#define LOST_FILE_LOCATE    (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">2</span><span class="PreProc">)</span>
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Extended file open flags </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef SUPPORT_MOPI</span>
+<span class="PreProc">#define O_MOPI    </span><span class="Constant">65535</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> SUPPORT_MOPI </span><span class="Comment">*/</span>
+
+<span class="PreProc">#define O_DUMMY             </span><span class="Constant">32768</span><span class="PreProc"> </span>
+<span class="PreProc">#define O_LIVE              </span><span class="Constant">16384</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Return codes for PUPS statkill function </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define PUPS_EXEC           </span><span class="Constant">0</span>
+<span class="PreProc">#define PUPS_TERMINATED     (-</span><span class="Constant">1</span><span class="PreProc">)</span>
+<span class="PreProc">#define PUPS_STOPPED        (-</span><span class="Constant">2</span><span class="PreProc">)</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Homeostatic (file system) object states </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define DEAD                (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">1</span><span class="PreProc">) </span>
+<span class="PreProc">#define LIVE                (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">2</span><span class="PreProc">) </span>
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Maximum number of attempts to re-connect to a resource which has been </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> lost                                                                  </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> ----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define TRY_TIMEOUT         </span><span class="Constant">1</span><span class="PreProc"> </span>
+<span class="PreProc">#define MAX_TRYS            </span><span class="Constant">4</span><span class="PreProc"> </span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Maximum number of open files (per application) </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define MAX_FILES           </span><span class="Constant">512</span><span class="PreProc"> </span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Maximum number of signals </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define MAX_SIGS            </span><span class="Constant">68</span><span class="PreProc"> </span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Maximum number of children ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define MAX_CHILDREN        </span><span class="Constant">512</span><span class="PreProc"> </span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Timer modes (for PUPS virtual interval timers) </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define MAX_VTIMERS         </span><span class="Constant">512</span><span class="PreProc"> </span>
+
+<span class="PreProc">#define VT_NONE             </span><span class="Constant">0</span>
+<span class="PreProc">#define VT_ONESHOT          </span><span class="Constant">1</span>
+<span class="PreProc">#define VT_CONTINUOUS       </span><span class="Constant">2</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Allocation quantum for dynamically allocated arrays </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define ALLOC_QUANTUM       </span><span class="Constant">64</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Definition of signal parameter type </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">typedef</span> <span class="Type">struct</span> {   <span class="Type">int</span>  pid;                               <span class="Comment">// (Remote) pid to signal</span>
+                   <span class="Type">int</span>  signum;                            <span class="Comment">// Signal to be sent</span>
+                   <span class="Type">int</span>  r_pid;                             <span class="Comment">// PID of remote client</span>
+                   <span class="Type">int</span>  uid;                               <span class="Comment">// Id. of clients owner</span>
+                   <span class="Type">char</span> r_host[<span class="Constant">64</span>];                        <span class="Comment">// Remote host name</span>
+                   <span class="Type">char</span> r_client[<span class="Constant">64</span>];                      <span class="Comment">// Remote client name</span>
+               } sigparams_type;
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Definition of virtual timer type </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">typedef</span> <span class="Type">struct</span> {   <span class="Type">int</span>  priority;                          <span class="Comment">// Priority of timer</span>
+                   <span class="Type">char</span> *name;                             <span class="Comment">// Name of payload func</span>
+                   <span class="Type">int</span>  mode;                              <span class="Comment">// Mode of timer</span>
+                   <span class="Type">int</span>  prescaler;                         <span class="Comment">// Interval prescaler</span>
+                   <span class="Type">int</span>  interval_time;                     <span class="Comment">// Length of interval</span>
+                   <span class="Type">char</span> *handler_args;                     <span class="Comment">// Handler argument string</span>
+                   <span class="Type">void</span> (*handler)(<span class="Type">void</span> *, <span class="Type">char</span> *);        <span class="Comment">// Handler function</span>
+               } vttab_type;
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Definition of file table type </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">typedef</span> <span class="Type">struct</span> {   _BOOLEAN psrp;                          <span class="Comment">// Is this a PSRP stream?</span>
+                   _BOOLEAN pheap;                         <span class="Comment">// Is this a persistent heap?</span>
+                   _BOOLEAN creator;                       <span class="Comment">// TRUE if creator</span>
+                   _BOOLEAN named;                         <span class="Comment">// File (inode) is named</span>
+                   _BOOLEAN locked;                        <span class="Comment">// TRUE if file locked</span>
+                   _BOOLEAN mounted;                       <span class="Comment">// TRUE if on mounted fs</span>
+                   <span class="Type">int</span>      fdes;                          <span class="Comment">// File descriptor</span>
+                   <span class="Type">int</span>      id;                            <span class="Comment">// Entry id tag </span>
+                   <span class="Type">int</span>      mode;                          <span class="Comment">// File access mode </span>
+                   <span class="Type">int</span>      homeostatic;                   <span class="Comment">// Is this a live stream?</span>
+                   <span class="Type">int</span>      rd_pid;                        <span class="Comment">// Remote service daemon</span>
+                   <span class="Type">int</span>      fifo_pid;                      <span class="Comment">// Pipestream leaders PID</span>
+                   <span class="Type">int</span>      fs_blocks;                     <span class="Comment">// Min fs blocks for write</span>
+                   <span class="Type">int</span>      st_mode;                       <span class="Comment">// File protections</span>
+                   <span class="Type">int</span>      lost_cnt;                      <span class="Comment">// Loss count for file</span>
+                   <span class="Type">FILE</span>     *stream;                       <span class="Comment">// Stdio stream</span>
+
+<span class="PreProc">#ifdef ZLIB_SUPPORT</span>
+                   gzFILE   *zstream;                      <span class="Comment">// Compression stream</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> SUPPORT_ZLIB </span><span class="Comment">*/</span>
+
+                   <span class="Type">char</span>     *hname;                        <span class="Comment">// Handler's name</span>
+                   <span class="Type">char</span>     *fname;                        <span class="Comment">// File name (if any)</span>
+                   <span class="Type">char</span>     *fs_name;                      <span class="Comment">// File system name</span>
+                   <span class="Type">char</span>     *fshadow;                      <span class="Comment">// File shadow</span>
+                   <span class="Type">char</span>     *rd_host;                      <span class="Comment">// RSD host (for rd_pid)</span>
+                   <span class="Type">char</span>     *rd_ssh_port;                  <span class="Comment">// RSD host ssh port (for rd_pid)</span>
+                   _BOOLEAN (*homeostat)(<span class="Type">int</span>, <span class="Type">int</span>);        <span class="Comment">// Dynamic fs. homeostat</span>
+                   <span class="Type">void</span>     (*handler)(<span class="Type">void</span> *, <span class="Type">char</span> *);    <span class="Comment">// Handler</span>
+               } ftab_type;
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Definition of signal table type </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">typedef</span> <span class="Type">struct</span> {   <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span> haddr;                <span class="Comment">// Signal handler address</span>
+                   <span class="Type">char</span>              hname[SSIZE];         <span class="Comment">// Signal handler name</span>
+                   sigset_t          sa_mask;              <span class="Comment">// Sigs blocked in handler</span>
+                   <span class="Type">int</span>               sa_flags;             <span class="Comment">// Signal handler flags</span>
+               } sigtab_type;
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Definition of dynamic memory object type </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">typedef</span> <span class="Type">struct</span> {  <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span> size;                  <span class="Comment">// Size of object (bytes)</span>
+                  <span class="Type">int</span>               n_el;                  <span class="Comment">// Number of elements</span>
+                  <span class="Type">void</span>              *ptr;                  <span class="Comment">// Pointer to object</span>
+                  <span class="Type">char</span>              *name;                 <span class="Comment">// Object name</span>
+                  <span class="Type">char</span>              *type;                 <span class="Comment">// Object type</span>
+               } matab_object_type;
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Definition of dynamic memory table type </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">typedef</span> <span class="Type">struct</span> {  <span class="Type">int</span>               allocated;             <span class="Comment">// Objects in table</span>
+                   matab_object_type **object;             <span class="Comment">// Dynamic memory objects</span>
+               } matab_type;
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Definitions of child table type </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">typedef</span> <span class="Type">struct</span> {   <span class="Type">int</span>      pid;                           <span class="Comment">// Child pid</span>
+                   _BOOLEAN obituary;                      <span class="Comment">// If TRUE log child death</span>
+                   <span class="Type">char</span>     *name;                         <span class="Comment">// Child name</span>
+               } chtab_type;
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Seal pipestream on exit </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define PIPESTREAM_DETACH   </span><span class="Constant">1</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Error parameter definitions (for PUPS error handler) </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define NONE                </span><span class="Constant">1</span>
+<span class="PreProc">#define PRINT_ERROR_STRING  </span><span class="Constant">2</span>
+<span class="PreProc">#define EXIT_ON_ERROR       </span><span class="Constant">4</span>
+<span class="PreProc">#define CHILD_EXIT_ON_ERROR </span><span class="Constant">8</span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Indicates a free resource </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define FREE               (-</span><span class="Constant">9999</span><span class="PreProc">)</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Defines used by string manipulation functions </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define N_STREXT_STRINGS   </span><span class="Constant">64</span>
+<span class="PreProc">#define RESET_STREXT       (</span><span class="Type">void</span><span class="PreProc">)strext(</span><span class="Constant">'*'</span><span class="PreProc">,(</span><span class="Type">char</span><span class="PreProc"> *)</span><span class="Constant">NULL</span><span class="PreProc">,(</span><span class="Type">char</span><span class="PreProc"> *)</span><span class="Constant">NULL</span><span class="PreProc">)</span>
+<span class="PreProc">#define RESET_MSTREXT      </span><span class="Constant">1</span><span class="PreProc">,(</span><span class="Type">char</span><span class="PreProc"> *)</span><span class="Constant">NULL</span><span class="PreProc">,(</span><span class="Type">char</span><span class="PreProc"> *)</span><span class="Constant">NULL</span>
+<span class="PreProc">#define END_STRING         (-</span><span class="Constant">9999</span><span class="PreProc">) </span>
+<span class="PreProc">#define STREXT_ERROR       (-</span><span class="Constant">8888</span><span class="PreProc">)</span>
+<span class="PreProc">#define MSTREXT_RESET_ALL  </span><span class="Constant">1</span>
+<span class="PreProc">#define MSTREXT_RESET_CUR  </span><span class="Constant">2</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Monitor function return codes </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define TIMED_OUT          </span><span class="Constant">0</span>
+<span class="PreProc">#define READ_DATA          </span><span class="Constant">1</span>
+<span class="PreProc">#define WRITE_DATA         </span><span class="Constant">2</span>
+<span class="PreProc">#define EXCEPTION_RAISED   </span><span class="Constant">4</span><span class="PreProc"> </span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Defines used by utilib error handlers </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define PUPS_ERROR         (-</span><span class="Constant">1</span><span class="PreProc">)</span>
+<span class="PreProc">#define PUPS_OK            </span><span class="Constant">0</span>
+<span class="PreProc">#define MAX_FUNCS          </span><span class="Constant">512</span><span class="PreProc"> </span>
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Defines used by utilities library </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define STRING_LENGTH      </span><span class="Constant">1024</span><span class="PreProc"> </span>
+<span class="Comment">//#define LONG_LINE          1024</span>
+<span class="PreProc">#define LONG_LONG_LINE     </span><span class="Constant">4096</span>
+<span class="PreProc">#define NOT_FOUND          (-</span><span class="Constant">1</span><span class="PreProc">)</span>
+<span class="PreProc">#define INVALID_ARG        (-</span><span class="Constant">9999</span><span class="PreProc">)</span>
+<span class="PreProc">#define PI                 </span><span class="Constant">3.14159265</span>
+<span class="PreProc">#define DEGRAD             </span><span class="Constant">0.01745329</span>
+<span class="PreProc">#define RADDEG             </span><span class="Constant">57.29578778</span>
+<span class="PreProc">#define ASSUMED_ZERO       </span><span class="Constant">1.0e-128</span>
+
+
+
+<span class="PreProc">#ifdef __NOT_LIB_SOURCE__</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> External variable declarations </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+
+_IMPORT <span class="Type">jmp_buf</span>   appl_resident_restart;  <span class="Comment">// Restart location (for memory resident application)</span>
+
+<span class="PreProc">#ifdef SSH_SUPPORT</span>
+_EXPORT <span class="Type">char</span>     ssh_remote_port[];       <span class="Comment">// Remote (ssh) port</span>
+_EXPORT <span class="Type">char</span>     ssh_remote_uname[];      <span class="Comment">// Remote (ssh) username</span>
+_EXPORT _BOOLEAN ssh_compression;         <span class="Comment">// Use ssh compression</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> SSH_SUPPORT </span><span class="Comment">*/</span>
+
+_EXPORT _BOOLEAN    pups_abort_restart;   <span class="Comment">// TRUE if abort handler enabled</span>
+_EXPORT  sigjmp_buf pups_restart_buf;     <span class="Comment">// Abort restart buffer</span>
+_EXPORT _BOOLEAN    fs_write_blocked;     <span class="Comment">// TRUE if filesystem is full</span>
+
+<span class="PreProc">#ifdef CRIU_SUPPORT</span>
+_EXPORT _BOOLEAN appl_ssave;              <span class="Comment">// TRUE if (criu) state saving enabled</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> CRIU_SUPPORT </span><span class="Comment">*/</span>
+
+_EXPORT <span class="Type">int</span> sargc,                        <span class="Comment">// Number of arguments in command tail</span>
+            ptr,                          <span class="Comment">// Pointer to current option</span>
+            t_args,                       <span class="Comment">// Total args in generic command tail</span>
+            vitimer_quantum,              <span class="Comment">// Timer quantum (for PSRP timers)</span>
+            appl_fsa_mode,                <span class="Comment">// Filesystem access mode</span>
+            appl_t_args,                  <span class="Comment">// Total args in command tail</span>
+            appl_alloc_opt,               <span class="Comment">// Memory allocator options (for xmalloc etc)</span>
+            appl_max_files,               <span class="Comment">// Maximum number of ftab slots</span>
+            appl_max_child,               <span class="Comment">// Maximum number of child slots</span>
+            appl_max_pheaps,              <span class="Comment">// Maximum number of persistent heaps</span>
+            appl_max_vtimers,             <span class="Comment">// Maximum number of virtual timers</span>
+            appl_max_orifices,            <span class="Comment">// Maximum number of orifice [DLL] slots</span>
+            appl_vtag,                    <span class="Comment">// Application (compile) version tag</span>
+            base_arg,                     <span class="Comment">// Base argument for argfile ops</span>
+            appl_last_child,              <span class="Comment">// Last child process forked by xsystem</span>
+            appl_sid,                     <span class="Comment">// Session (process group) i.d. </span>
+            appl_pid,                     <span class="Comment">// Process i.d.</span>
+            appl_ppid,                    <span class="Comment">// (Effective) parent PID</span>
+            appl_uid,                     <span class="Comment">// Process UID (user i.d.)</span>
+            appl_gid,                     <span class="Comment">// Process group i.d.</span>
+            appl_tty,                     <span class="Comment">// Process controlling terminal descriptor</span>
+            appl_remote_pid,              <span class="Comment">// Remote PID to relay signals to</span>
+
+<span class="PreProc">#ifdef CRIU_SUPPORT</span>
+            appl_ssaves,                  <span class="Comment">// Number of times state has been saved</span>
+            appl_poll_time,               <span class="Comment">// Pol time for (Criu) state saving</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> CRIU_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef _OPENMP</span>
+            appl_omp_threads,             <span class="Comment">// Number of OMP threads</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> _OPENMP </span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef PTHREAD_SUPPORT</span>
+            appl_root_tid;                <span class="Comment">// LWP i.d. of root thread</span>
+            appl_root_thread,             <span class="Comment">// Root (initial) thread for process</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+            appl_nice_lvl;                <span class="Comment">// Process niceness</span>
+
+
+_EXPORT _BOOLEAN appl_verbose,            <span class="Comment">// TRUE if verbose mode selected</span>
+                 appl_resident,           <span class="Comment">// Application is memory resident </span>
+                 appl_enable_residence,   <span class="Comment">// Application can be memory resident</span>
+                 appl_etrap,              <span class="Comment">// TRUE if error trapping for gdb analysis</span>
+                 appl_proprietary,        <span class="Comment">// TRUE if application is proprietary</span>
+
+<span class="PreProc">#ifdef MAIL_SUPPORT</span>
+                 appl_mailable,           <span class="Comment">// TRUE if mail can be sent to process</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> MAIL_SUPPORT </span><span class="Comment">*/</span>
+
+                 test_mode,               <span class="Comment">// TRUE if test mode</span>
+                 init,                    <span class="Comment">// TRUE if first option</span>
+                 pg_leader,               <span class="Comment">// TRUE if process group leader</span>
+                 appl_nodetach,           <span class="Comment">// Don't detach stdio in background</span>
+                 appl_fgnd,               <span class="Comment">// TRUE if process in foreground process group</span>
+                 appl_snames_crypted,     <span class="Comment">// TRUE if shadow filenames crypted</span>
+                 appl_wait,               <span class="Comment">// TRUE if process waiting (SIGSTOP)</span>
+                 appl_psrp,               <span class="Comment">// TRUE if application PSRP enabled</span>
+                 appl_ppid_exit,          <span class="Comment">// If TRUE exit if parent terminates </span>
+                 appl_rooted,             <span class="Comment">// IF TRUE system context cannot migrate</span>
+                 appl_psrp_load,          <span class="Comment">// If TRUE load PSRP resources at startup</span>
+                 appl_psrp_save,          <span class="Comment">// If TRUE save dispatch table at exit</span>
+                 appl_have_pen,           <span class="Comment">// TRUE if binname != exec name</span>
+                 appl_default_chname,     <span class="Comment">// TRUE if PSRP channel name default</span>
+                 argd[];                  <span class="Comment">// Argument decode status flags</span>
+
+_EXPORT <span class="Type">char</span> *version,                    <span class="Comment">// Version of program</span>
+             *appl_owner,                 <span class="Comment">// Name of application owner</span>
+             *appl_password,              <span class="Comment">// Password of application owner</span>
+             *appl_name,                  <span class="Comment">// Application (process) name of program </span>
+             *appl_logfile,               <span class="Comment">// Error/log file </span>
+             *appl_bin_name,              <span class="Comment">// Application (binary) name of program</span>
+             *appl_remote_host,           <span class="Comment">// Remote host to relay signals to</span>
+
+<span class="PreProc">#ifdef MAIL_SUPPORT</span>
+             *appl_mdir,                  <span class="Comment">// Application mailbox</span>
+             *appl_mh_folder,             <span class="Comment">// Application MH (MIME) folder</span>
+             *appl_mime_dir,              <span class="Comment">// Process MIME workspace</span>
+             *appl_mime_type,             <span class="Comment">// MIME message part type (to retreive)</span>
+             *appl_replyto,               <span class="Comment">// Applicationm reply to address (for mail)</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> MAIL_SUPPORT </span><span class="Comment">*/</span>
+
+             *appl_fifo_dir,              <span class="Comment">// Application default FIFO patchboard directory</span>
+             *appl_fifo_topdir,           <span class="Comment">// Directory containing application patchboards</span>
+             *appl_ch_name,               <span class="Comment">// Application PSRP channel name</span>
+             *appl_err,                   <span class="Comment">// Application error string</span>
+             *appl_hostpool,              <span class="Comment">// Application capabilities database</span>
+             *appl_ben_name,              <span class="Comment">// Application binary</span>
+             *appl_pam_name,              <span class="Comment">// PUPS authentication module name</span>
+             *appl_ttyname,               <span class="Comment">// Applications controlling terminal</span>
+             *appl_uprot_tag,             <span class="Comment">// Homeostasis (file) revocation tag</span>
+             *author,                     <span class="Comment">// Author of program</span>
+             *revdate,                    <span class="Comment">// Date of last modification</span>
+             *shell,                      <span class="Comment">// Application shell</span>
+	     *appl_home,                  <span class="Comment">// Effective home directory</span>
+             *appl_cwd,                   <span class="Comment">// Application current working directory</span>
+             *appl_cmd_str,               <span class="Comment">// Application command string</span>
+             *appl_host,                  <span class="Comment">// Host node running this application</span>
+             *appl_state,                 <span class="Comment">// State of this application</span>
+             *arg_f_name,                 <span class="Comment">// Argument file name</span>
+             *appl_tunnel_path,           <span class="Comment">// Tunnel path (binary for tunnel process</span>
+             *args[<span class="Constant">256</span>],                  <span class="Comment">// Secondry argument vectors</span>
+             appl_argfifo[];              <span class="Comment">// Argument FIFO (for memory resident process)</span>
+
+<span class="PreProc">#ifdef CRIU_SUPPORT</span>
+_EXPORT <span class="Type">char</span> appl_ssave_dir[];            <span class="Comment">// Criu checkpoint directory for state saving</span>
+_EXPORT <span class="Type">char</span> appl_criu_dir[];             <span class="Comment">// Criu directory (holds migratable files and checkpoints) </span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> CRIU_SUPPORT </span><span class="Comment">*/</span>
+
+_EXPORT <span class="Type">char</span> date[SSIZE];                 <span class="Comment">// Date and time stamp</span>
+_EXPORT <span class="Type">char</span> errstr[SSIZE];               <span class="Comment">// Error string</span>
+_EXPORT <span class="Type">char</span> appl_machid[SSIZE];          <span class="Comment">// Unique machine (host) identifier</span>
+_EXPORT <span class="Type">void</span> *exit_function;              <span class="Comment">// Exit function to be called by SIGTERM</span>
+
+
+<span class="PreProc">#ifdef PTHREAD_SUPPORT </span>
+_EXPORT pthread_mutex_t pups_fork_mutex;  <span class="Comment">// Thread safe pups_fork mutex</span>
+_EXPORT pthread_mutex_t ftab_mutex;       <span class="Comment">// Thread safe file table mutex</span>
+_EXPORT pthread_mutex_t chtab_mutex;      <span class="Comment">// Thread safe child table mutex</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+
+_EXPORT _BOOLEAN    appl_kill_pg;
+_EXPORT _BOOLEAN    appl_secure;
+_EXPORT _BOOLEAN    pups_process_homeostat;
+_EXPORT _BOOLEAN    ftab_extend;
+_EXPORT ftab_type   *ftab;
+_EXPORT chtab_type  *chtab;
+_EXPORT vttab_type  *vttab;
+_EXPORT sigtab_type sigtab[MAX_SIGS];
+_EXPORT _BOOLEAN    default_fd_homeostat_action;
+_EXPORT _BOOLEAN    ignore_pups_signals;
+_EXPORT _BOOLEAN    pups_exit_entered;
+_EXPORT _BOOLEAN    in_vt_handler;
+_EXPORT _BOOLEAN    in_jmalloc;
+
+
+<span class="PreProc">#ifdef MAIL_SUPPORT</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Application mail handler   </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+_EXPORT <span class="Type">int</span>         (*appl_mail_handler)(<span class="Type">char</span> *);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> MAIL_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="PreProc">#else</span> <span class="Comment">/*</span><span class="Comment"> External variables </span><span class="Comment">*/</span>
+<span class="PreProc">#   undef  _EXPORT</span>
+<span class="PreProc">#   define _EXPORT</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> __NOT_LIB_SOURCE__ </span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Prototype function definitions ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Comment">// Thread aware sigprockmask()</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_sigprocmask(<span class="Type">int</span>, <span class="Type">const</span> sigset_t *<span class="Type">restrict</span>, sigset_t *<span class="Type">restrict</span>);
+
+<span class="Comment">// Get time (accurate to milliseconds)</span>
+_PROTOTYPE _EXPORT <span class="Type">double</span> millitime(<span class="Type">void</span>);
+
+<span class="Comment">// Get node name and I.P. address associated with network interface</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_get_ip_info(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">char</span> *, <span class="Type">char</span> *);
+
+<span class="Comment">// Forward indexing function</span>
+_PROTOTYPE _EXPORT <span class="Type">long</span> <span class="Type">int</span> ch_index(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span>);
+
+<span class="Comment">// Reverse indexing function</span>
+_PROTOTYPE _EXPORT <span class="Type">long</span> <span class="Type">int</span> rch_index(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span>);
+
+<span class="Comment">// Extended getpwnam routine (which searches NIS passwd map)</span>
+_PROTOTYPE _EXPORT <span class="Type">struct</span> passwd *pups_getpwnam(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Extended getpwuid routine (which searches NIS passwd map)</span>
+_PROTOTYPE _EXPORT <span class="Type">struct</span> passwd *pups_getpwuid(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Set up support child prior to dangerous operation</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_process_homeostat_enable(<span class="Type">const</span> _BOOLEAN);
+
+<span class="Comment">// Cancel support child (at end of dangerous operation)</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> pups_process_hoemostat_disable(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Clear a virtual timer datastructure</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_clear_vitimer(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Get file table index (associated with a file descriptor)</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_get_ftab_index_from_fd(<span class="Type">unsigned</span> <span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Get file table index (associated with a stream)</span>
+_PROTOTYPE _EXPORT  <span class="Type">int</span> pups_get_ftab_index_from_stream(<span class="Type">const</span> <span class="Type">FILE</span> *);
+
+<span class="Comment">// Restart virtual interval timers</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_vitrestart(<span class="Type">void</span>);
+
+<span class="Comment">// Find free file table index</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_find_free_ftab_index(<span class="Type">void</span>);
+
+<span class="PreProc">#ifdef ZLIB_SUPPORT</span>
+<span class="Comment">// Get file table index (associated with a zstream)</span>
+_PUBLIC <span class="Type">int</span> pups_get_ftab_index_from_zstream(<span class="Type">const</span> gzFILE *);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> ZLIB_SUPPORT </span><span class="Comment">*/</span>
+
+
+<span class="Comment">// Show number of link file locks concurrently held</span>
+_PROTOTYPE _PUBLIC <span class="Type">int</span> pups_show_link_file_locks(<span class="Type">const</span> <span class="Type">FILE</span> *);
+
+<span class="Comment">// Apply file lock</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_lockf(<span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>);
+
+<span class="Comment">// Test to see if file is on a mounted filesystem</span>
+_PROTOTYPE _EXPORT _BOOLEAN pups_get_fs_mountinfo(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">char</span> *);
+
+<span class="Comment">// Set system error number</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> pups_set_errno(<span class="Type">int</span>);
+
+<span class="Comment">// Get system error number</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_get_errno(<span class="Type">void</span>);
+
+<span class="Comment">// Swap a pair of integers</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> iswap(<span class="Type">int</span> *, <span class="Type">int</span> *);
+
+<span class="Comment">// Swap a pair of floats</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> fswap(FTYPE *, FTYPE *);
+
+<span class="Comment">// Set error handler parameters</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> pups_seterror(<span class="Type">const</span> <span class="Type">FILE</span> *, <span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Error handler</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_error(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Read standard items from command tail</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> pups_std_init(_BOOLEAN, <span class="Type">int</span>  *,<span class="Type">char</span> *,<span class="Type">char</span> *,<span class="Type">char</span> *,<span class="Type">char</span> *,<span class="Type">char</span> *[]);
+
+<span class="Comment">// Load argument vector from file</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> pups_argfile(<span class="Type">int</span>, <span class="Type">int</span> *, <span class="Type">const</span> <span class="Type">char</span> *[], _BOOLEAN []);
+
+<span class="Comment">// Generate effective command tail string from secondary argument vector</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> pups_argtline(<span class="Type">char</span> *);
+
+<span class="Comment">// Copy command tail</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> pups_copytail(<span class="Type">int</span> *, <span class="Type">const</span> <span class="Type">char</span> *[], <span class="Type">char</span> *[]);
+
+<span class="Comment">// Locate switch in command tail</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_locate(_BOOLEAN *, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">int</span> *, <span class="Type">const</span> <span class="Type">char</span>*[], <span class="Type">int</span>);
+
+<span class="Comment">// Decode character item from command tail</span>
+_PROTOTYPE _EXPORT <span class="Type">char</span> pups_ch_dec(<span class="Type">int</span> *, <span class="Type">int</span> *, <span class="Type">const</span> <span class="Type">char</span> *[]);
+
+<span class="Comment">// Decode integer from command tail</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_i_dec(<span class="Type">int</span> *, <span class="Type">int</span> *, <span class="Type">const</span> <span class="Type">char</span> *[]);
+
+<span class="Comment">// Decode float from command tail</span>
+_PROTOTYPE _EXPORT FTYPE pups_fp_dec(<span class="Type">int</span> *, <span class="Type">int</span> *, <span class="Type">const</span> <span class="Type">char</span> *[]);
+
+<span class="Comment">// Decode string item from command tail</span>
+_PROTOTYPE _EXPORT <span class="Type">char</span> *pups_str_dec(<span class="Type">int</span> *, <span class="Type">int</span> *, <span class="Type">const</span> <span class="Type">char</span> *[]);
+
+
+
+<span class="PreProc">#ifdef SECURE</span>
+<span class="Comment">// Application security routine</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> pups_securicor(<span class="Type">const</span> <span class="Type">char</span> *);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> SECURE </span><span class="Comment">*/</span>
+
+
+<span class="Comment">// Check if a terminal device has been redirected</span>
+_PROTOTYPE <span class="Type">void</span> pups_check_redirection(<span class="Type">const</span> des_t des);
+
+<span class="Comment">// Convert character to integer</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> actoi(<span class="Type">const</span> <span class="Type">char</span>);
+
+<span class="Comment">// Get absolute value of integer</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> iabs(<span class="Type">int</span>);
+
+<span class="Comment">// Test for even integer</span>
+_PROTOTYPE _EXPORT _BOOLEAN ieven(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Test for odd integer</span>
+_PROTOTYPE _EXPORT _BOOLEAN iodd(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Get absolute value of integer</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> iodd(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Test for integer sign</span>
+_PROTOTYPE _EXPORT _BOOLEAN isign(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Find the maximum of a pair of integers</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> imax(<span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Find the minimum of a pair of integers</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> imin(<span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Get sign of character</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> chsign(<span class="Type">const</span> <span class="Type">char</span>);
+
+<span class="Comment">// Pause/test routine</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> upause(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Check for file and open it if it exists</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_open(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">int</span>, <span class="Type">int</span>);
+
+<span class="Comment">// Close file</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_close(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Test if (named) file is living</span>
+_PROTOTYPE _EXPORT _BOOLEAN pups_isalive(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Protect an (unopened) file</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_protect(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">void</span> *);
+
+<span class="Comment">// Unprotect an (unopened) file</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_unprotect(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Return the number of times a live file descriptor has been lost (and recreated)</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_lost(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Test if file descriptor is living </span>
+_PROTOTYPE _EXPORT _BOOLEAN pups_fd_islive(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Make dead file descriptor alive</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_fd_alive(<span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">void</span> *);
+
+<span class="Comment">// Kill living file descriptor</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_fd_dead(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// CLose all open (ftab) file descriptors</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> pups_closeall(<span class="Type">void</span>);
+
+<span class="Comment">// Display currently open files</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> pups_show_open_fdescriptors(<span class="Type">const</span> <span class="Type">FILE</span> *);
+
+<span class="Comment">// Strip a comment from an input file</span>
+_PROTOTYPE _EXPORT _BOOLEAN strip_comment(<span class="Type">const</span> <span class="Type">FILE</span> *, <span class="Type">int</span> *, <span class="Type">char</span> *);
+
+<span class="Comment">// Test for existence of substring</span>
+_PROTOTYPE _EXPORT _BOOLEAN strncmps(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Strip an extension from a string</span>
+_PROTOTYPE _EXPORT _BOOLEAN strrext(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span>);
+
+<span class="Comment">// Reverse strip an extension from a string</span>
+_PROTOTYPE _EXPORT _BOOLEAN strrextr(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span>);
+
+<span class="Comment">// Copy string excluding characters</span>
+_PROTOTYPE _EXPORT <span class="Type">size_t</span> strexccpy(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Extract substring from string</span>
+_PROTOTYPE _EXPORT _BOOLEAN strext(<span class="Type">const</span> <span class="Type">char</span>, <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Check if string 2 is a substring of string 1</span>
+_PROTOTYPE _EXPORT _BOOLEAN strin(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Check if string 2 is a substring of string 1 </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> returning tail of string 1                   </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+
+_PROTOTYPE _EXPORT <span class="Type">char</span> *strin2(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Check if string 2 is a substring of string 1 [with string 2 demarcation check]</span>
+_PROTOTYPE _EXPORT _BOOLEAN strintok(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Check if string 3 is to right of string 2 within string 1</span>
+_PROTOTYPE _EXPORT _BOOLEAN stright(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Replace string s3 with string s4 globally within string s1, returning as string s2</span>
+_PROTOTYPE _EXPORT _BOOLEAN strep(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Replace string with a character constant</span>
+_PROTOTYPE _EXPORT _BOOLEAN strepch(<span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span>);
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Replace string demarcated string s3 with string s4 globally within string s1, returning </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> as string s2                                                                            </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PROTOTYPE _EXPORT _BOOLEAN streptok(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Truncate string at demarcation character (from string tail)</span>
+_PROTOTYPE _EXPORT _BOOLEAN strtrnc(<span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span>, <span class="Type">int</span>);
+
+<span class="Comment">// Truncate string at demarcation character (from string head)</span>
+_PROTOTYPE _EXPORT _BOOLEAN strtrnch(<span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span>, <span class="Type">int</span>);
+
+<span class="Comment">// Strip (nominated) trailing character string</span>
+_PROTOTYPE _EXPORT _BOOLEAN strail(<span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span>);
+
+<span class="Comment">// Extract leaf from pathname</span>
+_PROTOTYPE _EXPORT _BOOLEAN strleaf(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">char</span> *);
+
+<span class="Comment">// Extract branch from pathname</span>
+_PROTOTYPE _EXPORT _BOOLEAN strbranch(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">char</span> *);
+
+<span class="Comment">// Strip trailing character string (which begins with digit)</span>
+_PROTOTYPE _EXPORT _BOOLEAN strdigit(<span class="Type">char</span> *);
+
+<span class="Comment">// strip (nominated) leading characters from string</span>
+_PROTOTYPE _EXPORT <span class="Type">char</span> *strlead(<span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span>);
+
+<span class="Comment">// Return substring which starts at first non-whitespace character</span>
+_PROTOTYPE _EXPORT <span class="Type">char</span> *strfirst(<span class="Type">char</span> *);
+
+<span class="Comment">// Extract string</span>
+_PROTOTYPE _EXPORT _BOOLEAN strfrm(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span>, <span class="Type">int</span>, <span class="Type">char</span> *);
+
+<span class="Comment">// Count number of time character occurs in string</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> strchcnt(<span class="Type">const</span> <span class="Type">char</span>, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Extract substring from string [multiple embedded comparisons]</span>
+_PROTOTYPE _EXPORT _BOOLEAN m_strext(<span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">char</span>, <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Routine to return the position of a character in a string</span>
+_PROTOTYPE _EXPORT <span class="Type">long</span> <span class="Type">int</span> ch_pos(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span>);
+
+<span class="Comment">// Routine to return the reverse position of a character in a string</span>
+_PROTOTYPE _EXPORT <span class="Type">long</span> <span class="Type">int</span> rch_pos(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span>);
+
+<span class="Comment">// Extract substring from string with multiple demarcation characters</span>
+_PROTOTYPE _EXPORT _BOOLEAN mdc_strext(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">int</span> *, <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Extract substring from string with multiple demarcation characters</span>
+_PROTOTYPE _EXPORT _BOOLEAN mdc_strext2(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">int</span> *, <span class="Type">int</span> *, <span class="Type">int</span> *, <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Look for occurence of string 1 inside string 2 returning index to string 1</span>
+_PROTOTYPE _BOOLEAN strinp(<span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span> *, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Strip numeric characters from a string</span>
+_PROTOTYPE _EXPORT _BOOLEAN strpdigit(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">char</span> *);
+
+<span class="Comment">// Strip character from string</span>
+_PROTOTYPE _EXPORT <span class="Type">char</span> *strpch(<span class="Type">const</span> <span class="Type">char</span>, <span class="Type">char</span> *);
+
+<span class="Comment">// Replace characters in string with nominated character</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> mchrep(<span class="Type">const</span> <span class="Type">char</span>, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">char</span> *);
+
+<span class="Comment">// Copy string returning state of copied string pointer</span>
+_PROTOTYPE _EXPORT <span class="Type">char</span> *strccpy(<span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Test for empty string (contains only whitespace and control chars)</span>
+_PROTOTYPE _EXPORT _BOOLEAN strempty(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Generate random alphanumeric string</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> strand(<span class="Type">const</span> <span class="Type">size_t</span>, <span class="Type">char</span> *);
+
+<span class="Comment">// Find sign of float</span>
+_PROTOTYPE _EXPORT FTYPE fsign(<span class="Type">const</span> FTYPE);
+
+<span class="Comment">// Round a floating point number to N significant figures</span>
+_PROTOTYPE _EXPORT FTYPE sigfig(<span class="Type">const</span> FTYPE, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Pascal compatable squaring routine</span>
+_PROTOTYPE _EXPORT FTYPE sqr(<span class="Type">const</span> FTYPE);
+
+<span class="Comment">// Pascal compatable round routine</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> iround(<span class="Type">const</span> FTYPE);
+
+<span class="Comment">// Get next free PUPS file table index</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_find_ftab_index(<span class="Type">void</span>);
+
+<span class="Comment">// Get next free PUPS file table index</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_get_ftab_index(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Open file</span>
+_PROTOTYPE _EXPORT <span class="Type">FILE</span> *pups_fopen(<span class="Type">char</span> *, <span class="Type">char</span> *, <span class="Type">int</span>);
+
+<span class="Comment">// Bind descriptor to stream</span>
+_PROTOTYPE _EXPORT <span class="Type">FILE</span> *pups_fdopen(<span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Close file</span>
+_PROTOTYPE _EXPORT <span class="Type">FILE</span> *pups_fclose(<span class="Type">const</span> <span class="Type">FILE</span> *);
+
+
+<span class="PreProc">#ifdef ZLIB_SUPPORT</span>
+<span class="Comment">// Open file associated with zstream</span>
+_PROTOTYPE _EXPORT gzFILE *pups_xgzopen(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Close file associated with zstream</span>
+_PROTOTYPE _EXPORT gzFILE *pups_gzclose(<span class="Type">const</span> gzFILE *);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> ZLIB_SUPPORT </span><span class="Comment">*/</span>
+
+
+<span class="Comment">// Strip comments from file</span>
+_PROTOTYPE _EXPORT <span class="Type">FILE</span> *pups_strp_commnts(<span class="Type">const</span> <span class="Type">char</span>, <span class="Type">const</span> <span class="Type">FILE</span> *, <span class="Type">char</span> *);
+
+<span class="Comment">// Print arguments which have not been parsed by application</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> pups_t_arg_errs(<span class="Type">const</span> _BOOLEAN *, <span class="Type">const</span> <span class="Type">char</span> *[]);
+
+<span class="Comment">// Extended write - checks that N bytes are in fact read </span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_write(<span class="Type">const</span> des_t, <span class="Type">const</span> _BYTE *, <span class="Type">const</span> psize_t);
+
+<span class="Comment">// Extended write - checks that N bytes are in fact written</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_read(<span class="Type">const</span> des_t, _BYTE *, <span class="Type">const</span> psize_t);
+
+<span class="Comment">// Set memory allocator (extended) options</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> pups_set_alloc_opt(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Extended malloc - checks for allocation</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> *pups_malloc(<span class="Type">const</span> psize_t);
+
+<span class="Comment">// Extended realloc - checks for allocation</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> *pups_realloc(<span class="Type">void</span> *, <span class="Type">const</span> psize_t);
+
+<span class="Comment">// Extended calloc - checks for allocation</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> *pups_calloc(<span class="Type">const</span> pindex_t, <span class="Type">const</span> psize_t);
+
+<span class="Comment">// Extended free - checks for unassigned pointer</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> *pups_free(<span class="Type">const</span> <span class="Type">void</span> *);
+
+<span class="Comment">// Set process state</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> pups_set_state(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Routine to get an application state vector</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> pups_get_state(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Display an application state vector</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> pups_show_state(<span class="Type">void</span>);
+
+<span class="Comment">// Register name of (file) creator</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_creator(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Relinquish creator rights to file</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_not_creator(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Generate command vector from string and then do execv */</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_execls(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Routine to allocate a two dimensional array</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> **pups_aalloc(<span class="Type">const</span> pindex_t, <span class="Type">const</span> pindex_t, <span class="Type">const</span> psize_t);
+
+<span class="Comment">// Routine to free a two dimensional array</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> **pups_afree(pindex_t, <span class="Type">void</span> **);
+
+<span class="Comment">// Routine to perform a heapsort</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> sort2(<span class="Type">int</span>, FTYPE [], FTYPE[]);
+
+<span class="Comment">// Get entries in directory</span>
+_PROTOTYPE _EXPORT <span class="Type">char</span> **pups_get_directory_entries(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">int</span> *, <span class="Type">int</span> *);
+
+<span class="Comment">// Get (multikeyed) entries in directory</span>
+_PROTOTYPE _EXPORT <span class="Type">char</span> **pups_get_multikeyed_directory_entries(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">char</span> **, <span class="Type">int</span> *, <span class="Type">int</span> *);
+
+<span class="Comment">// Read call which is not interrupted by signal handling</span>
+_PROTOTYPE _EXPORT <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span> pups_sread(<span class="Type">const</span> <span class="Type">int</span>, <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>);
+
+<span class="Comment">// Write call which is not interrupted by signal handling</span>
+_PROTOTYPE _EXPORT <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span> pups_swrite(<span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>);
+
+<span class="Comment">// Search a path for an item</span>
+_PROTOTYPE _EXPORT <span class="Type">char</span> *pups_search_path(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Set process execution name</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> pups_set_pen(<span class="Type">const</span> <span class="Type">char</span> *[], <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Register process entrance function</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_register_entrance_f(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">void</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Deregister process entrance function</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_deregister_entrance_f(<span class="Type">const</span> <span class="Type">void</span> *);
+
+<span class="Comment">// Show entrance functions</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> pups_show_entrance_f(<span class="Type">const</span> <span class="Type">FILE</span> *);
+
+<span class="Comment">// Register process exit function</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_register_exit_f(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">void</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Deregister process exit function</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_deregister_exit_f(<span class="Type">const</span> <span class="Type">void</span> *);
+
+<span class="Comment">// Show exit functions</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> pups_show_exit_f(<span class="Type">const</span> <span class="Type">FILE</span> *);
+
+<span class="Comment">// Register process abort function</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_register_abort_f(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">void</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Show abort functions</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> pups_show_abort_f(<span class="Type">const</span> <span class="Type">FILE</span> *);
+
+<span class="Comment">// Deregister process abort  function</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_deregister_abort_f(<span class="Type">const</span> <span class="Type">void</span> *);
+
+<span class="Comment">// PUPS process exit */</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_exit(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Pipe read */</span>
+_PROTOTYPE _EXPORT <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span> pups_pipe_read(<span class="Type">const</span> <span class="Type">int</span>, <span class="Type">void</span> *, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>);
+
+<span class="Comment">// Block signal (for critical code sequence protection)</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pupsighold(<span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> _BOOLEAN);
+
+<span class="Comment">// Release blocked signals</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pupsigrelse(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Block PUPS signals</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> pupshold(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Release all PUPS signals */</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> pupsrelse(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// PUPS signal handler</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_sighandle(<span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">void</span> *, <span class="Type">const</span> sigset_t *);
+
+<span class="Comment">// Suspend process until specified signal is recieved</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_signalpause(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Check to see if specified signal is pending</span>
+_PUBLIC _BOOLEAN pups_signalpending(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// PUPS signal handler status</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> pups_show_sigstatus(<span class="Type">const</span> <span class="Type">FILE</span> *);
+
+<span class="Comment">// PUPS signal mask/signal pending status</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> pups_show_sigmaskstatus(<span class="Type">const</span> <span class="Type">FILE</span> *);
+
+<span class="Comment">// Convert signal name to signal number</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_signametosigno(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Convert signal number to signal name</span>
+_PROTOTYPE _EXPORT <span class="Type">char</span> *pups_signotosigname(<span class="Type">const</span> <span class="Type">int</span>, <span class="Type">char</span> *);
+
+<span class="Comment">// PUPS signal handler extended status</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_show_siglstatus(<span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">FILE</span> *);
+
+<span class="Comment">// PUPS signal handler exit vectorer</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_sigvector(<span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> sigjmp_buf *);
+
+<span class="Comment">// Test to see if data is available on descriptor</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_monitor(<span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Return date string</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> strdate(<span class="Type">char</span> *);
+
+<span class="Comment">// Set up PUPS virtual interval timer</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_setvitimer(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">time_t</span>, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">void</span> *);
+
+<span class="Comment">// Clear PUPS virtual interval timer</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_clearvitimer(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Restart timer system</span>
+_PROTOTYPE _EXPORT _BOOLEAN vitmer_restart(<span class="Type">void</span>);
+
+<span class="Comment">// Show PUPS virtual interval timer</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> pups_show_vitimers(<span class="Type">const</span> <span class="Type">FILE</span> *);
+
+<span class="Comment">// Set homeostatic file state parameters</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_set_fs_hsm_parameters(<span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Homeostatic write check routine</span>
+_PUBLIC <span class="Type">int</span> pups_write_homeostat(<span class="Type">const</span> <span class="Type">int</span>, <span class="Type">int</span> (*)(<span class="Type">int</span>));
+
+<span class="Comment">// Homeostat for stdio redirected to FIFO's</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_default_fd_homeostat(<span class="Type">void</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Monitor effective parent process</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> pups_default_parent_homeostat(<span class="Type">void</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// File system space homeostat</span>
+_PROTOTYPE _EXPORT _BOOLEAN pups_check_fs_space(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Attach homeostat to file table entry</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_attach_homeostat(<span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">void</span> *);
+
+<span class="Comment">// Detach homeostat from file table entry</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_detach_homeostat(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// VT timer compatable sleep routine</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_sleep(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Microsecond alarm function</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_malarm(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>);
+
+<span class="Comment">// Get (named) file lock</span>
+_PROTOTYPE _EXPORT _BOOLEAN pups_get_lock(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Release (named) file lock</span>
+_PROTOTYPE _EXPORT _BOOLEAN pups_release_lock(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Get PUPS file descriptor lock</span>
+_PROTOTYPE _EXPORT _BOOLEAN pups_get_fd_lock(<span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Release PUPS file descriptor lock</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_release_fd_lock(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Get file descriptor (from filename)</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_fname2fdes(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Get file stream (from filename)</span>
+_PROTOTYPE _EXPORT <span class="Type">FILE</span> *pups_fname2fstream(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Get file table index (from file name)</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_fname2index(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Get file table index (from file descriptor)</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_fdes2index(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Enable obituary (for child)</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_pipestream_obituary_enable(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Disable obituary (for child)</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_pipestream_obituary_disable(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Extended fork routine</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_fork(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> _BOOLEAN);
+
+<span class="Comment">// Extended creat command</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_creat(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Extended fchmod which updates ftab</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_fchmod(<span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Extended strlen command</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_strlen(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Tracked malloc routine</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> *pups_tmalloc(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Tracked calloc routine</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> *pups_tcalloc(<span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Tracked realloc routine</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> *pups_trealloc(<span class="Type">void</span> *, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>);
+
+<span class="Comment">// Convert tracked object name to heap address</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> *pups_tnametoptr(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Convert partial tracked object name to heap address</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> *pups_tpartnametoptr(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Convert type to heap address</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> *pups_ttypetoptr(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Tracked object free</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> *pups_tfree(<span class="Type">const</span> <span class="Type">void</span> *);
+
+<span class="Comment">// Tracked dynamic array allocation</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> **pups_taalloc(<span class="Type">const</span> pindex_t, <span class="Type">const</span> pindex_t, <span class="Type">const</span> psize_t, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Tracked dynamic array free</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> **pups_tafree(<span class="Type">const</span> <span class="Type">void</span> **);
+
+<span class="Comment">// Display tracked object attributes</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_tshowobject(<span class="Type">const</span> <span class="Type">FILE</span> *, <span class="Type">const</span> <span class="Type">void</span> *);
+
+<span class="Comment">// Display tracked object table</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_tshowobjects(<span class="Type">const</span> <span class="Type">FILE</span> *, <span class="Type">int</span> *);
+
+<span class="Comment">// Extended fgets function</span>
+_PROTOTYPE _EXPORT <span class="Type">char</span> *pups_fgets(<span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">FILE</span> *);
+
+<span class="Comment">// PUPS wait function</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pupswait(<span class="Type">const</span> _BOOLEAN, <span class="Type">int</span> *);
+
+<span class="Comment">// PUPS waitpid function</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pupswaitpid(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">int</span>, <span class="Type">int</span> *);
+
+<span class="Comment">// Set child name associated with child process</span>
+_PROTOTYPE _EXPORT _BOOLEAN pups_set_child_name(<span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Clear a child table slot</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_clear_chtab_slot(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Show active children</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> pups_show_children(<span class="Type">const</span> <span class="Type">FILE</span> *);
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Switch automatic child handling off (for a process we wish </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> to wait for explicitily)                                   </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PROTOTYPE _EXPORT <span class="Type">void</span> pups_noauto_child(<span class="Type">void</span>);
+
+<span class="Comment">// Re-enable automatic child handling</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> pups_auto_child(<span class="Type">void</span>);
+
+<span class="Comment">// Is string a comment string? (first non-space character '#')</span>
+_PROTOTYPE _EXPORT _BOOLEAN strcomment(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Set all characters in string to NULL ('\0')</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> strclr(<span class="Type">char</span> *);
+
+<span class="Comment">// Save a PUPS sigtab entry</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> pups_sigtabsave(<span class="Type">const</span> <span class="Type">int</span>, sigtab_type *);
+
+<span class="Comment">// Restore a PUPS sigtab entry</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> pups_sigtabrestore(<span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> sigtab_type *);
+
+<span class="Comment">// Turn local echoing off (on tty)</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_tty_echoing_off(<span class="Type">FILE</span> *, <span class="Type">struct</span> termios *);
+
+<span class="Comment">// Turn local tty echoing on (on tty) */</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> pups_tty_echoing_on(<span class="Type">FILE</span> *, <span class="Type">int</span>, <span class="Type">struct</span> termios);
+
+<span class="Comment">// Execute command (pipeline) locally */</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_lexec(<span class="Type">char</span> *, <span class="Type">char</span> *, <span class="Type">int</span>);
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> PUPS statkill -- pids which belong to terminated or stopped process </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> return error                                                        </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_statkill(<span class="Type">int</span>, <span class="Type">int</span>);
+
+
+<span class="Comment">// Set file table id tag</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> set_ftab_id(<span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Get file table index (from id tag)</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_get_ftab_index_by_id(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Get file table index (from file name)</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_get_ftab_index_by_name(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Clear file table slot</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_clear_ftab_slot(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Initialise child table</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> pups_init_child_table(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// lseek() function which is PUPS signal safe</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_lseek(<span class="Type">int</span>, <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>, <span class="Type">int</span>);
+
+<span class="Comment">// Get load average</span>
+_PROTOTYPE _EXPORT FTYPE pups_get_load_average(<span class="Type">const</span> <span class="Type">int</span> which_load_average);
+
+<span class="Comment">// Test to see if fdes is asscoiated with a seekable device</span>
+_PROTOTYPE _EXPORT _BOOLEAN pups_is_seekable(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Relay data to a process slaved via a pair of FIFO's</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_fifo_relay(<span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Set a read or write link file lock</span>
+_PROTOTYPE <span class="Type">int</span> pups_get_rdwr_link_file_lock(<span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Get file lock [using link()]</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_get_link_file_lock(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Release file lock [set using link()]</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_release_link_file_lock(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Wait for file to be unlinked before returning to caller</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_unlink(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Interaction free version of usleep()</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_usleep(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>);
+
+<span class="Comment">// Check to see if current file is on CDFS</span>
+_PROTOTYPE _EXPORT _BOOLEAN pups_is_on_isofs(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Check to see if current file is on CDFS</span>
+_PROTOTYPE _EXPORT _BOOLEAN pups_is_on_fisofs(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Check to see if current file is on NFS</span>
+_PROTOTYPE _EXPORT _BOOLEAN pups_is_on_nfs(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Check to see if current file is on NFS</span>
+_PROTOTYPE _EXPORT _BOOLEAN pups_is_on_fnfs(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Copy file (by name)</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_cpfile(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">int</span>);
+
+<span class="Comment">// Copy file (by descriptor)</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_fcpfile(<span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Check for host scanning (ps, top etc)</span>
+_PROTOTYPE _EXPORT _BOOLEAN pups_cmd_running(<span class="Type">void</span>);
+
+<span class="Comment">// Do I own the current process?</span>
+_PROTOTYPE _EXPORT _BOOLEAN pups_i_own(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Enable abort restart (on reciept of SIGQUIT)</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_restart_enable(<span class="Type">void</span>);
+
+<span class="Comment">// Disable abort restart (on reciept of SIGQUIT)</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_restart_disable(<span class="Type">void</span>);
+
+<span class="Comment">// Compute psuedo 32 bit cyclic redundancy checksum</span>
+_PUBLIC <span class="Type">int</span> pups_crc_p32(<span class="Type">const</span> <span class="Type">size_t</span>, _BYTE *);
+
+<span class="Comment">// Generate 64 bit cyclic redundancy checksum</span>
+_PUBLIC <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span> pups_crc_64(<span class="Type">const</span> <span class="Type">size_t</span>, _BYTE *);
+
+<span class="Comment">// Extract CRC signature from file name</span>
+_PROTOTYPE _EXPORT <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span> pups_get_signature(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span>);
+
+<span class="Comment">// Sign a file (with its CRC checksum)</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_sign(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span>);
+
+<span class="Comment">// PUPS signal safe fprintf function</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pupsfprintf(<span class="Type">FILE</span> *, <span class="Type">char</span> *, ...);
+
+<span class="Comment">// Replace command tail tem at specified location</span>
+_PROTOTYPE _EXPORT _BOOLEAN pups_replace_cmd_tail_item(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Insert item into the command tail</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_insert_cmd_tail_item(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Clear command tail</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_clear_cmd_tail(<span class="Type">void</span>);
+
+<span class="Comment">// Handler for backtracking (when segmentation violation occurs)</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_segv_backtrack_handler(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Set a backtrack re-entry point (in process address space)</span>
+_PROTOTYPE _EXPORT _BOOLEAN pups_backtrack(<span class="Type">const</span> _BOOLEAN);
+
+<span class="Comment">// Has file been updated?</span>
+_PROTOTYPE _EXPORT _BOOLEAN pups_file_updated(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Is host reachable?</span>
+_PROTOTYPE _EXPORT _BOOLEAN pups_host_reachable(<span class="Type">const</span> <span class="Type">char</span> *);
+
+
+<span class="Comment">// Set (fcntl) file lock (on descriptor)</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_flock(<span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">off_t</span>, <span class="Type">const</span> <span class="Type">off_t</span>, <span class="Type">const</span> _BOOLEAN);
+
+<span class="Comment">// Set (fcntl) file lock (on named file)</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_flockfile(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">off_t</span>, <span class="Type">const</span> <span class="Type">off_t</span>, <span class="Type">const</span> _BOOLEAN);
+
+<span class="Comment">// Display flock locks currently held by caller process</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_show_flock_locks(<span class="Type">const</span> <span class="Type">FILE</span> *);
+
+<span class="Comment">// Substitute substring</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> strsub(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">char</span> *);
+
+
+<span class="PreProc">#ifdef PSRP_AUTHENTICATE</span>
+<span class="Comment">// Authenticate user</span>
+_PROTOTYPE _EXPORT _BOOLEAN pups_checkuser(<span class="Type">char</span> *, <span class="Type">char</span> *);
+
+<span class="Comment">// Authenticate secure service password</span>
+_PROTOTYPE _EXPORT _BOOLEAN pups_check_appl_password(<span class="Type">char</span> *);
+
+<span class="Comment">// Authenticate a user</span>
+_PROTOTYPE _EXPORT _BOOLEAN pups_getpass(<span class="Type">char</span> *);
+
+<span class="Comment">// Check that application has password set</span>
+_PROTOTYPE _EXPORT _BOOLEAN pups_check_pass_set(<span class="Type">void</span>);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PSRP_ATHENTICATE </span><span class="Comment">*/</span>
+
+
+<span class="Comment">// Get file type</span>
+_PROTOTYPE _EXPORT <span class="Type">char</span> *pups_get_file_type(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">/*</span><span class="Comment"> Convert string to lower case</span>
+<span class="Comment">_PROTOTYPE _EXPORT int downcase(char *);</span>
+
+<span class="Comment">// Convert string to upper case</span>
+<span class="Comment">_PROTOTYPE _EXPORT int upcase(char *);</span>
+
+<span class="Comment">// Enigma encrypt a string</span>
+<span class="Comment">_PROTOTYPE _EXPORT int ecryptstr(const int, const _BOOLEAN, const char *, char *);</span>
+
+<span class="Comment">// Get exporting NFS host name (from file path)</span>
+<span class="Comment">_PROTOTYPE _EXPORT int pups_get_nfs_host(const char *pathname, const char *host);</span>
+
+<span class="Comment">// Reflect endian ness of float</span>
+<span class="Comment">_PROTOTYPE _EXPORT float fconv(const FTYPE);</span>
+
+<span class="Comment">// Reflect endian ness of int</span>
+<span class="Comment">_PROTOTYPE _EXPORT int iconv(const int);</span>
+
+<span class="Comment">// Reflect endian ness of short</span>
+<span class="Comment">_PROTOTYPE _EXPORT short int sconv(const short int);</span>
+
+<span class="Comment">// Reflect endian ness of long</span>
+<span class="Comment">_PROTOTYPE _EXPORT long int lconv(const long int);</span>
+
+<span class="Comment">// Encrypted formatted print</span>
+<span class="Comment">_PROTOTYPE _EXPORT int efprintf(FILE *, const char *, ...);</span>
+
+<span class="Comment">// Encrypted formatted scan</span>
+<span class="Comment">_PROTOTYPE _EXPORT int efscanf(FILE *, const char *, ...);</span>
+
+<span class="Comment">// Encrypted formatted string scan</span>
+<span class="Comment">_PROTOTYPE _EXPORT int esscanf(char *cipher, const char *format, ...);</span>
+
+<span class="Comment">// Encrypted fputs</span>
+<span class="Comment">_PROTOTYPE _EXPORT int efputs(const char *, const FILE *);</span>
+
+<span class="Comment">// Encrypted fgets</span>
+<span class="Comment">_PROTOTYPE _EXPORT char *efgets(char *, const unsigned long int, const FILE *);</span>
+
+<span class="Comment">// Mark context of non local goto valid</span>
+<span class="Comment">_PROTOTYPE _EXPORT int pups_set_jump_vector(void);</span>
+
+<span class="Comment">// Mark context of non local goto invalid</span>
+<span class="Comment">_PROTOTYPE _EXPORT int pups_reset_jump_vector(void);</span>
+
+<span class="Comment">// TRUE if linux version (sub) string matches key</span>
+<span class="Comment">_PROTOTYPE _EXPORT _BOOLEAN pups_is_linuxversion(const char *);</span>
+
+<span class="Comment">// How many CPUS's does host have?</span>
+<span class="Comment">_PROTOTYPE _EXPORT int pups_cpus(FTYPE *, char *);</span>
+
+<span class="Comment">// Get resource loading</span>
+<span class="Comment">_PROTOTYPE _PUBLIC int pups_get_resource_loading(const _BOOLEAN, FTYPE *, int *);</span>
+
+<span class="Comment">// Have we got resources required?</span>
+<span class="Comment">_PROTOTYPE _EXPORT _BOOLEAN pups_have_resources(FTYPE, int);</span>
+
+<span class="Comment">// Transfer a file to/from a remote host</span>
+<span class="Comment">_PROTOTYPE _EXPORT int pups_scp(const char *, const char *, const char *);</span>
+
+<span class="Comment">// Is process PUPS/P3 aware?</span>
+<span class="Comment">_PROTOTYPE _EXPORT _BOOLEAN pups_aware(const int);</span>
+
+<span class="Comment">// Open extended pipestream</span>
+<span class="Comment">_PROTOTYPE _EXPORT int pups_popen(const char *, const char *, const int, int *);</span>
+
+<span class="Comment">// Open buffered extended pipestream</span>
+<span class="Comment">_PROTOTYPE _EXPORT FILE *pups_fpopen(const char *, const char *, const char *, int *);</span>
+
+<span class="Comment">// Close extended pipestream</span>
+<span class="Comment">_PROTOTYPE _EXPORT int pups_pclose(const int, const int);</span>
+
+<span class="Comment">// Close buffered extended pipestream</span>
+<span class="Comment">_PROTOTYPE _EXPORT int pups_fpclose(const FILE *, const int);</span>
+
+<span class="Comment">// Test to see if process is foreground</span>
+<span class="Comment">_PROTOTYPE _EXPORT _BOOLEAN pups_is_foreground(void);</span>
+
+<span class="Comment">// Test to see if process is background</span>
+<span class="Comment">_PROTOTYPE _EXPORT _BOOLEAN pups_is_background(void);</span>
+
+<span class="Comment">// Release all link file locks</span>
+<span class="Comment">_PROTOTYPE _EXPORT int pups_release_all_link_file_locks(void);</span>
+
+<span class="Comment">// Is command installed on system</span>
+<span class="Comment">_PROTOTYPE _EXPORT _BOOLEAN pups_cmd_installed(const char *);</span>
+
+<span class="Comment">// Get current CPU utilisation on host</span>
+<span class="Comment">_PROTOTYPE _EXPORT FTYPE pups_cpu_utilisation(void);</span>
+
+<span class="Comment">// Get prefix from string</span>
+<span class="Comment">_PROTOTYPE _EXPORT int pups_prefix(const char, const char *, char *);</span>
+
+<span class="Comment">// Get suffix from string</span>
+<span class="Comment">_PROTOTYPE _EXPORT int pups_suffix(const char, const char *, char *);</span>
+
+<span class="Comment">// Get file size</span>
+<span class="Comment">_PROTOTYPE _EXPORT unsigned long int pups_get_fsize(const char *);</span>
+
+<span class="Comment">// Descriptor associated with a pipe</span>
+<span class="Comment">_PROTOTYPE _EXPORT int isapipe(const int);</span>
+
+<span class="Comment">// Descriptor associated with a file</span>
+<span class="Comment">_PROTOTYPE _EXPORT int isafile(const int);</span>
+
+<span class="Comment">// Descriptor associated with a socket</span>
+<span class="Comment">_PROTOTYPE _EXPORT int isasock(const int);</span>
+
+<span class="Comment">// Descriptor associated with a (data) conduit (pipe, file or socket)</span>
+<span class="Comment">_PROTOTYPE _EXPORT int isaconduit(const int);</span>
+
+<span class="Comment">// Get system information for current host</span>
+<span class="Comment">_PROTOTYPE _EXPORT int pups_sysinfo(char *, char *, char *, char *);</span>
+
+<span class="Comment">// Am I running in virtual enviroment? </span>
+<span class="Comment">_PROTOTYPE _EXPORT _BOOLEAN pups_os_is_virtual(char *);</span>
+
+<span class="Comment">// Is character first one in string? </span>
+<span class="Comment">_PROTOTYPE _EXPORT _BOOLEAN ch_is_first(const char *, const char); </span>
+
+<span class="Comment">// Is character last one in string? </span>
+<span class="Comment">_PROTOTYPE _EXPORT _BOOLEAN ch_is_last(const char *, const char); </span>
+
+<span class="Comment">// Is architecture big endian?</span>
+<span class="Comment">_PROTOTYPE _EXPORT _BOOLEAN pups_bigendian(void);</span>
+
+
+<span class="Comment">#ifdef CRIU_SUPPORT</span>
+<span class="Comment">// Enable (Criu) state saving</span>
+<span class="Comment">_PROTOTYPE _EXPORT int pups_ssave_enable(void);</span>
+
+<span class="Comment">// Disable (Criu) state saving</span>
+<span class="Comment">_PROTOTYPE _EXPORT int pups_ssave_disable(void);</span>
+<span class="Comment">#endif </span><span class="Error">/</span><span class="Comment">* CRIU_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="Comment">// Set (round robin) scheduling priority</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_set_rt_sched(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Switch to standard (time sharing) scheduler</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_set_tslice_sched(<span class="Type">void</span>);
+
+<span class="Comment">// Copy file</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pups_copy_file(<span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+
+<span class="PreProc">#ifdef BSD_FUNCTION_SUPPORT</span>
+<span class="Comment">// Open BSD strlcat function</span>
+_PROTOTYPE _EXPORT <span class="Type">size_t</span> strlcat(<span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">size_t</span> dsize);
+
+<span class="Comment">// Open BSD strlcpy functiom</span>
+_PROTOTYPE _EXPORT <span class="Type">size_t</span> strlcpy(<span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">size_t</span> dsize);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> BSD_FUNCTION_SUPPORT </span><span class="Comment">*/</span>
+
+
+<span class="Comment">// Can we run command? */</span>
+_PROTOTYPE _EXPORT _BOOLEAN pups_can_run_command(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Enable (memory) residency</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> pups_enable_resident(<span class="Type">void</span>);
+
+<span class="Comment">// Get size of directory in bytes</span>
+_PROTOTYPE _EXPORT <span class="Type">off_t</span> pups_dsize(<span class="Type">const</span> <span class="Type">char</span> *);
+
+
+<span class="PreProc">#ifdef _CPLUSPLUS</span>
+<span class="PreProc">#   undef  _EXPORT</span>
+<span class="PreProc">#   define _EXPORT </span><span class="Type">extern</span><span class="PreProc"> </span><span class="Constant">&quot;C&quot;</span>
+<span class="PreProc">#else</span>
+<span class="PreProc">#   undef  _EXPORT</span>
+<span class="PreProc">#   define _EXPORT </span><span class="Type">extern</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> _CPLUSPLUS </span><span class="Comment">*/</span>
+
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> UTILS_H </span><span class="Comment">*/</span>
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

@@ -10,7 +10,7 @@ SOMAKE \- generate a PUPS shared object (.so) from object (.o) file or archive (
 .I [usage | --usage] 
 .I !shared library name!
 .I !<list of .o files>!
->& <log file>
+[2> <log file>]
 .br
 
 .SH DESCRIPTION
@@ -33,6 +33,22 @@ POSIX dynamic link loader
 .B --usage 
 prints out help information about
 .I share(1)
+.br
+
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
+.br
+
+.SH ENVIRONMENTAL VARIABLES
+none.
 .br
 
 .SH COPYRIGHT

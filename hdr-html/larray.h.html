@@ -1,0 +1,308 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.5.1.src.git/include.libs/larray.h.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="cpp">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Purpose: Header file for larraylib.</span>
+
+<span class="Comment">    Author: M.A. O'Neill</span>
+<span class="Comment">            Tumbling Dice Ltd</span>
+<span class="Comment">            Gosforth</span>
+<span class="Comment">            Newcastle upon Tyne</span>
+<span class="Comment">            NE3 4RT</span>
+<span class="Comment">            United Kingdom</span>
+
+<span class="Comment">    Version: 2.00 </span>
+<span class="Comment">    Dated:   4th January 2022</span>
+<span class="Comment">    E-mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="PreProc">#ifndef LARRAY_HDR</span>
+<span class="PreProc">#define LARRAY_HDR</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Keep c2man happy </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;c2man.h&gt;</span>
+
+<span class="PreProc">#ifndef __C2MAN__</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stdio.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;me.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;utils.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;nfo.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;casino.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;psrp.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;signal.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;vstamp.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> __C2MAN__ </span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef CKPT_SUPPORT</span>
+<span class="Type">extern</span> <span class="Type">int</span> checkpointing;
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> CKPT_SUPPORT </span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Defines used by this application ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Comment">/*</span><span class="Comment">*********</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Version </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">*********</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define LARRAY_VERSION                </span><span class="Constant">&quot;2.00&quot;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> String size </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define SSIZE                         </span><span class="Constant">2048</span>
+
+
+
+<span class="Comment">/*</span><span class="Comment">*******************************</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Floating point representation </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">*******************************</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;ftype.h&gt;</span>
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Allocation quantum (for row vectors) </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define LARRAY_ALLOC_QUANTUM          </span><span class="Constant">32</span><span class="PreProc"> </span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Vector states </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define DEFLATED                      </span><span class="Constant">1</span><span class="PreProc"> </span>
+<span class="PreProc">#define INFLATED                      </span><span class="Constant">2</span><span class="PreProc"> </span>
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Magic (for binary files) </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define VLIST_MAGIC                   </span><span class="Constant">&quot;vlist&quot;</span>
+<span class="PreProc">#define MLIST_MAGIC                   </span><span class="Constant">&quot;mlist&quot;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Structures defined by this application ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Definition of auxillliary data container type ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">typedef</span> <span class="Type">struct</span> {   <span class="Type">void</span>     *save;       <span class="Comment">/*</span><span class="Comment"> Save ASCII auxilliary data        </span><span class="Comment">*/</span>
+                   <span class="Type">void</span>     *load;       <span class="Comment">/*</span><span class="Comment"> Load ASCII auxilliary data        </span><span class="Comment">*/</span>
+                   <span class="Type">void</span>     *bsave;      <span class="Comment">/*</span><span class="Comment"> Save binary auxilliary data       </span><span class="Comment">*/</span>
+                   <span class="Type">void</span>     *bload;      <span class="Comment">/*</span><span class="Comment"> Load binary auxilliary data       </span><span class="Comment">*/</span>
+                   <span class="Type">void</span>     *data;       <span class="Comment">/*</span><span class="Comment"> Auxilliary data                   </span><span class="Comment">*/</span>
+               } auxdata_type;
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Definition of the vlist_type (vector addressed as a list) ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">typedef</span> <span class="Type">struct</span> {   <span class="Type">char</span>         name[<span class="Constant">256</span>];   <span class="Comment">/*</span><span class="Comment"> Name of list vector           </span><span class="Comment">*/</span>
+                   <span class="Type">int</span>          state;       <span class="Comment">/*</span><span class="Comment"> State (inflated or deflated)  </span><span class="Comment">*/</span>
+                   <span class="Type">int</span>          components;  <span class="Comment">/*</span><span class="Comment"> Size of vector                </span><span class="Comment">*/</span>
+                   <span class="Type">int</span>          used;        <span class="Comment">/*</span><span class="Comment"> Non zero components           </span><span class="Comment">*/</span>
+                   <span class="Type">int</span>          allocated;   <span class="Comment">/*</span><span class="Comment"> Non zero components           </span><span class="Comment">*/</span>
+                   <span class="Type">int</span>          *index;      <span class="Comment">/*</span><span class="Comment"> Allocated components          </span><span class="Comment">*/</span>
+                   auxdata_type *auxdata;    <span class="Comment">/*</span><span class="Comment"> Auxilliary data               </span><span class="Comment">*/</span>
+                   FTYPE        *value;      <span class="Comment">/*</span><span class="Comment"> Non zero component values     </span><span class="Comment">*/</span>
+               } vlist_type;
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Definition of the mlist_type (matrix addressed as a list) ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">typedef</span> <span class="Type">struct</span> {   <span class="Type">char</span>       name[<span class="Constant">256</span>]; <span class="Comment">/*</span><span class="Comment"> Name of matrix                    </span><span class="Comment">*/</span>
+                   <span class="Type">int</span>        rows;      <span class="Comment">/*</span><span class="Comment"> Rows in matrix                    </span><span class="Comment">*/</span>
+                   <span class="Type">int</span>        cols;      <span class="Comment">/*</span><span class="Comment"> Cols in matrix                    </span><span class="Comment">*/</span>
+                   vlist_type **vector;  <span class="Comment">/*</span><span class="Comment"> Row vectors                       </span><span class="Comment">*/</span>
+               } mlist_type;
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Functions exported by this application ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Comment">// Destroy list vector</span>
+_PROTOTYPE _EXPORT vlist_type *lvector_destroy(vlist_type *);
+
+<span class="Comment">// Destroy list matrix</span>
+_PROTOTYPE _EXPORT mlist_type *lmatrix_destroy(mlist_type *);
+
+<span class="Comment">// Create list matrix</span>
+_PROTOTYPE _EXPORT mlist_type *lmatrix_create(<span class="Type">FILE</span> *, <span class="Type">int</span>, <span class="Type">int</span>, FTYPE *);
+
+<span class="Comment">// Creat list vector</span>
+_PROTOTYPE _EXPORT vlist_type *lvector_create(<span class="Type">FILE</span> *, <span class="Type">int</span>, FTYPE *);
+
+<span class="Comment">// Copy list matrix/</span>
+_PROTOTYPE _EXPORT mlist_type *lmatrix_copy(mlist_type *);
+
+<span class="Comment">// Copy list vector</span>
+_PROTOTYPE _EXPORT vlist_type *lvector_copy(vlist_type *);
+
+<span class="Comment">// Deflate list vector</span>
+_PROTOTYPE _EXPORT vlist_type *lvector_deflate(<span class="Type">FILE</span> *, _BOOLEAN, FTYPE *, vlist_type *);
+
+<span class="Comment">// Deflate list matrix</span>
+_PROTOTYPE _EXPORT mlist_type *lmatrix_deflate(<span class="Type">FILE</span> *, _BOOLEAN, FTYPE *, mlist_type *);
+
+<span class="Comment">// Inflate list vector</span>
+_PROTOTYPE _EXPORT vlist_type *lvector_inflate(_BOOLEAN, vlist_type *);
+
+<span class="Comment">// Inflate list matrix</span>
+_PROTOTYPE _EXPORT mlist_type *lmatrix_inflate(_BOOLEAN, mlist_type *);
+
+<span class="Comment">// Do fast re-initialisation of pattern vector</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> fastResetPatternVector(<span class="Type">int</span>, FTYPE *, vlist_type *);
+
+<span class="Comment">// Get list value from list vector list</span>
+_PROTOTYPE _EXPORT FTYPE lvector_get_list_value(<span class="Type">int</span>, <span class="Type">int</span> *, vlist_type *);
+
+<span class="Comment">// Get component value from list vector</span>
+_PROTOTYPE _EXPORT FTYPE lvector_get_component_value(<span class="Type">int</span>, vlist_type *);
+
+<span class="Comment">// Get list value from list matrix</span>
+_PROTOTYPE _EXPORT FTYPE lmatrix_get_list_value(<span class="Type">int</span>, <span class="Type">int</span>, <span class="Type">int</span> *, mlist_type *);
+
+<span class="Comment">// Get component value from list matrix</span>
+_PROTOTYPE _EXPORT FTYPE lmatrix_get_element_value(<span class="Type">int</span> row, <span class="Type">int</span> col, mlist_type *);
+
+<span class="Comment">// Normalise list matrix</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> lmatrix_normalise(mlist_type *);
+
+<span class="Comment">// Normalize list vector</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> lvector_normalise(vlist_type *);
+
+<span class="Comment">// Print list vector</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> lvector_print(<span class="Type">FILE</span> *, <span class="Type">int</span>, vlist_type *);
+
+<span class="Comment">// Scan list vector</span>
+_PUBLIC vlist_type *lvector_scan(<span class="Type">FILE</span> *);
+
+<span class="Comment">// Print list matrix</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> lmatrix_print(<span class="Type">FILE</span> *, <span class="Type">int</span>, mlist_type *);
+
+<span class="Comment">// Scan list matrix</span>
+_PUBLIC mlist_type *lmatrix_scan(<span class="Type">FILE</span> *);
+
+<span class="Comment">// Set list vector name</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> lvector_set_name(<span class="Type">char</span> *, vlist_type *);
+
+<span class="Comment">// Set list matrix name</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> lmatrix_set_name(<span class="Type">char</span> *, mlist_type *);
+
+<span class="Comment">// Get list vector inflation state</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> lvector_get_state(vlist_type *);
+
+<span class="Comment">// Get list vector size</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> lvector_get_size(vlist_type *);
+
+<span class="Comment">// Get list matrix size</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> lmatrix_get_size(mlist_type *, <span class="Type">int</span> *, <span class="Type">int</span> *);
+
+<span class="Comment">// Get list vector (allocated) size</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> lvector_get_allocated(vlist_type *);
+
+<span class="Comment">// Get size of list vector (non zero components in corresponding vector)</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> lvector_get_used(vlist_type *);
+
+<span class="Comment">// Get list vector compression factor</span>
+_PROTOTYPE _EXPORT FTYPE lvector_get_compression_factor(vlist_type *);
+
+<span class="Comment">// Get list matrix compression factor</span>
+_PROTOTYPE _EXPORT FTYPE lmatrix_get_compression_factor(mlist_type *);
+
+<span class="Comment">// Load list vector from (ASCII) file</span>
+_PROTOTYPE _EXPORT vlist_type *lvector_load_from_file(<span class="Type">char</span> *);
+
+<span class="Comment">// Save list vector to (ASCII) file</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> lvector_save_to_file(<span class="Type">char</span> *, vlist_type *);
+
+<span class="Comment">// Load list matrix from (ASCII) file</span>
+_PROTOTYPE _EXPORT mlist_type *lmatrix_load_from_file(<span class="Type">char</span> *filename);
+
+<span class="Comment">// Save list matrix to (ASCII) file </span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> lmatrix_save_to_file(<span class="Type">char</span> *, mlist_type *);
+
+<span class="Comment">// Save list vector in binary format to file</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> lvector_save_to_binary_file(<span class="Type">char</span> *, vlist_type *);
+
+<span class="Comment">// Load list vector saved in binary format from file</span>
+_PROTOTYPE _EXPORT vlist_type *lvector_load_from_binary_file(<span class="Type">char</span> *);
+
+<span class="Comment">// Save list matrix in binary format to file</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> lmatrix_save_to_binary_file(<span class="Type">char</span> *, mlist_type *);
+
+<span class="Comment">// Load list matrix saved in binary format from file</span>
+_PROTOTYPE _EXPORT mlist_type *lmatrix_load_from_binary_file(<span class="Type">char</span> *);
+
+<span class="Comment">// Save list vector in binary format to open file descriptor</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> lvector_save_to_binary_fildes(<span class="Type">int</span>, vlist_type *);
+
+<span class="Comment">// Load list vector saved in binary format from open file descriptor</span>
+_PROTOTYPE _EXPORT vlist_type *lvector_load_from_binary_fildes(<span class="Type">int</span>);
+
+<span class="Comment">// Save list matrix in binary format to open file descriptor</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> lmatrix_save_to_binary_fildes(<span class="Type">int</span>, mlist_type *);
+
+<span class="Comment">// Load list matrix saved in binary format from open file descriptor</span>
+_PROTOTYPE _EXPORT mlist_type *lmatrix_load_from_binary_fildes(<span class="Type">int</span>);
+
+
+<span class="PreProc">#ifdef _CPLUSPLUS</span>
+<span class="PreProc">#   undef  _EXPORT</span>
+<span class="PreProc">#   define _EXPORT </span><span class="Type">extern</span><span class="PreProc"> C</span>
+<span class="PreProc">#else</span>
+<span class="PreProc">#   undef _EXPORT</span>
+<span class="PreProc">#   define _EXPORT </span><span class="Type">extern</span>
+<span class="PreProc">#endif</span>
+
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> LARRAY_HDR </span><span class="Comment">*/</span>
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

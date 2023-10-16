@@ -13,8 +13,8 @@
                NE3 4RT
                United Kingdom
 
-    Dated:    27th September 2019 
-    Version:  2.00 
+    Version:  2.02 
+    Dated:    7th January 2022
     E-mail:   mao@tumblingdice.co.uk
 ------------------------------------------------------------------------------*/
 
@@ -48,7 +48,7 @@ _PRIVATE void hiplib_slot(int level)
 {   (void)fprintf(stderr,"lib hiplib %s: [ANSI C]\n",HIPLIB_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 1985-2019 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 1987-2022 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
        (void)fprintf(stderr,"PUPS/P3 HIPS support library (built %s %s)\n\n",__TIME__,__DATE__);
     }
@@ -175,7 +175,7 @@ _PRIVATE char *hips_desc_massage(char *s)
          k,
          beg;
 
-    if(s == (char *)NULL)
+    if(s == (char *)NULL || strcmp(s,"") == 0)
     {  pups_set_errno(EINVAL);
        return((char *)NULL);
     }
@@ -184,10 +184,10 @@ _PRIVATE char *hips_desc_massage(char *s)
     beg = 1;
 
     for (i=0;i<len;i++)
-    {   if (beg && *(s+i) == '.' && *(s+i+1) == '\n')
+    {   if (beg && s[i] == '.' && s[i+1] == '\n')
         {
             for (k=i+2;k<=len;k++)
-                *(s+k-2) = *(s+k);
+                s[k-2] = s[k];
             i--;
             len -= 2;
         }
@@ -229,7 +229,7 @@ _PRIVATE _BYTE *hips_alloc(int i,int j)
 
 _PUBLIC void hips_upd_desc(hipl_hdr *hdr, char *txt)
 
-{   if(hdr == (hipl_hdr *)NULL || txt == (char *)NULL)
+{   if(hdr == (hipl_hdr *)NULL || txt == (char *)NULL || strcmp(txt,"") == 0)
     {  pups_set_errno(EINVAL);
        return;
     }
@@ -381,11 +381,11 @@ _PUBLIC void hips_frd_hdr(int fd, hipl_hdr *hdr)
     }
 
     hdr->seq_history[0] = '\0';
-    for (i=0;i<=lineno;i++)
+    for (i=0; i<=lineno; i++)
          (void)strlcat(hdr->seq_history,ssave[i],SSIZE);
-    lineno = 0;
 
-    while(strcmp(hips_getline(fd,&ssave[lineno],&slmax[lineno]),".\n"))
+    lineno = 0;
+    while(strcmp(hips_getline(fd,&ssave[lineno],&slmax[lineno]),".\n")) // has a .
     {
        lineno++;
        if (lineno >= LINES)
@@ -400,7 +400,7 @@ _PUBLIC void hips_frd_hdr(int fd, hipl_hdr *hdr)
     }
 
     hdr->seq_desc[0] = '\0';
-    for (i=0;i<lineno;i++)  // <=
+    for (i=0; i<lineno; i++)
          (void)strlcat(hdr->seq_desc,ssave[i],SSIZE);
 
     pups_set_errno(OK);
@@ -542,7 +542,8 @@ _PUBLIC void hips_fwr_hdr(int fd, hipl_hdr *hdr)
 
 _PRIVATE void hips_wstr(int fd, char *s)
 
-{  if(write(fd,s,strlen(s)) == (-1))
+{  
+   if(write(fd,s,strlen(s)) == (-1))
       pups_error("[hips_wstr]: invalid file descriptor");
 
    if(s[0] == '\0' || s[strlen(s)-1] != '\n')
@@ -620,9 +621,13 @@ _PUBLIC void hips_init_hdr(hipl_hdr *hdr,  // HIPL header structure
 
    if(shi != (char *)NULL)
       (void)strlcpy(hdr->seq_history,shi,SSIZE);
+   else
+      (void)strlcpy(hdr->seq_history,"\n",SSIZE);
 
    if(desc != (char *)NULL)
       (void)strlcpy(hdr->seq_desc,hips_desc_massage(desc),SSIZE);
+   else
+      (void)strlcpy(hdr->seq_desc,"\n",SSIZE);
 
    hdr->num_frame      = nfr;
    hdr->rows           = rw;
@@ -714,11 +719,11 @@ _PUBLIC int hips_display_hdr_info(FILE *stream, hipl_hdr *hdr)
                             break;
     }
 
-    (void)fprintf(stream,"\n    sequence history         : %s",hdr->seq_history);
+    (void)fprintf(stream,"    sequence history         : %s",hdr->seq_history);
     if(strcmp(hdr->seq_history,"") == 0)
        (void)fprintf(stream,"\n");
 
-    (void)fprintf(stream,"\n    sequence descriptor      : %s\n",hdr->seq_desc);
+    (void)fprintf(stream,"    sequence descriptor      : %s\n",hdr->seq_desc);
     if(strcmp(hdr->seq_desc,"") == 0)
        (void)fprintf(stream,"\n");
 
@@ -804,10 +809,10 @@ _PUBLIC int  hips_f_rd_hdr_info(int       fildes,
 _PUBLIC void hips_wr_hdr_info(char     *application,
                               int              argc,
                               char          *args[],
-                              char     *history_str,
+                              char        *desc_str,
                               hipl_hdr         *hdr)
 
-{   hips_f_wr_hdr_info(1,application,argc,args,history_str,hdr);
+{   hips_f_wr_hdr_info(1,application,argc,args,desc_str,hdr);
 }
 
 
@@ -822,11 +827,11 @@ _PUBLIC void hips_f_wr_hdr_info(int            fildes,
                                 char     *application,
                                 int              argc,
                                 char          *args[],
-                                char     *history_str,
+                                char        *desc_str,
                                 hipl_hdr         *hdr)
 
 {   hips_upd_hdr(hdr,application,argc,args);
-    hips_upd_desc(hdr,history_str);
+    hips_upd_desc(hdr,desc_str);
     hips_fwr_hdr(fildes,hdr);
 }
 
@@ -1077,15 +1082,15 @@ _PUBLIC void hips_to_tiff(_BOOLEAN     do_in_mem,    // Force in memory RGB conv
          size_in_bytes,
          rows_per_strip;
 
-    _BYTE *buf               = (_BYTE *)NULL,
-          **bandbuf          = (_BYTE **)NULL;
+    _BYTE *buf                 = (_BYTE *)NULL,
+          **bandbuf            = (_BYTE **)NULL;
 
     hipl_hdr hdr;
-    TIFF     *tiff_hdr       = (TIFF *)NULL;
+    TIFF     *tiff_hdr         = (TIFF *)NULL;
  
     time_t          clock;
-    struct tm       *tm      = (struct tm *)NULL;
-    struct passwd  *pwd      = (struct passwd *) NULL;
+    struct tm       *tm        = (struct tm *)NULL;
+    struct passwd  *pwd        = (struct passwd *) NULL;
 
     char   datetime[SSIZE]     = "",
            eff_seq_desc[SSIZE] = "";
@@ -1260,7 +1265,7 @@ _PUBLIC void hips_to_tiff(_BOOLEAN     do_in_mem,    // Force in memory RGB conv
 
     if(pixel_layers == 1 || planarconfig == 2)
     {  for(j=0; j<hdr.rows; ++j)
-       {  (void)pups_pipe_read(fdes,buf,cols*size_in_bytes);
+       {  (void)pups_read(fdes,buf,cols*size_in_bytes);
           (void)TIFFWriteScanline(tiff_hdr,(tdata_t)buf,j,0);
        }
     }
@@ -1295,7 +1300,7 @@ _PUBLIC void hips_to_tiff(_BOOLEAN     do_in_mem,    // Force in memory RGB conv
           bandbuf = (_BYTE **)pups_calloc(pixel_layers*rows,sizeof(_BYTE *));
           for(j=0; j<pixel_layers*rows; ++j)
           {  bandbuf[j] = (_BYTE *)pups_calloc(cols,size_in_bytes);
-             (void)pups_pipe_read(fdes,bandbuf[j],cols*size_in_bytes); 
+             (void)pups_read(fdes,bandbuf[j],cols*size_in_bytes); 
           }
 
 
@@ -1367,7 +1372,7 @@ _PUBLIC void hips_to_tiff(_BOOLEAN     do_in_mem,    // Force in memory RGB conv
 
              for(i=0; i<pixel_layers; ++i)
              {  (void)pups_lseek(fdes,pos + i*rows*cols*size_in_bytes + j*cols*size_in_bytes,SEEK_SET);
-                (void)pups_pipe_read(fdes,bandbuf[i],cols*size_in_bytes);
+                (void)pups_read(fdes,bandbuf[i],cols*size_in_bytes);
              }
 
 
@@ -1530,26 +1535,52 @@ _PUBLIC void tiff_to_hips(_BOOLEAN  do_in_mem,    // Force in memory RGNB conver
 
        (void)time(&clock);
        tm = localtime(&clock);
-       (void)sprintf(orig_date,"%4d:%2d:%2d %2d:%2d:%2d",tm->tm_year + 1900,
-                                                             tm->tm_mon + 1,
-                                                                tm->tm_mday,
-                                                                tm->tm_hour,
-                                                                 tm->tm_min,
-                                                                 tm->tm_sec);
+       (void)sprintf(orig_date,"%04d:%02d:%02d %02d:%02d:%02d",tm->tm_year + 1900,
+                                                                   tm->tm_mon + 1,
+                                                                      tm->tm_mday,
+                                                                      tm->tm_hour,
+                                                                       tm->tm_min,
+                                                                       tm->tm_sec);
     }
 
-    hips_init_hdr(&hdr,
-                  orig_name,
-                  "tiff2hips",
-                  pixel_layers,
-                  orig_date,
-                  rows,
-                  cols,
-                  bits_per_pixel,
-                  0,
-                  0,
-                  "",
-                  seq_desc);
+
+    /*------------------------*/
+    /* No sequence descriptor */
+    /*------------------------*/
+
+    if(seq_desc == (char *)NULL)
+    {  hips_init_hdr(&hdr,
+                     orig_name,
+                     "tiff2hips",
+                     pixel_layers,
+                     orig_date,
+                     rows,
+                     cols,
+                     bits_per_pixel,
+                     0,
+                     0,
+                     "",
+                     (char *)NULL);
+    }
+
+
+    /*---------------------*/
+    /* Sequence descriptor */
+    /*---------------------*/
+
+    else
+       hips_init_hdr(&hdr,
+                     orig_name,
+                     "tiff2hips",
+                     pixel_layers,
+                     orig_date,
+                     rows,
+                     cols,
+                     bits_per_pixel,
+                     0,
+                     0,
+                     "",
+                     seq_desc);
 
 
     /*--------------------*/
@@ -1774,7 +1805,7 @@ _PUBLIC void tiff_to_hips(_BOOLEAN  do_in_mem,    // Force in memory RGNB conver
     Check to see that header matches image specifications ...
 -------------------------------------------------------------------------------------*/
 
-_PUBLIC void kontron_read_hdr(int fdes, _BOOLEAN endian_swap, img_hdr_type *img_hdr)
+_PUBLIC void img_read_hdr(int fdes, _BOOLEAN endian_swap, img_hdr_type *img_hdr)
 {
     _USHORT *hd        = (_USHORT *)NULL,
             n_recs;
@@ -1788,8 +1819,8 @@ _PUBLIC void kontron_read_hdr(int fdes, _BOOLEAN endian_swap, img_hdr_type *img_
        return;
     }
 
-    if(pups_pipe_read(fdes,&n_recs,sizeof(_USHORT)) == (-1))
-       pups_error("[kontron_read_hdr] invalid file descriptor\n");
+    if(pups_read(fdes,&n_recs,sizeof(_USHORT)) == (-1))
+       pups_error("[img_read_hdr] invalid file descriptor\n");
 
     if(endian_swap == TRUE)
        (void)swap_bytes(&n_recs);
@@ -1808,9 +1839,9 @@ _PUBLIC void kontron_read_hdr(int fdes, _BOOLEAN endian_swap, img_hdr_type *img_
     /* Read the header */
     /*-----------------*/
 
-    if(pups_pipe_read(fdes,hd,hdr_size) != hdr_size)
+    if(pups_read(fdes,hd,hdr_size) != hdr_size)
     {  (void)close(fdes);
-       pups_error("[kontron_read_hdr] Incorrect number of pixels read\n");
+       pups_error("[img_read_hdr] Incorrect number of pixels read\n");
     }
 
 
@@ -1825,7 +1856,7 @@ _PUBLIC void kontron_read_hdr(int fdes, _BOOLEAN endian_swap, img_hdr_type *img_
 
     if(hd[0]!=0x1247 || hd[1]!=0xb06d)
     {  (void)close(fdes);
-       pups_error("[kontron_read_header] not an IMG file\n");
+       pups_error("[img_read_header] not an IMG file\n");
     }
 
     if(endian_swap == TRUE)
@@ -1850,7 +1881,7 @@ _PUBLIC void kontron_read_hdr(int fdes, _BOOLEAN endian_swap, img_hdr_type *img_
     /*-----------------------------------*/ 
 
     if((int)hd[5] != 1)
-       pups_error("[kontron_read_hdr] can only have single frame images");
+       pups_error("[img_read_hdr] can only have single frame images");
     else
        img_hdr->n_frames = 1;
 
@@ -1894,9 +1925,9 @@ _PUBLIC void kontron_read_hdr(int fdes, _BOOLEAN endian_swap, img_hdr_type *img_
     format ...
 ---------------------------------------------------------------------------*/
 
-_PUBLIC void kontron_write_hdr(int fdes, img_hdr_type *img_hdr)
+_PUBLIC void img_write_hdr(int fdes, _BOOLEAN endian_swap, img_hdr_type *img_hdr)
 
-{   _USHORT  buf[128] = "";
+{   _USHORT  buf[128] = { 0 };
     long int ltmp;
 
 
@@ -1932,6 +1963,18 @@ _PUBLIC void kontron_write_hdr(int fdes, img_hdr_type *img_hdr)
     buf[5] = (short)0x4321;
     buf[6] = (short)1;
 
+
+    /*----------------------------------------------*/
+    /* Swap bytes in header if changing endianicity */
+    /*----------------------------------------------*/
+
+    if(endian_swap == TRUE)
+    {  int i;
+
+       for(i=0; i<7; ++i)
+          swap_bytes(&buf[i]);
+    } 
+  
 
     /*----------------*/
     /* Image datatype */
@@ -1977,7 +2020,7 @@ _PUBLIC void kontron_write_hdr(int fdes, img_hdr_type *img_hdr)
     /*--------------------------*/
 
     if(write(fdes,buf,128L*buf[0]) == (-1))
-       pups_error("[kontron_write_hdr] invalid file descriptor");
+       pups_error("[img_write_hdr] invalid file descriptor");
 
 
     /*-------------------------------------*/
@@ -1997,8 +2040,9 @@ _PUBLIC void kontron_write_hdr(int fdes, img_hdr_type *img_hdr)
     Convert HIPS image to Kontron image ...
 -----------------------------------------------------------------------------*/
 
-_PUBLIC void hips_to_kontron(char *hips_filename,    // HIPS filename
-                             char  *img_filename)    // Kontron filename
+_PUBLIC void hips_to_img(_BOOLEAN endian_swap,   // Big or little endian?
+                         char *hips_filename,    // HIPS filename
+                         char  *img_filename)    // Kontron filename
 
 {   int i,
         j,
@@ -2047,13 +2091,13 @@ _PUBLIC void hips_to_kontron(char *hips_filename,    // HIPS filename
     /*----------------------------------------------*/
 
     if(hdr.pixel_format != PFBYTE)
-       pups_error("[hips_to_kontron] can only convert byte images to Kontron (img) format");
+       pups_error("[hips_to_img] can only convert byte images to Kontron (img) format");
    
     img_hdr.rows = hdr.rows;
     img_hdr.cols = hdr.cols;
 
     if(hdr.num_frame != 1 && hdr.num_frame != 3)
-       pups_error("[hips_to_kontron] can only convert single frame sequence to Kontron (img) format");
+       pups_error("[hips_to_img] can only convert single frame sequence to Kontron (img) format");
     else
        img_hdr.n_frames = 1;
 
@@ -2068,7 +2112,7 @@ _PUBLIC void hips_to_kontron(char *hips_filename,    // HIPS filename
        img_hdr.colour = IMG_GREY;
 
     img_hdr.has_lut = FALSE;
-    (void)kontron_write_hdr(ides,&img_hdr);
+    (void)img_write_hdr(ides,endian_swap,&img_hdr);
 
 
     /*-------------------------------------------*/
@@ -2078,7 +2122,7 @@ _PUBLIC void hips_to_kontron(char *hips_filename,    // HIPS filename
     buf = (_BYTE *)pups_calloc(hdr.cols,sizeof(_BYTE));
     for(i=0; i<hdr.num_frame; ++i)
     {  for(j=0; j<hdr.rows; ++j)
-       {  (void)pups_pipe_read(fdes,buf,hdr.cols*sizeof(_BYTE));
+       {  (void)pups_read(fdes,buf,hdr.cols*sizeof(_BYTE));
           (void)write(ides,buf,hdr.cols*sizeof(_BYTE));
        }
     }
@@ -2096,11 +2140,11 @@ _PUBLIC void hips_to_kontron(char *hips_filename,    // HIPS filename
     Convert IMG image to HIPS image ...
 -----------------------------------------------------------------------------*/
 
-_PUBLIC void kontron_to_hips(_BOOLEAN  endian_swap,    // Big or little endian?
-                             int              argc,    // Argument count
-                             char          *argv[],    // Argument vector
-                             char    *img_filename,    // Kontron filename
-                             char   *hips_filename)    // HIPS filename
+_PUBLIC void img_to_hips(_BOOLEAN  endian_swap,    // Big or little endian?
+                          int              argc,    // Argument count
+                          char          *argv[],    // Argument vector
+                          char    *img_filename,    // Kontron filename
+                          char   *hips_filename)    // HIPS filename
 
 {   int i,
         j,
@@ -2145,8 +2189,8 @@ _PUBLIC void kontron_to_hips(_BOOLEAN  endian_swap,    // Big or little endian?
     if(img_filename == (char *)NULL)
        ides = 0;
     else
-    {  do_close_ides = TRUE;
-       ides          = pups_open(img_filename,1,DEAD);
+    {  do_close_des = TRUE;
+       ides         = pups_open(img_filename,1,DEAD);
     }
 
 
@@ -2154,7 +2198,7 @@ _PUBLIC void kontron_to_hips(_BOOLEAN  endian_swap,    // Big or little endian?
     /* Read IMG header data */ 
     /*----------------------*/
 
-    kontron_read_hdr(ides,endian_swap,&img_hdr);
+    img_read_hdr(ides,endian_swap,&img_hdr);
 
     if(img_hdr.colour == IMG_RGB)
        pixel_layers = 3;
@@ -2190,7 +2234,8 @@ _PUBLIC void kontron_to_hips(_BOOLEAN  endian_swap,    // Big or little endian?
                   img_hdr.cols,
                   8,
                   0,
-                  0,
+                  PFBYTE,
+                  "",
                   "");
 
 
@@ -2209,7 +2254,7 @@ _PUBLIC void kontron_to_hips(_BOOLEAN  endian_swap,    // Big or little endian?
     buf = (_BYTE *)pups_calloc(hdr.cols,sizeof(_BYTE));
     for(i=0; i<hdr.num_frame; ++i)
     {  for(j=0; j<hdr.rows; ++j)
-       {  (void)pups_pipe_read(ides,buf,hdr.cols*sizeof(_BYTE));
+       {  (void)pups_read(ides,buf,hdr.cols*sizeof(_BYTE));
           (void)write(fdes,buf,hdr.cols*sizeof(_BYTE));
        }
     }
@@ -2218,7 +2263,7 @@ _PUBLIC void kontron_to_hips(_BOOLEAN  endian_swap,    // Big or little endian?
     if(do_close_fdes == TRUE)
        (void)pups_close(fdes);
 
-    if(do_close_ides == TRUE)
+    if(do_close_des == TRUE)
        (void)pups_close(ides);
 
     pups_set_errno(OK);

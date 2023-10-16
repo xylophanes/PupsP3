@@ -6,7 +6,7 @@ PC2C \- Preprocessor to convert Dynamic C[D] to PUPS-ANSI C.
 
 .SH SYNOPSIS
 .B pc2c < <D language source> > <PUPS-ANSI C language source> 
->& <log file>
+[2> <log file>]
 .br
 
 .SH DESCRIPTION
@@ -124,6 +124,18 @@ _UNLOCK_THREAD_FMUTEX(mutex): unlock mutex.
 .SH OPTIONS
 
 None.
+.br
+
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
 .br
 
 .SH ENVIRONMENT VARIABLES

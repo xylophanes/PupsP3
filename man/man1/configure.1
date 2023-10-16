@@ -11,7 +11,7 @@ CONFIGURE \- generate makefile from PUPSP3 makefile template (.in) file.
 .I !PUPSP3 architecture type!
 .I !PUPSP3 Makefile template!
 .I [debug]
->& <log file>
+[2> <log file>]
 .br
 
 .SH DESCRIPTION
@@ -52,6 +52,22 @@ as the last argument to
 generates a makefile which will produce executables which can be debugged using
 .I gdb(1)
 .br
+
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
+.br
+
+.SH ENVIRONMENTAL VARIABLES
+none.
+br
 
 .SH COPYRIGHT
 (C) Tumbling Dice Ltd.

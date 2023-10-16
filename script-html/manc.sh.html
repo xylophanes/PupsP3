@@ -1,0 +1,48 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.5.1.src.git/pupscore.src/manc.sh.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="bash">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">#!/bin/bash</span>
+<span class="Comment">#</span>
+<span class="Comment">#-------------------------------------------------------------------------------------</span>
+<span class="Comment">#  Generate stub man page documentation from a C or C++ source using c2man application</span>
+<span class="Comment">#  (C) M.A. O'Neill 2009-2021</span>
+<span class="Comment">#</span>
+<span class="Comment">#  $1 is source file to generate man page from.</span>
+<span class="Comment">#  $2 is name of man page file.</span>
+<span class="Comment">#-------------------------------------------------------------------------------------</span>
+<span class="Comment">#</span>
+
+c2man <span class="Special">-DPSRP_AUTHENTICATE</span> <span class="Special">-DCKPT_SUPPORT</span> <span class="Special">-DSOCKET_SUPPORT</span> <span class="Special">-DSUPPORT_SHARED_HEAPS</span> <span class="Special">-DDLL_SUPPORT</span> <span class="Special">-g</span> <span class="Special">-I</span>. <span class="Special">-I</span>../include.libs <span class="Statement">&lt;</span><span class="PreProc">$1</span> <span class="Statement">&gt;</span><span class="PreProc">$2</span>
+<span class="Statement">exit</span> <span class="Constant">0</span>
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

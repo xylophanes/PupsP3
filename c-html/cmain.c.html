@@ -1,0 +1,144 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/cmain.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Purpose: main for a PUPS/P3 application </span>
+
+<span class="Comment">    Author: M.A. O'Neill</span>
+<span class="Comment">            Tumbling Dice</span>
+<span class="Comment">            Gosforth</span>
+<span class="Comment">            Tyne and Wear</span>
+<span class="Comment">            NE3 4RT</span>
+
+<span class="Comment">    Version: 2.00 </span>
+<span class="Comment">    Dated:   4th January 2022</span>
+<span class="Comment">    E-mail:  mao@tumblingdice.co.uk </span>
+<span class="Comment">-------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="PreProc">#include </span><span class="Constant">&lt;stdio.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/stat.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/types.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;fcntl.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;bubble.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;errno.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;xtypes.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;setjmp.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Local definitions </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define CRC_SIZE </span><span class="Constant">1024</span>
+<span class="PreProc">#define SSIZE    </span><span class="Constant">2048</span><span class="PreProc"> </span>
+
+<span class="PreProc">#ifdef THREAD_SUPPORT</span>
+_PUBLIC pthread_t root_tid;
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> THREAD_SUPPORT </span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Imported variables </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+
+_IMPORT _BOOLEAN initialised;
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Exported vaiables </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span>     _bubble_lang_flag = <span class="Constant">0</span>;
+_PUBLIC <span class="Type">jmp_buf</span> appl_resident_restart;
+
+
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Main entry point </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> main(<span class="Type">int</span> argc, <span class="Type">char</span> **argv, <span class="Type">char</span> **envp)
+{    <span class="Type">int</span>   bin_des   = (-<span class="Constant">1</span>);
+
+     <span class="Type">off_t</span> pos,
+           size;
+
+     <span class="Type">char</span>  **eff_argv  = (<span class="Type">char</span> **)<span class="Constant">NULL</span>,
+           itag[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+     <span class="Type">struct</span> stat stat_buf;
+
+<span class="PreProc">     #ifdef THREAD_SUPPORT</span>
+     _root_tid = pthread_self();
+<span class="PreProc">     #endif</span> <span class="Comment">/*</span><span class="Comment"> THREAD_SUPPORT </span><span class="Comment">*/</span>
+
+    initialised = TRUE;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Re-entry point for a memory resident application </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(setjmp(appl_resident_restart) &gt; <span class="Constant">0</span>)
+    {
+
+       <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Read argument vector from FIFO </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+
+
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Non memory resident process </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">else</span>
+
+       <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Copy argument vector </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+
+       eff_argv = argv;
+
+
+<span class="PreProc">    #ifdef BUBBLE_MEMORY_SUPPORT</span>
+    <span class="Statement">return</span> bubble_target(argc, eff_argv, envp);
+<span class="PreProc">    #else</span>
+    <span class="Statement">return</span> pups_main(argc, eff_argv, envp);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> BUBBLE_MEMORY_SUPPORT </span><span class="Comment">*/</span>
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

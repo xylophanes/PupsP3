@@ -1,16 +1,14 @@
-#-----------------------------------------------------------------------
-# Makefile for cache - utility to perform intelligent write to tee file 
-# M.A. O'Neill, Tumbling Dice 23/01/2018 
-#-----------------------------------------------------------------------
+#-----------------------------------------------
+# Makefile for cache - test fast caching library 
+# M.A. O'Neill, Tumbling Dice 04/01/2022 
+#-----------------------------------------------
 
-CFLAGS		=	-fopenmp -ffast-math TARGET_CFLAGS -DDAISY_TEST
-ARCHDEPCFLAGS	=	TARGET_ARCHDEPCFLAGS -ffast-math -fopenmp
-
-LDFLAGS		=	TARGET_LIBS -lgomp
-ARCHDEPLDFLAGS	=	TARGET_ARCHDEPLDFLAGS
-
-CC		=	gcc
-LIBS		=	../lib.TARGET_LIBEXT/libpups.a ../lib.TARGET_LIBEXT/shgmalloc.o
+CFLAGS		= -fopenmp -ffast-math TARGET_CFLAGS -DDAISY_TEST
+ARCHDEPCFLAGS	= TARGET_ARCHDEPCFLAGS -ffast-math -fopenmp
+LDFLAGS		= TARGET_LIBS -lgomp
+ARCHDEPLDFLAGS	= TARGET_ARCHDEPLDFLAGS
+CC		= gcc
+LIBS		= ../lib.TARGET_LIBEXT/libpups.a ../lib.TARGET_LIBEXT/shgmalloc.o
 
 cache:		cache.o cache.c $(LIBS)
 		$(CC) $(CFLAGS) $(ARCHDEPCFLAGS) cache.o $(LIBS) -o cache $(LDFLAGS) $(ARCHDEPLDFLAGS)
@@ -25,9 +23,23 @@ cache.c:	../include.libs/utils.h    ../include.libs/slotman.h	\
                 ../include.libs/netlib.h   ../include.libs/psrp.h	\
                 ../include.libs/psrp.h     ../include.libs/dll.h
 
+
+#--------------
+# Clean section
+#--------------
+
 .PHONY:		clean
 clean:
+		@rm -f *.o
+
+.PHONY:		cleanall
+cleanall:
 		@rm -f *.o cache
+
+
+#----------------
+# Install section
+#----------------
 
 .PHONY:		install
 install:
@@ -37,6 +49,11 @@ install:
 .PHONY:		unstripped
 unstripped:
 		@cp -f cache TARGET_INSTALL_DIR
+
+
+#--------------
+# Clean section
+#--------------
 
 .PHONY:		uninstall
 uninstall:

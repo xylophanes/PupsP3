@@ -1,0 +1,280 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.5.1.src.git/include.libs/tad.h.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="cpp">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------</span>
+<span class="Comment">    Purpose: header for multithread DLL support library.</span>
+
+<span class="Comment">    Author:  M.A. O'Neill</span>
+<span class="Comment">             Tumbling Dice Ltd</span>
+<span class="Comment">             Gosforth</span>
+<span class="Comment">             Newcastle upon Tyne</span>
+<span class="Comment">             NE3 4RT</span>
+<span class="Comment">             United Kingdom</span>
+
+<span class="Comment">    Version: 2.00 </span>
+<span class="Comment">    Dated:   4th January 2022</span>
+<span class="Comment">    E-mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">-------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="PreProc">#ifndef TAD_H</span>
+<span class="PreProc">#define TAD_H</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Keep c2man happy </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;c2man.h&gt;</span>
+
+<span class="PreProc">#ifndef __C2MAN__</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;me.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;utils.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> __C2MAN__ </span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">*********</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Version </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">*********</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define TADLIB_VERSION            </span><span class="Constant">&quot;2.00&quot;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> String size </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define SSIZE                     </span><span class="Constant">2048</span>
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Max mutexes on PUPS server </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define MAX_MUTEXES               </span><span class="Constant">1024</span><span class="PreProc"> </span>
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Max threads on PUPS server </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define MAX_THREADS               </span><span class="Constant">1024</span><span class="PreProc"> </span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Max mutexes per thread </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define MAX_MUTEXES_PER_THREAD    </span><span class="Constant">512</span><span class="PreProc"> </span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Default stack size (bytes per thread) </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define DEFAULT_STACKSIZE         </span><span class="Constant">32768</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Macros defined by pc2c </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+
+<span class="PreProc">#ifndef PTHREAD_SUPPORT</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Dummy macro definitions -- used if we find ourselves with a pc2c </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> translated code and without POSIX thread support                 </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define _LOCK_THREAD_MUTEX(mutex)              </span><span class="Comment">// Lock mutex</span>
+<span class="PreProc">#define _UNLOCK_THREAD_MUTEX(mutex)            </span><span class="Comment">// Unlock mutex</span>
+<span class="PreProc">#define _DEFINE_FMUTEX(mutex)                  </span><span class="Comment">// Define mutex for current function</span>
+<span class="PreProc">#define _UNDEFINE_FMUTEX(mutex)                </span><span class="Comment">// Undefine mutex</span>
+<span class="PreProc">#define _USE_FMUTEX(mutex)                     </span><span class="Comment">// Use mutex with current function</span>
+<span class="PreProc">#define _INIT_PUPS_THREADS                     </span><span class="Comment">// Initialise PUPS threads</span>
+<span class="PreProc">#define _EXEC_THREAD_ROOT_THREAD_ONLY          </span><span class="Comment">// Excutable by root thread only</span>
+<span class="PreProc">#define _ROOT_THREAD                           </span><span class="Comment">// Root thread function</span>
+<span class="PreProc">#define _THREADSAFE                            </span><span class="Comment">// Thread safe function identifier </span>
+<span class="PreProc">#define PUPSTHREAD_MUTEX_LOCK  (-</span><span class="Constant">1</span><span class="PreProc">)            </span><span class="Comment">// Wait to acquire mutex </span>
+
+
+<span class="PreProc">#else</span>
+
+<span class="PreProc">#ifndef __C2MAN__</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;pthread.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> _+_C2MAN__ </span><span class="Comment">*/</span>
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Macros for use with pc2c and POSIX thread support </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define _LOCK_THREAD_MUTEX(mutex)              pthread_mutex_lock(mutex);</span>
+<span class="PreProc">#define _UNLOCK_THREAD_MUTEX(mutex)            pthread_mutex_unlock(mutex);</span>
+<span class="PreProc">#define _DEFINE_FMUTEX(mutex)                  pthread_mutex_t mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;</span>
+<span class="PreProc">#define _UNDEFINE_FMUTEX(mutex)</span>
+<span class="PreProc">#define _USE_FMUTEX(mutex)</span>
+<span class="PreProc">#define _INIT_PUPS_THREADS                     pupsthread_std_init();</span>
+<span class="PreProc">#define _EXEC_ROOTHREAD_ONLY                   </span><span class="Statement">if</span><span class="PreProc">(pthread_rootthread() == FALSE) </span><span class="Statement">return</span><span class="PreProc">;</span>
+<span class="PreProc">#define _ROOT_THREAD </span>
+<span class="PreProc">#define _THREADSAFE</span>
+<span class="PreProc">#define PUPSTHREAD_MUTEX_LOCK  (-</span><span class="Constant">1</span><span class="PreProc">)            </span><span class="Comment">// Wait to acquire mutex</span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Data structure for thread table </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">typedef</span> <span class="Type">struct</span> {   pthread_t tid;              <span class="Comment">// Thread identifier</span>
+                   <span class="Type">int</span>       tpid;             <span class="Comment">// LWP processor identifier</span>
+                   <span class="Type">char</span>      tfuncname[SSIZE]; <span class="Comment">// Name of threaded function</span>
+                   <span class="Type">char</span>      state[SSIZE];     <span class="Comment">// Thread state (run or stop)</span>
+                   <span class="Type">void</span>      *tfunc;           <span class="Comment">// Address of threaded function</span>
+                   <span class="Type">void</span>      *targs;           <span class="Comment">// Arguments of threaded function</span>
+                   sigset_t  sigmask;          <span class="Comment">// Thread signal mask</span>
+               } ttab_type;
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Variables exported by the multithreaded DLL support library </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef __NOT_LIB_SOURCE__</span>
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Public variables exported by this library (note this is not the best </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> way of exporting the thread table -- it would be better to have all  </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> the manipulation of the thread table done by functions defined here  </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> which are themselves _PUBLIC functions of this library)              </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_EXPORT pthread_mutex_t test_mutex;
+_EXPORT pthread_mutex_t ttab_mutex;           <span class="Comment">// Mutex for thread tab access</span>
+_EXPORT <span class="Type">int</span>             n_threads;            <span class="Comment">// Number of running threads</span>
+_EXPORT ttab_type       ttab[MAX_THREADS];    <span class="Comment">// Thread table </span>
+
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment">  __NOT_LIB_SOURCE__ </span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> PUPS thread manipulation functions </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Comment">// Is caller the root thread?</span>
+_PROTOTYPE _EXPORT _THREADSAFE _BOOLEAN pupsthread_is_root_thread(<span class="Type">void</span>);
+
+<span class="Comment">// Set thread specific errno</span>
+_PROTOTYPE _EXPORT _THREADSAFE <span class="Type">void</span> pupsthread_set_errno(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Get thread specific errno</span>
+_PROTOTYPE _EXPORT _THREADSAFE <span class="Type">int</span> pupsthread_get_errno(<span class="Type">void</span>);
+
+<span class="Comment">// Lock mutex</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pupsthread_mutex_lock(<span class="Type">const</span> pthread_mutex_t *);
+
+<span class="Comment">// Unlock mutex</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pupsthread_mutex_unlock(<span class="Type">const</span> pthread_mutex_t *);
+
+<span class="Comment">// Get tid (thread identifier) associated with given function name */</span>
+_PROTOTYPE _EXPORT pthread_t pupsthread_tfuncname2tid(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Get name of function associated with tid</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pupsthread_tid2tfuncname(<span class="Type">const</span> pthread_t tid, <span class="Type">char</span> *);
+
+<span class="Comment">// Get nid (thread number) associated with given function name</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pupsthread_tfuncname2nid(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Get function name associated with given thread number (nid)</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pupsthread_nid2tfuncname(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span> nid, <span class="Type">char</span> *);
+
+<span class="Comment">// Get thread number (nid) associated with given thread handle</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pupsthread_tid2nid(<span class="Type">const</span> pthread_t);
+
+<span class="Comment">// Translate (LWP) tpid to ttab index (nid)</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pupsthread_tpid2nid(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Translate ttab index (nid) to (LWP) tpid</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pupsthread_nid2tpid(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Get thread handle associated with given thread number (nid)</span>
+_PROTOTYPE _EXPORT pthread_t pupsthread_nid2tid(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Show single entry in thread table</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pupsthread_show_threadinfo(<span class="Type">const</span> <span class="Type">FILE</span> *, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Show contents of thread table</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> pupsthread_show_ttab(<span class="Type">const</span> <span class="Type">FILE</span> *);
+
+<span class="Comment">// Initialised PUPS threads</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> pupsthread_init(<span class="Type">void</span>);
+
+<span class="Comment">// Create a PUPS thread</span>
+_PROTOTYPE _EXPORT pthread_t pupsthread_create(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">void</span> *, <span class="Type">const</span> <span class="Type">void</span> *);
+
+<span class="Comment">// Cancel PUPS thread</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pupsthread_cancel(<span class="Type">const</span> pthread_t);
+
+<span class="Comment">// Stop PUPS thread</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pupsthread_pause(<span class="Type">const</span> pthread_t);
+
+<span class="Comment">// Restart PUPS thread</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pupsthread_cont(<span class="Type">const</span> pthread_t);
+
+<span class="Comment">// Cancel thread</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pupsthread_cancel(<span class="Type">const</span> pthread_t);
+
+<span class="Comment">// Cancel all PUPS threads (except for calling root thread)</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> pupsthread_cancel_all_other_threads(<span class="Type">void</span>);
+
+<span class="Comment">// Exit PUPS thread (terminating it)</span>
+_PROTOTYPE _EXPORT _THREADSAFE <span class="Type">void</span> pupsthread_exit(<span class="Type">void</span> *);
+
+<span class="Comment">// Release mutexes</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> pupsthread_unlock_mutexes(<span class="Type">void</span>);
+
+
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef _CPLUSPLUS</span>
+<span class="PreProc">#   undef  _EXPORT</span>
+<span class="PreProc">#   define _EXPORT </span><span class="Type">extern</span><span class="PreProc"> </span><span class="Constant">&quot;C&quot;</span>
+<span class="PreProc">#else</span>
+<span class="PreProc">#   undef  _EXPORT                                                              </span>
+<span class="PreProc">#   define _EXPORT </span><span class="Type">extern</span><span class="PreProc">                                   </span>
+<span class="PreProc">#endif</span>
+
+<span class="PreProc">#endif</span>  <span class="Comment">/*</span><span class="Comment"> TAD_H </span><span class="Comment">*/</span>
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

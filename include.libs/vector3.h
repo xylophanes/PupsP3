@@ -8,9 +8,9 @@
              NE3 4RT
              United Kingdom
 
-     E-mail:  mao@tumblingdice.co.uk
-     Date:    24th January 2018 
      Version: 2.09 
+     Date:    4th January 2022
+     E-mail:  mao@tumblingdice.co.uk
 ------------------------------------------------------------------------------*/
 
 #ifndef VECTOR3_H

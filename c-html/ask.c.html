@@ -1,0 +1,551 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/ask.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------------------</span>
+<span class="Comment">    Purpose: get textual infomation for use in shell script.</span>
+
+<span class="Comment">    Author:  M.A. O'Neill</span>
+<span class="Comment">             Tumbling Dice Ltd</span>
+<span class="Comment">             Gosforth</span>
+<span class="Comment">             Newcastle upon Tyne</span>
+<span class="Comment">             NE3 4RT</span>
+<span class="Comment">             United Kingdom</span>
+
+<span class="Comment">    Version: 4.04 </span>
+<span class="Comment">    Dated:   24th May 2022 </span>
+<span class="Comment">    E-mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">-----------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;stdio.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;bsd/string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;signal.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stdlib.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/types.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/stat.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/wait.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;fcntl.h&gt;</span>
+
+<span class="PreProc">#ifdef HAVE_READLINE</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;readline/readline.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;readline/history.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> HAVE_READLINE </span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;xtypes.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Version </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define ASK_VERSION     </span><span class="Constant">&quot;4.04&quot;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> String size </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define SSIZE           </span><span class="Constant">2048</span><span class="PreProc"> </span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> History </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define ASK_MAX_HISTORY </span><span class="Constant">1024</span>
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------------------</span>
+<span class="Comment">    Variables which are local to this application ...</span>
+<span class="Comment">----------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> child_pid = (-<span class="Constant">1</span>);
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------------------</span>
+<span class="Comment">    Look for the occurence of string s2 within string s1 ...</span>
+<span class="Comment">----------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _BOOLEAN strin(<span class="Type">char</span> *s1, <span class="Type">char</span> *s2)
+
+{   <span class="Type">int</span> i,
+        cmp_size,
+        chk_limit;
+
+    <span class="Statement">if</span>(strlen(s2) &gt; strlen(s1))
+       <span class="Statement">return</span>(FALSE);
+
+    chk_limit = strlen(s1) - strlen(s2) + <span class="Constant">1</span>;
+    cmp_size  = strlen(s2);
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;chk_limit; ++i)
+       <span class="Statement">if</span>(strncmp(&amp;s1[i],s2,cmp_size) == <span class="Constant">0</span>)
+          <span class="Statement">return</span>(TRUE);
+
+    <span class="Statement">return</span>(FALSE);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------------------</span>
+<span class="Comment">    Test for empty string (contains only whitespace and control chars) ...</span>
+<span class="Comment">----------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _BOOLEAN strempty(<span class="Type">const</span> <span class="Type">char</span> *s)
+
+{   <span class="Type">size_t</span> i,
+           size;
+
+    <span class="Statement">if</span>(s == (<span class="Type">const</span> <span class="Type">char</span> *)<span class="Constant">NULL</span>)
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+
+    size = strlen(s);
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Do not process empnty string </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(size &gt; <span class="Constant">0</span>)
+    {  <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;strlen(s); ++i)
+       {  <span class="Statement">if</span>(s[i] != <span class="Constant">' '</span> &amp;&amp; s[i] != <span class="Special">'\n'</span>)
+             <span class="Statement">return</span>(FALSE);
+       }
+
+       <span class="Statement">return</span>(TRUE);
+    }
+
+    <span class="Statement">return</span>(-<span class="Constant">1</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to copy a string filtering out characters which have been</span>
+<span class="Comment">    marked as excluded ...</span>
+<span class="Comment">--------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">size_t</span> strexccpy(<span class="Type">const</span> <span class="Type">char</span> *s1, <span class="Type">char</span> *s2, <span class="Type">const</span> <span class="Type">char</span> *ex_ch)
+
+{   <span class="Type">size_t</span> i,
+           j,
+           k,
+           size_1,
+           size_2;
+
+    <span class="Statement">if</span>(s1    == (<span class="Type">const</span> <span class="Type">char</span> *)<span class="Constant">NULL</span>    ||
+       s2    == (<span class="Type">char</span> *)      <span class="Constant">NULL</span>    ||
+       ex_ch == (<span class="Type">const</span> <span class="Type">char</span> *)<span class="Constant">NULL</span>     )
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+
+    size_1 = strlen(s1);
+    size_2 = strlen(ex_ch);
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Do not process empty string </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(size_1 &gt; <span class="Constant">0</span> &amp;&amp; size_2 &gt; <span class="Constant">0</span>)
+    {
+       j = <span class="Constant">0</span>;
+       <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;size_1; ++i)
+       {   <span class="Statement">for</span>(k=<span class="Constant">0</span>; k&lt;size_2; ++k)
+           {  <span class="Statement">if</span>(s1[i] == ex_ch[k])
+                 <span class="Statement">goto</span> exclude;
+           }
+
+           s2[j] = s1[i];
+           ++j;
+
+<span class="Statement">exclude</span>:   <span class="Statement">continue</span>;
+
+       }
+
+       <span class="Statement">return</span>(j);
+    }
+
+    <span class="Statement">return</span>(-<span class="Constant">1</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------------------</span>
+<span class="Comment">    Handler for signals ...</span>
+<span class="Comment">----------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> exit_handler(<span class="Type">int</span> signum)
+
+{   <span class="Statement">if</span>(child_pid != (-<span class="Constant">1</span>))
+       (<span class="Type">void</span>)kill(child_pid,<span class="Constant">SIGTERM</span>);
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+    (<span class="Type">void</span>)exit(<span class="Constant">255</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------------------</span>
+<span class="Comment">    Test to see if string contains spaces ...</span>
+<span class="Comment">----------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> no_space(<span class="Type">char</span> *s)
+
+{   <span class="Type">int</span> i,
+        cnt = <span class="Constant">0</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Strip leading spaces </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;strlen(s); ++i)
+    {  <span class="Statement">if</span>(s[i] == <span class="Constant">' '</span> || s[i] == <span class="Special">'\t'</span>)
+          ++cnt;
+       <span class="Statement">else</span>
+          <span class="Statement">break</span>;
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Strip trailing spaces </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=strlen(s); i &gt;= <span class="Constant">0</span>; --i)
+    {  <span class="Statement">if</span>(s[i] == <span class="Constant">' '</span> || s[i] == <span class="Special">'\t'</span> || s[i] == <span class="Special">'\n'</span> || s[i] == <span class="Special">'\0'</span>)
+          s[i] = <span class="Special">'\0'</span>;
+       <span class="Statement">else</span>
+          <span class="Statement">break</span>;
+    }
+
+    <span class="Statement">for</span>(i=cnt; i&lt;strlen(s); ++i)
+    {  <span class="Statement">if</span>(s[i] == <span class="Constant">' '</span> || s[i] == <span class="Special">'\t'</span>)
+	  <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    <span class="Statement">return</span>(cnt);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------------------</span>
+<span class="Comment">    Main entry point ...</span>
+<span class="Comment">----------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> main(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   <span class="Type">int</span>  ret,
+         in,
+         status,
+         out,
+         err,
+         prompt_index                    = <span class="Constant">1</span>;
+
+    _BOOLEAN looper                      = TRUE;
+
+    <span class="Type">char</span>     value[SSIZE]                = <span class="Constant">&quot;&quot;</span>,
+             ask_history[SSIZE]          = <span class="Constant">&quot;&quot;</span>,
+             ask_history_pathname[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+;
+    <span class="Type">FILE</span>     *out_stream                 = (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>;
+
+    <span class="Statement">if</span>(argc == <span class="Constant">2</span> &amp;&amp; (strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;-usage&quot;</span>) == <span class="Constant">0</span> || strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;-help&quot;</span>) == <span class="Constant">0</span>))
+    {
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">ask version </span><span class="Special">%s</span><span class="Constant">, (C) Tumbling Dice 2003-2022 (built </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,ASK_VERSION,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;ASK is free software, covered by the GNU General Public License, and you are</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;welcome to change it and/or distribute copies of it under certain conditions.</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;See the GPL and LGPL licences at www.gnu.org for further details</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;ASK comes with ABSOLUTELY NO WARRANTY</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">Usage: ask [-help | -usage] | [-clear] [payload] [prompt]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       exit(<span class="Constant">1</span>);
+    }
+
+
+
+<span class="PreProc">    #ifdef HAVE_READLINE</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Get (readline) history if any </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)snprintf(ask_history_pathname,SSIZE,<span class="Constant">&quot;/tmp/ask.</span><span class="Special">%d</span><span class="Constant">.history&quot;</span>,getuid());
+
+    <span class="Statement">if</span>(argc == <span class="Constant">2</span> &amp;&amp; strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;-clear&quot;</span>) == <span class="Constant">0</span>)
+    {  (<span class="Type">void</span>)unlink(ask_history_pathname);
+       prompt_index = <span class="Constant">2</span>;
+    }
+
+    (<span class="Type">void</span>)snprintf(ask_history,SSIZE,ask_history_pathname);
+    <span class="Statement">if</span>(access(ask_history,F_OK | R_OK) != (-<span class="Constant">1</span>))
+    {  (<span class="Type">void</span>)history_truncate_file(ask_history,ASK_MAX_HISTORY);
+       (<span class="Type">void</span>)read_history(ask_history);
+    }
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> HAVE_READLINE </span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(isatty(<span class="Constant">0</span>) != <span class="Constant">1</span>)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;ask: standard I/O is not associated with a terminal</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       exit(<span class="Constant">255</span>);
+    }
+
+    <span class="Statement">if</span>(argc == <span class="Constant">3</span>)
+       prompt_index = <span class="Constant">2</span>;
+
+    out = dup(<span class="Constant">1</span>);
+
+    (<span class="Type">void</span>)close(<span class="Constant">0</span>);
+    (<span class="Type">void</span>)open(<span class="Constant">&quot;/dev/tty&quot;</span>,<span class="Constant">0</span>);
+
+    (<span class="Type">void</span>)close(<span class="Constant">1</span>);
+    (<span class="Type">void</span>)open(<span class="Constant">&quot;/dev/tty&quot;</span>,<span class="Constant">1</span>);
+
+    (<span class="Type">void</span>)close(<span class="Constant">2</span>);
+    (<span class="Type">void</span>)open(<span class="Constant">&quot;/dev/tty&quot;</span>,<span class="Constant">1</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Start payload command which runs while this application is active. </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> This gets arount some problems with signal propagation by shells.  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)signal(<span class="Constant">SIGHUP</span>, (<span class="Type">void</span> *)&amp;exit_handler);
+    (<span class="Type">void</span>)signal(<span class="Constant">SIGQUIT</span>,(<span class="Type">void</span> *)&amp;exit_handler);
+    (<span class="Type">void</span>)signal(<span class="Constant">SIGINT</span>, (<span class="Type">void</span> *)exit_handler);
+    (<span class="Type">void</span>)signal(<span class="Constant">SIGTERM</span>,(<span class="Type">void</span> *)&amp;exit_handler);
+
+    <span class="Statement">if</span>(argc == <span class="Constant">3</span>)
+    {  <span class="Statement">if</span>((child_pid = fork()) == <span class="Constant">0</span>)
+       {  <span class="Type">char</span> payload_cmd[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+
+          <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Payload will exec with child_pid </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+          (<span class="Type">void</span>)snprintf(payload_cmd,SSIZE,<span class="Constant">&quot;exec </span><span class="Special">%s</span><span class="Constant"> &amp;&quot;</span>,argv[<span class="Constant">1</span>]);
+          (<span class="Type">void</span>)execlp(<span class="Constant">&quot;sh&quot;</span>,<span class="Constant">&quot;sh&quot;</span>,<span class="Constant">&quot;-c&quot;</span>,payload_cmd,(<span class="Type">char</span> *)<span class="Constant">0</span>);
+
+          _exit(<span class="Constant">0</span>);
+       }
+       <span class="Statement">else</span>
+       {
+
+          <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Wait for child to avoid zombies </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+
+          (<span class="Type">void</span>)waitpid(child_pid,&amp;status,<span class="Constant">0</span>);
+
+          prompt_index = <span class="Constant">2</span>;
+       }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Main loop of the ask command </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+
+    out_stream = fdopen(out,<span class="Constant">&quot;w&quot;</span>);
+    <span class="Statement">do</span> {
+
+            <span class="Type">char</span> prompt[SSIZE]       = <span class="Constant">&quot;&quot;</span>,
+		 history_line[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+<span class="PreProc">	    #ifdef HAVE_READLINE  </span>
+            <span class="Statement">if</span>(argc == <span class="Constant">1</span> || argv[prompt_index] == (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+            {  (<span class="Type">void</span>)strlcpy(value,readline(<span class="Constant">&quot;ask&gt; &quot;</span>),SSIZE);
+               <span class="Statement">if</span>(strempty(value) == FALSE &amp;&amp; strexccpy(value,history_line,<span class="Constant">&quot;</span><span class="Special">\t</span><span class="Constant">&quot;</span>) &gt; <span class="Constant">0</span>)
+                  (<span class="Type">void</span>)add_history(history_line);
+            }
+            <span class="Statement">else</span>
+            {
+
+	       <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+	       <span class="Comment">/*</span><span class="Comment"> If prompt starts with a '^' character </span><span class="Comment">*/</span>
+	       <span class="Comment">/*</span><span class="Comment"> insert newline                        </span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+	       <span class="Statement">if</span>(argv[prompt_index][<span class="Constant">0</span>] == <span class="Constant">'^'</span>)
+               {  <span class="Type">unsigned</span> <span class="Type">int</span> i,
+		               cnt  = <span class="Constant">0</span>;
+
+		  <span class="Type">char</span> space[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+		  <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment"> Whitespace filler </span><span class="Comment">*/</span>
+		  <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+		  <span class="Statement">for</span>(i=<span class="Constant">1</span>; i&lt;strlen(argv[prompt_index]); ++i)
+	          {  <span class="Statement">if</span>(argv[prompt_index][i] == <span class="Constant">' '</span>)
+	             {  space[cnt] = <span class="Constant">' '</span>;
+		        ++cnt;
+	             }
+		     <span class="Statement">else</span>
+                     {  space[cnt] = <span class="Special">'\0'</span>;
+		        <span class="Statement">break</span>;
+                     }
+                  }
+
+                  (<span class="Type">void</span>)snprintf(prompt,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Special">\n</span><span class="Special">%s</span><span class="Constant">&gt; &quot;</span>,(<span class="Type">char</span> *)&amp;argv[prompt_index][<span class="Constant">1</span>],space);
+	       }
+	       <span class="Statement">else</span>
+                  (<span class="Type">void</span>)snprintf(prompt,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">&gt; &quot;</span>,argv[prompt_index]);
+
+               (<span class="Type">void</span>)strlcpy(value,readline(prompt),SSIZE);
+               <span class="Statement">if</span>(strempty(value) == FALSE &amp;&amp; strexccpy(value,history_line,<span class="Constant">&quot;</span><span class="Special">\t</span><span class="Constant">&quot;</span>) &gt; <span class="Constant">0</span>)
+                  (<span class="Type">void</span>)add_history(history_line);
+            }
+<span class="PreProc">            #else</span>
+            <span class="Statement">if</span>(argc == <span class="Constant">1</span>)
+               (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;ask&gt; &quot;</span>);
+            <span class="Statement">else</span>
+            {
+
+	       <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+	       <span class="Comment">/*</span><span class="Comment"> If prompt starts with a '^' character </span><span class="Comment">*/</span>
+	       <span class="Comment">/*</span><span class="Comment"> insert newline                        </span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+	       <span class="Statement">if</span>(argv[prompt_index][<span class="Constant">0</span>] == <span class="Constant">'^'</span>)
+               {  <span class="Type">unsigned</span> <span class="Type">int</span> i,
+		               cnt  = <span class="Constant">0</span>;
+
+		  <span class="Type">char</span> space[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+		  <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment"> Whitespace filler </span><span class="Comment">*/</span>
+		  <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+		  <span class="Statement">for</span>(i=<span class="Constant">1</span>; i&lt;strlen(argv[prompt_index]); ++i)
+	          {  <span class="Statement">if</span>(argv[prompt_index][i] == <span class="Constant">' '</span>)
+	             {  space[cnt] = <span class="Constant">' '</span>;
+		        ++cnt;
+	             }
+		     <span class="Statement">else</span>
+                     {  space[cnt] = <span class="Special">'\0'</span>;
+		        <span class="Statement">break</span>;
+                     }
+                  }
+
+                  (<span class="Type">void</span>)snprintf(prompt,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Special">\n</span><span class="Special">%s</span><span class="Constant">&gt;&quot;</span>,(<span class="Type">char</span> *)&amp;argv[prompt_index][<span class="Constant">1</span>],space);
+	       }
+	       <span class="Statement">else</span>
+                  (<span class="Type">void</span>)snprintf(prompt,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">&gt; &quot;</span>,argv[prompt_index]);
+
+	       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">&quot;</span>,prompt);
+               (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+            }
+
+            (<span class="Type">void</span>)fgets(value,<span class="Constant">256</span>,<span class="Constant">stdin</span>);
+<span class="PreProc">            #endif</span> <span class="Comment">/*</span><span class="Comment"> HAVE_READLINE </span><span class="Comment">*/</span>
+
+
+            <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment"> Value of !ls tells ask to list the contents </span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment"> of the current working directory            </span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+
+            looper  = TRUE;
+            <span class="Statement">if</span>(strin(value,<span class="Constant">&quot;!&quot;</span>) == TRUE)
+            {  <span class="Type">int</span>  n_spaces              = <span class="Constant">0</span>;
+               <span class="Type">char</span> ls_output_buffer[<span class="Constant">256</span>] = <span class="Constant">&quot;&quot;</span>;
+
+               <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment"> Skip any leading spaces </span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+
+               <span class="Statement">while</span>(value[n_spaces] == <span class="Constant">' '</span>)
+                    ++n_spaces;
+
+               (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+               (<span class="Type">void</span>)fflush(<span class="Constant">stdout</span>);
+
+               (<span class="Type">void</span>)system((<span class="Type">char</span> *)&amp;value[n_spaces+<span class="Constant">1</span>]);
+
+               (<span class="Type">void</span>)fprintf(<span class="Constant">stdout</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+               (<span class="Type">void</span>)fflush(<span class="Constant">stdout</span>);
+            }
+
+
+            <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment"> Ask only expects one parameter </span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+
+            <span class="Statement">else</span>
+	    {  <span class="Statement">if</span>((ret = no_space(value)) &gt;= <span class="Constant">0</span>)
+               {  (<span class="Type">void</span>)fprintf(out_stream,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,(<span class="Type">char</span> *)&amp;value[ret]);
+                  (<span class="Type">void</span>)fflush(out_stream);
+
+                  looper = FALSE;
+               }
+
+
+               <span class="Comment">/*</span><span class="Comment">-------</span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment"> Error </span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment">-------</span><span class="Comment">*/</span>
+
+	       <span class="Statement">else</span>
+               {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;ask: expecting one argument only</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+	          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+	       }
+            }
+       } <span class="Statement">while</span>(looper == TRUE);
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Save readline history </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">    #ifdef HAVE_READLINE</span>
+    (<span class="Type">void</span>)write_history(ask_history);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> HAVE_READLINE </span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)fclose(out_stream);
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

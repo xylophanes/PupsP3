@@ -1,0 +1,89 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/statd.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Statement { color: #af5f00; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Get size of directory in bytes </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">off_t</span> pus_dsize(<span class="Type">char</span> *directory_name)
+{
+    <span class="Type">off_t</span> directory_size = <span class="Constant">0</span>;
+    <span class="Type">DIR</span>   *pDir          = (<span class="Type">DIR</span> *)<span class="Constant">NULL</span>;
+
+    <span class="Statement">if</span> ((pDir = opendir(directory_name)) != (<span class="Type">DIR</span> *)<span class="Constant">NULL</span>)
+    {
+        <span class="Type">struct</span> dirent *pDirent = (<span class="Type">struct</span> dirent *)<span class="Constant">NULL</span>;
+
+        <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+	<span class="Comment">/*</span><span class="Comment"> Get size of files in directory </span><span class="Comment">*/</span>
+	<span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+
+        <span class="Statement">while</span> ((pDirent = readdir(pDir)) != (<span class="Type">struct</span> dirent *)<span class="Constant">NULL</span>)
+        {
+            <span class="Type">char</span>   buffer[PATH_MAX + <span class="Constant">1</span>] = <span class="Constant">&quot;&quot;</span>;
+            <span class="Type">struct</span> stat file_stat;
+
+            (<span class="Type">void</span>)strcat(strcat(strcpy(buffer, directory_name), <span class="Constant">&quot;/&quot;</span>), pDirent-&gt;d_name);
+
+            <span class="Statement">if</span> (stat(buffer, &amp;file_stat) == <span class="Constant">0</span>)
+                directory_size += file_stat.st_blocks * S_BLKSIZE;
+
+
+	    <span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+	    <span class="Comment">/*</span><span class="Comment"> Sub-directory ? </span><span class="Comment">*/</span>
+	    <span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+
+            <span class="Statement">if</span> (pDirent-&gt;d_type == DT_DIR)
+            {
+
+	       <span class="Comment">/*</span><span class="Comment">-----</span><span class="Comment">*/</span>
+	       <span class="Comment">/*</span><span class="Comment"> Yes </span><span class="Comment">*/</span>
+	       <span class="Comment">/*</span><span class="Comment">-----</span><span class="Comment">*/</span>
+
+	       <span class="Statement">if</span> (strcmp(pDirent-&gt;d_name, <span class="Constant">&quot;.&quot;</span>) != <span class="Constant">0</span> &amp;&amp; strcmp(pDirent-&gt;d_name, <span class="Constant">&quot;..&quot;</span>) != <span class="Constant">0</span>)
+                    directory_size += pups_dsize(buffer);
+            }
+        }
+
+        (<span class="Type">void</span>) closedir(pDir);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Size of directory tree </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> in bytes               </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">return</span>(directory_size);
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

@@ -1,4 +1,4 @@
-.TH ARSE 1 "17 Feburary 2009" "PUPSP3 commands" "PUPSP3 commands"
+.TH ARSE 1 "17th Feburary 2009" "PUPSP3 commands" "PUPSP3 commands"
 
 .SH NAME
 ARSE \- creates an interactive anus (arse hole) from which data for attached payload pipeline is is emitted.  
@@ -18,7 +18,7 @@ ARSE \- creates an interactive anus (arse hole) from which data for attached pay
 .B -hole
 .I arse hole FIFO name
 !
->& <log file>
+[2> <log file>]
 .br
 
 .SH DESCRIPTION
@@ -67,6 +67,19 @@ and
 .I arse hole FIFO name
 specifies the name of the anus (arse hole) FIFO for this instance of
 .I arse(1)
+.br
+
+
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
 .br
 
 

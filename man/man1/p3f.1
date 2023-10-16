@@ -21,7 +21,7 @@ P3F \- test to see if process is PUPS/P3 aware.
 |
 .B <PID name>
 !
->& <log file>
+[>2 <log file>]
 .br
 
 .SH DESCRIPTION
@@ -68,6 +68,19 @@ means error condition. If
 flag is set the error condition will be reported to
 .I standard error.
 .br
+
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
+.br
+
 .SH ENVIRONMENT VARIABLES
 None.
 .br

@@ -1,0 +1,147 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/testdll.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------------</span>
+<span class="Comment">    Purpose: small DLL to exercise the dynamic loading features of</span>
+<span class="Comment">             the PUPS system</span>
+
+<span class="Comment">     Author:  M.A. O'Neill</span>
+<span class="Comment">              Tumbling Dice Ltd</span>
+<span class="Comment">              Gosforth</span>
+<span class="Comment">              Newcastle upon Tyne</span>
+<span class="Comment">              NE3 4RT</span>
+<span class="Comment">              United Kingdom</span>
+
+<span class="Comment">    Version: 2.00</span>
+<span class="Comment">    Dated:   4th January 2022</span>
+<span class="Comment">    E-mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">---------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;stdio.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;xtypes.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;psrp.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> PSRP communication channels - required if exported function </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> are dynamic PSRP action functions                           </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_IMPORT <span class="Type">FILE</span> *psrp_in,
+             *psrp_out;
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Each dynamic function must supply four pieces of information. Firstly the   </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> _BOOLEAN &lt;func&gt;_is_orifice = TRUE tells the binder (in dlllib) that this    </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> function may be legitimately exported. The &lt;func&gt;_prototype is used to make </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> sure that importing process and the exportying DLL can do dynamic type      </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> checking (in the future, they may also do type broking aka CORBA). The      </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> &lt;func&gt;_info pointer optionally points to a string which supplies user       </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> readable information about the exported function.                           </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">                                                                             </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> The last piece of information supplied is, of course, the function itself.  </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Mark this function as being orifice exportable </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC _BOOLEAN phlegm_is_orifice = TRUE;
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Optional information field </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">char</span>     *phlegm_info      = <span class="Constant">&quot;Mucus by any other name&quot;</span>;
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Prototype for function (note this is a PSRP dynamic function prototype) </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">char</span>     *phlegm_prototype = <span class="Constant">&quot;int (*)(int, char *[])&quot;</span>;
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> The function actually exported </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> phlegm(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;phlegm</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(psrp_out);
+
+    <span class="Statement">return</span>(PSRP_OK);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Mark this function as being orifice exportable </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC _BOOLEAN sickbag_is_orifice = TRUE;
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Optional information field </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">char</span>     *sickbag_info      = <span class="Constant">&quot;The sickbag&quot;</span>;
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Prototype for function (note this is a PSRP dynamic function prototype) </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">char</span>     *sickbag_prototype = <span class="Constant">&quot;int (*)(int, char *[])&quot;</span>;
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> The function actually exported </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> sickbag(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;sickbag</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(psrp_out);
+
+    <span class="Statement">return</span>(PSRP_OK);
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

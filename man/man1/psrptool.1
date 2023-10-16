@@ -16,7 +16,7 @@ PSRPTOOL \- Starts PSRP client in a new window.
 .I font size
 ][
 .I [PSRP client command tail] 
->& <log file>
+[2> <log file>]
 .br
 
 .SH DESCRIPTION
@@ -59,6 +59,22 @@ used by the (slaved)
 .I xterm(1)
 shell tool. Defaults to
 .B 6 point.
+.br
+
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
+.br
+
+.SH ENVIRONMENTAL VARAIBLES
+none.
 .br
 
 .SH COPYRIGHT

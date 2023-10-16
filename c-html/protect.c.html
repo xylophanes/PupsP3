@@ -1,0 +1,1435 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/protect.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Purpose: Multi file homeostat </span>
+
+<span class="Comment">    Author:  M.A. O'Neill</span>
+<span class="Comment">             Tumbling Dice Ltd</span>
+<span class="Comment">             Gosforth</span>
+<span class="Comment">             Newcastle upon Tyne</span>
+<span class="Comment">             NE3 4RT</span>
+<span class="Comment">             United Kingdom</span>
+
+<span class="Comment">    Version: 2.00 </span>
+<span class="Comment">    Dated:   26th January 2022</span>
+<span class="Comment">    E-mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">-------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="PreProc">#include </span><span class="Constant">&lt;me.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;utils.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;netlib.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;psrp.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/stat.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/types.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;errno.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;dirent.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;signal.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;vstamp.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;time.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Version of protect </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define PROTECT_VERSION    </span><span class="Constant">&quot;2.00&quot;</span>
+
+<span class="PreProc">#ifdef BUBBLE_MEMORY_SUPPORT</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;bubble.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> BUBBLE_MEMORY_SUPPORT </span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Get signal mapping appropriate to OS and hardware architecture </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define __DEFINE__</span>
+<span class="PreProc">#if defined(I386) || defined(X86_64)</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sig.linux.x86.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> I386 || X86_64 </span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef ARMV6L</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sig.linux.arm.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> ARMV6L </span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef ARMV7L</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sig.linux.arm.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> ARMV7L </span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef AARCH64</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sig.linux.arm.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> AARCH64 </span><span class="Comment">*/</span>
+<span class="PreProc">#undef __DEFINE__</span>
+
+
+<span class="PreProc">#define DELAY </span><span class="Constant">100000</span>
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Get application information for slot manager ...</span>
+<span class="Comment">------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Slot information function </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> protect_slot(<span class="Type">int</span> level)
+{   (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;int [PUPS/PSRP] application protect </span><span class="Special">%s</span><span class="Constant">: [ANSI C, PUPS/PSRP]</span><span class="Special">\n</span><span class="Constant">&quot;</span>,PROTECT_VERSION);
+
+    <span class="Statement">if</span>(level &gt; <span class="Constant">1</span>)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;(C) 2005-2022 Tumbling Dice</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Author: M.A. O'Neill</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;File and directory protector (built </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+    }
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Application usage function </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> protect_usage()
+
+{   (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;!-principal &lt;file/directory to protect&gt;!</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[-defer:FALSE]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[-lifetime &lt;lifetime in minutes&gt;]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[-key &lt;key (for files in directory):all&gt;]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[&gt;&amp; &lt;ASCII log file&gt;]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Signals</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;SIGINIT SIGCHAN SIGPSRP: Process status [PSRP] request (protocol </span><span class="Special">%4.2F</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,PSRP_PROTOCOL_VERSION);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;SIGCLIENT: tell client server is about to segment</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+
+<span class="PreProc">    #ifdef CRUI_SUPPORT</span>
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;SIGCHECK SIGRESTART:      checkpoint and restart signals</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> CRIU_SUPPORT </span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;SIGALIVE: check for existence of client on signal dispatch host</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+}
+
+
+<span class="PreProc">#ifdef SLOT</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;slotman.h&gt;</span>
+_EXTERN <span class="Type">void</span> (* SLOT)() __attribute__ ((aligned(<span class="Constant">16</span>))) = protect_slot;
+_EXTERN <span class="Type">void</span> (* USE )() __attribute__ ((aligned(<span class="Constant">16</span>))) = protect_usage;
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> SLOT </span><span class="Comment">*/</span>
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Application build date ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_EXTERN <span class="Type">char</span> appl_build_time[SSIZE] = <span class="Constant">__TIME__</span>;
+_EXTERN <span class="Type">char</span> appl_build_date[SSIZE] = <span class="Constant">__DATE__</span>;
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Defines which are private to this application ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define FOREVER               </span><span class="Constant">1</span>
+<span class="PreProc">#define DEFAULT_LIFETIME      </span><span class="Constant">600</span><span class="PreProc"> </span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Functions which are private to this application ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Comment">// Exit function</span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> exit_func(<span class="Type">char</span> *arg);
+
+<span class="Comment">// Set/display principal (protected object)</span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> set_principal(<span class="Type">int</span>, <span class="Type">char</span> *[]);
+
+<span class="Comment">// Set/display protection lifetime (in seconds)</span>
+_PRIVATE <span class="Type">int</span> set_lifetime(<span class="Type">int</span>, <span class="Type">char</span> *[]);
+
+<span class="Comment">// Set/display file protection key</span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> set_key(<span class="Type">int</span>, <span class="Type">char</span> *[]);
+
+<span class="Comment">// Protect a file (in principal directory)</span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> myprotect(<span class="Type">int</span>, <span class="Type">char</span> *[]);
+
+<span class="Comment">// Unprotect a file (in principal directory)</span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> myunprotect(<span class="Type">int</span>, <span class="Type">char</span> *[]);
+
+<span class="Comment">// Show list of protected file (in principal directory)</span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> show_protected_files(<span class="Type">int</span>, <span class="Type">char</span> *[]);
+
+<span class="Comment">// PSRP process status display dispatch function</span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> psrp_process_status(<span class="Type">int</span>, <span class="Type">char</span> *[]);
+
+<span class="Comment">// Scan directory (for new files to protect)</span>
+_PROTOTYPE _PRIVATE <span class="Type">void</span> scan_directory(<span class="Type">char</span> *);
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Variables which are private to this module ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+                                                     <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+_PRIVATE _BOOLEAN is_directory      = FALSE;         <span class="Comment">/*</span><span class="Comment"> TRUE if we are protecting a directory of files </span><span class="Comment">*/</span>
+_PRIVATE _BOOLEAN do_defer          = FALSE;         <span class="Comment">/*</span><span class="Comment"> TRUE if we have deferred protection enabled    </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">char</span> file_name[SSIZE]      = <span class="Constant">&quot;&quot;</span>;            <span class="Comment">/*</span><span class="Comment"> Name of file/directory to be protected         </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">char</span> key[SSIZE]            = <span class="Constant">&quot;all&quot;</span>;         <span class="Comment">/*</span><span class="Comment"> Key (for matching directory files)             </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">char</span> prot_pathname[SSIZE]  = <span class="Constant">&quot;&quot;</span>;            <span class="Comment">/*</span><span class="Comment"> Protection flag (for protected directory)      </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">char</span> pathname[SSIZE]       = <span class="Constant">&quot;&quot;</span>;            <span class="Comment">/*</span><span class="Comment"> Pathname                                       </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">struct</span> stat stat_buf;                       <span class="Comment">/*</span><span class="Comment"> File (inode) statistics buffer                 </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>  n_files               = <span class="Constant">0</span>;             <span class="Comment">/*</span><span class="Comment"> Number of protected files (in directory)       </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span> fdes                   = <span class="Constant">0</span>;             <span class="Comment">/*</span><span class="Comment"> Number of times principal attacked             </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">time_t</span> lifetime            = FOREVER;       <span class="Comment">/*</span><span class="Comment"> Protection lifetime                            </span><span class="Comment">*/</span>
+                                                     <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef HYDRA_OF_LERNA</span>
+                                                     <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span> child_pid;                              <span class="Comment">/*</span><span class="Comment"> PID of child bud process                       </span><span class="Comment">*/</span>
+                                                     <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> HYDRA_OF_LERNA </span><span class="Comment">*/</span>
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Software I.D. tag (used if CKPT support enabled to discard stale dynamic</span>
+<span class="Comment">    checkpoint files) ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define VTAG  </span><span class="Constant">3748</span>
+<span class="Type">extern</span> <span class="Type">int</span> appl_vtag = VTAG;
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Main - decode command tail then interpolate using parameters supplied by user ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> pups_main(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   <span class="Type">DIR</span>           *dirp       = (<span class="Type">DIR</span> *)<span class="Constant">NULL</span>;
+    <span class="Type">struct</span> dirent *next_entry = (<span class="Type">struct</span> dirent *)<span class="Constant">NULL</span>;
+
+    <span class="Type">time_t</span> tdum,
+           start_time;
+
+
+    _IMMORTAL _BOOLEAN entered = FALSE;
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Ignore any clients who may be trying to attach to us until we are intialised </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    psrp_ignore_requests();
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Use a hydra (of lerna) algorithm to protect our thread of execution </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="PreProc">    #ifdef HYDRA_OF_LERNA</span>
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Make sure that we run in our own session (so parent pups_exit() </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> will not cause child to exit                                    </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)setsid();
+
+<span class="Statement">refork</span>:
+
+    <span class="Statement">if</span>((child_pid = pups_fork(FALSE,FALSE)) == <span class="Constant">0</span>)
+    {
+
+       <span class="Comment">/*</span><span class="Comment">---------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> We are a child -- wait for our parent to die      </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> before activating ourself and protecting our file </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">---------------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">while</span>(getppid() != <span class="Constant">1</span>)
+            (<span class="Type">void</span>)pups_usleep(DELAY);
+
+       <span class="Statement">if</span>(appl_verbose == TRUE)
+       {  (<span class="Type">void</span>)strdate(date);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): parent terminated [central head crushed -- regrowing] (reforking)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                          date,appl_name,appl_pid,appl_host,appl_owner);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Our parent is gone - take over from it </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+       entered = FALSE;
+       <span class="Statement">goto</span> refork;
+    }
+
+    start_time = time(&amp;tdum);
+    <span class="Statement">if</span>(entered != TRUE)
+    {  <span class="Statement">while</span>(TRUE)
+       {   <span class="Statement">if</span>(lifetime != FOREVER)
+           {  <span class="Statement">if</span>(time(&amp;tdum) - start_time &gt; lifetime)
+              { <span class="Statement">if</span>(appl_verbose == TRUE)
+                {  (<span class="Type">void</span>)strdate(date);
+                   (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): protection lifetime expired -- exiting</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                        date,appl_name,appl_pid,appl_host,appl_owner);
+                   (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+                   pups_exit(<span class="Constant">0</span>);
+                }
+              }
+           }
+
+
+           <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> Check to see if we have any new entries in directory -- if they match </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> key we will have to protect them                                      </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+           <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> Check to see if we have any new entries in directory -- if they match </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> key we will have to protect them                                      </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+           <span class="Statement">if</span>(is_directory == TRUE)
+              scan_directory(file_name);
+
+
+           <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> Check to see if child has been terminated -- if it has create a new child </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> to take its place                                                         </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+           <span class="Statement">if</span>(kill(child_pid,SIGALIVE) == (-<span class="Constant">1</span>))
+           {  <span class="Statement">if</span>(appl_verbose == TRUE)
+              {  (<span class="Type">void</span>)strdate(date);
+                 (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): child terminated [head crushed -- regrowing] (reforking)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                        date,appl_name,appl_pid,appl_host,appl_owner);
+                 (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+              }
+
+              <span class="Statement">goto</span> refork;
+           }
+
+           (<span class="Type">void</span>)pups_usleep(DELAY);
+       }
+    }
+    <span class="Statement">else</span>
+       entered = TRUE;
+<span class="PreProc">    #endif</span>  <span class="Comment">/*</span><span class="Comment"> HYDRA_OF_LERNA </span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Get standard items form the command tail ...</span>
+<span class="Comment">------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    pups_std_init(TRUE,
+                  &amp;argc,
+                  PROTECT_VERSION,
+                  <span class="Constant">&quot;M.A. O'Neill&quot;</span>,
+                  <span class="Constant">&quot;protect&quot;</span>,
+                  <span class="Constant">&quot;2022&quot;</span>,
+                  argv);
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Application specific arguments should go here       </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> embryo.c has some examples of how it should be done </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((ptr = pups_locate(&amp;init,<span class="Constant">&quot;principal&quot;</span>,&amp;argc,args,<span class="Constant">0</span>)) !=  NOT_FOUND)
+    {  <span class="Statement">if</span>(strccpy(file_name,pups_str_dec(&amp;ptr,&amp;argc,args)) == (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+          pups_error(<span class="Constant">&quot;protect: expecting name of file/directory to protect&quot;</span>);
+    }
+    <span class="Statement">else</span>
+       pups_error(<span class="Constant">&quot;protect: expecting name of file/directory to protect&quot;</span>);
+
+    <span class="Statement">if</span>(pups_locate(&amp;init,<span class="Constant">&quot;defer&quot;</span>,&amp;argc,args,<span class="Constant">0</span>) !=  NOT_FOUND)
+       do_defer = TRUE;
+
+    <span class="Statement">if</span>(appl_verbose == TRUE)
+    {  (<span class="Type">void</span>)strdate(date);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): deferred protection enabled</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                 date,appl_name,appl_pid,appl_host,appl_owner);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    }
+
+    <span class="Statement">if</span>((ptr = pups_locate(&amp;init,<span class="Constant">&quot;lifetime&quot;</span>,&amp;argc,args,<span class="Constant">0</span>)) !=  NOT_FOUND)
+    {  <span class="Statement">if</span>((lifetime = pups_i_dec(&amp;ptr,&amp;argc,args)) == (<span class="Type">int</span>)INVALID_ARG)
+          pups_error(<span class="Constant">&quot;[protect] expecting lifetime (in seconds)&quot;</span>);
+
+       <span class="Statement">if</span>(appl_verbose == TRUE)
+       {  (<span class="Type">void</span>)strdate(date);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): principal will be protected for </span><span class="Special">%d</span><span class="Constant"> seconds</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                          date,appl_name,appl_pid,appl_host,appl_owner,lifetime);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+    }
+
+    <span class="Statement">if</span>((ptr = pups_locate(&amp;init,<span class="Constant">&quot;key&quot;</span>,&amp;argc,args,<span class="Constant">0</span>)) !=  NOT_FOUND)
+    {  <span class="Statement">if</span>(strccpy(key,pups_str_dec(&amp;ptr,&amp;argc,args)) == (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+          pups_error(<span class="Constant">&quot;[protect] expecting key (for directory-file protection)&quot;</span>);
+    }
+
+    <span class="Statement">if</span>(appl_verbose == TRUE)
+    {  (<span class="Type">void</span>)strdate(date);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): key (for directory-file protection) is </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n</span><span class="Constant">&quot;</span>,
+                                               date,appl_name,appl_pid,appl_host,appl_owner,key);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Complain about any unparsed arguments </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pups_t_arg_errs(argd,args);
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Initialise the PSRP system here using psrp_init()       </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Note any PSRP dyanmic load option you do not want       </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> is simply excluded from the first set of OR'd args      </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> If you don't want homeostasis protection for the        </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> server messaging channels omit PSRP_HOMEOSTATIC_STREAMS </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+
+    psrp_init(PSRP_STATIC_FUNCTION | PSRP_STATIC_DATABAG | PSRP_HOMEOSTATIC_STREAMS,<span class="Constant">NULL</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Load default dispatch table for this applications (loads    </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> dynamic objects which have been previously attached to this </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> application and remembers any aliases we may have had for   </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> dispatch table objects                                      </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)psrp_attach_static_function(<span class="Constant">&quot;protect&quot;</span>,  (<span class="Type">void</span> *)&amp;myprotect);
+    (<span class="Type">void</span>)psrp_attach_static_function(<span class="Constant">&quot;unprotect&quot;</span>,(<span class="Type">void</span> *)&amp;myunprotect);
+    (<span class="Type">void</span>)psrp_attach_static_function(<span class="Constant">&quot;protstat&quot;</span>, (<span class="Type">void</span> *)&amp;show_protected_files);
+    (<span class="Type">void</span>)psrp_attach_static_function(<span class="Constant">&quot;key&quot;</span>,      (<span class="Type">void</span> *)&amp;set_key);
+    (<span class="Type">void</span>)psrp_attach_static_function(<span class="Constant">&quot;lifetime&quot;</span>, (<span class="Type">void</span> *)&amp;set_lifetime);
+    (<span class="Type">void</span>)psrp_attach_static_function(<span class="Constant">&quot;status&quot;</span>,   (<span class="Type">void</span> *)&amp;psrp_process_status);
+    (<span class="Type">void</span>)psrp_attach_static_function(<span class="Constant">&quot;principal&quot;</span>,(<span class="Type">void</span> *)&amp;set_principal);
+    (<span class="Type">void</span>)psrp_load_default_dispatch_table();
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Once we have initialised the PSRP system, attached any dynamic objects   </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> and loaded any alias tables lets tell the world we are open for business </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    psrp_accept_requests();
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Any payload functions which attach or create objects like files and persistent heaps   </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> should register an exit function here, so that any temporary objects are destroyed     </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> by pups_exit()                                                                         </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pups_register_exit_f(<span class="Constant">&quot;exitfunc&quot;</span>,(<span class="Type">void</span> *)&amp;exit_func,(<span class="Type">char</span> *)<span class="Constant">NULL</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Payload of application here </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Do we have a directory </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((dirp = opendir(file_name)) != (<span class="Type">DIR</span> *)<span class="Constant">NULL</span>)
+    {  <span class="Type">char</span> hname[SSIZE]    = <span class="Constant">&quot;&quot;</span>,
+            pathname[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+       <span class="Statement">if</span>(do_defer == TRUE)
+          pups_error(<span class="Constant">&quot;[protect] cannot have deferred protection for directories&quot;</span>);
+
+
+       <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Do we have a protect process already protecting this directory? If so  </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> it will create &lt;file_name&gt;.prot in the same branch of the file tree as </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> the directory entry.                                                   </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+       (<span class="Type">void</span>)snprintf(prot_pathname,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">.prot&quot;</span>,file_name);
+
+       <span class="Statement">if</span>(access(prot_pathname,F_OK | R_OK | W_OK) != (-<span class="Constant">1</span>))
+       {  <span class="Type">FILE</span> *stream = (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>;
+          <span class="Type">int</span>  prot_pid;
+          <span class="Type">char</span> prot_host[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+          stream = fopen(prot_pathname,<span class="Constant">&quot;r&quot;</span>);
+          (<span class="Type">void</span>)fscanf(stream,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">&quot;</span>,&amp;prot_pid);
+
+          <span class="Statement">if</span>(kill(SIGALIVE,prot_pid) != (-<span class="Constant">1</span>))
+          {  <span class="Statement">if</span>(appl_verbose == TRUE)
+             {  (<span class="Type">void</span>)strdate(date);
+                (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): directory </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> is already protected</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                          date,appl_name,appl_pid,appl_host,appl_owner,file_name);
+                (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+             }
+          }
+
+          pups_exit(<span class="Constant">255</span>);
+       }
+       <span class="Statement">else</span>
+       {  <span class="Type">FILE</span> *stream = (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>;
+
+
+          <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Create a protection flag file</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+
+          (<span class="Type">void</span>)pups_creat(prot_pathname,<span class="PreProc">0</span><span class="Constant">600</span>);
+          stream = pups_fopen(prot_pathname,<span class="Constant">&quot;w&quot;</span>,LIVE);
+
+          (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,appl_pid);
+          (<span class="Type">void</span>)fflush(stream);
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Yes we do - set up protection for each file in the directory </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------</span><span class="Comment">*/</span>
+
+       is_directory = TRUE;
+
+       <span class="Statement">while</span>((next_entry = readdir(dirp)) != (<span class="Type">struct</span> dirent *)<span class="Constant">NULL</span>)
+       {
+
+           <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> If any of the files in the directory are themselves a directory </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> they cannot be protected.                                       </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+           (<span class="Type">void</span>)snprintf(pathname,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/</span><span class="Special">%s</span><span class="Constant">&quot;</span>,file_name,next_entry-&gt;d_name);
+           (<span class="Type">void</span>)stat(pathname,&amp;stat_buf);
+
+           <span class="Statement">if</span>((S_ISREG(stat_buf.st_mode) || S_ISFIFO(stat_buf.st_mode))        &amp;&amp;
+              strcmp(next_entry-&gt;d_name,<span class="Constant">&quot;.&quot;</span>)    != <span class="Constant">0</span>                           &amp;&amp;
+              strcmp(next_entry-&gt;d_name,<span class="Constant">&quot;..&quot;</span>)   != <span class="Constant">0</span>                           &amp;&amp;
+              strin(next_entry-&gt;d_name,<span class="Constant">&quot;uprot&quot;</span>) == FALSE                       &amp;&amp;
+              (strin(next_entry-&gt;d_name,key) == TRUE  || strcmp(key,<span class="Constant">&quot;all&quot;</span>) == <span class="Constant">0</span>))
+           {   (<span class="Type">void</span>)snprintf(pathname,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/</span><span class="Special">%s</span><span class="Constant">&quot;</span>,file_name,next_entry-&gt;d_name);
+
+<span class="PreProc">               #ifndef USE_PROTECT</span>
+               fdes = pups_open(pathname,<span class="Constant">0</span>,LIVE);
+               (<span class="Type">void</span>)pups_creator(fdes);
+<span class="PreProc">               #endif</span> <span class="Comment">/*</span><span class="Comment"> USE_PROTECT </span><span class="Comment">*/</span>
+
+               (<span class="Type">void</span>)snprintf(hname,SSIZE,<span class="Constant">&quot;default_fd_homeostat: </span><span class="Special">%s</span><span class="Constant">&quot;</span>,pathname);
+
+<span class="PreProc">               #ifdef USE_PROTECT</span>
+               fdes = pups_protect(pathname,hname,(<span class="Type">void</span> *)&amp;pups_default_fd_homeostat);
+<span class="PreProc">               #else</span>
+               (<span class="Type">void</span>)pups_fd_alive(fdes,hname,(<span class="Type">void</span> *)&amp;pups_default_fd_homeostat);
+<span class="PreProc">               #endif</span> <span class="Comment">/*</span><span class="Comment"> USE_PROTECT </span><span class="Comment">*/</span>
+
+               ++n_files;
+
+              <span class="Statement">if</span>(appl_verbose == TRUE)
+              {  (<span class="Type">void</span>)strdate(date);
+                 (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): protecting file </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> (in directory </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                               date,appl_name,appl_pid,appl_host,appl_owner,next_entry-&gt;d_name,file_name);
+                 (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+              }
+           }
+        }
+
+        (<span class="Type">void</span>)closedir(dirp);
+    }
+    <span class="Statement">else</span>
+    {  <span class="Type">char</span> hname[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+
+       <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Wait for file which is to be protected to be created </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(access(file_name,F_OK | R_OK | W_OK) == (-<span class="Constant">1</span>))
+       {  <span class="Statement">if</span>(do_defer == FALSE)
+              pups_exit(<span class="Constant">255</span>);
+          <span class="Statement">else</span>
+          {  <span class="Statement">if</span>(appl_verbose == TRUE)
+             {  (<span class="Type">void</span>)strdate(date);
+                (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): waiting for file </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n</span><span class="Constant">&quot;</span>,
+                            date,appl_name,appl_pid,appl_host,appl_owner,file_name);
+                (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+             }
+
+             <span class="Statement">while</span>(access(file_name,F_OK | R_OK | W_OK) == (-<span class="Constant">1</span>))
+                   pups_usleep(DELAY);
+
+             <span class="Statement">if</span>(appl_verbose == TRUE)
+             {  (<span class="Type">void</span>)strdate(date);
+                (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): file </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> now created</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                            date,appl_name,appl_pid,appl_host,appl_owner,file_name);
+                (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+             }
+          }
+       }
+
+       fdes = pups_open(file_name,<span class="Constant">0</span>,LIVE);
+       (<span class="Type">void</span>)pups_creator(fdes);
+       (<span class="Type">void</span>)snprintf(hname,SSIZE,<span class="Constant">&quot;default_fd_homeostat: </span><span class="Special">%s</span><span class="Constant">&quot;</span>,file_name);
+       (<span class="Type">void</span>)pups_fd_alive(fdes,hname,&amp;pups_default_fd_homeostat);
+
+       <span class="Statement">if</span>(appl_verbose == TRUE)
+       {  (<span class="Type">void</span>)strdate(date);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): protecting file </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n</span><span class="Constant">&quot;</span>,
+                     date,appl_name,appl_pid,appl_host,appl_owner,file_name);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> simply wait until protected files are tampered with (until terminated) </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    start_time = time(&amp;tdum);
+    <span class="Statement">while</span>(TRUE)
+    {   <span class="Statement">if</span>(lifetime != FOREVER)
+        {  <span class="Statement">if</span>(time(&amp;tdum) - start_time &gt; lifetime)
+           {  <span class="Statement">if</span>(appl_verbose == TRUE)
+              {  (<span class="Type">void</span>)strdate(date);
+                 (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): protection lifetime expired -- exiting</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                      date,appl_name,appl_pid,appl_host,appl_owner);
+                 (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+              }
+
+              pups_exit(<span class="Constant">0</span>);
+           }
+        }
+
+
+        <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> Check to see if we have any new entries in directory -- if they match </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> key we will have to protect them                                      </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+        <span class="Statement">if</span>(is_directory == TRUE)
+           scan_directory(file_name);
+
+
+<span class="PreProc">        #ifdef HYDRA_OF_LERNA</span>
+        <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------</span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> Check to see if child has been terminated -- if it has create a new child </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> to take its place                                                         </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+        <span class="Statement">if</span>(kill(child_pid,SIGALIVE) == (-<span class="Constant">1</span>))
+        {  <span class="Statement">if</span>(appl_verbose == TRUE)
+           {  (<span class="Type">void</span>)strdate(date);
+              (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): child terminated [head crushed -- regrowing] (reforking)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                     date,appl_name,appl_pid,appl_host,appl_owner);
+              (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+           }
+
+           <span class="Statement">goto</span> refork;
+        }
+<span class="PreProc">        #endif</span> <span class="Comment">/*</span><span class="Comment"> HYDRA_OF_LERNA </span><span class="Comment">*/</span>
+
+        (<span class="Type">void</span>)pups_usleep(DELAY);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Exit nicely clearing up and mess we have made </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+
+    pups_exit(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Display process status (to attached PSRP client process) ...</span>
+<span class="Comment">----------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> psrp_process_status(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{
+   (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    Protect (version </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,PROTECT_VERSION);
+   (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    ======================</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+   (<span class="Type">void</span>)fflush(psrp_out);
+
+<span class="PreProc">#if defined(CRIIU_SUPPORT)</span>
+    (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    Binary is Criu enabled (checkpointable)</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+<span class="PreProc">#endif</span>  <span class="Comment">/*</span><span class="Comment"> CRIU_SUPPORT </span><span class="Comment">*/</span>
+
+   <span class="Statement">if</span>(is_directory == TRUE)
+   {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    Protecting directory </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant"> files)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,file_name,n_files);
+      (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    </span><span class="Special">\&quot;</span><span class="Constant">protstat</span><span class="Special">\&quot;</span><span class="Constant"> PSRP option shows list of protected filenames</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+   }
+   <span class="Statement">else</span>
+   {  <span class="Type">int</span> lost_cnt;
+
+      lost_cnt = pups_lost(fdes);
+
+      <span class="Statement">if</span>(lost_cnt &gt; <span class="Constant">0</span>)
+      {  <span class="Statement">if</span>(lost_cnt == <span class="Constant">1</span>)
+            (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    Protecting regular file </span><span class="Special">%s</span><span class="Constant"> (attacked once)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,file_name);
+         <span class="Statement">else</span>
+            (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    Protecting regular file </span><span class="Special">%s</span><span class="Constant"> (attacked </span><span class="Special">%d</span><span class="Constant"> times)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,file_name,lost_cnt);
+      }
+      <span class="Statement">else</span>
+         (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    Protecting regular file </span><span class="Special">%s</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,file_name);
+   }
+
+   (<span class="Type">void</span>)fflush(psrp_out);
+
+<span class="PreProc">   #ifdef HYDRA_OF_LERNA</span>
+   (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    Thread of execution protected by (bi-process) hydra-of-lerna algorithm</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+   (<span class="Type">void</span>)fflush(psrp_out);
+<span class="PreProc">   #endif</span> <span class="Comment">/*</span><span class="Comment"> HYDRA_OF_LERNA </span><span class="Comment">*/</span>
+
+   <span class="Statement">return</span>(PSRP_OK);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to automically extended protection to key-match files which have been added to</span>
+<span class="Comment">    the protected directory ...</span>
+<span class="Comment">-----------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> scan_directory(<span class="Type">char</span> *dir_name)
+
+{   <span class="Type">int</span> i,
+        index,
+        n_used                = <span class="Constant">0</span>,
+        n_alloc               = <span class="Constant">0</span>;
+
+    <span class="Type">DIR</span>           *dirp       = (<span class="Type">DIR</span> *)<span class="Constant">NULL</span>;
+    <span class="Type">struct</span> dirent *next_entry = (<span class="Type">struct</span> dirent *)<span class="Constant">NULL</span>;
+    <span class="Type">char</span>          **nlist     = (<span class="Type">char</span> **)<span class="Constant">NULL</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check that we can open the (protection) directory </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((dirp = opendir(dir_name)) == (<span class="Type">DIR</span> *)<span class="Constant">NULL</span>)
+    {  <span class="Statement">if</span>(appl_verbose == TRUE)
+       {  (<span class="Type">void</span>)strdate(date);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): cannot open (protection) directory (</span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                date,appl_name,appl_pid,appl_host,appl_owner,file_name);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+          pups_exit(<span class="Constant">255</span>);
+       }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Build snapshot of files in the protection directory </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">while</span>((next_entry = readdir(dirp)) != (<span class="Type">struct</span> dirent *)<span class="Constant">NULL</span>)
+    {
+
+        <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> If any of the files in the directory are themselves a directory </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> they cannot be protected.                                       </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+        (<span class="Type">void</span>)snprintf(pathname,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/</span><span class="Special">%s</span><span class="Constant">&quot;</span>,file_name,next_entry-&gt;d_name);
+        (<span class="Type">void</span>)stat(pathname,&amp;stat_buf);
+
+        <span class="Statement">if</span>((S_ISREG(stat_buf.st_mode) || S_ISFIFO(stat_buf.st_mode))    &amp;&amp;
+           strcmp(next_entry-&gt;d_name,<span class="Constant">&quot;.&quot;</span>)    != <span class="Constant">0</span>                       &amp;&amp;
+           strcmp(next_entry-&gt;d_name,<span class="Constant">&quot;..&quot;</span>)   != <span class="Constant">0</span>                       &amp;&amp;
+           strin(next_entry-&gt;d_name,<span class="Constant">&quot;uprot&quot;</span>) == FALSE                    )
+        {
+
+           <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> Allocate space for name table </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+
+           <span class="Statement">if</span>(n_used % ALLOC_QUANTUM == <span class="Constant">0</span>)
+           {  n_alloc += ALLOC_QUANTUM;
+              nlist = (<span class="Type">char</span> **)pups_calloc(n_alloc,<span class="Statement">sizeof</span>(<span class="Type">char</span> *));
+           }
+
+           nlist[n_used] = (<span class="Type">char</span> *)pups_malloc(SSIZE*<span class="Statement">sizeof</span>(<span class="Type">char</span>));
+           (<span class="Type">void</span>)strlcpy(nlist[n_used++],pathname,SSIZE);
+        }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Ok - we have the current list of files in the protection directory -- unprotect </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> any time expired files and add any new files to the list                        </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;n_used; ++i)
+    {  <span class="Type">struct</span> stat statbuf;
+
+
+       <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Do we have any new files? </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>((index = pups_get_ftab_index_by_name(nlist[i])) == (-<span class="Constant">1</span>) &amp;&amp; (strin(nlist[i],key) == TRUE || strcmp(key,<span class="Constant">&quot;all&quot;</span>) == <span class="Constant">0</span>))
+       {  <span class="Type">int</span> fdes = (-<span class="Constant">1</span>);
+          <span class="Type">char</span> hname[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+          fdes = pups_open(nlist[i],<span class="Constant">0</span>,LIVE);
+          (<span class="Type">void</span>)pups_creator(fdes);
+          (<span class="Type">void</span>)snprintf(hname,SSIZE,<span class="Constant">&quot;default_fd_homeostat: </span><span class="Special">%s</span><span class="Constant">&quot;</span>,nlist[i]);
+          (<span class="Type">void</span>)pups_fd_alive(fdes,hname,&amp;pups_default_fd_homeostat);
+
+          ++n_files;
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">---------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> If the key has been changed revoke the protection </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> of those file which do not match new key          </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">---------------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(index != (-<span class="Constant">1</span>) &amp;&amp; strin(ftab[index].fname,key) == FALSE &amp;&amp; strcmp(key,<span class="Constant">&quot;all&quot;</span>) != <span class="Constant">0</span>)
+       {  <span class="Statement">if</span>(appl_verbose == TRUE)
+          {  (<span class="Type">void</span>)strdate(date);
+             (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): protection revoked for file </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n</span><span class="Constant">&quot;</span>,
+                            date,appl_name,appl_pid,appl_host,appl_owner,ftab[index].fname);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+          }
+
+          (<span class="Type">void</span>)pupsighold(<span class="Constant">SIGALRM</span>,TRUE);
+          (<span class="Type">void</span>)pups_fd_dead(ftab[index].fdes);
+          (<span class="Type">void</span>)pups_close(ftab[index].fdes);
+          (<span class="Type">void</span>)pupsigrelse(<span class="Constant">SIGALRM</span>);
+
+          --n_files;
+       }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Free memory </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;n_alloc; ++i)
+       (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)nlist[i]);
+
+    (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)nlist);
+    (<span class="Type">void</span>)closedir(dirp);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Add files (in directory) to protected list ...</span>
+<span class="Comment">------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> myprotect(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   <span class="Type">int</span>  index,
+         fdes = (-<span class="Constant">1</span>);
+
+    <span class="Type">char</span> hname[SSIZE]    = <span class="Constant">&quot;&quot;</span>,
+         pathname[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check command parameters </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(argc == <span class="Constant">1</span>)
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">usage: protect &lt;filename&gt;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+    <span class="Statement">if</span>(is_directory == TRUE)
+       (<span class="Type">void</span>)snprintf(pathname,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/</span><span class="Special">%s</span><span class="Constant">&quot;</span>,file_name,argv[<span class="Constant">1</span>]);
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)strlcpy(pathname,argv[<span class="Constant">1</span>],SSIZE);
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Block SIGALRM while we unprotect the file </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pupsighold(<span class="Constant">SIGALRM</span>,TRUE);
+
+    <span class="Statement">if</span>(access(pathname,F_OK | R_OK | W_OK) == (-<span class="Constant">1</span>))
+    {  <span class="Type">char</span> uprot_pathname[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+       (<span class="Type">void</span>)snprintf(uprot_pathname,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">.uprot&quot;</span>,pathname);
+       <span class="Statement">if</span>(access(uprot_pathname,F_OK | R_OK | W_OK) == (-<span class="Constant">1</span>))
+       {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">file </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> does not exist</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,pathname);
+          (<span class="Type">void</span>)fflush(psrp_out);
+
+
+          <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> We can now release signal </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+          (<span class="Type">void</span>)pupsigrelse(<span class="Constant">SIGALRM</span>);
+
+          <span class="Statement">return</span>(PSRP_OK);
+       }
+       <span class="Statement">else</span>
+          (<span class="Type">void</span>)rename(uprot_pathname,pathname);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Is the file  we wish to protect already protected? </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((index = pups_get_ftab_index_by_name(pathname)) != (-<span class="Constant">1</span>))
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">file </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> is already protected</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,pathname);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+
+       <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> We can now release signal </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+       (<span class="Type">void</span>)pupsigrelse(<span class="Constant">SIGALRM</span>);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Add file to list of protected files </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)snprintf(hname,SSIZE,<span class="Constant">&quot;default_fd_homeostat: </span><span class="Special">%s</span><span class="Constant">&quot;</span>,pathname);
+
+<span class="PreProc">    #ifdef USE_PROTECT</span>
+    fdes = protect((<span class="Type">FILE</span> *)<span class="Constant">NULL</span>,pathname,hname,(<span class="Type">void</span> *)&amp;pups_default_fd_homeostat);
+<span class="PreProc">    #else</span>
+    fdes = pups_open(pathname,<span class="Constant">2</span>,LIVE);
+    (<span class="Type">void</span>)pups_creator(fdes);
+    (<span class="Type">void</span>)pups_fd_alive(fdes,hname,&amp;pups_default_fd_homeostat);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> USE_PROTECT </span><span class="Comment">*/</span>
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> We can now release signal </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pupsigrelse(<span class="Constant">SIGALRM</span>);
+
+    (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">file </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> (homeostatically) protected</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,pathname);
+    (<span class="Type">void</span>)fflush(psrp_out);
+
+    <span class="Statement">if</span>(appl_verbose == TRUE)
+    {  (<span class="Type">void</span>)strdate(date);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): file </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> (homeostatically) protected</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                    date,appl_name,appl_pid,appl_host,appl_owner,pathname);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    }
+
+
+    <span class="Statement">return</span>(PSRP_OK);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Revoke protection (on currently protected file) ...</span>
+<span class="Comment">------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> myunprotect(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   <span class="Type">int</span> index;
+
+    <span class="Type">char</span> pathname[SSIZE]  = <span class="Constant">&quot;&quot;</span>,
+         upathname[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check command parameters </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(argc == <span class="Constant">1</span>)
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">usage: protect &lt;filename&gt;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+    <span class="Statement">if</span>(is_directory == TRUE)
+       (<span class="Type">void</span>)snprintf(pathname,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/</span><span class="Special">%s</span><span class="Constant">&quot;</span>,file_name,argv[<span class="Constant">1</span>]);
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)strlcpy(pathname,argv[<span class="Constant">1</span>],SSIZE);
+
+    <span class="Statement">if</span>(access(pathname,F_OK | R_OK | W_OK) == (-<span class="Constant">1</span>))
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">unprotect: file </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> does not exist</span><span class="Special">\n</span><span class="Constant">&quot;</span>,pathname);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+    <span class="Statement">if</span>((index = pups_get_ftab_index_by_name(pathname)) == (-<span class="Constant">1</span>))
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">unprotect: file </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> is not protected</span><span class="Special">\n</span><span class="Constant">&quot;</span>,pathname);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Block SIGALRM while we unprotect the file </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pupsighold(<span class="Constant">SIGALRM</span>,TRUE);
+
+    <span class="Statement">if</span>(appl_verbose == TRUE)
+    {  (<span class="Type">void</span>)strdate(date);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): protection revoked for file </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n</span><span class="Constant">&quot;</span>,
+                               date,appl_name,appl_pid,appl_host,appl_owner,pathname);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    }
+
+<span class="PreProc">    #ifdef USE_PROTECT</span>
+    (<span class="Type">void</span>)unprotect(ftab[index].fdes);
+<span class="PreProc">    #else</span>
+    (<span class="Type">void</span>)pups_fd_dead(ftab[index].fdes);
+    (<span class="Type">void</span>)pups_close(ftab[index].fdes);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> USE_PROTECT </span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(is_directory == TRUE)
+    {  (<span class="Type">void</span>)snprintf(upathname,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">.uprot&quot;</span>,pathname);
+       (<span class="Type">void</span>)rename(pathname,upathname);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> We can now release signal </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pupsigrelse(<span class="Constant">SIGALRM</span>);
+
+    (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">protection revoked for file </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n\n</span><span class="Constant">&quot;</span>,pathname);
+    (<span class="Type">void</span>)fflush(psrp_out);
+
+    <span class="Statement">return</span>(PSRP_OK);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Show files which are currently protected ...</span>
+<span class="Comment">------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> show_protected_files(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   <span class="Type">int</span> cnt = <span class="Constant">0</span>;
+
+    <span class="Type">DIR</span>           *dirp       = (<span class="Type">DIR</span> *)<span class="Constant">NULL</span>;
+    <span class="Type">struct</span> dirent *next_entry = (<span class="Type">struct</span> dirent *)<span class="Constant">NULL</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check comamnd parameters </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(argc != <span class="Constant">1</span>)
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">usage: show</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+    <span class="Statement">if</span>(is_directory == FALSE)
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;show: </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> is not a directory (cannot show files)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,file_name);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+    (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    Protected files in directory </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n\n</span><span class="Constant">&quot;</span>,file_name);
+    (<span class="Type">void</span>)fflush(psrp_out);
+
+    dirp = opendir(file_name);
+    <span class="Statement">while</span>((next_entry = readdir(dirp)) != (<span class="Type">struct</span> dirent *)<span class="Constant">NULL</span>)
+    {
+
+        <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> If any of the files in the directory are themselves a directory </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> they cannot be protected.                                       </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+        (<span class="Type">void</span>)snprintf(pathname,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/</span><span class="Special">%s</span><span class="Constant">&quot;</span>,file_name,next_entry-&gt;d_name);
+        (<span class="Type">void</span>)stat(pathname,&amp;stat_buf);
+
+        <span class="Statement">if</span>((S_ISREG(stat_buf.st_mode) || S_ISFIFO(stat_buf.st_mode))        &amp;&amp;
+            strcmp(next_entry-&gt;d_name,<span class="Constant">&quot;.&quot;</span>)    != <span class="Constant">0</span>                          &amp;&amp;
+            strcmp(next_entry-&gt;d_name,<span class="Constant">&quot;..&quot;</span>)   != <span class="Constant">0</span>                          &amp;&amp;
+            strin(next_entry-&gt;d_name,<span class="Constant">&quot;uprot&quot;</span>) == FALSE                      &amp;&amp;
+            (strin(next_entry-&gt;d_name,key) == TRUE || strcmp(key,<span class="Constant">&quot;all&quot;</span>) == <span class="Constant">0</span>))
+         {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    </span><span class="Special">%d</span><span class="Constant">:    </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,cnt,next_entry-&gt;d_name);
+            (<span class="Type">void</span>)fflush(psrp_out);
+
+            ++cnt;
+         }
+    }
+
+    (<span class="Type">void</span>)closedir(dirp);
+
+    <span class="Statement">if</span>(cnt == <span class="Constant">0</span>)
+       (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    No files protected</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+    <span class="Statement">else</span> <span class="Statement">if</span>(cnt == <span class="Constant">1</span>)
+       (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    1 file protected</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    </span><span class="Special">%d</span><span class="Constant"> files protected</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,cnt);
+
+    (<span class="Type">void</span>)fflush(psrp_out);
+    <span class="Statement">return</span>(PSRP_OK);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Set/show matched image I.D. key ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> set_lifetime(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{
+
+   <span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+   <span class="Comment">/*</span><span class="Comment"> Get new key </span><span class="Comment">*/</span>
+   <span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(argc &gt; <span class="Constant">2</span>)
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">usage: lifetime &lt;lifetime in seconds | forever | default&gt;</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Display current protection key </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(argc == <span class="Constant">1</span>)
+    {  <span class="Statement">if</span>(lifetime == FOREVER)
+          (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">protection lifetime is forever</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,file_name,key);
+       <span class="Statement">else</span> <span class="Statement">if</span>(lifetime == DEFAULT_LIFETIME)
+          (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">protection lifetime is </span><span class="Special">%d</span><span class="Constant"> seconds (default)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,DEFAULT_LIFETIME);
+       <span class="Statement">else</span>
+          (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">protection lifetime is </span><span class="Special">%d</span><span class="Constant"> seconds</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,file_name,key);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+    <span class="Statement">if</span>(strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;forever&quot;</span>) == <span class="Constant">0</span>)
+    {  lifetime = FOREVER;
+
+       (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">protection lifetime is now forever</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(psrp_out);
+    }
+    <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;default&quot;</span>) == <span class="Constant">0</span>)
+    {  lifetime = DEFAULT_LIFETIME;
+
+       (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">protection lifetime is now </span><span class="Special">%d</span><span class="Constant"> (default)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,file_name,key);
+       (<span class="Type">void</span>)fflush(psrp_out);
+    }
+    <span class="Statement">else</span>
+    {  <span class="Type">int</span> itmp;
+
+       <span class="Statement">if</span>(sscanf(argv[<span class="Constant">1</span>],<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">&quot;</span>,&amp;itmp) != <span class="Constant">1</span> || itmp &lt;= <span class="Constant">0</span>)
+       {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">protection lifetime parameter must be a positive integer</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,lifetime);
+          (<span class="Type">void</span>)fflush(psrp_out);
+
+          <span class="Statement">return</span>(PSRP_OK);
+       }
+
+       lifetime = itmp;
+       (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">protection lifetime is now </span><span class="Special">%d</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,file_name,lifetime);
+       (<span class="Type">void</span>)fflush(psrp_out);
+    }
+
+    <span class="Statement">if</span>(appl_verbose == TRUE)
+    {  (<span class="Type">void</span>)strdate(date);
+       <span class="Statement">if</span>(lifetime == FOREVER)
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): protection lifetime is now forever</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                           date,appl_name,appl_pid,appl_host,appl_owner);
+       <span class="Statement">else</span> <span class="Statement">if</span>(lifetime == DEFAULT_LIFETIME)
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): protection lifetime is now </span><span class="Special">%d</span><span class="Constant"> (default)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                       date,appl_name,appl_pid,appl_host,appl_owner,lifetime);
+       <span class="Statement">else</span>
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): protection lifetime is now </span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                             date,appl_name,appl_pid,appl_host,appl_owner,lifetime);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    }
+
+    <span class="Statement">return</span>(PSRP_OK);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Set/show matched image I.D. key ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> set_key(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{
+
+    <span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Get new key </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(argc &gt; <span class="Constant">2</span>)
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">usage: key [&lt;(directory) file protection key&gt;]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+    <span class="Statement">if</span>(is_directory == FALSE)
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> is not a directory (key invalid)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,file_name);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Display current protection key </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(argc == <span class="Constant">1</span>)
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">(directory </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant">) file protection key is </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n\n</span><span class="Constant">&quot;</span>,file_name,key);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+    (<span class="Type">void</span>)strlcpy(key,argv[<span class="Constant">1</span>],SSIZE);
+    (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">(directory </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant">) file key changed to </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n\n</span><span class="Constant">&quot;</span>,file_name,key);
+    (<span class="Type">void</span>)fflush(psrp_out);
+
+
+    <span class="Statement">if</span>(appl_verbose == TRUE)
+    {  (<span class="Type">void</span>)strdate(date);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): (directory file protection key changed to </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n</span><span class="Constant">&quot;</span>,
+                                                  date,appl_name,appl_pid,appl_host,appl_owner,key);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    }
+
+    <span class="Statement">return</span>(PSRP_OK);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Set principal (which is protected, or in which files are protected) ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> set_principal(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   <span class="Type">int</span> index;
+    <span class="Type">DIR</span>           *dirp       = (<span class="Type">DIR</span> *)<span class="Constant">NULL</span>;
+    <span class="Type">struct</span> dirent *next_entry = (<span class="Type">struct</span> dirent *)<span class="Constant">NULL</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Get new directory </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(argc &gt; <span class="Constant">2</span>)
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">usage: dir [&lt;directory&gt;]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+    <span class="Statement">if</span>(argc == <span class="Constant">1</span>)
+    {  <span class="Statement">if</span>(is_directory == TRUE)
+          (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">(directory) protecting principal (directory) </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n\n</span><span class="Constant">&quot;</span>,file_name);
+       <span class="Statement">else</span>
+          (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">(directory) protecting principal (file) </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n\n</span><span class="Constant">&quot;</span>,file_name);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+    <span class="Statement">if</span>(access(argv[<span class="Constant">1</span>],F_OK | R_OK | W_OK) == (-<span class="Constant">1</span>))
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">cannot change principal to </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> (does not exist)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,file_name);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Revoke all protections on current principal </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pupsighold(<span class="Constant">SIGALRM</span>,TRUE);
+    <span class="Statement">if</span>(is_directory == TRUE)
+    {  dirp = opendir(file_name);
+
+       <span class="Statement">while</span>((next_entry = readdir(dirp)) != (<span class="Type">struct</span> dirent *)<span class="Constant">NULL</span>)
+       {
+
+            <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment"> If any of the files in the directory are themselves a directory </span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment"> they cannot be protected.                                       </span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+            (<span class="Type">void</span>)snprintf(pathname,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/</span><span class="Special">%s</span><span class="Constant">&quot;</span>,file_name,next_entry-&gt;d_name);
+            (<span class="Type">void</span>)stat(pathname,&amp;stat_buf);
+
+            <span class="Statement">if</span>((S_ISREG(stat_buf.st_mode) || S_ISFIFO(stat_buf.st_mode))       &amp;&amp;
+               strcmp(next_entry-&gt;d_name,<span class="Constant">&quot;.&quot;</span>)    != <span class="Constant">0</span>                          &amp;&amp;
+               strcmp(next_entry-&gt;d_name,<span class="Constant">&quot;..&quot;</span>)   != <span class="Constant">0</span>                          &amp;&amp;
+               strin(next_entry-&gt;d_name,<span class="Constant">&quot;uprot&quot;</span>) == FALSE                      &amp;&amp;
+               (strin(next_entry-&gt;d_name,key) == TRUE || strcmp(key,<span class="Constant">&quot;all&quot;</span>) == <span class="Constant">0</span>))
+            {  <span class="Type">char</span> pathname[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+               (<span class="Type">void</span>)snprintf(pathname,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/</span><span class="Special">%s</span><span class="Constant">&quot;</span>,file_name,next_entry-&gt;d_name);
+               index = pups_get_ftab_index_by_name(pathname);
+
+               <span class="Statement">if</span>(index != (-<span class="Constant">1</span>))
+               {  (<span class="Type">void</span>)pups_fd_dead(ftab[index].fdes);
+                  (<span class="Type">void</span>)pups_close(ftab[index].fdes);
+               }
+            }
+       }
+
+       (<span class="Type">void</span>)closedir(dirp);
+    }
+    <span class="Statement">else</span>
+    {  index = pups_get_ftab_index_by_name(file_name);
+       (<span class="Type">void</span>)pups_fd_dead(ftab[index].fdes);
+       (<span class="Type">void</span>)pups_close(ftab[index].fdes);
+    }
+
+    (<span class="Type">void</span>)strlcpy(file_name,argv[<span class="Constant">1</span>],SSIZE);
+    (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">principal changed to </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n\n</span><span class="Constant">&quot;</span>,file_name);
+    (<span class="Type">void</span>)fflush(psrp_out);
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check if new principal is a directory </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((dirp = opendir(file_name)) != (<span class="Type">DIR</span> *)<span class="Constant">NULL</span>)
+    {  (<span class="Type">void</span>)closedir(dirp);
+       is_directory = TRUE;
+    }
+
+    <span class="Statement">if</span>(appl_verbose == TRUE)
+    {  (<span class="Type">void</span>)strdate(date);
+       <span class="Statement">if</span>(is_directory == TRUE)
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): principal changed to (directory) </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n</span><span class="Constant">&quot;</span>,
+                                      date,appl_name,appl_pid,appl_host,appl_owner,file_name);
+       <span class="Statement">else</span>
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): principal changed to (file) </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n</span><span class="Constant">&quot;</span>,
+                                 date,appl_name,appl_pid,appl_host,appl_owner,file_name);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    }
+
+    <span class="Statement">return</span>(PSRP_OK);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Exit function -- rename all files which have a .uprot extension ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> exit_func(<span class="Type">char</span> *arg)
+
+{   <span class="Type">DIR</span>           *dirp      = (<span class="Type">DIR</span> *)<span class="Constant">NULL</span>;
+    <span class="Type">struct</span> dirent *next_item = (<span class="Type">struct</span> dirent *)<span class="Constant">NULL</span>;
+
+    <span class="Statement">if</span>(is_directory == FALSE)
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+
+    dirp = opendir(file_name);
+    <span class="Statement">while</span>((next_item = readdir(dirp)) != (<span class="Type">struct</span> dirent *)<span class="Constant">NULL</span>)
+    {    <span class="Statement">if</span>(strin(next_item-&gt;d_name,<span class="Constant">&quot;.uprot&quot;</span>) == TRUE)
+         {  <span class="Type">char</span> pathname[SSIZE]       = <span class="Constant">&quot;&quot;</span>,
+                 uprot_pathname[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+            (<span class="Type">void</span>)snprintf(uprot_pathname,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/</span><span class="Special">%s</span><span class="Constant">&quot;</span>,file_name,next_item-&gt;d_name);
+            (<span class="Type">void</span>)strlcpy(pathname,uprot_pathname,SSIZE);
+            (<span class="Type">void</span>)strtrnc(pathname,<span class="Constant">'.'</span>,<span class="Constant">1</span>);
+            (<span class="Type">void</span>)rename(uprot_pathname,pathname);
+         }
+    }
+
+    (<span class="Type">void</span>)unlink(prot_pathname);
+
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

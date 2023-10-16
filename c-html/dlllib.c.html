@@ -1,0 +1,1080 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/dlllib.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------</span>
+<span class="Comment">    Purpose: DLL support for PUPS environment</span>
+
+<span class="Comment">    Author:  M.A. O'Neill</span>
+<span class="Comment">             Tumbling Dice Ltd</span>
+<span class="Comment">             Gosforth</span>
+<span class="Comment">             Newcastle upon Tyne</span>
+<span class="Comment">             NE3 4RT</span>
+<span class="Comment">             United Kingdom</span>
+
+<span class="Comment">    Version: 2.02 </span>
+<span class="Comment">    Dated:   4th January 2022</span>
+<span class="Comment">    E-mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef DLL_SUPPORT</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> If we have OpenMP support then we also have pthread support </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> (OpenMP is built on pthreads for Linux distributions).      </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#if defined(_OPENMP) &amp;&amp; !defined(PTHREAD_SUPPORT)</span>
+<span class="PreProc">#define PTHREAD_SUPPORT</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+
+<span class="PreProc">#include </span><span class="Constant">&lt;me.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;xtypes.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;errno.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;utils.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;dlfcn.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+
+<span class="PreProc">#undef   __NOT_LIB_SOURCE__</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;tad.h&gt;</span>
+<span class="PreProc">#define  __NOT_LIB_SOURCE__</span>
+
+<span class="PreProc">#ifdef PTHREAD_SUPPORT</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;tad.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="PreProc">#undef    __NOT_LIB_SOURCE__</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;dll.h&gt;</span>
+<span class="PreProc">#define   __NOT_LIB_SOURCE__</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------</span>
+<span class="Comment">    Get application information for slot manager ...</span>
+<span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Slot information function </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> dlllib_slot(<span class="Type">int</span> level)
+{   (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;lib dlllib </span><span class="Special">%s</span><span class="Constant">: [ANSI C]</span><span class="Special">\n</span><span class="Constant">&quot;</span>,DLL_VERSION);
+
+    <span class="Statement">if</span>(level &gt; <span class="Constant">1</span>)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;(C) 1999-2022 Tumbling Dice</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Author: M.A. O'Neill</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;PUPS/P3 DLL support library (built </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    }
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+}
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Segment identification for dynamic link support library ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef SLOT</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;slotman.h&gt;</span>
+_EXTERN <span class="Type">void</span> (* SLOT ) __attribute__ ((aligned(<span class="Constant">16</span>))) = dlllib_slot;
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> SLOT </span><span class="Comment">*/</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Variables which are imported by this library </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">  Public variables exported by this library (note this is not the best </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">  way of exporting the thread table -- it would be better to have all  </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">  the manipulation of the thread table done by functions defined here  </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">  which are themselves _PUBLIC functions of this library)              </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span>             n_orifices                   = <span class="Constant">0</span>;    <span class="Comment">// Number of orifices in use</span>
+_PUBLIC <span class="Type">int</span>             ortab_slots                  = <span class="Constant">0</span>;    <span class="Comment">// Number of active orifice slots</span>
+_PUBLIC ortab_type      *ortab      = (ortab_type *)<span class="Constant">NULL</span>;    <span class="Comment">// Orifice table</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------</span>
+<span class="Comment">    Get next free slot in the orifice table ...</span>
+<span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> get_ortab_slot(<span class="Type">void</span>)
+
+{   <span class="Type">int</span> i;
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;appl_max_orifices; ++i)
+    {  <span class="Statement">if</span>(ortab[i].dll_handle == (<span class="Type">void</span> *)<span class="Constant">NULL</span>)
+       {  pups_set_errno(<span class="Constant">EAGAIN</span>);
+          <span class="Statement">return</span>(i);
+       }
+    }
+
+    ++ortab_slots;
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(ortab_slots);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Find an ortab slot given orifice handle ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> find_ortab_slot_by_handle(<span class="Type">const</span> <span class="Type">void</span> *orifice_handle)
+
+{   <span class="Type">int</span> i;
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Only the root thread can process </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> PSRP requests                    </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(pupsthread_is_root_thread() == FALSE)
+       error(<span class="Constant">&quot;[find_ortab_slot_by_handle] attempt by non root thread to perform PUPS/P3 DLL operation&quot;</span>);
+
+    <span class="Statement">if</span>(orifice_handle == (<span class="Type">void</span> *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;appl_max_orifices; ++i)
+    {  <span class="Statement">if</span>(ortab[i].orifice_handle == orifice_handle)
+       {  pups_set_errno(OK);
+          <span class="Statement">return</span>(i);
+       }
+    }
+
+    pups_set_errno(<span class="Constant">ESRCH</span>);
+    <span class="Statement">return</span>(-<span class="Constant">1</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Return the index of the ortab entry of named orifice ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> find_ortab_slot_by_name(<span class="Type">const</span> <span class="Type">char</span> *orifice_name)
+
+{   <span class="Type">int</span> i;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Sanity check </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(orifice_name == (<span class="Type">const</span> <span class="Type">char</span> *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Only the root thread can process </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> PSRP requests                    </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(pupsthread_is_root_thread() == FALSE)
+       error(<span class="Constant">&quot;[find_ortab_slot_by_name] attempt by non root thread to perform PUPS/P3 DLL operation&quot;</span>);
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;appl_max_orifices; ++i)
+    {  <span class="Statement">if</span>(ortab[i].orifice_name != (<span class="Type">char</span> *)<span class="Constant">NULL</span> &amp;&amp; strcmp(ortab[i].orifice_name,orifice_name) == <span class="Constant">0</span>)
+       {  pups_set_errno(OK);
+          <span class="Statement">return</span>(i);
+       }
+    }
+
+    pups_set_errno(<span class="Constant">ESRCH</span>);
+    <span class="Statement">return</span>(-<span class="Constant">1</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Clear orifice table slot ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> clear_ortab_slot(<span class="Type">const</span> _BOOLEAN destroy, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span> index)
+
+{
+
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Sanity check </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(index &gt;= appl_max_orifices)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Only the root thread can process </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> PSRP requests                    </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(pupsthread_is_root_thread() == FALSE)
+       error(<span class="Constant">&quot;[clear_ortab_slot] attempt by non root thread to perform PUPS/P3 DLL operation&quot;</span>);
+
+    ortab[index].cnt            = <span class="Constant">0</span>;
+    ortab[index].dll_handle     = (<span class="Type">void</span> *)<span class="Constant">NULL</span>;
+    ortab[index].orifice_handle = (<span class="Type">void</span> *)<span class="Constant">NULL</span>;
+
+    <span class="Statement">if</span>(destroy == FALSE)
+    {  ortab[index].orifice_name       = (<span class="Type">char</span> *)<span class="Constant">NULL</span>;
+       ortab[index].orifice_prototype  = (<span class="Type">char</span> *)<span class="Constant">NULL</span>;
+       ortab[index].dll_name           = (<span class="Type">char</span> *)<span class="Constant">NULL</span>;
+       ortab[index].orifice_info       = (<span class="Type">char</span> *)<span class="Constant">NULL</span>;
+    }
+    <span class="Statement">else</span> <span class="Statement">if</span>(destroy == TRUE)
+    {  ortab[index].orifice_name       = (<span class="Type">char</span> *)pups_free((<span class="Type">void</span> *)ortab[index].orifice_name);
+       ortab[index].orifice_prototype  = (<span class="Type">char</span> *)pups_free((<span class="Type">void</span> *)ortab[index].orifice_prototype);
+       ortab[index].dll_name           = (<span class="Type">char</span> *)pups_free((<span class="Type">void</span> *)ortab[index].dll_name);
+       ortab[index].orifice_info       = (<span class="Type">char</span> *)pups_free((<span class="Type">void</span> *)ortab[index].orifice_info);
+    }
+    <span class="Statement">else</span>
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Initialise orifice table ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> ortab_init(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span> max_orifices)
+
+{   <span class="Type">int</span> i;
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Only the root thread can process </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> PSRP requests                    </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(pupsthread_is_root_thread() == FALSE)
+       error(<span class="Constant">&quot;[ortab_init] attempt by non root thread to perform PUPS/P3 DLL operation&quot;</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Orifice slot count &lt;= 0 implies that we are </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> not using orifices                          </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(max_orifices &gt; MAX_ORIFICES)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>;
+    }
+
+    ortab = (ortab_type *)pups_calloc(max_orifices,<span class="Statement">sizeof</span>(ortab_type));
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;max_orifices; ++i)
+    {  ortab[i].dll_handle        = (<span class="Type">void</span> *)<span class="Constant">NULL</span>;
+       ortab[i].orifice_handle    = (<span class="Type">void</span> *)<span class="Constant">NULL</span>;
+       ortab[i].cnt               = <span class="Constant">0</span>;
+       ortab[i].dll_name          = (<span class="Type">char</span> *)<span class="Constant">NULL</span>;
+       ortab[i].orifice_name      = (<span class="Type">char</span> *)<span class="Constant">NULL</span>;
+       ortab[i].orifice_prototype = (<span class="Type">char</span> *)<span class="Constant">NULL</span>;
+    }
+
+    pups_set_errno(OK);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Check for existence of an orifice. If the orifice exists its prototype</span>
+<span class="Comment">    is returned ...  </span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC _BOOLEAN pups_is_orifice(<span class="Type">const</span> <span class="Type">char</span>          *dll_name,    <span class="Comment">// Name of DLL exporting orifice</span>
+                                 <span class="Type">const</span> <span class="Type">char</span>      *orifice_name,    <span class="Comment">// Name of orifice</span>
+                                 <span class="Type">const</span> <span class="Type">char</span> *orifice_prototype)    <span class="Comment">// Orifice prototype</span>
+
+{   <span class="Type">void</span> *dll_handle            = (<span class="Type">void</span> *)<span class="Constant">NULL</span>,
+         *is_orifice            = (<span class="Type">void</span> *)<span class="Constant">NULL</span>,
+         *prototype_handle      = (<span class="Type">void</span> *)<span class="Constant">NULL</span>;
+
+    <span class="Type">char</span> cwd[SSIZE]             = <span class="Constant">&quot;&quot;</span>,
+         is_orifice_name[SSIZE] = <span class="Constant">&quot;&quot;</span>,
+         dll_pathname[SSIZE]    = <span class="Constant">&quot;&quot;</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Sanity check </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(dll_name          == (<span class="Type">const</span> <span class="Type">char</span> *)<span class="Constant">NULL</span>  ||
+       orifice_name      == (<span class="Type">const</span> <span class="Type">char</span> *)<span class="Constant">NULL</span>  ||
+       orifice_prototype == (<span class="Type">const</span> <span class="Type">char</span> *)<span class="Constant">NULL</span>   )
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Only the root thread can process </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> PSRP requests                    </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(pupsthread_is_root_thread() == FALSE)
+       error(<span class="Constant">&quot;[pups_is_orifice] attempt by non root thread to perform PUPS/P3 DLL operation&quot;</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Open DLL which contains the orifice we wish to investigate  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Make sure that path is absolute - LINUX dlopen() appears to </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> require this!                                               </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(dll_name[<span class="Constant">0</span>] != <span class="Constant">'/'</span>)
+    {  (<span class="Type">void</span>)getcwd(cwd,SSIZE);
+       (<span class="Type">void</span>)snprintf(dll_pathname,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/</span><span class="Special">%s</span><span class="Constant">&quot;</span>,cwd,dll_name);
+    }
+
+    <span class="Statement">if</span>((dll_handle = dlopen(dll_pathname,RTLD_NOW | RTLD_GLOBAL)) == (<span class="Type">void</span> *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EACCES</span>);
+       <span class="Statement">return</span>(FALSE);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check that we are about to bind a registered orifice </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> function - if not, returt to caller                  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)snprintf(is_orifice_name,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">_is_orifice&quot;</span>,orifice_name);
+    <span class="Statement">if</span>((is_orifice = dlsym(dll_handle,is_orifice_name)) == (<span class="Type">void</span> *)<span class="Constant">NULL</span>)
+    {  (<span class="Type">void</span>)dlclose(dll_handle);
+
+       pups_set_errno(<span class="Constant">EACCES</span>);
+       <span class="Statement">return</span>(FALSE);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check that this is an orifice function </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(*(_BOOLEAN *)is_orifice == TRUE)
+    {  <span class="Type">char</span> prototype_handle_name[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+       (<span class="Type">void</span>)snprintf(prototype_handle_name,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">_prototype&quot;</span>,orifice_name);
+       <span class="Statement">if</span>((prototype_handle = dlsym(dll_handle,prototype_handle_name)) != (<span class="Type">void</span> *)<span class="Constant">NULL</span>)
+       {  <span class="Statement">if</span>(strcmp(orifice_prototype,*(<span class="Type">char</span> **)prototype_handle) != <span class="Constant">0</span>)
+          {
+
+             <span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> Close all dynamically imported variables      </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> Note that we have to close the DLL exactly as </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> many times as it has been opened in order to  </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> detach it from the calling processes address  </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> space                                         </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+
+             (<span class="Type">void</span>)dlclose(dll_handle);
+
+             <span class="Statement">if</span>(orifice_prototype != (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+                (<span class="Type">void</span>)strlcpy(orifice_prototype,<span class="Constant">&quot;none&quot;</span>,SSIZE);
+
+             (<span class="Type">void</span>)pups_set_errno(<span class="Constant">EACCES</span>);
+             <span class="Statement">return</span>(FALSE);
+          }
+       }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Close all dynamically imported variables      </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Note that we have to close the DLL exactly as </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> many times as it has been opened in order to  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> detach it from the calling processes address  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> space                                         </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)dlclose(dll_handle);
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(TRUE);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Bind orifice handle. An orifice is a function or variable which is</span>
+<span class="Comment">    exported by a DLL. In C, a prototypical orifice looks like:</span>
+
+<span class="Comment">    _BOOLEAN &lt;name&gt;_is_orifice: Tells binder this is an orifice function.</span>
+
+<span class="Comment">    char     &lt;name&gt;_prototype : Prototype of orifice should be EXACTLY the</span>
+<span class="Comment">                                same as internal C definition.</span>
+
+<span class="Comment">    C declaration of orifice function ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> *pups_bind_orifice_handle(<span class="Type">const</span> <span class="Type">char</span> *dll_name,            <span class="Comment">// Name of DLL which exports orifice</span>
+                                       <span class="Type">const</span> <span class="Type">char</span> *orifice_name,        <span class="Comment">// Name of orifice</span>
+                                       <span class="Type">const</span> <span class="Type">char</span> *orifice_prototype)   <span class="Comment">// Prototype of orifice</span>
+
+{   <span class="Type">int</span> index;
+
+    <span class="Type">void</span> *dll_handle                 = (<span class="Type">void</span> *)<span class="Constant">NULL</span>,
+         *orifice_handle             = (<span class="Type">void</span> *)<span class="Constant">NULL</span>,
+         *info_handle                = (<span class="Type">void</span> *)<span class="Constant">NULL</span>,
+         *is_orifice                 = (<span class="Type">void</span> *)<span class="Constant">NULL</span>,
+         *prototype_handle           = (<span class="Type">void</span> *)<span class="Constant">NULL</span>;
+
+    <span class="Type">char</span> cwd[SSIZE]                   = <span class="Constant">&quot;&quot;</span>,
+         dll_pathname[SSIZE]          = <span class="Constant">&quot;&quot;</span>,
+         info_handle_name[SSIZE]      = <span class="Constant">&quot;&quot;</span>,
+         prototype_handle_name[SSIZE] = <span class="Constant">&quot;&quot;</span>,
+         is_orifice_name[SSIZE]       = <span class="Constant">&quot;&quot;</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Sanity check </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(dll_name == (<span class="Type">const</span> <span class="Type">char</span> *)<span class="Constant">NULL</span> || orifice_name == (<span class="Type">const</span> <span class="Type">char</span> *)<span class="Constant">NULL</span> || orifice_prototype == (<span class="Type">const</span> <span class="Type">char</span> *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>((<span class="Type">void</span> *)<span class="Constant">NULL</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Only the root thread can process </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> PSRP requests                    </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(pupsthread_is_root_thread() == FALSE)
+       error(<span class="Constant">&quot;[pups_bind_orifice_handle] attempt by non root thread to perform PUPS/P3 DLL operation&quot;</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check that we haven't already bound this orifice </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((index = find_ortab_slot_by_name(orifice_name)) != (-<span class="Constant">1</span>))
+    {  pups_set_errno(<span class="Constant">EEXIST</span>);
+       <span class="Statement">return</span>((<span class="Type">void</span> *)<span class="Constant">NULL</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check that we are about to bind a registered orifice        </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> function - if not, return to caller                         </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Make sure that path is absolute - LINUX dlopen() appears to </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> require this!                                               </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(strccpy(dll_pathname,pups_search_path(<span class="Constant">&quot;DLLPATH&quot;</span>,dll_name)) == (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+    {  <span class="Statement">if</span>(dll_name[<span class="Constant">0</span>] != <span class="Constant">'/'</span>)
+       {  (<span class="Type">void</span>)getcwd(cwd,SSIZE);
+          (<span class="Type">void</span>)snprintf(dll_pathname,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/</span><span class="Special">%s</span><span class="Constant">&quot;</span>,cwd,dll_name);
+       }
+       <span class="Statement">else</span>
+          (<span class="Type">void</span>)strlcpy(dll_pathname,dll_name,SSIZE);
+
+
+       <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Check that DLL pathname is valid </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(access(dll_pathname,F_OK | R_OK) == (-<span class="Constant">1</span>))
+       {  pups_set_errno(<span class="Constant">EEXIST</span>);
+          <span class="Statement">return</span>((<span class="Type">void</span> *)<span class="Constant">NULL</span>);
+       }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Open DLL which contains the orifice we wish to bind </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((dll_handle = dlopen(dll_pathname,RTLD_NOW | RTLD_GLOBAL)) == (<span class="Type">void</span> *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EEXIST</span>);
+       <span class="Statement">return</span>((<span class="Type">void</span> *)<span class="Constant">NULL</span>);
+    }
+
+    (<span class="Type">void</span>)snprintf(is_orifice_name,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">_is_orifice&quot;</span>,orifice_name);
+    <span class="Statement">if</span>((is_orifice = dlsym(dll_handle,is_orifice_name)) == (<span class="Type">void</span> *)<span class="Constant">NULL</span>)
+    {  (<span class="Type">void</span>)dlclose(dll_handle);
+
+       pups_set_errno(<span class="Constant">EEXIST</span>);
+       <span class="Statement">return</span>((<span class="Type">void</span> *)<span class="Constant">NULL</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check that this is an orifice function </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(*(_BOOLEAN *)is_orifice == TRUE)
+    {  <span class="Type">char</span> prototype_handle_name[SSIZE]    = <span class="Constant">&quot;&quot;</span>,
+            orifice_initialiser_name[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+       <span class="Type">int</span>  (*initialiser_handle)(<span class="Type">void</span>);
+
+       (<span class="Type">void</span>)snprintf(prototype_handle_name,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">_prototype&quot;</span>,orifice_name);
+       <span class="Statement">if</span>((prototype_handle = dlsym(dll_handle,prototype_handle_name)) != (<span class="Type">void</span> *)<span class="Constant">NULL</span>)
+       {  <span class="Statement">if</span>((orifice_handle = dlsym(dll_handle,orifice_name))  == (<span class="Type">void</span> *)<span class="Constant">NULL</span>    ||
+             strcmp(orifice_prototype,*(<span class="Type">char</span> **)prototype_handle) != <span class="Constant">0</span>              )
+          {
+
+             <span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> Close oriface to dynamically linked library   </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment">                                               </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> Note that we have to close the DLL exactly as </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> many times as it has been opened in order to  </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> detach it from the calling processes address  </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> space                                         </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+
+             (<span class="Type">void</span>)dlclose(dll_handle);
+
+             (<span class="Type">void</span>)pups_set_errno(<span class="Constant">EACCES</span>);
+             <span class="Statement">return</span>((<span class="Type">void</span> *)<span class="Constant">NULL</span>);
+          }
+
+          <span class="Statement">if</span>((index = get_ortab_slot()) == (-<span class="Constant">1</span>))
+          {
+
+             <span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> We have run out of space in the orifice       </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> table                                         </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment">                                               </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> Close oriface to dynamically linked library   </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment">                                               </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> Note that we have to close the DLL exactly as </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> many times as it has been opened in order to  </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> detach it from the calling processes address  </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> space                                         </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+
+             (<span class="Type">void</span>)dlclose(dll_handle);
+
+             (<span class="Type">void</span>)pups_set_errno(<span class="Constant">ENOMEM</span>);
+             <span class="Statement">return</span>((<span class="Type">void</span> *)<span class="Constant">NULL</span>);
+          }
+
+
+          <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Note that we are limited to around 1000 characters of </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> information in the orifice info field                 </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------</span><span class="Comment">*/</span>
+
+          (<span class="Type">void</span>)snprintf(info_handle_name,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">_info&quot;</span>,orifice_name);
+          <span class="Statement">if</span>((info_handle = dlsym(dll_handle,info_handle_name)) != (<span class="Type">void</span> *)<span class="Constant">NULL</span>)
+          {  <span class="Statement">if</span>(ortab[index].orifice_info == (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+                ortab[index].orifice_info = (<span class="Type">char</span> *)pups_malloc(SSIZE);
+             (<span class="Type">void</span>)strlcpy(ortab[index].orifice_info,*(<span class="Type">char</span> **)info_handle,SSIZE);
+          }
+
+
+          <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> We have loaded the DLL. Copy data associated with the </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> DLL into the orifice table                            </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------</span><span class="Comment">*/</span>
+
+          <span class="Statement">if</span>(ortab[index].orifice_name == (<span class="Type">char</span> )<span class="Constant">NULL</span>)
+             ortab[index].orifice_name  = (<span class="Type">char</span> *)pups_malloc(SSIZE);
+          (<span class="Type">void</span>)strlcpy(ortab[index].orifice_name,     (<span class="Type">char</span> *)orifice_name,SSIZE);
+
+          <span class="Statement">if</span>(ortab[index].dll_name == (<span class="Type">char</span> )<span class="Constant">NULL</span>)
+             ortab[index].dll_name = (<span class="Type">char</span> *)pups_malloc(SSIZE);
+          (<span class="Type">void</span>)strlcpy(ortab[index].dll_name,         (<span class="Type">char</span> *)dll_name,SSIZE);
+
+          <span class="Statement">if</span>(ortab[index].orifice_prototype == (<span class="Type">char</span> )<span class="Constant">NULL</span>)
+             ortab[index].orifice_prototype = (<span class="Type">char</span> *)pups_malloc(SSIZE);
+          (<span class="Type">void</span>)strlcpy(ortab[index].orifice_prototype,(<span class="Type">char</span> *)orifice_prototype,SSIZE);
+
+          ortab[index].dll_handle        = dll_handle;
+	  ortab[index].orifice_handle    = orifice_handle;
+          ++ortab[index].cnt;
+
+
+          <span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Run any initialisation functions we may require </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+
+          (<span class="Type">void</span>)snprintf(orifice_initialiser_name,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">_initialise&quot;</span>,orifice_name);
+          <span class="Statement">if</span>((initialiser_handle = dlsym(dll_handle,orifice_initialiser_name)) != (<span class="Type">void</span> *)<span class="Constant">NULL</span>)
+          {  <span class="Statement">if</span>((*initialiser_handle)() == (-<span class="Constant">1</span>))
+             {
+
+                <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+                <span class="Comment">/*</span><span class="Comment"> We have failed to initialise (API) environment for </span><span class="Comment">*/</span>
+                <span class="Comment">/*</span><span class="Comment"> dynamic function                                   </span><span class="Comment">*/</span>
+                <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+
+                (<span class="Type">void</span>)dlclose(dll_handle);
+
+                (<span class="Type">void</span>)pups_set_errno(<span class="Constant">EACCES</span>);
+                <span class="Statement">return</span>((<span class="Type">void</span> *)<span class="Constant">NULL</span>);
+             }
+          }
+
+          (<span class="Type">void</span>)pups_set_errno(OK);
+          <span class="Statement">return</span>(orifice_handle);
+       }
+    }
+
+    (<span class="Type">void</span>)dlclose(dll_handle);
+
+    (<span class="Type">void</span>)pups_set_errno(<span class="Constant">ESRCH</span>);
+    <span class="Statement">return</span>((<span class="Type">void</span> *)<span class="Constant">NULL</span>);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Free orifice handle ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> *pups_free_orifice_handle(<span class="Type">const</span> <span class="Type">void</span> *orifice_handle)
+
+{   <span class="Type">int</span>  index;
+    <span class="Type">char</span> orifice_exitf_name[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+    <span class="Type">void</span> (*orifice_exit_handle)(<span class="Type">void</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Sanity check </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(orifice_handle == (<span class="Type">const</span> <span class="Type">void</span> *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>((<span class="Type">void</span> *)<span class="Constant">NULL</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Only the root thread can process </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> PSRP requests                    </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(pupsthread_is_root_thread() == FALSE)
+       error(<span class="Constant">&quot;[pups_free_orifice_handle] attempt by non root thread to perform PUPS/P3 DLL operation&quot;</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check that address supplied actually is a PUPS </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> orifice handle                                 </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((index = find_ortab_slot_by_handle(orifice_handle)) == (-<span class="Constant">1</span>))
+       <span class="Statement">return</span>((<span class="Type">void</span> *)<span class="Constant">NULL</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check that we can in fact free this orifice  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> handle. If cnt is non-zero there are other   </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> threads using this orifice, so we can't free </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> it yet                                       </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(ortab[index].cnt &gt; <span class="Constant">1</span>)
+    {  --ortab[index].cnt;
+       (<span class="Type">void</span>)pups_set_errno(OK);
+
+       <span class="Statement">return</span>(orifice_handle);
+    }
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Do any cleanup which may be necessary </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)snprintf(orifice_exitf_name,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">_exit&quot;</span>,ortab[index].orifice_name);
+    <span class="Statement">if</span>((orifice_exit_handle = dlsym(ortab[index].dll_handle,orifice_exitf_name)) != (<span class="Type">void</span> *)<span class="Constant">NULL</span>)
+       (*orifice_exit_handle)();
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Actually free the handle </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)dlclose(ortab[index].dll_handle);
+    clear_ortab_slot(FALSE,index);
+
+    (<span class="Type">void</span>)pups_set_errno(OK);
+    <span class="Statement">return</span>((<span class="Type">void</span> *)<span class="Constant">NULL</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to display currently loaded DLL's - this routine will probably</span>
+<span class="Comment">    be called in response to signalling an active process ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> pups_show_orifices(<span class="Type">const</span> <span class="Type">FILE</span> *stream)
+
+{   <span class="Type">int</span> i,
+        orifices = <span class="Constant">0</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Sanity check </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(stream == (<span class="Type">const</span> <span class="Type">FILE</span> *)<span class="Constant">NULL</span>)
+    {  (<span class="Type">void</span>)pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>;
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Only the root thread can process </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> PSRP requests                    </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(pupsthread_is_root_thread() == FALSE)
+       error(<span class="Constant">&quot;[pups_show_orifices] attempt by non root thread to perform PUPS/P3 DLL operation&quot;</span>);
+
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">    Bound DLL orifices</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    ==================</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(stream);
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;appl_max_orifices; ++i)
+    {  <span class="Statement">if</span>(ortab[i].orifice_handle != (<span class="Type">void</span> *)<span class="Constant">NULL</span>)
+       {  ++orifices;
+
+
+          <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Display orifice data </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+
+          (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    </span><span class="Special">%04d</span><span class="Constant">: Orifice </span><span class="Special">%-48s</span><span class="Constant"> (prototype </span><span class="Special">%-32s</span><span class="Constant">) (handle at </span><span class="Special">%018x</span><span class="Constant"> virtual) imported from DLL </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,i,
+                                                                                                        ortab[i].orifice_name,
+                                                                                                   ortab[i].orifice_prototype,
+                                                                                   (<span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>)ortab[i].orifice_handle,
+                                                                                                            ortab[i].dll_name);
+
+
+          <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Display information on theb orifice (if we have any) </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+          <span class="Statement">if</span>(ortab[i].orifice_info != (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+             (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    info: </span><span class="Special">%s</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,ortab[i].orifice_info);
+
+          (<span class="Type">void</span>)fflush(stream);
+       }
+    }
+
+    <span class="Statement">if</span>(orifices == <span class="Constant">1</span>)
+       (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">    </span><span class="Special">%04d</span><span class="Constant"> orifice slots allocated [process DLL limit] (</span><span class="Special">%04d</span><span class="Constant"> in use)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,appl_max_orifices,<span class="Constant">1</span>);
+    <span class="Statement">else</span> <span class="Statement">if</span>(orifices &gt; <span class="Constant">1</span>)
+       (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">    </span><span class="Special">%04d</span><span class="Constant"> orifice slots allocated [process DLL limit] (</span><span class="Special">%04d</span><span class="Constant"> in use)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,appl_max_orifices,orifices);
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    </span><span class="Special">%d</span><span class="Constant"> orifice slots allocated [process DLL limit] (none in use)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,      appl_max_orifices);
+
+    (<span class="Type">void</span>)fflush(stream);
+
+    pups_set_errno(OK);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Decode a formatted function prototype ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC _BOOLEAN dll_decode_ffp(<span class="Type">const</span> <span class="Type">char</span> *in_proto, <span class="Type">const</span> <span class="Type">char</span> *orifice_name)
+
+{   <span class="Type">int</span> index;
+
+    <span class="Type">char</span> stripped_in_proto[SSIZE] = <span class="Constant">&quot;&quot;</span>,
+         stripped_ff_proto[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Sanity check </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(in_proto == (<span class="Type">const</span> <span class="Type">char</span> *)<span class="Constant">NULL</span> || orifice_name == (<span class="Type">const</span> <span class="Type">char</span> *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Only the root thread can process </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> PSRP requests                    </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(pupsthread_is_root_thread() == FALSE)
+       error(<span class="Constant">&quot;[dll_decode_ffp] attempt by non root thread to perform PUPS/P3 DLL operation&quot;</span>);
+
+    <span class="Statement">if</span>((index = find_ortab_slot_by_name(orifice_name)) == FALSE)
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Make sure the prototye passed by the caller and that    </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> of the function match. Note that this is a SCAN mode    </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> operation, so we can safely strip all whitespace from   </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> both in_proto and ff_proto before we make a comparision </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)strlcpy(stripped_in_proto,strpch(<span class="Constant">' '</span>,in_proto),SSIZE);
+    (<span class="Type">void</span>)strlcpy(stripped_ff_proto,strpch(<span class="Constant">' '</span>,ortab[index].orifice_prototype),SSIZE);
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Do prototypes match? </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+
+    pups_set_errno(OK);
+    <span class="Statement">if</span>(strcmp(stripped_in_proto,stripped_ff_proto) == <span class="Constant">0</span>)
+       <span class="Statement">return</span>(TRUE);
+
+    <span class="Statement">return</span>(FALSE);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Scan a DLL and display its orifices ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC _BOOLEAN pups_show_dll_orifices(<span class="Type">const</span> <span class="Type">FILE</span> *stream, <span class="Type">const</span> <span class="Type">char</span> *dll_name)
+
+{   <span class="Type">FILE</span> *nm_stream = (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>;
+
+    <span class="Type">int</span>      orifices = <span class="Constant">0</span>;
+    <span class="Type">long</span> <span class="Type">int</span> index;
+
+    <span class="Type">void</span> *dll_handle                   = (<span class="Type">void</span> *)<span class="Constant">NULL</span>,
+         *orifice_prototype_handle     = (<span class="Type">void</span> *)<span class="Constant">NULL</span>,
+         *orifice_info_handle          = (<span class="Type">void</span> *)<span class="Constant">NULL</span>;
+
+    <span class="Type">char</span> strdum[SSIZE]                 = <span class="Constant">&quot;&quot;</span>,
+         line[SSIZE]                   = <span class="Constant">&quot;&quot;</span>,
+         cwd[SSIZE]                    = <span class="Constant">&quot;&quot;</span>,
+         dll_pathname[SSIZE]           = <span class="Constant">&quot;&quot;</span>,
+         orifice_name[SSIZE]           = <span class="Constant">&quot;&quot;</span>,
+         orifice_prototype_name[SSIZE] = <span class="Constant">&quot;&quot;</span>,
+         orifice_info_name[SSIZE]      = <span class="Constant">&quot;&quot;</span>,
+         nm_command[SSIZE]             = <span class="Constant">&quot;&quot;</span>,
+         next_symbol[SSIZE]            = <span class="Constant">&quot;&quot;</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Sanity check </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(stream == (<span class="Type">const</span> <span class="Type">FILE</span> *)<span class="Constant">NULL</span> || dll_name == (<span class="Type">const</span> <span class="Type">char</span> *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(FALSE);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Only the root thread can process </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> PSRP requests                    </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(pupsthread_is_root_thread() == FALSE)
+       error(<span class="Constant">&quot;[pups_show_dll_orifices] attempt by non root thread to perform PUPS/P3 DLL operation&quot;</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check that pathname to DLL is valid </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(access(dll_name,F_OK | R_OK | W_OK) == (-<span class="Constant">1</span>))
+    {  (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;pups_show_dll_orifices: DLL </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> does not exist</span><span class="Special">\n</span><span class="Constant">&quot;</span>,dll_name);
+       (<span class="Type">void</span>)fflush(stream);
+
+       pups_set_errno(<span class="Constant">EEXIST</span>);
+       <span class="Statement">return</span>(FALSE);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Try to open DLL                          </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> LINUX insists on having an absolute path </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> for dlopen() -- could be a bug           </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(dll_name[<span class="Constant">0</span>] != <span class="Constant">'/'</span>)
+    {  (<span class="Type">void</span>)getcwd(cwd,SSIZE);
+       (<span class="Type">void</span>)snprintf(dll_pathname,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/</span><span class="Special">%s</span><span class="Constant">&quot;</span>,cwd,dll_name);
+    }
+
+    <span class="Statement">if</span>((dll_handle = dlopen(dll_pathname,RTLD_NOW | RTLD_GLOBAL)) == (<span class="Type">void</span> *)<span class="Constant">NULL</span>)
+    {  (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;pups_show_dll_orifices: </span><span class="Special">%s</span><span class="Constant"> is not a DLL</span><span class="Special">\n</span><span class="Constant">&quot;</span>,dll_name);
+       (<span class="Type">void</span>)fflush(stream);
+
+       pups_set_errno(<span class="Constant">EACCES</span>);
+       <span class="Statement">return</span>(FALSE);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Get symbol table </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)snprintf(nm_command,SSIZE,<span class="Constant">&quot;nm -p </span><span class="Special">%s</span><span class="Constant">&quot;</span>,dll_name);
+    <span class="Statement">if</span>((nm_stream = popen(nm_command,<span class="Constant">&quot;r&quot;</span>)) == (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>)
+    {  <span class="Statement">if</span>(stream != (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>)
+       {  (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;pups_show_dll_orifices: failed to exec nm command pipeline</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fflush(stream);
+       }
+
+       pups_set_errno(<span class="Constant">EPIPE</span>);
+
+       (<span class="Type">void</span>)pclose(nm_stream);
+       <span class="Statement">return</span>(FALSE);
+    }
+
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">Orifices exported by DLL </span><span class="Special">%s</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,dll_name);
+    (<span class="Type">void</span>)fflush(stream);
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Read symbols -- if we have a symbol of the form </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> &lt;name&gt;_is_orifice, then we have a valid orifice </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> in which case we need to dlopen() it and read   </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> prototype and functional information            </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">do</span> {   <span class="Type">char</span> tmpstr[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+           (<span class="Type">void</span>)fgets(line,SSIZE,nm_stream);
+           <span class="Statement">if</span>(feof(nm_stream) == <span class="Constant">0</span>)
+           {  (<span class="Type">void</span>)sscanf(line,<span class="Constant">&quot;</span><span class="Special">%s%s%s</span><span class="Constant">&quot;</span>,strdum,strdum,next_symbol);
+
+
+              <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+              <span class="Comment">/*</span><span class="Comment"> Do we have an orifice? </span><span class="Comment">*/</span>
+              <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+              <span class="Statement">if</span>(strinp((<span class="Type">long</span> *)&amp;index,next_symbol,<span class="Constant">&quot;_is_orifice&quot;</span>) == TRUE)
+              {
+
+                 <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+                 <span class="Comment">/*</span><span class="Comment"> Extract orifice name </span><span class="Comment">*/</span>
+                 <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+
+                 next_symbol[index] = <span class="Special">'\0'</span>;
+                 (<span class="Type">void</span>)strlcpy(orifice_name,next_symbol,SSIZE);
+                 ++orifices;
+
+
+                 <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------</span><span class="Comment">*/</span>
+                 <span class="Comment">/*</span><span class="Comment"> Build symbols for orifice prototype and information </span><span class="Comment">*/</span>
+                 <span class="Comment">/*</span><span class="Comment"> handles                                             </span><span class="Comment">*/</span>
+                 <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------</span><span class="Comment">*/</span>
+
+                 (<span class="Type">void</span>)snprintf(orifice_prototype_name,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">_prototype&quot;</span>,orifice_name);
+                 (<span class="Type">void</span>)snprintf(orifice_info_name     ,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">_info&quot;</span>     ,orifice_name);
+
+                 <span class="Statement">if</span>((orifice_prototype_handle = dlsym(dll_handle,orifice_prototype_name)) != (<span class="Type">void</span> *)<span class="Constant">NULL</span>)
+                 {   orifice_info_handle = dlsym(dll_handle,orifice_info_name);
+
+
+                     <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+                     <span class="Comment">/*</span><span class="Comment"> Display orifice information </span><span class="Comment">*/</span>
+                     <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+
+                     <span class="Statement">if</span>(*(<span class="Type">char</span> **)orifice_info_handle != (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+                        (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    </span><span class="Special">%04d</span><span class="Constant">: orifice name: </span><span class="Special">%-48s</span><span class="Constant"> [dynamic prototype </span><span class="Special">%-48s</span><span class="Constant">]</span><span class="Special">\n</span><span class="Constant">          orifice info: </span><span class="Special">%-48s</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,orifices,
+                                                                                                                                      orifice_name,
+                                                                                                                *(<span class="Type">char</span> **)orifice_prototype_handle,
+                                                                                                                     *(<span class="Type">char</span> **)orifice_info_handle);
+                     <span class="Statement">else</span>
+                        (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    </span><span class="Special">%04d</span><span class="Constant">: orifice name: </span><span class="Special">%-48s</span><span class="Constant"> [dynamic prototype </span><span class="Special">%-48s</span><span class="Constant">]</span><span class="Special">\n</span><span class="Constant">&quot;</span>,orifices,
+                                                                                                     orifice_name,
+                                                                               *(<span class="Type">char</span> **)orifice_prototype_handle);
+                     (<span class="Type">void</span>)fflush(stream);
+
+                 }
+              }
+           }
+        } <span class="Statement">while</span>(feof(nm_stream) == <span class="Constant">0</span>);
+
+    <span class="Statement">if</span>(orifices  == <span class="Constant">1</span>)
+       (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">    DLL </span><span class="Special">%-48s</span><span class="Constant"> has exported </span><span class="Special">%04d</span><span class="Constant"> orifice (</span><span class="Special">%04d</span><span class="Constant"> orifices available)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,    dll_name,<span class="Constant">1</span>,MAX_ORIFICES);
+    <span class="Statement">else</span> <span class="Statement">if</span>(orifices &gt; <span class="Constant">1</span>)
+       (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">    DLL </span><span class="Special">%-48s</span><span class="Constant"> has exported </span><span class="Special">%04d</span><span class="Constant"> orifices (</span><span class="Special">%04d</span><span class="Constant"> orifices available)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,   dll_name,orifices,MAX_ORIFICES - orifices);
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    DLL </span><span class="Special">%-48s</span><span class="Constant"> is not a PUPS dynamic library (</span><span class="Special">%04d</span><span class="Constant"> orifices available)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,dll_name,MAX_ORIFICES);
+
+    (<span class="Type">void</span>)fflush(stream);
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Close the DLL </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)dlclose(dll_handle);
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(TRUE);
+}
+
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> DLL_SUPPORT </span><span class="Comment">*/</span>
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

@@ -1,0 +1,185 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/tas.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span>
+<span class="Comment">     Purpose: tests for a lock file in a directory which can be</span>
+<span class="Comment">              accessed by multiple processes.</span>
+
+<span class="Comment">     Author:  M.A. O'Neill</span>
+<span class="Comment">              Tumbling Dice Ltd</span>
+<span class="Comment">              Gosforth</span>
+<span class="Comment">              Newcastle upon Tyne</span>
+<span class="Comment">              NE3 4RT</span>
+<span class="Comment">              United Kingdom</span>
+
+<span class="Comment">     Version: 2.01 </span>
+<span class="Comment">     Dated:   24th January 2022</span>
+<span class="Comment">     e-mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;stdio.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;signal.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stdlib.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;bsd/string.h&gt;</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Version of tas </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define TAS_VERSION    </span><span class="Constant">&quot;2.01&quot;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> String size </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define SSIZE          </span><span class="Constant">2048</span><span class="PreProc"> </span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span>
+<span class="Comment">    Variables which are global to this application ...</span>
+<span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">static</span> <span class="Type">int</span>  lock_pid         = (-<span class="Constant">1</span>);
+<span class="Type">static</span> <span class="Type">int</span>  n_args           = (-<span class="Constant">1</span>);
+<span class="Type">static</span> <span class="Type">char</span> lock_name[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span>
+<span class="Comment">   Remove lock on exit ...</span>
+<span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">static</span> <span class="Type">int</span> exit_handler(<span class="Type">int</span> signum)
+
+{
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Lock intelligently -- if we lose the process which </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> asked for the lock -- delete lock                  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(n_args == <span class="Constant">3</span>)
+    {  <span class="Statement">while</span>(<span class="Constant">1</span>)
+       {   <span class="Statement">if</span>(kill(lock_pid,<span class="Constant">SIGCONT</span>) == (-<span class="Constant">1</span>))
+           {  <span class="Statement">if</span>(access(lock_name,F_OK | R_OK | W_OK) != (-<span class="Constant">1</span>))
+                 (<span class="Type">void</span>)unlink(lock_name);
+           }
+       }
+   }
+
+   exit(<span class="Constant">0</span>);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Main entry point </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+<span class="Type">int</span> main(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   <span class="Type">int</span> entered = <span class="Constant">0</span>;
+
+    <span class="Statement">if</span>(argc != <span class="Constant">2</span> || strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;-usage&quot;</span>) == <span class="Constant">0</span> || strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;-help&quot;</span>) == <span class="Constant">0</span>)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">tas version </span><span class="Special">%s</span><span class="Constant">, (C) Tumbling Dice 2002-2022 (built </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,TAS_VERSION,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;TAS is free software, covered by the GNU General Public License, and you are</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;welcome to change it and/or distribute copies of it under certain conditions.</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;See the GPL and LGPL licences at www.gnu.org for further details</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;TAS comes with ABSOLUTELY NO WARRANTY</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">Usage: tas [-usage | -help] | &lt;lock file name&gt; [&lt;lock PID&gt;]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       exit(<span class="Constant">255</span>);
+    }
+
+    (<span class="Type">void</span>)strlcpy(lock_name,argv[<span class="Constant">1</span>],SSIZE);
+    <span class="Statement">if</span>(argc == <span class="Constant">3</span>)
+    {  <span class="Statement">if</span>(sscanf(argv[<span class="Constant">2</span>],<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">&quot;</span>,&amp;lock_pid) != <span class="Constant">1</span>)
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;tas: expecting lock PID</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+          exit(<span class="Constant">255</span>);
+       }
+
+       (<span class="Type">void</span>)signal(<span class="Constant">SIGTERM</span>,(<span class="Type">void</span> *)&amp;exit_handler);
+       (<span class="Type">void</span>)signal(<span class="Constant">SIGINT</span>, (<span class="Type">void</span> *)&amp;exit_handler);
+       (<span class="Type">void</span>)signal(<span class="Constant">SIGQUIT</span>,(<span class="Type">void</span> *)&amp;exit_handler);
+
+       n_args = argc;
+    }
+
+    <span class="Statement">while</span>(mkdir(lock_name,<span class="PreProc">0</span><span class="Constant">700</span>) == (-<span class="Constant">1</span>))
+    {    <span class="Statement">if</span>(entered == <span class="Constant">0</span>)
+         {  entered = <span class="Constant">1</span>;
+
+            (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">tas: lock (</span><span class="Special">%s</span><span class="Constant">) is in use</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,lock_name);
+            (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+         }
+
+         sleep(<span class="Constant">1</span>);
+    }
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    tas: got lock (</span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,lock_name);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Lock intelligently -- if we lose the process which </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> asked for the lock -- delete lock                  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(argc == <span class="Constant">3</span>)
+    {  <span class="Statement">while</span>(<span class="Constant">1</span>)
+       {   <span class="Statement">if</span>(kill(lock_pid,<span class="Constant">SIGCONT</span>) == (-<span class="Constant">1</span>))
+   	   {  <span class="Statement">if</span>(access(lock_name,F_OK | R_OK | W_OK) != (-<span class="Constant">1</span>))
+	         (<span class="Type">void</span>)unlink(lock_name);
+
+              exit(<span class="Constant">0</span>);
+	   }
+
+	   (<span class="Type">void</span>)usleep(<span class="Constant">100</span>);
+       }
+    }
+
+    exit(<span class="Constant">0</span>);
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

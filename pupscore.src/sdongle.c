@@ -9,7 +9,7 @@
               United Kingdom
 
      Version: 2.00 
-     Dated:   30th August 2019 
+     Dated:   4th January 2022
      e-mail:  mao@tumblingdice.co.uk
 -------------------------------------------------------------------*/
 
@@ -57,7 +57,7 @@ _PUBLIC int main(int argc, char *argv[])
     struct stat stat_buf;
 
     if(argc < 2 || argc > 3 || strcmp(argv[1],"-usage") == 0 || strcmp(argv[1],"-help") == 0)
-    {  (void)fprintf(stderr,"\nsdongle version %s, (C) Tumbling Dice 2003-2019 (built %s)\n\n",SDONGLE_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nsdongle version %s, (C) Tumbling Dice 2003-2022 (built %s)\n\n",SDONGLE_VERSION,__TIME__,__DATE__);
        (void)fprintf(stderr,"SDONGLE is free software, covered by the GNU General Public License, and you are\n");
        (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
        (void)fprintf(stderr,"See the GPL and LGPL licences at www.gnu.org for further details\n");
@@ -65,7 +65,7 @@ _PUBLIC int main(int argc, char *argv[])
        (void)fprintf(stderr,"\nUsage: sdongle [-usage | -help] [<dongle file name>]\n\n");
        (void)fflush(stderr);
 
-       exit(-1);
+       exit(255);
     }
 
 
@@ -87,13 +87,13 @@ _PUBLIC int main(int argc, char *argv[])
     {  (void)fprintf(stderr,"dongle: soft dongle file \"%s\" already exists\n",argv[1]);
        (void)fflush(stderr);
 
-       exit(-1);
+       exit(255);
     }
     else if(access(argv[1],F_OK | R_OK | W_OK) != (-1))
     {  (void)fprintf(stderr,"dongle: soft dongle file \"%s\" already exists\n",dongle_file_name);
        (void)fflush(stderr);
 
-       exit(-1);
+       exit(255);
     }
 
 

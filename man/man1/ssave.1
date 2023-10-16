@@ -9,7 +9,7 @@ SSAVE \- save state of command via
 .B ssave 
 .B [-usage | -help]
 .B [-t <poll time] [-cd <crui directory>] !-p <payload command/shell-script!
->& <log file>
+[2> <log file>]
 .br
 
 .SH DESCRIPTION
@@ -24,7 +24,6 @@ via
 .I restart(1)
 using the last checkpoint saved.
 .br
-
 
 .SH OPTIONS
 
@@ -65,18 +64,26 @@ the bodies of files which need to be
 and migrated with a checkpoint moving to a new host.
 .br
 
-.SH ENVIRONMENT VARIABLES
-None.
-.br
-
 .SH FILES
 the
 .I criu(1)
 checkpoint is stored in
 .I /tmp/criu.<payload pid>.ssave.
+.SH EXIT STATUS
 
-.SH BUGS
-.I None
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
+.br
+
+.SH ENVIRONMENT VARIABLES
+None.
+.br
 
 .SH COPYRIGHT
 (C) Tumbling Dice Ltd.

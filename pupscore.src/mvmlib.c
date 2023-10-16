@@ -9,7 +9,7 @@
               United Kingdom
 
     Version: 2.02 
-    Dated:   27th September 2019 
+    Dated:   4th January 2022
     E-mail:  mao@tumblingdice.co..uk
 ------------------------------------------------------------------------------*/
 
@@ -38,7 +38,7 @@ _PRIVATE void mvm_slot(int level)
 {   (void)fprintf(stderr,"lib mvmlib %s: [ANSI C]\n",MVMLIB_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(c) 1995-2019 Tumbling Dice, Gosforth\n");
+    {  (void)fprintf(stderr,"(c) 1995-2022 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
        (void)fprintf(stderr,"Meta virtual paged object library (built %s %s)\n",__TIME__,__DATE__);
        (void)fflush(stderr);
@@ -460,7 +460,7 @@ _PUBLIC void **mvm_init(char             *name,  // Name of virtual memory
     (void)snprintf(errstr,SSIZE,"mvm_init: too many metata virtual memory objects (max per process %d)\n",MVM_TABLE_SIZE);
     error(errstr); 
 
-    pups_exit(-1);
+    pups_exit(255);
 }
 
 

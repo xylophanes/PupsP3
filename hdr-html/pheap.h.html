@@ -1,0 +1,321 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.5.1.src.git/include.libs/pheap.h.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="cpp">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span>
+<span class="Comment">    Header file for persistent heap library. A persistent heap is an</span>
+<span class="Comment">    area of data memory which may be mapped serially into the</span>
+<span class="Comment">    address spaces of multiple process.</span>
+
+<span class="Comment">    Author:  M.A. O'Neill</span>
+<span class="Comment">             Tumbling Dice Ltd</span>
+<span class="Comment">             Gosforth</span>
+<span class="Comment">             Newcastle upon Tyne</span>
+<span class="Comment">             NE3 4RT</span>
+<span class="Comment">             United Kingdom</span>
+
+<span class="Comment">    Version: 2.00 </span>
+<span class="Comment">    Dated:   4th January 2022</span>
+<span class="Comment">    Email:   mao@tumblingdice.co.uk</span>
+<span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifndef PHEAP_H</span>
+<span class="PreProc">#define PHEAP_H</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Keep c2man happy </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;c2man.h&gt;</span>
+
+<span class="PreProc">#ifndef __C2MAN__</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;me.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;utils.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/types.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/mman.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/errno.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;setjmp.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> __C2MAN__ </span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">*********</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Version </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">*********</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define PHEAP_VERSION    </span><span class="Constant">&quot;2.00&quot;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> String size </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define SSIZE              </span><span class="Constant">2048</span>
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Definitions which are local to this module </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define PHM_MAP_LOCAL      </span><span class="Constant">1</span>
+<span class="PreProc">#define PHM_MAP_GLOBAL     </span><span class="Constant">2</span>
+
+<span class="PreProc">#define N_PARAMETERS       </span><span class="Constant">21</span><span class="PreProc"> </span>
+<span class="PreProc">#define MAGIC_OFFSET       </span><span class="Constant">19</span>
+<span class="PreProc">#define HEAPMAGIC32BIG     </span><span class="Constant">0xff003200L</span>
+<span class="PreProc">#define HEAPMAGIC64BIG     </span><span class="Constant">0xff006400L</span>
+<span class="PreProc">#define HEAPMAGIC32LITTLE  </span><span class="Constant">0xff003200L</span>
+<span class="PreProc">#define HEAPMAGIC64LITTLE  </span><span class="Constant">0xff006400L</span>
+<span class="PreProc">#define MAX_PHEAPS         </span><span class="Constant">64</span><span class="PreProc"> </span>
+<span class="PreProc">#define PHM_SBRK_SIZE      </span><span class="Constant">65535</span><span class="PreProc"> </span>
+<span class="PreProc">#define PHM_BSTORE_SIZE    </span><span class="Constant">32000000</span>
+<span class="PreProc">#define PHOBMAP_QUANTUM    </span><span class="Constant">128</span><span class="PreProc"> </span>
+<span class="PreProc">#define DEFAULT_MAX_TRYS   </span><span class="Constant">8</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Heap disposition </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define O_KEEP          </span><span class="Constant">0</span>
+<span class="PreProc">#define O_DESTROY       </span><span class="Constant">128</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Heap attachment flags </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define ATTACH_PHEAP    </span><span class="Constant">1</span>
+<span class="PreProc">#define CREATE_PHEAP    </span><span class="Constant">2</span>
+<span class="PreProc">#define LIVE_PHEAP      </span><span class="Constant">4</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Offset operations (for process address space mapping) </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define ADD_OFFSET      </span><span class="Constant">0</span>
+<span class="PreProc">#define SUBTRACT_OFFSET </span><span class="Constant">1</span>
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Lock recursion counter defines </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define LOCK_COUNTERS   </span><span class="Constant">256</span>
+<span class="PreProc">#define DECREMENT       </span><span class="Constant">0</span>
+<span class="PreProc">#define INCREMENT       </span><span class="Constant">1</span>
+<span class="PreProc">#define GET             </span><span class="Constant">3</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Write/update counter defines </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define WRITE_COUNTERS  </span><span class="Constant">256</span>
+<span class="PreProc">#define READ            </span><span class="Constant">0</span>
+<span class="PreProc">#define WRITE           </span><span class="Constant">1</span>
+<span class="PreProc">#define READWRITE       </span><span class="Constant">2</span>
+<span class="PreProc">#define UPDATE          READWRITE</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Definition of heap_type - the heap table is an aggregate of </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> this structure                                              </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">typedef</span> <span class="Type">struct</span> {    <span class="Type">int</span>               fd;               <span class="Comment">// File descriptor for heap backing store file</span>
+                    <span class="Type">int</span>               flags;            <span class="Comment">// Flags (for associated descriptor)</span>
+                    <span class="Type">int</span>               m_cnt;            <span class="Comment">// Number of processes mapping heap </span>
+                    <span class="Type">long</span> <span class="Type">int</span>          mtime;            <span class="Comment">// Lat modification time of heap file </span>
+                    <span class="Type">char</span>              name[SSIZE];      <span class="Comment">// Name of heap backing store file </span>
+                    <span class="Type">int</span>               ptrsize;          <span class="Comment">// Number of address bits for heap addresses</span>
+                    <span class="Type">size_t</span>            segment_size;     <span class="Comment">// Size of reserved virtual memory for heap</span>
+                    <span class="Type">size_t</span>            sdata;            <span class="Comment">// Address of first byte on heap</span>
+                    <span class="Type">size_t</span>            edata;            <span class="Comment">// Address of last byte on heap</span>
+                    <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span> heapmagic;        <span class="Comment">// Magic number for persistent heaps </span>
+                    <span class="Type">void</span>              *addr;            <span class="Comment">// Base heap address in caller address space</span>
+                    _BOOLEAN          exists;           <span class="Comment">// TRUE if heap already exists</span>
+                    _BOOLEAN          addresses_local;  <span class="Comment">// TRUE if addresses local to attached process</span>
+                    _BOOLEAN          autodestruct;     <span class="Comment">// Heap autodestruct flag</span>
+               } heap_type;
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Object map - used to translate names to addresses and vice </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> versa (on peristent heap)                                  </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">typedef</span> <span class="Type">struct</span> {    <span class="Type">void</span>     *addr;                     <span class="Comment">// Address of persistent object</span>
+                    <span class="Type">char</span>     name[SSIZE];               <span class="Comment">// Name of persistent object</span>
+                    <span class="Type">char</span>     info[SSIZE];               <span class="Comment">// Object information string</span>
+                    <span class="Type">int</span>      pid;                       <span class="Comment">// Last PID to acquire lock</span>
+                    <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span> size;             <span class="Comment">// Size of object (in bytes)</span>
+               } phobmap_type;
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Variables exported by the persistent heap library </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------</span><span class="Comment">*/</span>
+
+_EXPORT heap_type       *htable;
+_EXPORT _BOOLEAN        do_msm_init;
+_EXPORT pthread_mutex_t htab_mutex;
+_EXPORT pthread_mutex_t phmalloc_mutex;
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Functions exported by persistent heap library </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Comment">// Initialise persistent heap</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> msm_init(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Extend [grow] persistent heap table</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> msm_extend(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Attach a persistent heap to process returning its heap descriptor</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> msm_heap_attach(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Detach a persistent heap</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> msm_heap_detach(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Extend the memory within a persistent heap</span>
+_PROTOTYPE _EXTERN <span class="Type">void</span> *msm_sbrk(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">size_t</span>);
+
+<span class="Comment">// Gather statistics on heap</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> msm_hstat(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, heap_type *);
+
+<span class="Comment">// Find first free named persistent object slot in the map area</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> msm_get_free_mapslot(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Find object in persistent object map</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> msm_find_mapped_object(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">void</span> *);
+
+<span class="Comment">// Add object to the persitent heap object map</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> msm_map_object(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span> h_index, <span class="Type">const</span> <span class="Type">void</span> *ptr, <span class="Type">const</span> <span class="Type">char</span> *name);
+
+<span class="Comment">// Remove persisent object from object map</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> msm_unmap_object(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span> hdes, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span> h_index);
+
+<span class="Comment">// Translate persistent object name to address</span>
+_PROTOTYPE _PUBLIC <span class="Type">void</span> *msm_map_objectname2addr(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Translate persistent object name to index</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> msm_map_objectname2index(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Translate persistent object map index to name</span>
+_PROTOTYPE _EXTERN <span class="Type">char</span> *msm_map_objectindex2name(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Translate persistent object map index to address </span>
+_PROTOTYPE _EXTERN <span class="Type">void</span> *msm_map_objectindex2addr(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Map a (persistent) address to object table index</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> msm_map_objectaddr2index(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">void</span> *);
+
+<span class="Comment">// Is this mapname unique?</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> msm_mapname_unique(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Show persistent heap object table</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> msm_show_mapped_objects(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">FILE</span> *);
+
+<span class="Comment">// Show details of object in persistent heap</span>
+_PROTOTYPE _EXTERN  <span class="Type">int</span> msm_show_mapped_object(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">FILE</span> *);
+
+<span class="Comment">// Translate persistent heap descriptor to name</span>
+_PROTOTYPE _EXTERN <span class="Type">char</span> *msm_hdes2name(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Translate persistent heap name to heap descriptor</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> msm_name2hdes(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Translate persistent heap fdes (file descriptor) to heap descriptor</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> msm_fdes2hdes(<span class="Type">int</span>);
+
+<span class="Comment">// Set info field of mapped object</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> map_setinfo(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Set the size field of mapped object</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> map_setsize(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">size_t</span>);
+
+<span class="Comment">// Inverse synchronisation of heap table</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> msm_isync_heaptables(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Synchronisation of heap table</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> msm_sync_heaptables(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Print heaptable (debugging)</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> msm_print_heaptables(<span class="Type">const</span> <span class="Type">FILE</span> *, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">size_t</span>);
+
+<span class="Comment">// Detach all persistent heaps</span>
+_PROTOTYPE _EXTERN <span class="Type">void</span> msm_exit(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Mark a persistent heap for &quot;autodestruct-on-detach&quot;</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> msm_set_autodestruct_state(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> _BOOLEAN);
+
+<span class="Comment">// See if a persistent object exists</span>
+_PROTOTYPE _EXTERN _BOOLEAN msm_phobject_exists(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">char</span> *);
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Set pesistent heap addressing to local (PHM_MAP_LOCAL) </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> or relative (PHM_MAP_REMOTE)                           </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PROTOTYPE _EXTERN <span class="Type">int</span> msm_map_address_mode(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+
+<span class="Comment">// Translate heap name to heap table index</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> msm_name2index(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Check if address is in heap</span>
+_PROTOTYPE _EXTERN _BOOLEAN msm_addr_in_heap(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">void</span> *);
+
+<span class="Comment">// Translate heap fdes to heap table index </span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> msm_fdes2hdes(<span class="Type">const</span> <span class="Type">int</span> fdes);
+
+<span class="Comment">// Check to see if an address lies within persistent heap</span>
+_PROTOTYPE _EXTERN _BOOLEAN msm_addr_in_heap(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span> hdes, <span class="Type">const</span> <span class="Type">void</span> *ptr);
+
+<span class="Comment">// Convert global heap address to local process address</span>
+_PROTOTYPE _EXTERN <span class="Type">void</span> *msm_map_haddr_to_paddr(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">void</span> *);
+
+<span class="Comment">// Convert local process address to global heap address</span>
+_PROTOTYPE _EXTERN <span class="Type">void</span> *msm_map_paddr_to_haddr(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">void</span> *);
+
+<span class="Comment">// Save state of heap</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> msm_save_heapstate(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PHEAP_H </span><span class="Comment">*/</span>
+
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

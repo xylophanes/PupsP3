@@ -1,0 +1,181 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.5.1.src.git/include.libs/casino.h.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="cpp">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------- </span>
+<span class="Comment">    Header for the random number generator library.</span>
+
+<span class="Comment">    Author:  M.A. O'Neill</span>
+<span class="Comment">             Tumbling Dice Ltd</span>
+<span class="Comment">             Gosforth</span>
+<span class="Comment">             Newcastle upon Tyne</span>
+<span class="Comment">             NE3 4RT</span>
+<span class="Comment">             United Kingdom</span>
+
+<span class="Comment">    Version: 2.00 </span>
+<span class="Comment">    Dated:   4th January 2022</span>
+<span class="Comment">    E-Mail:  mao@tumblingdice.co.uk </span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="PreProc">#ifndef CASINO_H</span>
+<span class="PreProc">#define CASINO_H</span>
+
+
+<span class="Comment">/*</span><span class="Comment">*********</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Version </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">*********</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define CASINO_VERSION  </span><span class="Constant">&quot;2.00&quot;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Keep c2man happy </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;c2man.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Floating point representation ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;ftype.h&gt;</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Definition of gate datastructure required by the user defined</span>
+<span class="Comment">    distribution generator ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">typedef</span> <span class="Type">struct</span> {   <span class="Type">int</span>   n_gates;     <span class="Comment">// Number of gates </span>
+                   FTYPE frame_size;  <span class="Comment">// Total size of gate frame</span>
+                   FTYPE *gate_x;     <span class="Comment">// Pointer to returned deviate </span>
+                   FTYPE *gate_y;     <span class="Comment">// Pointer to transform function </span>
+               } gate_type;
+
+
+<span class="PreProc">#ifdef __NOT_LIB_SOURCE__</span>
+
+_EXPORT <span class="Type">long</span> r_init;
+
+<span class="PreProc">#else</span> <span class="Comment">/*</span><span class="Comment"> External variable declarations </span><span class="Comment">*/</span>
+<span class="PreProc">#   undef  _EXPORT</span>
+<span class="PreProc">#   define _EXPORT</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> __NOT_LIB_SOURCE__ </span><span class="Comment">*/</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Prototype bindings ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Comment">// Return N! as floating point number</span>
+_PROTOTYPE _EXPORT FTYPE factrl(<span class="Type">int</span>);
+
+<span class="Comment">// Return binomial coefficient as floating point number</span>
+_PROTOTYPE _EXPORT FTYPE bico(<span class="Type">int</span>, <span class="Type">int</span>);
+
+<span class="Comment">// High precision linear congruential random deviates</span>
+_PROTOTYPE _EXPORT FTYPE ran1(<span class="Type">void</span>);
+
+<span class="Comment">// Reduced precision linear congruential generator </span>
+_PROTOTYPE _EXPORT FTYPE ran2(<span class="Type">void</span>);
+
+<span class="Comment">// Random deviates using Knuths' method </span>
+_PROTOTYPE _EXPORT FTYPE ran3(<span class="Type">void</span>);
+
+<span class="Comment">// Random deviate long period random number generator</span>
+_PROTOTYPE _EXPORT FTYPE ran4(<span class="Type">long</span> *);
+
+<span class="Comment">// Park-Miller random number generator (with Bays-Durham shuffle)</span>
+_PROTOTYPE _EXPORT FTYPE ran5(<span class="Type">long</span> *);
+
+<span class="Comment">// Gaussian deviates via the Box-Muller Transfor </span>
+_PROTOTYPE _EXPORT FTYPE gasdev(FTYPE (* )(__UDEF_ARGS__), FTYPE);
+
+<span class="Comment">// Gaussian Deviates via Central Limit Theorem</span>
+_PROTOTYPE _EXPORT FTYPE gasdev2(FTYPE (* )(__UDEF_ARGS__), FTYPE);
+
+<span class="Comment">// Gamma deviates via substitution method</span>
+_PROTOTYPE _EXPORT FTYPE gamdev(<span class="Type">int</span>, FTYPE (* )(__UDEF_ARGS__));
+
+<span class="Comment">// Poisson distribution via substitution method</span>
+_PROTOTYPE _EXPORT FTYPE poidev(FTYPE, FTYPE (* )(__UDEF_ARGS__));
+
+<span class="Comment">// Binomial deviates via substitution method</span>
+_PROTOTYPE _EXPORT FTYPE bnldev(FTYPE, <span class="Type">int</span>, FTYPE (* )(__UDEF_ARGS__));
+
+<span class="Comment">// User defined deviates via substitution method</span>
+_PROTOTYPE _EXPORT FTYPE numdev(FTYPE (* )(__UDEF_ARGS__), gate_type *);
+
+<span class="Comment">// Number of unique combinations of n objects taken from m</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> n_from_m(<span class="Type">int</span>, <span class="Type">int</span>);
+
+<span class="Comment">// Linear correlation coefficient [Pearson's r]</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span>  pearsn(FTYPE [],
+                                FTYPE [],
+                                <span class="Type">int</span>      ,
+                                FTYPE  *,
+                                FTYPE  *,
+                                FTYPE  *);
+
+<span class="Comment">// Spearman's rank correlation coefficient</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span>  spear(FTYPE [],
+                               FTYPE [],
+                               <span class="Type">int</span>      ,
+                               FTYPE  *,
+                               FTYPE  *,
+                               FTYPE  *,
+                               FTYPE  *,
+                               FTYPE  *);
+
+
+<span class="Comment">// Write to (enigma) encrypted data stream</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> enigma8read(<span class="Type">unsigned</span> <span class="Type">long</span>, <span class="Type">int</span>, _BYTE *, <span class="Type">unsigned</span> <span class="Type">long</span>);
+
+<span class="Comment">// Read from (enigma) encrypted data stream</span>
+_PROTOTYPE _EXPORT  <span class="Type">int</span> enigma8read(<span class="Type">unsigned</span> <span class="Type">long</span>, <span class="Type">int</span>, _BYTE *, <span class="Type">unsigned</span> <span class="Type">long</span>);
+
+<span class="PreProc">#ifdef _CPLUSPLUS</span>
+<span class="PreProc">#   undef  _EXPORT</span>
+<span class="PreProc">#   define _EXPORT </span><span class="Type">extern</span><span class="PreProc"> C</span>
+<span class="PreProc">#else</span>
+<span class="PreProc">#   undef  _EXPORT</span>
+<span class="PreProc">#   define _EXPORT </span><span class="Type">extern</span>
+<span class="PreProc">#endif</span>
+
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> CASINO.H </span><span class="Comment">*/</span>
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

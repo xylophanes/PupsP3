@@ -1,4 +1,4 @@
-.TH MKFILE 1 "30 December 2002" "PUPSP3 build tools" "PUPSP3 build tools"
+.TH MKFILE 1 "30th December 2002" "PUPSP3 build tools" "PUPSP3 build tools"
 
 .SH NAME
 MKTTY \- PUPS file creation utility.
@@ -6,7 +6,7 @@ MKTTY \- PUPS file creation utility.
 
 .SH SYNOPSIS
 .B mkfile [-help | -usage] | <name> <(octal> permisions>
->& <log file>
+[2> <log file>]
 .br
 
 .SH DESCRIPTION
@@ -29,6 +29,18 @@ permissions are 0600 (-rw-------).
 .B -help | -usage
 prints out usage string. The application then exists (with return
 code 1).
+.br
+
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
 .br
 
 .SH ENVIRONMENT VARIABLES

@@ -1,0 +1,514 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.5.1.src.git/include.libs/cantor.h.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="cpp">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Purpose: Header for Cantor cellular database library. </span>
+
+<span class="Comment">    Author:  M.A. O'Neill</span>
+<span class="Comment">             Tumbling Dice Ltd</span>
+<span class="Comment">             Gosforth</span>
+<span class="Comment">             Newcastle upon Tyne</span>
+<span class="Comment">             NE3 4RT</span>
+<span class="Comment">             United Kingdom</span>
+
+<span class="Comment">    Version: 3.00 </span>
+<span class="Comment">    Dated:   4th January 2022</span>
+<span class="Comment">    E-mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifndef CANTOR_H</span>
+<span class="PreProc">#define CANTOR_H</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Keep c2man happy </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;c2man.h&gt;</span>
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------</span>
+<span class="Comment">    Defines usd by the Cantor core library ...</span>
+<span class="Comment">-------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Comment">/*</span><span class="Comment">*********</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Version </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">*********</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define CANTOR_VERSION        </span><span class="Constant">&quot;3.00&quot;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Header which need to be included ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;xtypes.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;ftype.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------</span>
+<span class="Comment">    Datastructures defined by this module ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> String size </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define SSIZE </span><span class="Constant">2048</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Definition of a node in the network </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">typedef</span> <span class="Type">struct</span> ltype link_type;
+<span class="Type">typedef</span> <span class="Type">struct</span> otype object_type;
+
+<span class="Type">typedef</span> <span class="Type">struct</span> {   <span class="Type">char</span>         name[SSIZE];         <span class="Comment">// Name of network node</span>
+                   <span class="Type">char</span>         type[SSIZE];         <span class="Comment">// Type of node</span>
+                   <span class="Type">int</span>          object_alloc;        <span class="Comment">// Number of object slots allocated to this node</span>
+                   <span class="Type">int</span>          object_cnt;          <span class="Comment">// Number of objects associated with this node</span>
+                   object_type  **objects;           <span class="Comment">// Node objects (if any)</span>
+                   <span class="Type">int</span>          link_alloc;          <span class="Comment">// Number of link slots allocated to this node </span>
+                   <span class="Type">int</span>          link_cnt;            <span class="Comment">// Number of links associated with this node/</span>
+                   link_type    **links;             <span class="Comment">// Connected objects which reference this node</span>
+
+<span class="PreProc">                   #ifdef PERSISTENT_HEAP_SUPPORT</span>
+                   <span class="Type">char</span>         link_name[SSIZE];    <span class="Comment">// Handle to links array on persistent heap</span>
+                   <span class="Type">char</span>         object_name[SSIZE];  <span class="Comment">// Handle to objects array on persistent heap </span>
+<span class="PreProc">                   #endif</span> <span class="Comment">/*</span><span class="Comment"> pupsp3-4.0.0.src.old     _HEAP_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="PreProc">                   #ifdef PTHREAD_SUPPORT</span>
+                   pthread_mutex_t mutex;            <span class="Comment">// Node access mutex </span>
+<span class="PreProc">                   #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+               } node_type;
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Definition of list of nodes </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">typedef</span> <span class="Type">struct</span> {   <span class="Type">char</span>         name[SSIZE];         <span class="Comment">// Name of nodelist</span>
+                   <span class="Type">char</span>         type[SSIZE];         <span class="Comment">// Type of nodelist</span>
+                   <span class="Type">int</span>          node_alloc;          <span class="Comment">// Number of node slots in nodelist</span>
+                   <span class="Type">int</span>          node_cnt;            <span class="Comment">// Number of nodes in nodelist</span>
+                   node_type    **nodes;             <span class="Comment">// Node list</span>
+
+<span class="PreProc">                   #ifdef PERSISTENT_HEAP_SUPPORT</span>
+                   <span class="Type">char</span>         node_name[SSIZE];    <span class="Comment">// Handle to nodes array on persistent heap </span>
+<span class="PreProc">                   #endif</span> <span class="Comment">/*</span><span class="Comment"> PERSISTENT_HEAP_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="PreProc">                   #ifdef PTHREAD_SUPPORT</span>
+                   pthread_mutex_t mutex;            <span class="Comment">// Node list access mutex </span>
+<span class="PreProc">                   #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+               } nodelist_type;
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Definition of a link through the network </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">struct</span> ltype {  <span class="Type">char</span>      tag[SSIZE];               <span class="Comment">// Label identifying link</span>
+                <span class="Type">char</span>      type[SSIZE];              <span class="Comment">// Type of link </span>
+                <span class="Type">int</span>       hdes;                     <span class="Comment">// Shared heap handle of link </span>
+                FTYPE     length;                   <span class="Comment">// Physical size of link </span>
+                FTYPE     flux;                     <span class="Comment">// Flux through this link from source </span>
+                <span class="Type">int</span>       node_alloc;               <span class="Comment">// Slots allocated to routelist </span>
+                <span class="Type">int</span>       node_cnt;                 <span class="Comment">// Length of routelist (in nodes) </span>
+                node_type **routelist;              <span class="Comment">// Nodes in this link </span>
+
+<span class="PreProc">                #ifdef PERSISTENT_HEAP_SUPPORT</span>
+                <span class="Type">char</span>     node_name[<span class="Constant">256</span>];            <span class="Comment">// Handle to routelist array on persistent heap </span>
+<span class="PreProc">                #endif</span> <span class="Comment">/*</span><span class="Comment"> PERSISTENT_HEAP_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="PreProc">                #ifdef PTHREAD_SUPPORT</span>
+                pthread_mutex_t mutex;              <span class="Comment">// Link access mutex </span>
+<span class="PreProc">                #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+             };
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Definition of an object which may be attached to a node </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">struct</span> otype {   <span class="Type">char</span> tag[SSIZE];                  <span class="Comment">// Tag which identifies this object </span>
+                 <span class="Type">char</span> type[SSIZE];                 <span class="Comment">// Type of object (data function etc)</span>
+                 <span class="Type">int</span>  hdes;                        <span class="Comment">// Shared heap handle of object </span>
+                 <span class="Type">char</span> infopage[SSIZE];             <span class="Comment">// HTML page which described object (if any) </span>
+                 <span class="Type">void</span> **olink;                     <span class="Comment">// Link to the object (function or data) </span>
+
+<span class="PreProc">                 #ifdef PERSISTENT_HEAP_SUPPORT</span>
+                 <span class="Type">char</span> object_name[SSIZE];          <span class="Comment">// Handle to object array on persistent heap</span>
+<span class="PreProc">                 #endif</span> <span class="Comment">/*</span><span class="Comment"> PERSISTENT_HEAP_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="PreProc">                 #ifdef PTHREAD_SUPPORT</span>
+                 pthread_mutex_t mutex;            <span class="Comment">// Object access mutex </span>
+<span class="PreProc">                 #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+             };
+
+
+<span class="PreProc">#ifdef _NOT_LIB_SOURCE_                   </span>
+
+<span class="PreProc">#else</span>
+<span class="PreProc">#   undef  _EXPORT</span>
+<span class="PreProc">#   define _EXPORT</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> _NOT_LIB_SOURCE_ </span><span class="Comment">*/</span>
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------</span>
+<span class="Comment">    Functions exported by this module ...</span>
+<span class="Comment">-------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef PTHREAD_SUPPORT</span>
+
+<span class="Comment">// Initialise node mutex (recursive) </span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> cantor_init_node_mutex(node_type *);
+
+<span class="Comment">// Initialise object mutex (recursive)</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> cantor_init_object_mutex(object_type *);
+
+<span class="Comment">// Initialise list mutex (recursive)</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> cantor_init_link_mutex(link_type *);
+
+<span class="Comment">// Initialise nodelist mutex (recursive)</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> cantor_init_nodelist_mutex(nodelist_type *);
+
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+
+<span class="Comment">// Get node index (given node ame)</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_get_node_index_from_name(nodelist_type *, <span class="Type">char</span> *);
+
+<span class="Comment">// Clear node</span>
+_PROTOTYPE _EXPORT node_type *cantor_clear_node(node_type *);
+
+<span class="PreProc">#ifdef PERSISTENT_HEAP_SUPPORT</span>
+<span class="Comment">// Clear node</span>
+_PROTOTYPE _EXPORT node_type *cantor_phclear_node(node_type *, <span class="Type">int</span>);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PERSISTENT_HEAP_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="Comment">// Clear node list </span>
+_PROTOTYPE _EXPORT nodelist_type *cantor_clear_nodelist(nodelist_type *);
+
+<span class="PreProc">#ifdef PERSISTENT_HEAP_SUPPORT</span>
+<span class="Comment">// Clear node list</span>
+_PROTOTYPE _EXPORT nodelist_type *cantor_phclear_nodelist(nodelist_type *, <span class="Type">int</span>);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PERSISTENT_HEAP_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="Comment">// Add node to nodelist</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_add_node_to_nodelist(nodelist_type *, node_type *);
+
+<span class="PreProc">#ifdef PERSISTENT_HEAP_SUPPORT</span>
+<span class="Comment">// Add node to nodelist</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_phadd_node_to_nodelist(nodelist_type *, node_type *, <span class="Type">int</span>, <span class="Type">char</span> *);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PERSISTENT_HEAP_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="Comment">// Remove node from nodelist</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_remove_node_from_nodelist(nodelist_type *, <span class="Type">char</span> *);
+
+<span class="PreProc">#ifdef PERSISTENT_HEAP_SUPPORT</span>
+<span class="Comment">// Remove node from nodelist</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_phremove_node_from_nodelist(nodelist_type *, <span class="Type">char</span> *, <span class="Type">int</span>);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PERSISTENT_HEAP_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="Comment">// Set nodelist name</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_set_nodelist_name(nodelist_type *nodelist, <span class="Type">char</span> *nodelist_name);
+
+<span class="Comment">// Set nodelist type</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_set_nodelist_type(nodelist_type *, <span class="Type">char</span> *);
+
+<span class="Comment">// Add object to node list</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_add_object_to_node(node_type *, object_type *);
+
+<span class="PreProc">#ifdef PERSISTENT_HEAP_SUPPORT</span>
+<span class="Comment">// Add object to node list</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_phadd_object_to_node(node_type *, object_type *, <span class="Type">int</span>, <span class="Type">char</span> *);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PERSISTENT_HEAP_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="Comment">// Remove object from node</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> remove_object_from_node(node_type *, <span class="Type">char</span> *);
+
+<span class="PreProc">#ifdef PERSISTENT_HEAP_SUPPORT</span>
+<span class="Comment">// Remove object from node</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_phremove_object_from_node(node_type *, <span class="Type">char</span> *, <span class="Type">int</span>);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PERSISTENT_HEAP_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="Comment">// Is node name unique?</span>
+_PROTOTYPE _EXPORT _BOOLEAN cantor_node_name_unique(nodelist_type *, <span class="Type">char</span> *);
+
+<span class="Comment">// Is object tag unique?</span>
+_PROTOTYPE _EXPORT _BOOLEAN cantor_object_tag_unique(node_type *, <span class="Type">char</span> *);
+
+<span class="Comment">// Get index of object (in node object table) given object name </span>
+_PROTOTYPE _EXPORT _BOOLEAN cantor_get_object_index_from_tag(node_type *, <span class="Type">char</span> *);
+
+<span class="Comment">// Get object tag (given index in node object table)</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_get_object_tag_from_index(<span class="Type">char</span> *, node_type *, <span class="Type">int</span>);
+
+<span class="Comment">// Add a link (inter-node link) to a node</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_add_link_to_node(node_type *, link_type *);
+
+<span class="PreProc">#ifdef PERSISTENT_HEAP_SUPPORT</span>
+<span class="Comment">// Add a link (inter-node link) to a node</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_phadd_link_to_node(node_type *, link_type *, <span class="Type">int</span>, <span class="Type">char</span> *);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PERSISTENT_HEAP_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="Comment">// Remove a link from a node (using linkweay tag to identify linkway to be removed)</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_remove_link_from_node(node_type *, <span class="Type">char</span> *);
+
+<span class="PreProc">#ifdef PERSISTENT_HEAP_SUPPORT</span>
+<span class="Comment">// Remove a link from a node (using linkweay tag to identify link to be removed)</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_phremove_link_from_node(node_type *, <span class="Type">char</span> *, <span class="Type">int</span>);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PERSISTENT_HEAP_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="Comment">// Is link i.d. tag unique</span>
+_PROTOTYPE _EXPORT _BOOLEAN cantor_link_tag_unique(node_type *, <span class="Type">char</span> *);
+
+<span class="Comment">// Get index into node link table (using link tag to ientify link required)</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_get_link_index_from_tag(node_type *, <span class="Type">char</span> *);
+
+<span class="Comment">// Get link tag (given index into node link table)</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_get_link_tag_from_index(<span class="Type">char</span> *, node_type *, <span class="Type">int</span>);
+
+<span class="Comment">// Set node name</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_set_node_name(node_type *, <span class="Type">char</span> *);
+
+<span class="Comment">// Print (limited) information about a node</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_print_node_info(<span class="Type">FILE</span> *, node_type *);
+
+<span class="Comment">// Generate VHTML page describing node</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_vhtml_node_info(_BOOLEAN, <span class="Type">char</span> *, <span class="Type">char</span> *, node_type *);
+
+<span class="Comment">// Clear a link (local process heap)</span>
+_PROTOTYPE _EXPORT link_type *cantor_clear_link(link_type *);
+
+<span class="PreProc">#ifdef PERSISTENT_HEAP_SUPPORT</span>
+<span class="Comment">// Clear a link (persistent heap)</span>
+_PROTOTYPE _EXPORT link_type *cantor_phclear_link(link_type *, <span class="Type">int</span>);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PERSISTENT_HEAP_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="Comment">// Clear a list of links</span>
+_PROTOTYPE _EXPORT link_type **cantor_clear_linklist(link_type **, <span class="Type">int</span>);
+
+<span class="PreProc">#ifdef PERSISTENT_HEAP_SUPPORT</span>
+<span class="Comment">// Clear a link (persistent heap)</span>
+_PROTOTYPE _EXPORT link_type **cantor_phclear_linklist(link_type **, <span class="Type">int</span>, <span class="Type">int</span>);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PERSISTENT_HEAP_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="Comment">// Add a node to an existing link</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_add_node_to_link(link_type *, node_type *);
+
+<span class="PreProc">#ifdef PERSISTENT_HEAP_SUPPORT</span>
+<span class="Comment">// Add a node to an existing link</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_phadd_node_to_link(link_type *, node_type *, <span class="Type">int</span>, <span class="Type">char</span> *);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PERSISTENT_HEAP_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="Comment">// Remove node (from existing link)</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_remove_node_from_link(link_type *, <span class="Type">char</span> *);
+
+<span class="Comment">// Copy (process heap) nodelist</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_copy_nodelist(<span class="Type">char</span> *, nodelist_type *, nodelist_type *);
+
+<span class="PreProc">#ifdef PERSISTENT_HEAP_SUPPORT</span>
+<span class="Comment">// Copy (persistent heap) nodelist</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_phcopy_nodelist(<span class="Type">int</span>, <span class="Type">char</span> *, nodelist_type *, nodelist_type *);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PERSISTENT_HEAP_SUPPORT </span><span class="Comment">*/</span>
+
+
+<span class="Comment">// Copy (process heap) node</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_copy_node(<span class="Type">char</span> *, node_type *, node_type *);
+
+<span class="PreProc">#ifdef PERSISTENT_HEAP_SUPPORT</span>
+<span class="Comment">// Copy (persistent heap) node</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_phcopy_node(<span class="Type">int</span>, <span class="Type">char</span> *, node_type *, node_type *);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PERSISTENT_HEAP_SUPPORT </span><span class="Comment">*/</span>
+
+
+<span class="Comment">// Copy (process heap) link</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_copy_link(<span class="Type">char</span> *, link_type *, link_type *);
+
+<span class="PreProc">#ifdef PERSISTENT_HEAP_SUPPORT</span>
+<span class="Comment">// Copy a (persistent heap) link</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_phcopy_link(<span class="Type">int</span>, <span class="Type">char</span> *, link_type *, link_type *);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PERSISTENT_HEAP_SUPPORT </span><span class="Comment">*/</span>
+
+
+<span class="Comment">// Set link tag</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_set_link_tag(link_type *, <span class="Type">char</span> *);
+
+<span class="Comment">// Set link type</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_set_link_type(link_type *, <span class="Type">char</span> *);
+
+<span class="Comment">// Set link flux</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_set_link_flux(link_type *, FTYPE);
+
+<span class="Comment">// Set link length</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_set_link_length(link_type *, FTYPE);
+
+<span class="Comment">// Compare a pair of nodes</span>
+_PROTOTYPE _EXPORT _BOOLEAN cantor_compare_nodes(node_type *, node_type *);
+
+<span class="Comment">// Clear object (removing it node objectlist)</span>
+_PROTOTYPE _EXPORT object_type *cantor_clear_object(object_type *);
+
+
+<span class="PreProc">#ifdef PERSISTENT_HEAP_SUPPORT</span>
+<span class="Comment">// Clear object (removing it node objectlist)</span>
+_PROTOTYPE _EXPORT object_type *cantor_phclear_object(object_type *, <span class="Type">int</span>);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PERSISTENT_HEAP_SUPPORT </span><span class="Comment">*/</span>
+
+
+<span class="Comment">// Clear an object list (removing it from node)</span>
+_PROTOTYPE _EXPORT object_type **cantor_clear_objectlist(object_type **, <span class="Type">int</span>);
+
+<span class="PreProc">#ifdef PERSISTENT_HEAP_SUPPORT</span>
+<span class="Comment">// Clear an object list (removing it from node)</span>
+_PROTOTYPE _EXPORT object_type **cantor_phclear_objectlist(object_type **, <span class="Type">int</span>, <span class="Type">int</span>);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PERSISTENT_HEAP_SUPPORT </span><span class="Comment">*/</span>
+
+
+<span class="Comment">// Allocate an object list</span>
+_PROTOTYPE _EXPORT object_type **cantor_allocate_objectlist(<span class="Type">int</span>, <span class="Type">int</span> *);
+
+<span class="Comment">// Set object name</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_set_object_name(object_type *, <span class="Type">char</span> *);
+
+<span class="Comment">// Set object type</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_set_object_type(object_type *, <span class="Type">char</span> *);
+
+<span class="Comment">// Create nodelist</span>
+_PROTOTYPE _EXPORT node_type *cantor_create_nodelist(node_type *, <span class="Type">int</span>, <span class="Type">int</span> *);
+
+<span class="Comment">// Set object link</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_set_olink(object_type *, <span class="Type">void</span> *);
+
+<span class="Comment">// Is pointer live?</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> *cantor_pointer_live(<span class="Type">void</span> *, _BOOLEAN);
+
+<span class="Comment">// Print nodes in link</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> cantor_print_link_info(<span class="Type">FILE</span> *, link_type *);
+
+<span class="Comment">// Generate VHTML page describing link</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_vhtml_link_info(<span class="Type">char</span> *, <span class="Type">char</span> *, link_type *);
+
+<span class="Comment">// Generate VHTML (and browse it)</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_vhtml_node_browse(_BOOLEAN, <span class="Type">char</span> *, node_type *);
+
+<span class="Comment">// Generate VHTML (and browse it)</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_vhtml_nodelist_browse(_BOOLEAN, <span class="Type">char</span> *, nodelist_type *);
+
+<span class="Comment">// Generate (rgen) rule file from link data</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_rulefile_from_clustered_link(<span class="Type">char</span> *, <span class="Type">int</span>, link_type **);
+
+
+<span class="PreProc">#ifdef PERSISTENT_HEAP_SUPPORT</span>
+<span class="Comment">// Lock nodelist</span>
+_PROTOTYPE _EXPORT nodelist_type *cantor_lock_nodelist(<span class="Type">int</span>, <span class="Type">char</span> *, <span class="Type">int</span>, <span class="Type">int</span>);
+
+<span class="Comment">// Lock node</span>
+_PROTOTYPE _EXPORT node_type *cantor_lock_node(<span class="Type">int</span>, <span class="Type">char</span> *, <span class="Type">int</span>);
+
+<span class="Comment">// Lock object</span>
+_PROTOTYPE _EXPORT object_type *cantor_lock_object(<span class="Type">int</span>, <span class="Type">char</span> *, <span class="Type">int</span>);
+
+<span class="Comment">// Lock link</span>
+_PROTOTYPE _EXPORT link_type *cantor_lock_link(<span class="Type">int</span>, <span class="Type">char</span> *, <span class="Type">int</span>);
+
+<span class="Comment">// Lock object list</span>
+_PROTOTYPE _EXPORT object_type **cantor_lock_objectlist(<span class="Type">int</span>, <span class="Type">char</span> *, <span class="Type">int</span>);
+
+<span class="Comment">// Lock routelist (link list)</span>
+_PROTOTYPE _EXPORT node_type **cantor_lock_routelist(<span class="Type">int</span>, <span class="Type">char</span> *, <span class="Type">int</span>);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PERSISTENT_HEAP_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="Comment">// Intersection of (local process heap) link</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_link_intersection(<span class="Type">char</span> *, link_type *, link_type *, link_type *);
+
+<span class="PreProc">#ifdef PERSISTENT_HEAP_SUPPORT</span>
+<span class="Comment">// Intersection of (persistent heap) link</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_phlink_intersection(<span class="Type">int</span>, <span class="Type">char</span> *, link_type *, link_type *, link_type *);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PERSISTENT_HEAP_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="Comment">// Union of (local process heap) linkways</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_link_union(<span class="Type">char</span> *, link_type *, link_type *, link_type *);
+
+<span class="PreProc">#ifdef PERSISTENT_HEAP_SUPPORT</span>
+<span class="Comment">// Union of (persistent heap) linkways</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_phlink_union(<span class="Type">int</span>, <span class="Type">char</span> *, link_type *, link_type *, link_type *);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PERSISTENT_HEAP_SUPPORT </span><span class="Comment">*/</span>
+
+
+<span class="Comment">// Difference of (local process heap) linkways</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_link_difference(<span class="Type">char</span> *, link_type *, link_type *, link_type *);
+
+<span class="PreProc">#ifdef PERSISTENT_HEAP_SUPPORT</span>
+<span class="Comment">// Difference of (persistent heap) linkways</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_phlink_difference(<span class="Type">int</span>, <span class="Type">char</span> *, link_type *, link_type *, link_type *);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PERSISTENT_HEAP_SUPPORT </span><span class="Comment">*/</span>
+
+
+<span class="Comment">// Object intersection of (local process heap) nodes</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_object_intersection(<span class="Type">char</span> *, node_type *, node_type *, node_type *);
+
+<span class="PreProc">#ifdef PERSISTENT_HEAP_SUPPORT</span>
+<span class="Comment">// Object intersection of (persistent heap) nodes</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_phobject_intersection(<span class="Type">int</span>, <span class="Type">char</span> *, node_type *, node_type *, node_type *);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PERSISTENT_HEAP_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="Comment">// Object union of (local process heap) nodes</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_object_union(<span class="Type">char</span> *, node_type *, node_type *, node_type *);
+
+<span class="PreProc">#ifdef PERSISTENT_HEAP_SUPPORT</span>
+<span class="Comment">// Object union of (persistent heap) nodes</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_phobject_union(<span class="Type">int</span>, <span class="Type">char</span> *, node_type *, node_type *, node_type *);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PERSISTENT_HEAP_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="Comment">// Object difference of (local process heap) nodes */</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_object_difference(<span class="Type">char</span> *, node_type *, node_type *, node_type *);
+
+<span class="PreProc">#ifdef PERSISTENT_HEAP_SUPPORT</span>
+<span class="Comment">// Object difference of (persistent heap) nodes</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> cantor_phobject_difference(<span class="Type">int</span>, <span class="Type">char</span> *, node_type *, node_type *, node_type *);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PERSISTENT_HEAP_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> CANTOR_HDR </span><span class="Comment">*/</span>
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

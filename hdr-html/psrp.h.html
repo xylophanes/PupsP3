@@ -1,0 +1,693 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.5.1.src.git/include.libs/psrp.h.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="cpp">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------</span>
+<span class="Comment">    Purpose: header for PSRP support library.</span>
+
+<span class="Comment">    Author:  M.A. O'Neill</span>
+<span class="Comment">             Tumbling Dice Ltd</span>
+<span class="Comment">             Gosforth</span>
+<span class="Comment">             Newcastle upon Tyne</span>
+<span class="Comment">             NE3 4RT</span>
+<span class="Comment">             United Kingdom</span>
+
+<span class="Comment">    Version: 5.05</span>
+<span class="Comment">    Dated:   12th July 2023 </span>
+<span class="Comment">    E-mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">-------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="PreProc">#ifndef PSRP_H</span>
+<span class="PreProc">#define PSRP_H</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Keep c2man happy </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;c2man.h&gt;</span>
+
+<span class="PreProc">#ifndef __C2MAN__</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stdio.h&gt;</span>
+
+<span class="PreProc">#ifdef THREAD_SUPPORT</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;pthread.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> THREAD_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> __C2MAN__ </span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">*********</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Version </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">*********</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define PSRPLIB_VERSION    </span><span class="Constant">&quot;5.05&quot;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> String size </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define SSIZE                 </span><span class="Constant">2048</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Floating point representation </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;ftype.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> PSRP interfaces </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+
+                             <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+<span class="PreProc">#define HAVE_PSRP  </span><span class="Constant">1</span><span class="PreProc">         </span><span class="Comment">/*</span><span class="Comment"> Process is PSRP aware </span><span class="Comment">*/</span>
+                             <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+
+                             <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+<span class="PreProc">#define UNIX_FACE (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">0</span><span class="PreProc">)   </span><span class="Comment">/*</span><span class="Comment"> PSRP command line options       </span><span class="Comment">*/</span>
+<span class="PreProc">#define PSRP_FACE (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">1</span><span class="PreProc">)   </span><span class="Comment">/*</span><span class="Comment"> PSRP requests via PSRP protocol </span><span class="Comment">*/</span>
+<span class="PreProc">#define MAIL_FACE (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">2</span><span class="PreProc">)   </span><span class="Comment">/*</span><span class="Comment"> PSRP requests via SMTP/MIME     </span><span class="Comment">*/</span>
+<span class="PreProc">#define WEB_FACE  (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">4</span><span class="PreProc">)   </span><span class="Comment">/*</span><span class="Comment"> PSRP requests via HTTP          </span><span class="Comment">*/</span>
+                             <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Defines used by crontab subsystem </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define MAX_CRON_SLOTS             </span><span class="Constant">16</span>
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> fcntl non-block flag </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifndef O_BLOCK</span>
+<span class="PreProc">#define O_BLOCK </span><span class="Constant">0</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> O_BLOCK </span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Default period for psrp client repeat commands </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define PSRP_RPT_DEFAULT                </span><span class="Constant">1</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Segmentatation delay for migrating or forked server </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> instance (seconds)                                  </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define SEGMENTATION_DELAY              </span><span class="Constant">5</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Max PSRP servers in cluster               </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define MAX_PSRP_SERVERS                </span><span class="Constant">1024</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Max PSRP channels on host                 </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define MAX_PSRP_CHANNELS               </span><span class="Constant">1024</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Number of clients on PSRP server          </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define MAX_CLIENTS                     </span><span class="Constant">32</span><span class="PreProc"> </span>
+<span class="PreProc">#define ENOCH                           (-</span><span class="Constant">9999</span><span class="PreProc">)</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Number of channels to slaved PSRP clients </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define PSRP_MAX_SIC_CHANNELS           </span><span class="Constant">8</span><span class="PreProc"> </span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Types of channel supported by SIC subsystem </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define SIC_FIFO                        </span><span class="Constant">1</span>
+<span class="PreProc">#define SIC_SSH_TUNNEL                  </span><span class="Constant">2</span>
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> PSRP class file end of record marker </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define PSRP_EOR_MARKER </span><span class="Constant">&quot;!#### end_of_PSRP_record</span><span class="Special">\n</span><span class="Constant">&quot;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> PSRP active channel states </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define PSRP_NO_EVENT                  </span><span class="Constant">0</span>
+<span class="PreProc">#define PSRP_CLIENT_TERMINATED         (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">0</span><span class="PreProc">)</span>
+<span class="PreProc">#define PSRP_IPC_LOST                  (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">1</span><span class="PreProc">) </span>
+<span class="PreProc">#define PSRP_OPC_LOST                  (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">2</span><span class="PreProc">) </span>
+<span class="PreProc">#define PSRP_LOCK_LOST                 (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">3</span><span class="PreProc">) </span>
+<span class="PreProc">#define PSRP_RECURSIVE                 (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">4</span><span class="PreProc">) </span>
+<span class="PreProc">#define PSRP_NOTRAIL                   (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">5</span><span class="PreProc">) </span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> PSRP system defines </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define PSRP_PROTOCOL_VERSION          </span><span class="Constant">9.02</span><span class="PreProc"> </span>
+<span class="PreProc">#define PSRP_BAG_TABLE_SIZE            </span><span class="Constant">128</span><span class="PreProc"> </span>
+<span class="PreProc">#define PSRP_DISPATCH_TABLE_SIZE       </span><span class="Constant">128</span><span class="PreProc"> </span>
+<span class="PreProc">#define PSRP_ALLOCATION_QUANTUM        </span><span class="Constant">128</span><span class="PreProc"> </span>
+<span class="PreProc">#define PSRP_OBJECT_UNKNOWN            (-</span><span class="Constant">9999</span><span class="PreProc">)</span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> PSRP object export states </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define PSRP_PUBLIC                    </span><span class="Constant">0</span>
+<span class="PreProc">#define PSRP_PRIVATE                   </span><span class="Constant">1</span>
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> PSRP object export class update states </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define PSRP_ADD_CLASS                 </span><span class="Constant">0</span>
+<span class="PreProc">#define PSRP_REMOVE_CLASS              </span><span class="Constant">1</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> PSRP library function return codes </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define PSRP_ERROR                     (-</span><span class="Constant">1</span><span class="PreProc">)</span>
+<span class="PreProc">#define PSRP_OK                        </span><span class="Constant">0</span><span class="PreProc">   </span>
+<span class="PreProc">#define PSRP_MORE                      (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">0</span><span class="PreProc">)</span>
+<span class="PreProc">#define PSRP_EOT                       (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">1</span><span class="PreProc">) </span>
+<span class="PreProc">#define PSRP_EOG                       (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">2</span><span class="PreProc">) </span>
+<span class="PreProc">#define PSRP_DISPATCH_ERROR            (-</span><span class="Constant">1</span><span class="PreProc">)</span>
+<span class="PreProc">#define PSRP_ITEM_LOCKED               (-</span><span class="Constant">2</span><span class="PreProc">)</span>
+<span class="PreProc">#define PSRP_TAG_ERROR                 (-</span><span class="Constant">3</span><span class="PreProc">)</span>
+<span class="PreProc">#define PSRP_LIST_ITEM_FOUND           (-</span><span class="Constant">4</span><span class="PreProc">)</span>
+<span class="PreProc">#define PSRP_EACCESS                   (-</span><span class="Constant">5</span><span class="PreProc">) </span>
+<span class="PreProc">#define PSRP_CONNECT_ERROR             (-</span><span class="Constant">6</span><span class="PreProc">)</span>
+<span class="PreProc">#define PSRP_DUPLICATE_PROCESS_NAME    (-</span><span class="Constant">7</span><span class="PreProc">)</span>
+<span class="PreProc">#define PSRP_STDIO_ERROR               (-</span><span class="Constant">8</span><span class="PreProc">)</span>
+<span class="PreProc">#define PSRP_TRANSPORT_ERROR           (-</span><span class="Constant">9</span><span class="PreProc">)</span>
+<span class="PreProc">#define PSRP_TERMINATED                (-</span><span class="Constant">10</span><span class="PreProc">)</span>
+<span class="PreProc">#define PSRP_STDIO_ASSIGNED            (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">3</span><span class="PreProc">) </span>
+<span class="PreProc">#define PSRP_RECONNECT_STDIO           (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">4</span><span class="PreProc">) </span>
+<span class="PreProc">#define PSRP_REDIRECT_STDIO            (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">5</span><span class="PreProc">) </span>
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Object types and states that the PSRP handler has to know about </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define PSRP_NONE                      </span><span class="Constant">0</span>
+<span class="PreProc">#define PSRP_STATIC_FUNCTION           (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">0</span><span class="PreProc">)</span>
+<span class="PreProc">#define PSRP_DYNAMIC_FUNCTION          (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">1</span><span class="PreProc">) </span>
+<span class="PreProc">#define PSRP_STATIC_DATABAG            (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">2</span><span class="PreProc">) </span>
+<span class="PreProc">#define PSRP_DYNAMIC_DATABAG           (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">3</span><span class="PreProc">)  </span>
+<span class="PreProc">#define PSRP_STATUS_ONLY               (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">4</span><span class="PreProc">) </span>
+<span class="PreProc">#define PSRP_STATICS_IMMORTAL          (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">5</span><span class="PreProc">) </span>
+<span class="PreProc">#define PSRP_HOMEOSTATIC_STREAMS       (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">6</span><span class="PreProc">) </span>
+<span class="PreProc">#define PSRP_PERSISTENT_HEAP           (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">7</span><span class="PreProc">) </span>
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Error code for no remote process for PSRP pipestream operations </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define ENORPROC                       </span><span class="Constant">768</span>
+
+
+<span class="PreProc">#ifdef MAIL_SUPPORT</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Types used by mail subsystem </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">typedef</span> <span class="Type">struct</span> {   <span class="Type">char</span>     type[SSIZE];     <span class="Comment">// MIME part type</span>
+                   <span class="Type">char</span>     path[SSIZE];     <span class="Comment">// Filepath of part</span>
+               } mc_type;
+
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> MAIL_SUPPORT </span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Types used by cron subsystem </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">typedef</span> <span class="Type">struct</span> {   <span class="Type">int</span>      from;            <span class="Comment">// Start of scheduled op.</span>
+                   <span class="Type">int</span>      to;              <span class="Comment">// End of scheduled op.</span>
+                   _BOOLEAN overnight;       <span class="Comment">// Op extends over midnight</span>
+                   <span class="Type">void</span>     (*func)(<span class="Type">int</span>);    <span class="Comment">// Payload function</span>
+                   <span class="Type">char</span>     fname[SSIZE];    <span class="Comment">// Name of payload function</span>
+                   <span class="Type">char</span>     fromdate[SSIZE]; <span class="Comment">// Date string for start</span>
+                   <span class="Type">char</span>     todate[SSIZE];   <span class="Comment">// Date string for stop</span>
+               } psrp_crontab_type;
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Types used by PSRP handler system </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">typedef</span> <span class="Type">struct</span> {    <span class="Type">int</span>  aliases_allocated;  <span class="Comment">// Allocated alias slots</span>
+		    <span class="Type">int</span>  aliases;            <span class="Comment">// Number of aliases</span>
+		    <span class="Type">char</span> **object_tag;       <span class="Comment">// Names of PSRP object</span>
+                    <span class="Type">char</span> *object_f_name;     <span class="Comment">// Object resource file</span>
+                    <span class="Type">int</span>  hid;                <span class="Comment">// Heap descriptor</span>
+		    <span class="Type">int</span>  object_type;        <span class="Comment">// Type of PSRP object</span>
+		    <span class="Type">int</span>  object_size;        <span class="Comment">// Size of PSRP object</span>
+		    <span class="Type">int</span>  object_state;       <span class="Comment">// State of PSRP object</span>
+		    <span class="Type">void</span> *object_handle;     <span class="Comment">// Handle of PSRP object</span>
+	       } psrp_object_type;
+
+
+<span class="Type">typedef</span> <span class="Type">struct</span> {    <span class="Type">char</span>       *in_name;     <span class="Comment">// Name of in stream</span>
+		    <span class="Type">char</span>      *out_name;     <span class="Comment">// Name of out stream</span>
+		    <span class="Type">char</span>     *host_name;     <span class="Comment">// Host for PSRP client</span>
+                    <span class="Type">char</span>      *ssh_port;     <span class="Comment">// Host ssh port</span>
+		    <span class="Type">char</span>           *pen;     <span class="Comment">// PSRP client PEN</span>
+		    <span class="Type">FILE</span>     *in_stream;     <span class="Comment">// In stream</span>
+		    <span class="Type">FILE</span>    *out_stream;     <span class="Comment">// Out stream</span>
+		    <span class="Type">int</span>           index;     <span class="Comment">// Index in channel table</span>
+                    <span class="Type">int</span>             scp;     <span class="Comment">// Slaved client PID</span>
+                    <span class="Type">int</span>            type;     <span class="Comment">// Channel type</span>
+                    _BOOLEAN     remote;     <span class="Comment">// TRUE if SIC remote</span>
+		} psrp_channel_type;
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Variables exported by the multithreaded DLL support library </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef __NOT_LIB_SOURCE__</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Variables exported by PSRP handler system </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+_EXPORT <span class="Type">FILE</span>     *psrp_in;                             <span class="Comment">// PSRP input channel (from client)</span>
+_EXPORT <span class="Type">FILE</span>     *psrp_out;                            <span class="Comment">// PSRP output channel (to client)</span>
+_EXPORT <span class="Type">char</span>     channel_name_in[];                    <span class="Comment">// PSRP input channel name</span>
+_EXPORT <span class="Type">char</span>     channel_name_out[];                   <span class="Comment">// PSRP ouput channel name</span>
+_EXPORT <span class="Type">int</span>      psrp_client_pid[MAX_CLIENTS];         <span class="Comment">// PID of PSRP client process</span>
+_EXPORT <span class="Type">int</span>      n_clients;                            <span class="Comment">// Number of connected clients</span>
+_EXPORT <span class="Type">int</span>      c_client;                             <span class="Comment">// Currently active client</span>
+_EXPORT <span class="Type">int</span>      psrp_seg_cnt;                         <span class="Comment">// Server segment counter</span>
+_EXPORT <span class="Type">int</span>      psrp_instances;                       <span class="Comment">// Instance counter</span>
+_EXPORT _BOOLEAN psrp_child_instance;                  <span class="Comment">// TRUE if child instance </span>
+_EXPORT _BOOLEAN psrp_mode;                            <span class="Comment">// TRUE if server in psrp mode</span>
+_EXPORT _BOOLEAN in_psrp_new_segment;                  <span class="Comment">// TRUE if about to segment</span>
+_EXPORT _BOOLEAN in_psrp_handler;                      <span class="Comment">// TRUE if in PSRP handler</span>
+_EXPORT _BOOLEAN in_chan_handler;                      <span class="Comment">// TRUE if in CHAN handler</span>
+_EXPORT          psrp_channel_type *psrp_current_sic;  <span class="Comment">// Current SIC channel</span>
+_EXPORT          psrp_object_type  *psrp_object_list;  <span class="Comment">// List of attached PSRP objects</span>
+
+<span class="PreProc">#else</span>
+<span class="PreProc">#   undef  _EXPORT</span>
+<span class="PreProc">#   define _EXPORT</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> __NOT_LIB_SOURCE__ </span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> PSRP handler functions </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+<span class="Comment">// Register client side abort callback</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_register_on_abort_callback_f(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">void</span> *);
+
+<span class="Comment">// Deregister client side abort callback</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> psrp_deregister_on_abort_callback_f(<span class="Type">void</span>);
+
+<span class="Comment">// Display client side abort callback function details</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_show_on_abort_callback_f(<span class="Type">const</span> <span class="Type">FILE</span> *);
+
+<span class="Comment">// Callback function for client side abort</span>
+_PROTOTYPE _EXPORT _BOOLEAN (*on_abort_callback_f)(<span class="Type">void</span>);
+
+<span class="Comment">// Ignore PSRP requests</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> psrp_ignore_requests(<span class="Type">void</span>);
+
+<span class="Comment">// Accept PSRP requests</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> psrp_accept_requests(<span class="Type">void</span>);
+
+<span class="Comment">// Initialise PSRP handler</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> psrp_init(<span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">int</span> (*)(<span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">char</span> *[]));
+
+<span class="Comment">// Attach static function to PSRP handler</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_attach_static_function(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">void</span> *);
+
+<span class="Comment">// Attach static databag to PSRP handler</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_attach_static_databag(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>, <span class="Type">const</span> _BYTE *);
+
+<span class="Comment">// Attach static databag to PSRP handler</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_attach_dynamic_databag(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Overlay PSRP server process with new command</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_overlay_server_process(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+
+<span class="PreProc">#ifdef SUPPORT_DLL</span>
+
+<span class="Comment">// Attach dynamic function to PSRP handler</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_attach_dynamic_function(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> SUPPORT_DLL </span><span class="Comment">*/</span>
+
+
+<span class="PreProc">#ifdef PERSISTENT_HEAP_SUPPORT</span>
+
+<span class="Comment">// Attach a persistent heap</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span>  psrp_attach_persistent_heap(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Show persistent heaps mapped into process address space</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> psrp_show_persistent_heaps(<span class="Type">const</span> <span class="Type">FILE</span> *);
+
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PERSISTENT_HEAP_SUPPORT </span><span class="Comment">*/</span>
+
+
+<span class="Comment">// Detach named object from PSRP handler</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_detach_object_by_name(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Detach object with known handle from PSRP handler</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_detach_object_by_handle(<span class="Type">const</span> <span class="Type">void</span> *);
+
+<span class="Comment">// Show attached functions</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> psrp_show_object_list(<span class="Type">void</span>);
+
+<span class="Comment">// Handle PSRP interrupt function request from remote client</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> int_handler(<span class="Type">int</span>);
+
+<span class="Comment">// Load default dispatch table (at server startup)</span>
+_PROTOTYPE _EXPORT _BOOLEAN psrp_load_default_dispatch_table(<span class="Type">void</span>);
+
+<span class="Comment">// Load a dispatch table class (merging functions on server)</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_load_dispatch_table(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Save a dispatch table class</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_save_dispatch_table(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Handle broken channel</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_chbrk_handler(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Initialise PSRP object function command tail decoder</span>
+_PROTOTYPE _EXPORT _BOOLEAN psrp_std_init(<span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">char</span> *[]);
+
+<span class="Comment">// Check for junk on PSRP object function comamnd lines</span>
+_PROTOTYPE _EXPORT _BOOLEAN psrp_t_arg_errs(<span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> _BOOLEAN *, <span class="Type">const</span> <span class="Type">char</span> *[]);
+
+<span class="Comment">// send error message to client</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> psrp_error(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Look up item in dispatch table by name</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> lookup_psrp_object_by_name(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Look up item in dispatch table by handle</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> lookup_psrp_object_by_handle(<span class="Type">const</span> <span class="Type">void</span> *);
+
+<span class="Comment">// Get handle of PSRP object from name</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> *psrp_get_handle_from_name(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Get name of PSRP object from handle</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_get_name_from_handle(<span class="Type">const</span> <span class="Type">void</span> *, <span class="Type">char</span> *);
+
+<span class="Comment">// Get type of psrp object from name</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_get_type_from_name(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Get type of psrp object from name</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_get_type_from_handle(<span class="Type">const</span> <span class="Type">void</span> *);
+
+<span class="Comment">// Remove communication channel</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> psrp_exit(<span class="Type">void</span>);
+
+<span class="Comment">// Resolve pid from process name</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_pname_to_pid(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Resolve process name from process pid</span>
+_PROTOTYPE _EXPORT _BOOLEAN psrp_pid_to_pname(<span class="Type">const</span> <span class="Type">int</span>, <span class="Type">char</span> *);
+
+<span class="Comment">// Resolve pid from PSRP channel name</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_channelname_to_pid(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">char</span> *, <span class="Type">char</span> *);
+
+<span class="Comment">// Resolve process name from PSRP channel name</span>
+_PROTOTYPE _EXPORT _BOOLEAN psrp_pid_to_channelname(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">int</span>, <span class="Type">char</span> *, <span class="Type">char</span> *);
+
+<span class="Comment">// Set current SIC</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_set_current_sic(<span class="Type">const</span> psrp_channel_type *);
+
+<span class="Comment">// Unset current SIC</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> psrp_unset_current_sic(<span class="Type">void</span>);
+
+<span class="Comment">// Create a slaved psrp interaction client</span>
+<span class="PreProc">#ifdef SSH_SUPPORT</span>
+_PROTOTYPE _EXPORT psrp_channel_type *psrp_create_slaved_interaction_client(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+<span class="PreProc">#else</span>
+_PROTOTYPE _EXPORT psrp_channel_type *psrp_create_slaved_interaction_client(<span class="Type">const</span> <span class="Type">char</span> *);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> SSH_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="Comment">// Carry out PSRP transaction via slaved client</span>
+_PROTOTYPE _EXPORT <span class="Type">char</span> *psrp_slaved_client_transaction(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> psrp_channel_type *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Destroy psrp slaved interaction client</span>
+_PROTOTYPE _EXPORT psrp_channel_type *psrp_destroy_slaved_interaction_client(<span class="Type">const</span> psrp_channel_type *, <span class="Type">const</span> _BOOLEAN);
+
+<span class="Comment">// Assign descriptors for a PSRP task function</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_assign_stdio(<span class="Type">const</span> <span class="Type">FILE</span> *, <span class="Type">const</span> <span class="Type">int</span> *, <span class="Type">const</span> <span class="Type">char</span> *[], <span class="Type">int</span> *, <span class="Type">int</span> *, <span class="Type">int</span> *);
+
+<span class="Comment">// Assign streams for a PSRP task function</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_assign_fstdio(<span class="Type">const</span> <span class="Type">FILE</span> *, <span class="Type">const</span> <span class="Type">int</span> *, <span class="Type">const</span> <span class="Type">char</span> *[], <span class="Type">FILE</span> *, <span class="Type">FILE</span> *, <span class="Type">FILE</span> *);
+
+<span class="Comment">// Wait for data on nominated descriptor</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_wait_for_data(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Provide an alias for a bound PSRP object</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_alias(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Remove an alias for a bound PSRP object</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_unalias(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Show alaises on object</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_show_aliases(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Duplicate current process</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_duplicate_instance(_BOOLEAN, <span class="Type">char</span> *);
+
+<span class="Comment">// Free resources allocated to tag index </span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_ifree_tag_list(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Search tag list for the first free slot</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_get_tag_index(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Search tag list</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_isearch_tag_list(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Get the index of the next available slot in the dispatch table</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_get_action_slot_index(<span class="Type">void</span>);
+
+<span class="Comment">// Destroy PSRP object</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> psrp_destroy_object(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Get state of PSRP object</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_ostate(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Check whether we have client locked on named channel</span>
+_PROTOTYPE _EXPORT _BOOLEAN psrp_channel_locked(<span class="Type">const</span> <span class="Type">FILE</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Show open slaved interation client channels</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> psrp_show_open_sics(<span class="Type">const</span> <span class="Type">FILE</span> *);
+
+<span class="Comment">// Empty a FIFO</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> empty_fifo(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Handler for client side of PSRP interrupt mechanism</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_client_int_handler(<span class="Type">int</span>);
+
+<span class="Comment">// Start a new server segment</span>
+<span class="PreProc">#ifdef SSH_SUPPORT</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_new_segment(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+<span class="PreProc">#else</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_new_segment(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> SSH_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="Comment">// Generate duplicate instance a PSRP server</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_new_instance(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Find host running specified server</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_get_server_host(<span class="Type">FILE</span> *, <span class="Type">char</span> *, <span class="Type">char</span> [][SSIZE]);
+
+<span class="Comment">// Prod a remote host (to see if it is alive)</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_prod_host(<span class="Type">FILE</span> *, <span class="Type">char</span> *, <span class="Type">char</span> *, <span class="Type">char</span> *, <span class="Type">int</span>, <span class="Type">int</span> *);
+
+<span class="Comment">// Find PSRP dispatch table slot entry</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_find_action_slot_index(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Send request over slaved client channel (peer-to-peer)</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_write_sic(<span class="Type">const</span> psrp_channel_type *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Read reply over slaved client channel (peer-to-peer)</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_read_sic(<span class="Type">const</span> psrp_channel_type *, <span class="Type">char</span> *);
+
+<span class="Comment">// Send abort over slaved client channel (perr-to-peer)</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> psrp_int_sic(<span class="Type">const</span> psrp_channel_type *);
+
+<span class="Comment">// Reset dispatch table</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> psrp_reset_dispatch_table(<span class="Type">void</span>);
+
+<span class="Comment">// Install PSRP channel exit function</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_set_client_exitf(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span> , <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">int</span> (*)(<span class="Type">int</span>));
+
+<span class="Comment">// Deinstall PSRP channel exit function</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_reset_client_exitf(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Schedule a crontab operation</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_crontab_schedule(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">void</span> *);
+
+<span class="Comment">// Unschedule a crontab operation</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_crontab_unschedule(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Initialise crontab</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> psrp_crontab_init(<span class="Type">void</span>);
+
+<span class="Comment">// Display crontab</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_show_crontab(<span class="Type">const</span> <span class="Type">FILE</span> *);
+
+<span class="Comment">// Set dispatch function error/status code</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> psrp_set_c_code(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Fork a PUPS (server) process</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_fork(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> _BOOLEAN);
+
+<span class="Comment">// Herpes algorithm</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> herpes_homeostat(<span class="Type">void</span> *, <span class="Type">char</span> *);
+
+<span class="Comment">// Shy algorithm</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> shy_homeostat(<span class="Type">void</span> *, <span class="Type">char</span> *);
+
+<span class="Comment">// Read trail data from migrated PSRP O/P channel</span>
+_PROTOTYPE _EXPORT _BOOLEAN psrp_read_trailfile(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">char</span> *, <span class="Type">char</span> *, <span class="Type">char</span> *);
+
+
+<span class="PreProc">#ifdef MAIL_SUPPORT</span>
+
+<span class="Comment">// Store components of a MIME message</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_mime_storeparts(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Extract PSRP requests from text segment of MIME message</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_msg2requestlist(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Delete compomnents of MIME message</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_mime_delete(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Send single file as MIME message </span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> psrp_mime_mail(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Send files as multipart MIME message </span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_mime_encapsulate(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> mc_type *);
+
+<span class="Comment">// Get replyto address from message header</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_get_replyto(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">char</span> *);
+
+<span class="Comment">// Mail homeostat (allow PSRP process to read its mailbox and reply to it mail!)</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_mail_homeostat(<span class="Type">void</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> MAIL_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="Comment">// Handler for SIGCONT */</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_cont_handler(<span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Rename an existing PSRP channel</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_rename_channel(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Start PSRP server on remote host </span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_remote_start(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">char</span> *[]);
+
+<span class="Comment">// Send list of requests to remote peer (via enslaved PSRP client)</span>
+<span class="PreProc">#ifdef SSH_SUPPORT</span>
+_PROTOTYPE _EXPORT <span class="Type">char</span> **psrp_process_sic_transaction_list(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">char</span> *);
+<span class="PreProc">#else</span>
+_PROTOTYPE _EXPORT <span class="Type">char</span> **psrp_process_sic_transaction_list(<span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">char</span> *);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> SSH_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="Comment">// Set up (exec) ennviroment</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_exec_env(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Enable PSRP abort flag </span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_enable_abrtflag(<span class="Type">void</span>);
+
+<span class="Comment">// Disable PSRP abort flag </span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_disable_abrtflag(<span class="Type">void</span>);
+
+<span class="Comment">// Rest PSRP abort flag </span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_reset_abrtflag(<span class="Type">void</span>);
+
+<span class="Comment">// Get PSRP abort flag </span>
+_PROTOTYPE _EXPORT _BOOLEAN psrp_get_abrtflag(<span class="Type">void</span>);
+
+<span class="Comment">// Enable/disable PSRP client interrupt (via SIGABRT)</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_critical(<span class="Type">const</span> _BOOLEAN);
+
+<span class="Comment">// Block/unblock client interrupt (via SIGABRT) </span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> psrp_client_block(<span class="Type">const</span> _BOOLEAN);
+
+<span class="Comment">// Is PEN (process execution name) unique? </span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> psrp_pen_unique(<span class="Type">void</span>);
+
+
+<span class="PreProc">#ifdef _CPLUSPLUS</span>
+<span class="PreProc">#   undef  _EXPORT</span>
+<span class="PreProc">#   define _EXPORT </span><span class="Type">extern</span><span class="PreProc"> </span><span class="Constant">&quot;C&quot;</span>
+<span class="PreProc">#else</span>
+<span class="PreProc">#   undef  _EXPORT                                                              </span>
+<span class="PreProc">#   define _EXPORT </span><span class="Type">extern</span><span class="PreProc">                                   </span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> _CPLUSPLUS </span><span class="Comment">*/</span>
+
+<span class="PreProc">#endif</span>  <span class="Comment">/*</span><span class="Comment"> PSRP_H </span><span class="Comment">*/</span>
+
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

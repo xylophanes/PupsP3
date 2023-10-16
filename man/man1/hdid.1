@@ -1,4 +1,4 @@
-.TH HDID 1 "22 February 2005" "PUPSP3 build tools" "PUPSP3 build tools"
+.TH HDID 1 "22nd February 2005" "PUPSP3 build tools" "PUPSP3 build tools"
 
 .SH NAME
 HDID \- get serial number of hard disk device 
@@ -13,7 +13,7 @@ HDID \- get serial number of hard disk device
 ][
 .I hard disk device | default
 ] 
->& <log file>
+[2> <log file>]
 .br
 
 .SH DESCRIPTION
@@ -39,6 +39,18 @@ filter.
 tells
 .I hdid(1)
 to (enigma) encrypt disk serial number.
+.br
+
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
 .br
 
 .SH ENVIRONMENT VARIABLES

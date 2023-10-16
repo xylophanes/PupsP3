@@ -1,0 +1,415 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/phfree.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Free a block of memory allocated by `malloc'.</span>
+<span class="Comment">    Copyright 1990, 1991, 1992, 1994 Free Software Foundation, Inc.</span>
+<span class="Comment">		  Written May 1989 by Mike Haertel.</span>
+
+<span class="Comment">    This library is free software; you can redistribute it and/or</span>
+<span class="Comment">    modify it under the terms of the GNU Library General Public License as</span>
+<span class="Comment">    published by the Free Software Foundation; either version 2 of the</span>
+<span class="Comment">    License, or (at your option) any later version.</span>
+
+<span class="Comment">    This library is distributed in the hope that it will be useful,</span>
+<span class="Comment">    but WITHOUT ANY WARRANTY; without even the implied warranty of</span>
+<span class="Comment">    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU</span>
+<span class="Comment">    Library General Public License for more details.</span>
+
+<span class="Comment">    You should have received a copy of the GNU Library General Public</span>
+<span class="Comment">    License along with this library; see the file COPYING.LIB.  If</span>
+<span class="Comment">    not, write to the Free Software Foundation, Inc., 675 Mass Ave,</span>
+<span class="Comment">    Cambridge, MA 02139, USA.</span>
+
+<span class="Comment">    The author may be reached (Email) at the address mike@ai.mit.edu,</span>
+<span class="Comment">    or (US mail) as Mike Haertel c/o Free Software Foundation.</span>
+
+<span class="Comment">    Persistent heap modifications by Mark O'Neill (mao@tumblingdice.co.uk)</span>
+<span class="Comment">    (C) 1998-2022 M.A. O'Neill, Tumbling Dice</span>
+<span class="Comment">-------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;stdio.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;errno.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;xtypes.h&gt;</span>
+
+<span class="PreProc">#ifndef	_PHMALLOC_INTERNAL</span>
+<span class="PreProc">#define _PHMALLOC_INTERNAL</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;phmalloc.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> _PHMALLOC_INTERNAL </span><span class="Comment">*/</span>
+
+
+_IMPORT heap_type         *htable;
+_IMPORT __malloc_size_t   *pheapsize;
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Add a persistent object to persistent object map </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+
+_PROTOTYPE _EXTERN <span class="Type">int</span> msm_map_object(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">void</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Remove a persistent object persistent object map within persistent memory segment </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PROTOTYPE _EXTERN <span class="Type">int</span> msm_unmap_object(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Debugging hook for free </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> (*__phfree_hook) __P ((<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> __ptr_t __ptr));
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> List of blocks allocated by memalign. </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">struct</span> alignlist *_aligned_blocks = <span class="Constant">NULL</span>;
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Object mapping switch </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> _no_phobject_mapping;
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Number of objects in heap </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+_IMPORT <span class="Type">int</span> *_phobjects;
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Return memory to the heap.                                 </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Like `free' but don't call a __free_hook if there is one.  </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> _phfree_internal (<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span> hdes, <span class="Type">const</span> __ptr_t ptr)
+{
+  <span class="Type">int</span> type,
+      h_index;
+
+  __malloc_size_t block,
+                  blocks,
+                  i;
+
+  <span class="Type">struct</span> list *prev = (<span class="Type">struct</span> list *)<span class="Constant">NULL</span>,
+              *next = (<span class="Type">struct</span> list *)<span class="Constant">NULL</span>;
+
+  <span class="Statement">if</span>(_no_phobject_mapping == <span class="Constant">0</span>)
+  {  <span class="Statement">if</span>((h_index = msm_find_mapped_object(hdes,ptr)) == (-<span class="Constant">1</span>))
+     {  errno = <span class="Constant">EINVAL</span>;
+        <span class="Statement">return</span>;
+     }
+  }
+
+  block = BLOCK (hdes, ptr);
+
+<span class="PreProc">#ifdef DEBUG</span>
+  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;SHFREE BLOCK: </span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,block);
+  (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> DEBUG </span><span class="Comment">*/</span>
+
+  type = _pheapinfo[hdes][block].busy.type;
+  <span class="Statement">switch</span> (type)
+  {
+    <span class="Statement">case</span> <span class="Constant">0</span>:
+
+
+      <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> Get as many statistics as early as we can. </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+
+      --_pheap_chunks_used[hdes];
+      _pheap_bytes_used[hdes] -= _pheapinfo[hdes][block].busy.info.size * BLOCKSIZE;
+      _pheap_bytes_free[hdes] += _pheapinfo[hdes][block].busy.info.size * BLOCKSIZE;
+
+
+      <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------</span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> Find the free cluster previous to this one in the free list.   </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> Start searching at the last block referenced; this may benefit </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> programs with locality of allocation.                          </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+      i = _pheapindex[hdes];
+      <span class="Statement">if</span>(i &gt; block)
+      {  <span class="Statement">while</span> (i &gt; block)
+	   i = _pheapinfo[hdes][i].free.prev;
+      }
+      <span class="Statement">else</span>
+      {  <span class="Statement">do</span> {    i = _pheapinfo[hdes][i].free.next;
+	    } <span class="Statement">while</span> (i &gt; <span class="Constant">0</span> &amp;&amp; i &lt; block);
+	 i = _pheapinfo[hdes][i].free.prev;
+      }
+
+
+      <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------</span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> Determine how to link this block into the free list.  </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------</span><span class="Comment">*/</span>
+
+      <span class="Statement">if</span> (block == i + _pheapinfo[hdes][i].free.size)
+      {
+
+          <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+	  <span class="Comment">/*</span><span class="Comment"> Coalesce this block with its predecessor.  </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+
+	  _pheapinfo[hdes][i].free.size += _pheapinfo[hdes][block].busy.info.size;
+	  block = i;
+      }
+      <span class="Statement">else</span>
+      {
+
+          <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+	  <span class="Comment">/*</span><span class="Comment"> Really link this block back into the free list.  </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+
+	  _pheapinfo[hdes][block].free.size = _pheapinfo[hdes][block].busy.info.size;
+	  _pheapinfo[hdes][block].free.next = _pheapinfo[hdes][i].free.next;
+	  _pheapinfo[hdes][block].free.prev = i;
+	  _pheapinfo[hdes][i].free.next = block;
+	  _pheapinfo[hdes][_pheapinfo[hdes][block].free.next].free.prev = block;
+	  ++_pheap_chunks_free[hdes];
+      }
+
+
+      <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> Now that the block is linked in, see if we can coalesce it  </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> with its successor (by deleting its successor from the list </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> and adding in its size).                                    </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+
+      <span class="Statement">if</span> (block + _pheapinfo[hdes][block].free.size == _pheapinfo[hdes][block].free.next)
+      {
+	  _pheapinfo[hdes][block].free.size                             += _pheapinfo[hdes][_pheapinfo[hdes][block].free.next].free.size;
+	  _pheapinfo[hdes][block].free.next                              = _pheapinfo[hdes][_pheapinfo[hdes][block].free.next].free.next;
+	  _pheapinfo[hdes][_pheapinfo[hdes][block].free.next].free.prev = block;
+	  --_pheap_chunks_free[hdes];
+      }
+
+
+      <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> Now see if we can return stuff to the system.  </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+
+      blocks = _pheapinfo[hdes][block].free.size;
+      <span class="Statement">if</span> (blocks &gt;= FINAL_FREE_BLOCKS                               &amp;&amp;
+          block + blocks == _pheaplimit[hdes]                       &amp;&amp;
+	  (*__phmorecore) (hdes, <span class="Constant">0</span>) == ADDRESS (hdes, block + blocks))
+      {
+	  __malloc_size_t bytes  = blocks * BLOCKSIZE;
+	  _pheaplimit[hdes]     -= blocks;
+
+	  (*__phmorecore) (hdes, -bytes);
+	  _pheapinfo[hdes][_pheapinfo[hdes][block].free.prev].free.next = _pheapinfo[hdes][block].free.next;
+	  _pheapinfo[hdes][_pheapinfo[hdes][block].free.next].free.prev = _pheapinfo[hdes][block].free.prev;
+	  block = _pheapinfo[hdes][block].free.prev;
+	  --_pheap_chunks_free[hdes];
+	  _pheap_bytes_free[hdes] -= bytes;
+      }
+
+
+      <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> Set the next search to begin at this block.  </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+
+      _pheapindex[hdes] = block;
+      <span class="Statement">break</span>;
+
+    <span class="Statement">default</span>:
+
+
+      <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> Do some of the statistics.  </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+
+      --_pheap_chunks_used[hdes];
+      _pheap_bytes_used[hdes] -= <span class="Constant">1</span> &lt;&lt; type;
+      ++_pheap_chunks_free[hdes];
+      _pheap_bytes_free[hdes] += <span class="Constant">1</span> &lt;&lt; type;
+
+
+      <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------</span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> Get the address of the first free fragment in this block.  </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------</span><span class="Comment">*/</span>
+
+      prev = (<span class="Type">struct</span> list *) ((<span class="Type">char</span> *) ADDRESS (hdes, block) + (_pheapinfo[hdes][block].busy.info.frag.first &lt;&lt; type));
+
+      <span class="Statement">if</span>(_pheapinfo[hdes][block].busy.info.frag.nfree == (BLOCKSIZE &gt;&gt; type) - <span class="Constant">1</span>)
+      {
+
+          <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+	  <span class="Comment">/*</span><span class="Comment"> If all fragments of this block are free, remove them </span><span class="Comment">*/</span>
+	  <span class="Comment">/*</span><span class="Comment"> from the fragment list and free the whole block.     </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+	  next = prev;
+	  <span class="Statement">for</span> (i = <span class="Constant">1</span>; i &lt; (__malloc_size_t) (BLOCKSIZE &gt;&gt; type); ++i)
+	  {    next = next-&gt;next;
+
+
+               <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment"> Check for partially relocated addresses which tend to occur </span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment"> when an attached client falls over unexpectedly             </span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+
+               <span class="Statement">if</span>((<span class="Type">unsigned</span> <span class="Type">long</span>)next &lt; htable[hdes].sdata   ||
+                  (<span class="Type">unsigned</span> <span class="Type">long</span>)next &gt; htable[hdes].edata    )
+                  next = (<span class="Type">struct</span> list *)((<span class="Type">unsigned</span> <span class="Type">long</span>)next + (<span class="Type">unsigned</span> <span class="Type">long</span>)htable[hdes].addr);
+          }
+
+	  prev-&gt;prev-&gt;next = next;
+	  <span class="Statement">if</span>(next != <span class="Constant">NULL</span>)
+	     next-&gt;prev = prev-&gt;prev;
+
+	  _pheapinfo[hdes][block].busy.type      = <span class="Constant">0</span>;
+	  _pheapinfo[hdes][block].busy.info.size = <span class="Constant">1</span>;
+
+
+          <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+	  <span class="Comment">/*</span><span class="Comment"> Keep the statistics accurate.  </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+
+	  ++_pheap_chunks_used[hdes];
+	  _pheap_bytes_used[hdes]  += BLOCKSIZE;
+	  _pheap_chunks_free[hdes] -= BLOCKSIZE &gt;&gt; type;
+	  _pheap_bytes_free[hdes]  -= BLOCKSIZE;
+
+	  phfree (hdes, ADDRESS (hdes, block));
+      }
+      <span class="Statement">else</span> <span class="Statement">if</span> (_pheapinfo[hdes][block].busy.info.frag.nfree != <span class="Constant">0</span>)
+      {
+
+          <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+	  <span class="Comment">/*</span><span class="Comment"> If some fragments of this block are free, link this  </span><span class="Comment">*/</span>
+	  <span class="Comment">/*</span><span class="Comment"> fragment into the fragment list after the first free </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> fragment of this block.                              </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+	  next = (<span class="Type">struct</span> list *) ptr;
+	  next-&gt;next = prev-&gt;next;
+	  next-&gt;prev = prev;
+	  prev-&gt;next = next;
+
+	  <span class="Statement">if</span> (next-&gt;next != <span class="Constant">NULL</span>)
+	    next-&gt;next-&gt;prev = next;
+	  ++_pheapinfo[hdes][block].busy.info.frag.nfree;
+      }
+      <span class="Statement">else</span>
+      {
+
+          <span class="Comment">/*</span><span class="Comment">---------------------------------------------------</span><span class="Comment">*/</span>
+	  <span class="Comment">/*</span><span class="Comment"> No fragments of this block are free, so link this </span><span class="Comment">*/</span>
+	  <span class="Comment">/*</span><span class="Comment"> fragment into the fragment list and announce that </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> it is the first free fragment of this block.      </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">---------------------------------------------------</span><span class="Comment">*/</span>
+
+	  prev = (<span class="Type">struct</span> list *) ptr;
+	  _pheapinfo[hdes][block].busy.info.frag.nfree = <span class="Constant">1</span>;
+	  _pheapinfo[hdes][block].busy.info.frag.first = (<span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>)
+	  ((<span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>) ((<span class="Type">char</span> *) ptr - (<span class="Type">char</span> *) <span class="Constant">NULL</span>) % BLOCKSIZE &gt;&gt; type);
+
+	  prev-&gt;next       = _phfraghead[hdes][type].next;
+	  prev-&gt;prev       = &amp;_phfraghead[hdes][type];
+	  prev-&gt;prev-&gt;next = prev;
+
+	  <span class="Statement">if</span>(prev-&gt;next != <span class="Constant">NULL</span>)
+	    prev-&gt;next-&gt;prev = prev;
+      }
+      <span class="Statement">break</span>;
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Update persistent object table to reflect fact that we have removed </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> an object. Mark O'Neill 31/3/98                                     </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)msm_unmap_object(hdes,h_index);
+
+<span class="PreProc">#ifdef DEBUG</span>
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;PHFREE EXIT</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> DEBUG </span><span class="Comment">*/</span>
+
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Return memory to the heap. </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">void</span> *phfree (<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span> hdes, <span class="Type">const</span> __ptr_t ptr)
+
+{ <span class="Type">struct</span> alignlist *l;
+
+  <span class="Statement">if</span> (ptr == <span class="Constant">NULL</span>)
+    <span class="Statement">return</span>;
+
+<span class="PreProc">  #ifdef PTHREAD_SUPPORT</span>
+  (<span class="Type">void</span>)pthread_mutex_lock(&amp;htab_mutex);
+<span class="PreProc">  #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+  <span class="Statement">for</span> (l = _aligned_blocks; l != <span class="Constant">NULL</span>; l = l-&gt;next)
+    <span class="Statement">if</span> (l-&gt;aligned == ptr)
+      {
+
+                                <span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+	l-&gt;aligned = <span class="Constant">NULL</span>;	<span class="Comment">/*</span><span class="Comment"> Mark the slot in the list as free </span><span class="Comment">*/</span>
+                                <span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+
+	ptr = l-&gt;exact;
+	<span class="Statement">break</span>;
+      }
+
+  <span class="Statement">if</span> (__phfree_hook != <span class="Constant">NULL</span>)
+    (*__phfree_hook) (hdes, ptr);
+  <span class="Statement">else</span>
+    _phfree_internal (hdes, ptr);
+
+<span class="PreProc">  #ifdef PTHREAD_SUPPORT</span>
+  (<span class="Type">void</span>)pthread_mutex_unlock(&amp;htab_mutex);
+<span class="PreProc">  #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+  <span class="Statement">return</span>((<span class="Type">void</span> *)<span class="Constant">NULL</span>);
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

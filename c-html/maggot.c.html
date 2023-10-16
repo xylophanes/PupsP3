@@ -1,0 +1,1225 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/maggot.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Error { color: #ffffff; background-color: #ff6060; padding-bottom: 1px; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Purpose: The digital maggot -- searches for psrp files and FIFOS and removes them if</span>
+<span class="Comment">             they are stale (e.g. exist without an associated PSRP process)  </span>
+
+<span class="Comment">    Author:  M.A. O'Neill</span>
+<span class="Comment">             Tumbling Dice Ltd</span>
+<span class="Comment">             Gosforth</span>
+<span class="Comment">             Newcastle upon Tyne</span>
+<span class="Comment">             NE3 4RT</span>
+<span class="Comment">             United Kingdom</span>
+
+<span class="Comment">    Version: 3.03 </span>
+<span class="Comment">    Dated:   14th October 2023</span>
+<span class="Comment">    E-mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">-------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="PreProc">#include </span><span class="Constant">&lt;me.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;utils.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;netlib.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;psrp.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/types.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;bsd/string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;errno.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;vstamp.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/stat.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Version of maggot </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define MAGGOT_VERSION    </span><span class="Constant">&quot;3.03&quot;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Get signal mapping appropriate to OS and hardware architecture </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define __DEFINE__</span>
+<span class="PreProc">#if defined(I386) || defined(X86_64)</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sig.linux.x86.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> I386 || X86_64 </span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef ARMV6L</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sig.linux.arm.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> ARMV6L </span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef ARMV7L</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sig.linux.arm.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> ARMV7L </span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef AARCH64</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sig.linux.arm.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> AARCH64 </span><span class="Comment">*/</span>
+<span class="PreProc">#undef __DEFINE__</span>
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Get application information for slot manager ...</span>
+<span class="Comment">------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Slot information function </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> maggot_slot(<span class="Type">int</span> level)
+{   (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;int app (PSRP) maggot </span><span class="Special">%s</span><span class="Constant">: [ANSI C]</span><span class="Special">\n</span><span class="Constant">&quot;</span>,MAGGOT_VERSION);
+
+    <span class="Statement">if</span>(level &gt; <span class="Constant">1</span>)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;(C) 1999-2022 Tumbling Dice</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Author: M.A. O'Neill</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;The digital maggot (PUPS stale resource and garbage collection) (built </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+    }
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Application usage function </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> maggot_usage()
+
+{
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[-search &lt;directory list:/tmp;/fifos/&lt;localhost&gt;]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[-parse &lt;key list&gt;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[-delay_period &lt;minutes:60&gt;]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[-global:FALSE]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[&gt;&amp; &lt;ASCII log file&gt;]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Signals</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;SIGINIT SIGCHAN SIGPSRP: Process status [PSRP] request (protocol </span><span class="Special">%4.2F</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,PSRP_PROTOCOL_VERSION);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;SIGCLIENT: tell client server is about to segment</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+
+<span class="PreProc">    #ifdef CRUI_SUPPORT</span>
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;SIGCHECK SIGRESTART:      checkpoint and restart signals</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> CRIU_SUPPORT </span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;SIGALIVE: check for existence of client on signal dispatch host</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+}
+
+
+
+
+<span class="PreProc">#ifdef SLOT</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;slotman.h&gt;</span>
+_EXTERN <span class="Type">void</span> (* SLOT)() __attribute__ ((aligned(<span class="Constant">16</span>))) = maggot_slot;
+_EXTERN <span class="Type">void</span> (* USE )() __attribute__ ((aligned(<span class="Constant">16</span>))) = maggot_usage;
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> SLOT </span><span class="Comment">*/</span>
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Application build date ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_EXTERN <span class="Type">char</span> appl_build_time[SSIZE] = <span class="Constant">__TIME__</span>;
+_EXTERN <span class="Type">char</span> appl_build_date[SSIZE] = <span class="Constant">__DATE__</span>;
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Defines which are used by this application ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define N_ENTRIES     </span><span class="Constant">1024</span>
+<span class="PreProc">#define MAX_S_DIRS    </span><span class="Constant">32</span>
+<span class="PreProc">#define MAX_KEYS      </span><span class="Constant">32</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Public variables and function pointers used by this application ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Functions which are private to this application ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Comment">/*</span><span class="Comment"> Report on the status of the maggot process </span><span class="Comment">*/</span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> psrp_process_status(<span class="Type">int</span>, <span class="Type">char</span> *[]);
+
+<span class="Comment">/*</span><span class="Comment"> Remove a stale PSRP resource </span><span class="Comment">*/</span>
+_PROTOTYPE _PRIVATE _BOOLEAN psrp_remove_stale_objects(<span class="Type">char</span> *, <span class="Type">char</span> *);
+
+<span class="Comment">/*</span><span class="Comment"> PUPS exit function </span><span class="Comment">*/</span>
+_PROTOTYPE _PRIVATE <span class="Type">void</span> maggot_exit_f(<span class="Type">char</span> *);
+
+<span class="Comment">/*</span><span class="Comment"> Builtin help for maggot PSRP API </span><span class="Comment">*/</span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> psrp_help(<span class="Type">int</span>, <span class="Type">char</span> *[]);
+
+<span class="Comment">/*</span><span class="Comment"> PSRP function to set delay period </span><span class="Comment">*/</span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> set_delay_period(<span class="Type">int</span>, <span class="Type">char</span> *[]);
+
+<span class="Comment">/*</span><span class="Comment"> PSRP function to add a directory to scan list </span><span class="Comment">*/</span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> add_directory(<span class="Type">int</span>, <span class="Type">char</span> *[]);
+
+<span class="Comment">/*</span><span class="Comment"> PSRP function to remove a directory from scan list </span><span class="Comment">*/</span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> remove_directory(<span class="Type">int</span>, <span class="Type">char</span> *[]);
+
+<span class="Comment">/*</span><span class="Comment"> PSRP function to add a key to key list </span><span class="Comment">*/</span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> add_key(<span class="Type">int</span>, <span class="Type">char</span> *[]);
+
+<span class="Comment">/*</span><span class="Comment"> PSRP function to remove a key from key  list </span><span class="Comment">*/</span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> remove_key(<span class="Type">int</span>, <span class="Type">char</span> *[]);
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Variables which are private to this module ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+                                                           <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>         n_entries          = <span class="Constant">0</span>;               <span class="Comment">/*</span><span class="Comment"> Directory entries (used in directory scanning)          </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>         scan_cnt           = <span class="Constant">0</span>;               <span class="Comment">/*</span><span class="Comment"> Number of scan of directories completed                 </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>         start_time         = <span class="Constant">0</span>;               <span class="Comment">/*</span><span class="Comment"> Start of last file system scan                          </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>         delay_period       = <span class="Constant">60</span>;              <span class="Comment">/*</span><span class="Comment"> Period between file system scans                        </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>         d_cnt              = <span class="Constant">0</span>;               <span class="Comment">/*</span><span class="Comment"> Number of user defined directories scanned              </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>         key_cnt              = <span class="Constant">0</span>;             <span class="Comment">/*</span><span class="Comment"> Number of user defined serach keys                      </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>         delete_cnt         = <span class="Constant">0</span>;               <span class="Comment">/*</span><span class="Comment"> Number of stale PSRP items removed by this maggot       </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>         log_wrap_cnt       = <span class="Constant">1024</span>;            <span class="Comment">/*</span><span class="Comment"> Number of objects logged before log file wraps          </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>         items_logged       = <span class="Constant">0</span>;               <span class="Comment">/*</span><span class="Comment"> Items in log file                                       </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">long</span>        wrap_pos           = <span class="Constant">0L</span>;              <span class="Comment">/*</span><span class="Comment"> Rewrap position in log file                             </span><span class="Comment">*/</span>
+_PRIVATE _BOOLEAN    e_l_allocated      = FALSE;           <span class="Comment">/*</span><span class="Comment"> TRUE if directory entry list allocated                  </span><span class="Comment">*/</span>
+_PRIVATE _BOOLEAN    global_maggot      = FALSE;           <span class="Comment">/*</span><span class="Comment"> TRUE if maggot cleaning up global PUPS/P3 log files     </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">char</span>        **entry_list        = (<span class="Type">char</span> **)<span class="Constant">NULL</span>;  <span class="Comment">/*</span><span class="Comment"> List of PSRP resources which may be stale               </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">struct</span> stat buf;                                  <span class="Comment">/*</span><span class="Comment"> Stat buffer for determining log stream type             </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">char</span>        d_list[MAX_S_DIRS][SSIZE];            <span class="Comment">/*</span><span class="Comment"> List of user scanned directories                        </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">char</span>        key_list[MAX_S_DIRS][SSIZE];          <span class="Comment">/*</span><span class="Comment"> List of user search keys                                </span><span class="Comment">*/</span>
+                                                           <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Software I.D. tag (used if CKPT support enabled to discard stale dynamic</span>
+<span class="Comment">    checkpoint files) ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define VTAG  </span><span class="Constant">3794</span>
+
+<span class="Type">extern</span> <span class="Type">int</span> appl_vtag = VTAG;
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Main - decode command tail then interpolate using parameters supplied by user ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> pups_main(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   <span class="Type">int</span> i;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Wait for PUPS/P3 to initialise </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)psrp_ignore_requests();
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Get standard items form the command tail ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    pups_std_init(TRUE,
+                  &amp;argc,
+                  MAGGOT_VERSION,
+                  <span class="Constant">&quot;M.A. O'Neill&quot;</span>,
+                  <span class="Constant">&quot;(PSRP) maggot&quot;</span>,
+                  <span class="Constant">&quot;2023&quot;</span>,
+                  argv);
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Are we a global maggot? </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(pups_locate(&amp;init,<span class="Constant">&quot;global&quot;</span>,&amp;argc,args,<span class="Constant">0</span>) != NOT_FOUND)
+    {  global_maggot = TRUE;
+
+       <span class="Statement">if</span>(appl_verbose == TRUE)
+       {  (<span class="Type">void</span>)strdate(date);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): global maggot</span><span class="Special">\n</span><span class="Constant">&quot;</span>,date,
+                                                              appl_name,
+                                                               appl_pid,
+                                                              appl_host,
+                                                             appl_owner,
+                                                        delay_period/<span class="Constant">60</span>);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Get the delay time -- the maggot will search the /fifo/&lt;hostname&gt; and </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> /tmp filesystems every delay seconds                                  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((ptr = pups_locate(&amp;init,<span class="Constant">&quot;delay_period&quot;</span>,&amp;argc,args,<span class="Constant">0</span>)) != NOT_FOUND)
+    {  <span class="Statement">if</span>((delay_period = pups_i_dec(&amp;ptr,&amp;argc,args)) == (<span class="Type">int</span>)INVALID_ARG)
+          pups_error(<span class="Constant">&quot;[maggot] expecting delay period for PSRP file system reaping&quot;</span>);
+
+       delay_period = iabs(delay_period)*<span class="Constant">60</span>;
+    }
+    <span class="Statement">else</span>
+       delay_period *= <span class="Constant">60</span>;
+
+    <span class="Statement">if</span>(appl_verbose == TRUE)
+    {  (<span class="Type">void</span>)strdate(date);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): PSRP filesystem period of grace for stale resources is </span><span class="Special">%d</span><span class="Constant"> minutes</span><span class="Special">\n</span><span class="Constant">&quot;</span>,date,
+                                                                                                               appl_name,
+                                                                                                                appl_pid,
+                                                                                                               appl_host,
+                                                                                                              appl_owner,
+                                                                                                         delay_period/<span class="Constant">60</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Initialise directory list </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;MAX_S_DIRS; ++i)
+       (<span class="Type">void</span>)strlcpy(d_list[i],<span class="Constant">&quot;notset&quot;</span>,SSIZE);
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Get user defined list of directories to be seached </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((ptr = pups_locate(&amp;init,<span class="Constant">&quot;search&quot;</span>,&amp;argc,args,<span class="Constant">0</span>)) != NOT_FOUND)
+    {  <span class="Type">char</span> d_name[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+       <span class="Statement">do</span> {
+               <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment"> Test for end of list </span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+
+               (<span class="Type">void</span>)strccpy(d_name,pups_str_dec(&amp;ptr,&amp;argc,args));
+               <span class="Statement">if</span> (strcmp(d_name,<span class="Constant">&quot;&quot;</span>) == <span class="Constant">0</span>)
+                  <span class="Statement">break</span>;
+
+
+               <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment"> Process next directory </span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+               <span class="Statement">else</span>
+               {
+
+                  <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment"> Can we access directory </span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+
+                  <span class="Statement">if</span>(stat(d_name,&amp;buf) == (-<span class="Constant">1</span>) &amp;&amp; appl_verbose == TRUE)
+                  {  (<span class="Type">void</span>)strdate(date);
+                     (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): cannot access </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,date,
+                                                                            appl_name,
+                                                                             appl_pid,
+                                                                            appl_host,
+                                                                           appl_owner,
+                                                                               d_name);
+                      (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+                  }
+
+
+                  <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------</span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment"> Is the directory actually identified as such by stat? </span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------</span><span class="Comment">*/</span>
+
+                  <span class="Statement">if</span>(!S_ISDIR(buf.st_mode) &amp;&amp; appl_verbose == TRUE)
+                  {  (<span class="Type">void</span>)strdate(date);
+                     (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">) </span><span class="Special">%s</span><span class="Constant"> is not a directory</span><span class="Special">\n</span><span class="Constant">&quot;</span>,date,
+                                                                                appl_name,
+                                                                                 appl_pid,
+                                                                                appl_host,
+                                                                               appl_owner,
+                                                                                   d_name);
+                      (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+                      pups_exit(<span class="Constant">255</span>);
+                  }
+
+
+                  <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment"> Add the directory to the list of those which are to be searched </span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment"> by this maggot                                                  </span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+                  <span class="Statement">else</span>
+                  {
+
+                     <span class="Statement">if</span>(appl_verbose == TRUE)
+                     {  (<span class="Type">void</span>)strdate(date);
+                        (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">) searching directory </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,date,
+                                                                                    appl_name,
+                                                                                     appl_pid,
+                                                                                    appl_host,
+                                                                                   appl_owner,
+                                                                                       d_name);
+                        (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+                        pups_exit(<span class="Constant">255</span>);
+                     }
+
+
+                     <span class="Statement">if</span>(d_cnt == MAX_S_DIRS)
+                        pups_error(<span class="Constant">&quot;[maggot] too many user defined search directories&quot;</span>);
+                     <span class="Statement">else</span>
+                     {  (<span class="Type">void</span>)strlcpy(d_list[d_cnt++],d_name,SSIZE);
+                        (<span class="Type">void</span>)strlcpy(d_name,<span class="Constant">&quot;&quot;</span>,SSIZE);
+                     }
+                  }
+               }
+           } <span class="Statement">while</span> (TRUE);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Initialise key list </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;MAX_KEYS; ++i)
+       (<span class="Type">void</span>)strlcpy(key_list[i],<span class="Constant">&quot;notset&quot;</span>,SSIZE);
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> User user defined search keys </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((ptr = pups_locate(&amp;init,<span class="Constant">&quot;parse&quot;</span>,&amp;argc,args,<span class="Constant">0</span>)) != NOT_FOUND)
+    {  <span class="Type">char</span> key[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+       <span class="Statement">do</span> {
+
+               <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment"> Test for end of list </span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+
+               (<span class="Type">void</span>)strccpy(key,pups_str_dec(&amp;ptr,&amp;argc,args));
+               <span class="Statement">if</span> (strcmp(key,<span class="Constant">&quot;&quot;</span>) == <span class="Constant">0</span>)
+                  <span class="Statement">break</span>;
+
+
+               <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment"> Add search key to list </span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+               <span class="Statement">else</span>
+               {  <span class="Statement">if</span>(appl_verbose == TRUE)
+                  {  (<span class="Type">void</span>)strdate(date);
+                     (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">) adding search key </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,date,
+                                                                               appl_name,
+                                                                                appl_pid,
+                                                                               appl_host,
+                                                                              appl_owner,
+                                                                                     key);
+                      (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+                  }
+
+                  <span class="Statement">if</span>(d_cnt == MAX_KEYS)
+                     pups_error(<span class="Constant">&quot;[maggot] too many user defined search keys&quot;</span>);
+                  <span class="Statement">else</span>
+                  {  (<span class="Type">void</span>)strlcpy(key_list[key_cnt++],key,SSIZE);
+                     (<span class="Type">void</span>)strlcpy(key,<span class="Constant">&quot;&quot;</span>,SSIZE);
+                  }
+               }
+           } <span class="Statement">while</span>(TRUE);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Get log wrap count </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)fstat(<span class="Constant">2</span>,&amp;buf);
+    <span class="Statement">if</span>(S_ISREG(buf.st_mode))
+    {  <span class="Statement">if</span>((ptr = pups_locate(&amp;init,<span class="Constant">&quot;delay_period&quot;</span>,&amp;argc,args,<span class="Constant">0</span>)) != NOT_FOUND)
+       {  <span class="Statement">if</span>((log_wrap_cnt = pups_i_dec(&amp;ptr,&amp;argc,args)) == (<span class="Type">int</span>)INVALID_ARG)
+              pups_error(<span class="Constant">&quot;[maggot] expecting maximum number of items in log file&quot;</span>);
+
+          log_wrap_cnt = iabs(log_wrap_cnt);
+       }
+    }
+
+    <span class="Statement">if</span>(appl_verbose == TRUE)
+    {  (<span class="Type">void</span>)strdate(date);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): log wrap count is </span><span class="Special">%d</span><span class="Constant"> items</span><span class="Special">\n</span><span class="Constant">&quot;</span>,date,
+                                                                        appl_name,
+                                                                         appl_pid,
+                                                                        appl_host,
+                                                                       appl_owner,
+                                                                     log_wrap_cnt);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Complain about any unparsed arguments </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+    pups_t_arg_errs(argd,args);
+
+    <span class="Statement">if</span>(appl_verbose == TRUE)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): started</span><span class="Special">\n</span><span class="Constant">&quot;</span>,date,
+                                                     appl_name,
+                                                      appl_pid,
+                                                     appl_host,
+                                                    appl_owner);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Save file pointer - we will rewind to this position when the log is wrapped </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(S_ISREG(buf.st_mode))
+       wrap_pos = pups_lseek(<span class="Constant">2</span>,<span class="Constant">0</span>,<span class="Constant">SEEK_CUR</span>);
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Initialise PSRP function dispatch handler - note that the embryo is fully dynamic and prepared</span>
+<span class="Comment">    to import both dynamic functions and data objects ...</span>
+<span class="Comment">---------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)psrp_init(PSRP_STATUS_ONLY | PSRP_HOMEOSTATIC_STREAMS,&amp;psrp_process_status);
+    (<span class="Type">void</span>)psrp_attach_static_function(<span class="Constant">&quot;help&quot;</span>,            &amp;psrp_help);
+    (<span class="Type">void</span>)psrp_attach_static_function(<span class="Constant">&quot;delay_period&quot;</span>,    &amp;set_delay_period);
+    (<span class="Type">void</span>)psrp_attach_static_function(<span class="Constant">&quot;add_directory&quot;</span>,   &amp;add_directory);
+    (<span class="Type">void</span>)psrp_attach_static_function(<span class="Constant">&quot;remove_directory&quot;</span>,&amp;remove_directory);
+    (<span class="Type">void</span>)psrp_attach_static_function(<span class="Constant">&quot;add_key&quot;</span>,         &amp;add_key);
+    (<span class="Type">void</span>)psrp_attach_static_function(<span class="Constant">&quot;remove_key&quot;</span>,      &amp;remove_key);
+    (<span class="Type">void</span>)psrp_accept_requests();
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Set up exit function to free memory allocated by the stale resource removal function ...</span>
+<span class="Comment">---------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    pups_register_exit_f(<span class="Constant">&quot;maggot_exit_f&quot;</span>,
+                         &amp;maggot_exit_f,
+                         (<span class="Type">char</span> *)<span class="Constant">NULL</span>);
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    This is the pups_main loop of the maggot -- it periodically checks the /fifo/&lt;hostname&gt; and /tmp</span>
+<span class="Comment">    filesystems of its host and removes stale resources ...</span>
+<span class="Comment">---------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">do</span> {    <span class="Type">unsigned</span> <span class="Type">int</span> i;
+
+
+            <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment"> Delay period between PSRP directory scans </span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+            <span class="Statement">if</span>(scan_cnt &gt; <span class="Constant">0</span>)
+            {  start_time = time((<span class="Type">time_t</span> *)<span class="Constant">NULL</span>);
+               (<span class="Type">void</span>)pups_sleep(<span class="Constant">5</span>);
+            }
+            ++scan_cnt;
+
+
+            <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment"> Scan PSRP directories for stale objects and if any </span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment"> are found remove them                              </span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+
+            <span class="Statement">if</span>(global_maggot == TRUE)
+               (<span class="Type">void</span>)psrp_remove_stale_objects(<span class="Constant">&quot;/tmp&quot;</span>,<span class="Constant">&quot;log&quot;</span>);
+            <span class="Statement">else</span>
+            {  (<span class="Type">void</span>)psrp_remove_stale_objects(appl_fifo_dir,<span class="Constant">&quot;fifo&quot;</span>);
+               (<span class="Type">void</span>)psrp_remove_stale_objects(appl_fifo_dir,<span class="Constant">&quot;pst&quot;</span>);
+               (<span class="Type">void</span>)psrp_remove_stale_objects(<span class="Constant">&quot;/tmp&quot;</span>,<span class="Constant">&quot;fifo&quot;</span>);
+               (<span class="Type">void</span>)psrp_remove_stale_objects(<span class="Constant">&quot;/tmp&quot;</span>,<span class="Constant">&quot;pst&quot;</span>);
+
+
+               <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment"> Process user defined keys </span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+               <span class="Statement">for</span> (i=<span class="Constant">0</span>; i&lt;key_cnt; ++i)
+                   (<span class="Type">void</span>)psrp_remove_stale_objects(<span class="Constant">&quot;/tmp&quot;</span>,key_list[i]);
+            }
+
+
+            <span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment"> Scan user defined directories for stale objects </span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment"> and remove any which are found                  </span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+
+            <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;d_cnt; ++i)
+            {  <span class="Type">unsigned</span> <span class="Type">int</span> j;
+
+               <span class="Statement">if</span>(strcmp(d_list[i],<span class="Constant">&quot;notset&quot;</span>) != <span class="Constant">0</span>)
+               {  (<span class="Type">void</span>)psrp_remove_stale_objects(d_list[i],<span class="Constant">&quot;fifo&quot;</span>);
+                  (<span class="Type">void</span>)psrp_remove_stale_objects(d_list[i],<span class="Constant">&quot;pst&quot;</span>);
+
+
+                  <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment"> Process user defined keys </span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+                  <span class="Statement">for</span> (j=<span class="Constant">0</span>; j&lt;key_cnt; ++j)
+                      (<span class="Type">void</span>)psrp_remove_stale_objects(d_list[i],key_list[j]);
+               }
+            }
+
+       } <span class="Statement">while</span>(TRUE);
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> If we are running as root recreate </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> /dev/tty and /dev/null             </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span> (getuid() == <span class="Constant">0</span>)
+       (<span class="Type">void</span>)system(<span class="Constant">&quot;mktty&quot;</span>);
+
+    pups_exit(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">   Report on the status of this maggot ...</span>
+<span class="Comment">---------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> psrp_process_status(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{    <span class="Type">int</span> i,
+         u_d_scan_dirs  = <span class="Constant">0</span>,
+         u_key_cnt      = <span class="Constant">0</span>;
+
+     (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">    maggot version </span><span class="Special">%s</span><span class="Constant"> status</span><span class="Special">\n</span><span class="Constant">&quot;</span>,MAGGOT_VERSION);
+     (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    ==========================</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+
+<span class="PreProc">#if defined(CRIU_SUPPORT)</span>
+     (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    Binary is Crui enabled (checkpointable)</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+<span class="PreProc">#endif</span>  <span class="Comment">/*</span><span class="Comment"> CRUI_SUPPORT </span><span class="Comment">*/</span>
+
+     (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    Stale resources will be deleted after </span><span class="Special">%d</span><span class="Constant"> minutes</span><span class="Special">\n</span><span class="Constant">&quot;</span>,delay_period/<span class="Constant">60</span>);
+     (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    Scanning </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> for stale PSRP objects</span><span class="Special">\n</span><span class="Constant">&quot;</span>,appl_fifo_dir);
+
+     <span class="Statement">if</span>(strin(appl_fifo_dir,<span class="Constant">&quot;fifos&quot;</span>) == TRUE)
+        (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    Scanning </span><span class="Special">\&quot;</span><span class="Constant">/tmp</span><span class="Special">\&quot;</span><span class="Constant"> for stale PSRP objects</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+
+
+     <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> User defined directories scanned </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+     <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;d_cnt; ++i)
+     {  <span class="Statement">if</span>(strcmp(d_list[i],<span class="Constant">&quot;notset&quot;</span>) != <span class="Constant">0</span>)
+        {  <span class="Statement">if</span>(u_d_scan_dirs == <span class="Constant">0</span>)
+           {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">    User defined directory(s) to be scanned</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+              (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    =======================================</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+              (<span class="Type">void</span>)fflush(psrp_out);
+           }
+
+           (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    </span><span class="Special">%d</span><span class="Constant">: Scanning </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> for stale PSRP objects</span><span class="Special">\n</span><span class="Constant">&quot;</span>,i,d_list[i]);
+           (<span class="Type">void</span>)fflush(psrp_out);
+
+           ++u_d_scan_dirs;
+        }
+     }
+
+     <span class="Statement">if</span>(u_d_scan_dirs &gt; <span class="Constant">0</span>)
+        (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    Total of </span><span class="Special">%d</span><span class="Constant"> user defined directory(s) to be scanned</span><span class="Special">\n</span><span class="Constant">&quot;</span>,d_cnt);
+
+
+     <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> User file keys </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+
+     <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;key_cnt; ++i)
+     {  <span class="Statement">if</span>(strcmp(key_list[i],<span class="Constant">&quot;notset&quot;</span>) != <span class="Constant">0</span>)
+        {  <span class="Statement">if</span>(u_key_cnt == <span class="Constant">0</span>)
+           {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">    User file keys</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+              (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    ==============</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+              (<span class="Type">void</span>)fflush(psrp_out);
+           }
+
+           (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    </span><span class="Special">%d</span><span class="Constant">:  Stale files containing key </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> will be removed</span><span class="Special">\n</span><span class="Constant">&quot;</span>,i,key_list[i]);
+           (<span class="Type">void</span>)fflush(psrp_out);
+
+           ++u_key_cnt;
+        }
+     }
+
+     <span class="Statement">if</span>(u_key_cnt &gt; <span class="Constant">0</span>)
+        (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    Total of </span><span class="Special">%d</span><span class="Constant"> user defined file keys</span><span class="Special">\n</span><span class="Constant">&quot;</span>,key_cnt);
+
+
+     <span class="Statement">if</span>(delete_cnt == <span class="Constant">0</span>)
+        (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">    No stale PSRP resources removed</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,delete_cnt);
+     <span class="Statement">else</span>
+        (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">    </span><span class="Special">%d</span><span class="Constant"> stale PSRP resources removed</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,delete_cnt);
+     (<span class="Type">void</span>)fflush(psrp_out);
+
+     <span class="Statement">return</span>(PSRP_OK);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------*.</span>
+<span class="Error">/</span><span class="Comment">* Parse pid in &lt;file name&gt;-&lt;pid&gt; format file </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> parse_pidname(<span class="Type">unsigned</span> <span class="Type">char</span> *filename)
+
+{    <span class="Type">unsigned</span> <span class="Type">int</span> i,
+                  size    = <span class="Constant">0</span>,
+                  cnt     = <span class="Constant">0</span>,
+                  pid_pos = <span class="Constant">0</span>;
+
+     <span class="Type">int</span>  pid             = (-<span class="Constant">1</span>);
+     <span class="Type">char</span> pidstr[SSIZE]   = <span class="Constant">&quot;&quot;</span>;
+
+
+     <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> Filename string size </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+
+     size = strlen(filename);
+
+
+     <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> Find start of PID string </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+
+     <span class="Statement">for</span> (i=size; i&gt;<span class="Constant">0</span>; --i)
+     {   <span class="Statement">if</span> (filename[i] == <span class="Constant">'-'</span>)
+         {  pid_pos = i + <span class="Constant">1</span>;
+            <span class="Statement">break</span>;
+         }
+     }
+
+
+     <span class="Comment">/*</span><span class="Comment">--------</span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> No PID </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment">--------</span><span class="Comment">*/</span>
+
+     <span class="Statement">if</span> (pid_pos == <span class="Constant">0</span>)
+        <span class="Statement">return</span> (-<span class="Constant">1</span>);
+
+
+     <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> Get PID string </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+
+     <span class="Statement">for</span> (i=pid_pos; i&lt;size; ++i)
+     {   pidstr[cnt] = filename[i];
+         ++cnt;
+     }
+
+
+     <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> Get (integer) PID </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+     (<span class="Type">void</span>)sscanf(pidstr,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">&quot;</span>,&amp;pid);
+     <span class="Statement">return</span> (pid);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Routine to remove stale items from PSRP file systems </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _BOOLEAN psrp_remove_stale_objects(<span class="Type">char</span> *directory, <span class="Type">char</span> *object_key)
+
+{   <span class="Type">unsigned</span> <span class="Type">int</span> i;
+
+    <span class="Type">int</span> entry_cnt  = <span class="Constant">0</span>,
+        psrp_pid   = (-<span class="Constant">1</span>),
+        owner      = (-<span class="Constant">1</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> If we cannot access directory containing stale resources </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> simply exit                                              </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(access(directory,F_OK | R_OK | W_OK) == (-<span class="Constant">1</span>))
+       <span class="Statement">return</span>(FALSE);
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> If this is the first time we have called this function   </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> create an entry list                                     </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(entry_list == (<span class="Type">char</span> **)<span class="Constant">NULL</span>)
+    {  entry_list = (<span class="Type">char</span> **)pups_calloc(N_ENTRIES,<span class="Statement">sizeof</span>(<span class="Type">char</span> *));
+       e_l_allocated = TRUE;
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Build a list of objects in all the directories which may </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> contain stale PSRP objects                               </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+
+    entry_list = pups_get_directory_entries(directory,object_key,&amp;n_entries,&amp;entry_cnt);
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;n_entries; ++i)
+    {  <span class="Type">char</span> strdum[SSIZE]     = <span class="Constant">&quot;&quot;</span>,
+            next_entry[SSIZE] = <span class="Constant">&quot;&quot;</span>,
+            hostname[SSIZE]   = <span class="Constant">&quot;&quot;</span>;
+
+       (<span class="Type">void</span>)strclr(next_entry);
+       (<span class="Type">void</span>)strclr(strdum);
+       (<span class="Type">void</span>)strclr(hostname);
+       psrp_pid    = (-<span class="Constant">1</span>);
+       (<span class="Type">void</span>)strlcpy(next_entry,entry_list[i],SSIZE);
+       mchrep(<span class="Constant">' '</span>,<span class="Constant">&quot;:#&quot;</span>,next_entry);
+
+                                                                                                         <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+       <span class="Statement">if</span>(sscanf(next_entry,<span class="Constant">&quot;</span><span class="Special">%s%s%s%s%s%d</span><span class="Constant">&quot;</span>,strdum,strdum,hostname,strdum,strdum,&amp;psrp_pid) == <span class="Constant">6</span>    ||    <span class="Comment">/*</span><span class="Comment"> Standard PUP/P3 files/FIFO's </span><span class="Comment">*/</span>
+          (psrp_pid = parse_pidname(entry_list[i]))                                        &gt;= <span class="Constant">0</span>     )    <span class="Comment">/*</span><span class="Comment"> &lt;filename&gt;-&lt;pid&gt;             </span><span class="Comment">*/</span>
+                                                                                                         <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+       {  <span class="Type">int</span>    ret,
+                 c_time;
+
+          <span class="Type">char</span>        pathname[<span class="Constant">1024</span>] = <span class="Constant">&quot;&quot;</span>;
+          <span class="Type">struct</span> stat buf;
+
+
+          <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Check if resource is stale and that it has been unchanged </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> for user specified delay period                           </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+
+          (<span class="Type">void</span>)snprintf(pathname,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/</span><span class="Special">%s</span><span class="Constant">&quot;</span>,directory,entry_list[i]);
+          (<span class="Type">void</span>)stat(pathname,&amp;buf);
+
+<span class="PreProc">          #ifdef SSH_SUPPORT</span>
+          <span class="Statement">if</span>(global_maggot == TRUE)
+          {  <span class="Type">char</span> pidname[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+             (<span class="Type">void</span>)snprintf(pidname,SSIZE,<span class="Constant">&quot;</span><span class="Special">%d%d</span><span class="Constant">&quot;</span>,&amp;psrp_pid,&amp;owner);
+             ret = pups_rkill(hostname,ssh_remote_port,appl_owner,pidname,<span class="Constant">SIGTERM</span>);
+	  }
+          <span class="Statement">else</span>
+<span class="PreProc">          #endif</span> <span class="Comment">/*</span><span class="Comment"> SSH_SUPPORT </span><span class="Comment">*/</span>
+
+          ret    = kill(psrp_pid,SIGALIVE);
+          c_time = time((<span class="Type">time_t</span> *)<span class="Constant">NULL</span>);
+
+                                                           <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+          <span class="Statement">if</span>(psrp_pid != (-<span class="Constant">1</span>)                         &amp;&amp;   <span class="Comment">/*</span><span class="Comment"> PSRP channel/lockpost etc.  </span><span class="Comment">*/</span>
+             c_time - buf.st_mtime &gt;  delay_period    &amp;&amp;   <span class="Comment">/*</span><span class="Comment"> Delay period OK             </span><span class="Comment">*/</span>
+             owner                 == getuid()        &amp;&amp;   <span class="Comment">/*</span><span class="Comment"> We own PSRP server          </span><span class="Comment">*/</span>
+             psrp_pid              != appl_pid        &amp;&amp;   <span class="Comment">/*</span><span class="Comment"> We are not damaging ourself </span><span class="Comment">*/</span>
+             ret                   == (-<span class="Constant">1</span>)             )   <span class="Comment">/*</span><span class="Comment"> PSRP server is dead         </span><span class="Comment">*/</span>
+                                                           <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+          {
+
+             <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> Remove stale resource </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+
+             (<span class="Type">void</span>)unlink(pathname);
+
+
+             <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> Log the fact that we have removed the stale resource </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+             <span class="Statement">if</span>(appl_verbose == TRUE)
+             {  ++items_logged;
+                <span class="Statement">if</span>(items_logged == log_wrap_cnt)
+                {  items_logged = <span class="Constant">0</span>;
+                   (<span class="Type">void</span>)pups_lseek(<span class="Constant">2</span>,wrap_pos,<span class="Constant">SEEK_SET</span>);
+                }
+
+                (<span class="Type">void</span>)strdate(date);
+                (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): stale PSRP resource (</span><span class="Special">%s</span><span class="Constant">) has been removed</span><span class="Special">\n</span><span class="Constant">&quot;</span>,date,
+                                                                                                appl_name,
+                                                                                                 appl_pid,
+                                                                                                appl_host,
+                                                                                               appl_owner,
+                                                                                            entry_list[i]);
+                (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+                ++delete_cnt;
+             }
+          }
+       }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Free memory allocated by directory scanner </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(n_entries &gt; <span class="Constant">0</span>)
+    {  <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;n_entries; ++i)
+          entry_list[i] = (<span class="Type">char</span> *)pups_free((<span class="Type">void</span> *)entry_list[i]);
+    }
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to remove stale items from PSRP file systems ...</span>
+<span class="Comment">---------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> maggot_exit_f(<span class="Type">char</span> *arg_str)
+
+{   <span class="Type">int</span> i;
+
+    <span class="Statement">if</span>(e_l_allocated == TRUE)
+    {  <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;n_entries; ++i)
+       {  <span class="Statement">if</span>(entry_list[i] != (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+             (<span class="Type">void</span> *)pups_free((<span class="Type">void</span> *)entry_list[i]);
+       }
+
+       (<span class="Type">void</span> *)pups_free((<span class="Type">void</span> *)entry_list);
+    }
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">   Static PSRP function which adds directories to the list of directories to be scanned ...</span>
+<span class="Comment">---------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> add_directory(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   <span class="Type">unsigned</span> <span class="Type">int</span> i;
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check that we have the correct argument count </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(argc != <span class="Constant">2</span>)
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    usage: add_directory &lt;name of scanned directory&gt;</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check argument is a directory </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)stat(argv[<span class="Constant">1</span>],&amp;buf);
+    <span class="Statement">if</span>(!S_ISDIR(buf.st_mode))
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    ERROR add_directory: </span><span class="Special">%s</span><span class="Constant"> is not a directory</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,argv[<span class="Constant">1</span>]);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_ERROR);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check to see if we already scanning this directory </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;MAX_S_DIRS; ++i)
+    {  <span class="Statement">if</span>(strcmp(d_list[i],argv[<span class="Constant">1</span>]) == <span class="Constant">0</span>)
+       {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    ERROR add_directory: </span><span class="Special">%s</span><span class="Constant"> is already in the list of scanned directories</span><span class="Special">\n</span><span class="Constant">&quot;</span>,argv[<span class="Constant">1</span>]);
+          (<span class="Type">void</span>)fflush(psrp_out);
+
+          <span class="Statement">return</span>(PSRP_ERROR);
+       }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Add directory to list </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;MAX_S_DIRS; ++i)
+    {
+       <span class="Statement">if</span>(strncmp(d_list[i],<span class="Constant">&quot;notset&quot;</span>,<span class="Constant">6</span>) == <span class="Constant">0</span>)
+       {  (<span class="Type">void</span>)strlcpy(d_list[i],argv[<span class="Constant">1</span>],SSIZE);
+
+          <span class="Statement">if</span>(i &gt;= d_cnt)
+             ++d_cnt;
+
+          (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    add_directory: </span><span class="Special">%s</span><span class="Constant"> added to scanned directory list</span><span class="Special">\n</span><span class="Constant">&quot;</span>,argv[<span class="Constant">1</span>]);
+          (<span class="Type">void</span>)fflush(psrp_out);
+
+          <span class="Statement">return</span>(PSRP_OK);
+       }
+    }
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">   Static PSRP function which removes directory from the list of directories to be scanned ...</span>
+<span class="Comment">---------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> remove_directory(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   <span class="Type">unsigned</span> <span class="Type">int</span> i;
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check that we have the correct argument count </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(argc != <span class="Constant">2</span>)
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    usage: remove_directory &lt;name of scanned directory&gt;</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Search for directory and remove it from scanned directory list </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;d_cnt; ++i)
+    {  <span class="Statement">if</span>(strcmp(argv[<span class="Constant">1</span>],d_list[i]) == <span class="Constant">0</span>)
+       {  (<span class="Type">void</span>)strlcpy(d_list[i],<span class="Constant">&quot;notset&quot;</span>,SSIZE);
+
+          (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    remove_directory: </span><span class="Special">%s</span><span class="Constant"> has been removed from scanned directory list</span><span class="Special">\n</span><span class="Constant">&quot;</span>,argv[<span class="Constant">1</span>]);
+          (<span class="Type">void</span>)fflush(psrp_out);
+
+          <span class="Statement">return</span>(PSRP_OK);
+       }
+    }
+
+    (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    ERROR remove_directory: </span><span class="Special">%s</span><span class="Constant"> not found in scanned directory list</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,argv[<span class="Constant">1</span>]);
+    (<span class="Type">void</span>)fflush(psrp_out);
+
+    <span class="Statement">return</span>(PSRP_ERROR);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">   Static PSRP function which adds key to key list ...</span>
+<span class="Comment">---------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> add_key(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   <span class="Type">unsigned</span> <span class="Type">int</span> i;
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check that we have the correct argument count </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(argc != <span class="Constant">2</span>)
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;usage: add_key &lt;key&gt;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check to see if key already in list </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;MAX_KEYS; ++i)
+    {  <span class="Statement">if</span>(strcmp(key_list[i],argv[<span class="Constant">1</span>]) == <span class="Constant">0</span>)
+       {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    ERROR add_key: </span><span class="Special">%s</span><span class="Constant"> is already in key list</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,argv[<span class="Constant">1</span>]);
+          (<span class="Type">void</span>)fflush(psrp_out);
+
+          <span class="Statement">return</span>(PSRP_ERROR);
+       }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Add key to list </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;MAX_KEYS; ++i)
+    {
+       <span class="Statement">if</span>(strncmp(key_list[i],<span class="Constant">&quot;notset&quot;</span>,<span class="Constant">6</span>) == <span class="Constant">0</span>)
+       {  (<span class="Type">void</span>)strlcpy(key_list[i],argv[<span class="Constant">1</span>],SSIZE);
+
+          <span class="Statement">if</span>(i &gt;= key_cnt)
+             ++key_cnt;
+
+          (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    add_key: </span><span class="Special">%s</span><span class="Constant"> added to key list</span><span class="Special">\n</span><span class="Constant">&quot;</span>,argv[<span class="Constant">1</span>]);
+          (<span class="Type">void</span>)fflush(psrp_out);
+
+          <span class="Statement">return</span>(PSRP_OK);
+       }
+    }
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">   Static PSRP function which removes key from key list ...</span>
+<span class="Comment">---------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> remove_key(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   <span class="Type">unsigned</span> <span class="Type">int</span> i;
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check that we have the correct argument count </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(argc != <span class="Constant">2</span>)
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    usage: remove_key &lt;key&gt;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Search for directory and remove it from scanned directory list </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;key_cnt; ++i)
+    {  <span class="Statement">if</span>(strcmp(argv[<span class="Constant">1</span>],key_list[i]) == <span class="Constant">0</span>)
+       {  (<span class="Type">void</span>)strlcpy(key_list[i],<span class="Constant">&quot;notset&quot;</span>,SSIZE);
+
+          (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    remove_key: </span><span class="Special">%s</span><span class="Constant"> has been removed from file key list</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,argv[<span class="Constant">1</span>]);
+          (<span class="Type">void</span>)fflush(psrp_out);
+
+          <span class="Statement">return</span>(PSRP_OK);
+       }
+    }
+
+    (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    ERROR remove_key: </span><span class="Special">%s</span><span class="Constant"> not found in file key list</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,argv[<span class="Constant">1</span>]);
+    (<span class="Type">void</span>)fflush(psrp_out);
+
+    <span class="Statement">return</span>(PSRP_ERROR);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">   Static PSRP function which sets scan delay period ...</span>
+<span class="Comment">---------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> set_delay_period(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   <span class="Type">int</span> tmp_delay_period;
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check that we have the correct argument count </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(argc != <span class="Constant">2</span>)
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    usage: delay_period &lt;seconds&gt;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Sanity check </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span> (sscanf(argv[<span class="Constant">1</span>],&amp;tmp_delay_period) != <span class="Constant">1</span> || tmp_delay_period &lt; <span class="Constant">0</span>)
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    ERROR: expecting delay period (integer &gt;= 0)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_ERROR);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set new delay period </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+
+    delay_period = tmp_delay_period;
+
+    (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    set_delay_period: scan delay period is now </span><span class="Special">%04d</span><span class="Constant"> seconds</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(psrp_out);
+
+    <span class="Statement">return</span>(PSRP_OK);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> PSRP API - maggot specific help </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> psrp_help(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{
+     (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">    Maggot version </span><span class="Special">%s</span><span class="Constant"> PSRP API</span><span class="Special">\n</span><span class="Constant">&quot;</span>,MAGGOT_VERSION);
+     (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    (C) Tumbling Dice 2023</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+     (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    PSRP command interface</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+     (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    ======================</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+     (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    status                                           : display current status of maggot</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+     (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    delay_period      !&lt;seconds&gt;!                    : set scan delay period &lt;seconds&gt;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+     (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    add_directory     !&lt;name&gt;!                       : add directory &lt;name&gt; to list of scanned directories</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+     (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    remove_directory  !&lt;name&gt;!                       : remove directory &lt;name&gt; from list of scanned directories</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+     (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    add_key           !&lt;name&gt;!                       : add key &lt;name&gt; to list of files keys to check for removal</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+     (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    remove_key        !&lt;name&gt;!                       : remove key &lt;name&gt; to list of file keys to check for removal</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+     (<span class="Type">void</span>)fflush(psrp_out);
+
+     <span class="Statement">return</span>(PSRP_OK);
+}
+
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

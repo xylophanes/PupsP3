@@ -8,7 +8,7 @@ hupter \- relay SIGHUP to payload process as SIGTERM.
 .B hupter 
 .B [-usage | -help]
 .I command
->& <log file>
+[2> <log file>]
 .br
 
 .SH DESCRIPTION
@@ -45,6 +45,18 @@ filter.
 is the command to be executed. If this is a
 .B pipeline
 it should be enclosed in quotes.
+.br
+
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
 .br
 
 .SH ENVIRONMENT VARIABLES

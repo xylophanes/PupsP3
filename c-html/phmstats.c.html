@@ -1,0 +1,88 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/phmstats.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------</span>
+<span class="Comment">    Access the statistics pups_maintained by `malloc'.</span>
+<span class="Comment">    Copyright 1990, 1991, 1992 Free Software Foundation, Inc.</span>
+<span class="Comment">		  Written May 1989 by Mike Haertel.</span>
+
+<span class="Comment">    This library is free software; you can redistribute it and/or</span>
+<span class="Comment">    modify it under the terms of the GNU Library General Public License as</span>
+<span class="Comment">    published by the Free Software Foundation; either version 2 of the</span>
+<span class="Comment">    License, or (at your option) any later version.</span>
+
+<span class="Comment">    This library is distributed in the hope that it will be useful,</span>
+<span class="Comment">    but WITHOUT ANY WARRANTY; without even the implied warranty of</span>
+<span class="Comment">    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU</span>
+<span class="Comment">    Library General Public License for more details.</span>
+
+<span class="Comment">    You should have received a copy of the GNU Library General Public</span>
+<span class="Comment">    License along with this library; see the file COPYING.LIB.  If</span>
+<span class="Comment">    not, write to the Free Software Foundation, Inc., 675 Mass Ave,</span>
+<span class="Comment">    Cambridge, MA 02139, USA.</span>
+
+<span class="Comment">    The author may be reached (Email) at the address mike@ai.mit.edu,</span>
+<span class="Comment">    or (US mail) as Mike Haertel c/o Free Software Foundation.</span>
+
+<span class="Comment">    Persistent heap modification by Mark O'Neill (mao@tumblingdice.co.uk)</span>
+<span class="Comment">    (C) 1998-2022 M.A. O'Neill, Tumbling Dice</span>
+<span class="Comment">---------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifndef	_PHMALLOC_INTERNAL</span>
+<span class="PreProc">#define _PHMALLOC_INTERNAL</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;phmalloc.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> _PHMALLOC_INTERNAL </span><span class="Comment">*/</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;xtypes.h&gt;</span>
+
+_PUBLIC <span class="Type">struct</span> mstats phmstats (<span class="Type">int</span> hdes)
+{
+  <span class="Type">struct</span> mstats result;
+
+<span class="PreProc">  #ifdef PTHREAD_SUPPORT</span>
+  (<span class="Type">void</span>)pthread_mutex_lock(&amp;htab_mutex);
+<span class="PreProc">  #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+  result.bytes_total  = (<span class="Type">char</span> *) (*__phmorecore) (hdes, <span class="Constant">0</span>) - _pheapbase[hdes];
+  result.chunks_used  = _pheap_chunks_used[hdes];
+  result.bytes_used   = _pheap_bytes_used[hdes];
+  result.chunks_free  = _pheap_chunks_free[hdes];
+  result.bytes_free   = _pheap_bytes_free[hdes];
+
+<span class="PreProc">  #ifdef PTHREAD_SUPPORT</span>
+  (<span class="Type">void</span>)pthread_mutex_unlock(&amp;htab_mutex);
+<span class="PreProc">  #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+  <span class="Statement">return</span> result;
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

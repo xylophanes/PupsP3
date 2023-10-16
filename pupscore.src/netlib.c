@@ -8,8 +8,8 @@
              NE3 4RT
              United Kingdom
 
-    Dated:   27th September 2019 
     Version: 5.00 
+    Dated:   4th January 2022
     E-Mail:  mao@tumblingdice.co.uk
 ------------------------------------------------------------------------------*/
 
@@ -71,7 +71,7 @@ _PRIVATE void netlib_slot(int level)
 {   (void)fprintf(stderr,"lib netlib %s: [ANSI C]\n",NETLIB_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 1995-2019 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 1995-2022 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
        (void)fprintf(stderr,"PUPS/P3 network support library (built %s %s)\n\n",__TIME__,__DATE__);
     }
@@ -297,7 +297,7 @@ _PUBLIC int pups_system(const char        *command_str,  // Command string
                     exec_shell,
                     shell_flags,
                     command_str,(char *)0) == -1)
-             _exit(-1);
+             _exit(255);
        }
        else
        {
@@ -307,7 +307,7 @@ _PUBLIC int pups_system(const char        *command_str,  // Command string
           /*---------------------*/
 
           (void)pups_execls(command_str);
-          _exit(-1);
+          _exit(255);
        }
     }
 
@@ -700,7 +700,7 @@ _PUBLIC gzFILE *pups_gzcopen(const char *command_pipeline, const char *shell, co
     Do not kill pipestream processes explicitly when pipestream is closed ...
 -------------------------------------------------------------------------------*/
 
-_PUBLIC int pipestream_kill_disable(const int fdes)
+_PUBLIC int pups_pipestream_kill_disable(const int fdes)
 
 {   int f_index;
 
@@ -744,7 +744,7 @@ _PUBLIC int pipestream_kill_disable(const int fdes)
     Kill pipestream processes explicitly when pipestream is closed ...
 -------------------------------------------------------------------------------*/
 
-_PUBLIC int pipestream_kill_enable(const int fdes)
+_PUBLIC int pups_pipestream_kill_enable(const int fdes)
 
 {   int f_index;
     
@@ -943,7 +943,7 @@ _PUBLIC int pups_system2(const char       *command_str,  // Command string
 
        if(in_des == (int *)NULL)
        {  if((tty = open("/dev/null",2)) == (-1))
-             _exit(-1);
+             _exit(255);
 
           (void)dup2 (tty,0);
           (void)close(tty);
@@ -967,7 +967,7 @@ _PUBLIC int pups_system2(const char       *command_str,  // Command string
 
        if(out_des == (int *)NULL)
        {  if((tty = open("/dev/null",2)) == (-1))
-             _exit(-1);
+             _exit(255);
 
           (void)dup2 (tty,1);
           (void)close(tty);
@@ -991,7 +991,7 @@ _PUBLIC int pups_system2(const char       *command_str,  // Command string
 
        if(err_des == (int *)NULL)
        {  if((tty = open("/dev/null",2)) == (-1))
-             _exit(-1);
+             _exit(255);
 
           (void)dup2 (tty,2);
           (void)close(tty);
@@ -1034,12 +1034,12 @@ _PUBLIC int pups_system2(const char       *command_str,  // Command string
                        exec_shell,
                       shell_flags,
                       command_str,(char *)0) == -1)
-                _exit(-1);
+                _exit(255);
           }
        }
        else
        {  (void)pups_execls(command_str);
-          _exit(-1);
+          _exit(255);
        }
     }
 
@@ -1597,7 +1597,7 @@ _PUBLIC int pups_rkill(const char *hostname, const char *ssh_port, const char *u
           /* We should not get here -- if we do an error has occured */
           /*---------------------------------------------------------*/
 
-          _exit(-1);
+          _exit(255);
        }
 
 

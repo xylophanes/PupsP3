@@ -1,0 +1,278 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/stripper.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span>
+<span class="Comment">     Purpose: Strips comments out (file/FIFO) stream</span>
+
+<span class="Comment">     Author:  M.A. O'Neill</span>
+<span class="Comment">              Tumbling Dice </span>
+<span class="Comment">              Gosforth</span>
+<span class="Comment">              Newcastle</span>
+<span class="Comment">              NE3 4RT</span>
+
+<span class="Comment">     Version: 2.00 </span>
+<span class="Comment">     Dated:   9th October 2023 </span>
+<span class="Comment">     E-mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;stdio.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stdlib.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;xtypes.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Version of stripper </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define STRIPPER_VERSION    </span><span class="Constant">&quot;2.00&quot;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> String size </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define SSIZE               </span><span class="Constant">2048</span><span class="PreProc"> </span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span>
+<span class="Comment">    Variables which are globally local to this application ...</span>
+<span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span>
+<span class="Comment">    Return first non whitespace character in a string ...</span>
+<span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">char</span> *strfirst(<span class="Type">char</span> *s1)
+
+{   <span class="Type">int</span> i,
+        size;
+
+    size = strlen(s1);
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;size; ++i)
+    {  <span class="Statement">if</span>(s1[i] != <span class="Constant">' '</span> &amp;&amp; s1[i] != <span class="Special">'\n'</span> &amp;&amp; s1[i] != <span class="Special">'\r'</span> &amp;&amp; s1[i] != <span class="Special">'\0'</span>)
+         <span class="Statement">return</span>(&amp;s1[i]);
+    }
+
+    <span class="Statement">return</span>((<span class="Type">char</span> *)<span class="Constant">NULL</span>);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span>
+<span class="Comment">    Test for empty string (contains only whitespace and</span>
+<span class="Comment">    control chars) ...</span>
+<span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _BOOLEAN strempty(<span class="Type">char</span> *s)
+
+{   <span class="Type">int</span> i;
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;strlen(s); ++i)
+    {  <span class="Statement">if</span>(s[i] != <span class="Constant">' '</span> &amp;&amp; s[i] != <span class="Special">'\n'</span>)
+         <span class="Statement">return</span>(FALSE);
+    }
+
+    <span class="Statement">return</span>(TRUE);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span>
+<span class="Comment">    Look for the occurence of string s2 within string s1 ...</span>
+<span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _BOOLEAN strin(<span class="Type">char</span> *s1, <span class="Type">char</span> *s2)
+
+{   <span class="Type">int</span> i,
+        cmp_size,
+        chk_limit;
+
+    <span class="Statement">if</span>(strlen(s2) &gt; strlen(s1))
+       <span class="Statement">return</span>(FALSE);
+
+    chk_limit = strlen(s1) - strlen(s2) + <span class="Constant">1</span>;
+    cmp_size  = strlen(s2);
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;chk_limit; ++i)
+    {  <span class="Statement">if</span>(strncmp(&amp;s1[i],s2,cmp_size) == <span class="Constant">0</span>)
+          <span class="Statement">return</span>(TRUE);
+    }
+
+    <span class="Statement">return</span>(FALSE);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span>
+<span class="Comment">    Strip comments in place ...</span>
+<span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _BOOLEAN strip_comment(<span class="Type">FILE</span> *stream, <span class="Type">int</span> *line_cnt, <span class="Type">char</span> *line)
+
+{
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Wind to next line which is not either a comment </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> or whitespace                                   </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">do</span> {   (<span class="Type">void</span>)fgets(line,SSIZE,stream);
+
+           <span class="Statement">if</span>(feof(stream) != <span class="Constant">0</span>)
+              <span class="Statement">return</span>(FALSE);
+
+           ++(*line_cnt);
+       } <span class="Statement">while</span>(strempty(line) == TRUE || strin(strfirst(line),<span class="Constant">&quot;#&quot;</span>) == TRUE);
+
+    <span class="Statement">return</span>(TRUE);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span>
+<span class="Comment">    Main entry point</span>
+<span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> main(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   <span class="Type">int</span> i,
+        line_cnt   = <span class="Constant">0</span>,
+        decoded    = <span class="Constant">0</span>,
+        n_comments = <span class="Constant">0</span>;
+
+    _BOOLEAN do_verbose  = FALSE,
+             not_comment = FALSE,
+             looper      = TRUE;
+
+    <span class="Type">char</span> hostname[SSIZE] = <span class="Constant">&quot;&quot;</span>,
+         line[SSIZE]     = <span class="Constant">&quot;&quot;</span>;
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;argc; ++i)
+    {  <span class="Statement">if</span>(argc == <span class="Constant">1</span> || strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;-usage&quot;</span>) == <span class="Constant">0</span> || strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;-help&quot;</span>) == <span class="Constant">0</span>)
+       {
+
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">stripper version </span><span class="Special">%s</span><span class="Constant">, (C) Tumbling Dice 2002-2023 (built </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,STRIPPER_VERSION,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;STRIPPER is free software, covered by the GNU General Public License, and you are</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;welcome to change it and/or distribute copies of it under certain conditions.</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;See the GPL and LGPL licences at www.gnu.org for further details</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;STRIPPER comes with ABSOLUTELY NO WARRANTY</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">Usage: stripper [-usage | -help] |  [-verbose] [&lt; &lt;commented file&gt;]  [&gt; &lt;stripped file&gt;] [&gt;&amp; &lt;error/status log]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+          exit(<span class="Constant">1</span>);
+       }
+       <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(argv[i],<span class="Constant">&quot;-verbose&quot;</span>) == <span class="Constant">0</span>)
+       {  do_verbose = TRUE;
+          ++decoded;
+       }
+    }
+
+    <span class="Statement">if</span>(do_verbose == TRUE)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    stripper (comment stripper)  version </span><span class="Special">%s</span><span class="Constant">, (C) Tumbling Dice, 2022</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,STRIPPER_VERSION);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    }
+
+    <span class="Statement">if</span>(decoded &lt; argc - <span class="Constant">1</span>)
+    {  <span class="Statement">if</span>(do_verbose == TRUE)
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;stripper (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): undecoded command tail items</span><span class="Special">\n</span><span class="Constant">&quot;</span>,getpid(),hostname);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+
+       exit(<span class="Constant">255</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Get hostname </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)gethostname(hostname,SSIZE);
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check that we are conencted to a valid datasource </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(isatty(<span class="Constant">0</span>) == <span class="Constant">1</span>)
+    {  <span class="Statement">if</span>(do_verbose == TRUE)
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;stripper (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): standard input must be connected to a file or FIFO</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,getpid(),hostname);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+
+       exit(<span class="Constant">255</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Get data from standard input strip comments prepended by a &quot;#&quot; symbol and </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> write uncommented data to standard output                                 </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">do</span> {   not_comment = strip_comment(<span class="Constant">stdin</span>,&amp;line_cnt,line);
+           n_comments += (line_cnt - <span class="Constant">1</span>);
+           line_cnt    = <span class="Constant">0</span>;
+
+           <span class="Statement">if</span>(feof(<span class="Constant">stdin</span>) != <span class="Constant">0</span>)
+              looper = FALSE;
+           <span class="Statement">else</span>
+           {  <span class="Comment">/*</span><span class="Comment"> Strip comments </span><span class="Comment">*/</span>
+              <span class="Statement">if</span>(not_comment == TRUE)
+              {  (<span class="Type">void</span>)fputs(line,<span class="Constant">stdout</span>);
+                 (<span class="Type">void</span>)fflush(<span class="Constant">stdout</span>);
+              }
+           }
+       } <span class="Statement">while</span>(looper == TRUE);
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Conversion completed </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(do_verbose == TRUE)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">stripper (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): finished (</span><span class="Special">%d</span><span class="Constant"> comments stripped)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,getpid(),hostname,n_comments);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    }
+
+    exit(<span class="Constant">0</span>);
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

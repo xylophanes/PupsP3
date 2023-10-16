@@ -1,4 +1,4 @@
-.TH LIBGEN 1 "22 February 2009" "PUPSP3 build tools" "PUPSP3 build tools"
+.TH LIBGEN 1 "22nd February 2009" "PUPSP3 build tools" "PUPSP3 build tools"
 
 .SH NAME
 LIBGEN \- build PUPS library files from skeleton library and library function files.
@@ -14,7 +14,7 @@ LIBGEN \- build PUPS library files from skeleton library and library function fi
 .I init | add
 .I library skeleton filename
 .I library function skeleton filename
->& <log file>
+[2> <log file>]
 .br
 
 .SH DESCRIPTION
@@ -77,6 +77,18 @@ to append
 to the library framework or
 .I library function skeleton filename
 if none is specified.
+.br
+
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
 .br
 
 .SH ENVIRONMENT VARIABLES

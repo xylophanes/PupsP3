@@ -1,0 +1,474 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/phrealloc.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Todo { color: #000000; background-color: #ffff00; padding-bottom: 1px; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------</span>
+<span class="Comment">    Change the size of a block allocated by `malloc'.</span>
+<span class="Comment">    Copyright 1990, 1991, 1992, 1993, 1994 Free Software Foundation, Inc.</span>
+<span class="Comment">    		     Written May 1989 by Mike Haertel.</span>
+
+<span class="Comment">    This library is free software; you can redistribute it and/or</span>
+<span class="Comment">    modify it under the terms of the GNU Library General Public License as</span>
+<span class="Comment">    published by the Free Software Foundation; either version 2 of the</span>
+<span class="Comment">    License, or (at your option) any later version.</span>
+
+<span class="Comment">    This library is distributed in the hope that it will be useful,</span>
+<span class="Comment">    but WITHOUT ANY WARRANTY; without even the implied warranty of</span>
+<span class="Comment">    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU</span>
+<span class="Comment">    Library General Public License for more details.</span>
+
+<span class="Comment">    You should have received a copy of the GNU Library General Public</span>
+<span class="Comment">    License along with this library; see the file COPYING.LIB.  If</span>
+<span class="Comment">    not, write to the Free Software Foundation, Inc., 675 Mass Ave,</span>
+<span class="Comment">    Cambridge, MA 02139, USA.</span>
+
+<span class="Comment">    The author may be reached (Email) at the address mike@ai.mit.edu,</span>
+<span class="Comment">    or (US mail) as Mike Haertel c/o Free Software Foundation.</span>
+
+<span class="Comment">    Persistent heap modifications by Mark O'Neill (mao@tumblingdice.co.uk)</span>
+<span class="Comment">    (C) 1998-2022 M.A. O'Neill, Tumbling Dice</span>
+<span class="Comment">-------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifndef	_PHMALLOC_INTERNAL</span>
+<span class="PreProc">#define _PHMALLOC_INTERNAL</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;phmalloc.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> _PHMALLOC_INTERNAL </span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;xtypes.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;errno.h&gt;</span>
+
+
+<span class="PreProc">#if (defined (MEMMOVE_MISSING) || !defined(_LIBC) &amp;&amp; !defined(STDC_HEADERS) &amp;&amp; !defined(USG))</span>
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Snarfed directly from Emacs src/dispnew.c:         </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> </span><span class="Todo">XXX</span><span class="Comment"> Should use system bcopy if it handles overlap. </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifndef emacs</span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Used to signify an internal heaplib call (which should  </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> not use object or heap locking)                         </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+
+_IMPORT <span class="Type">int</span> _pheap_internal;
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Used to signify that we should not update persistent object </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> table (as this is an internal operation)                    </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_IMPORT <span class="Type">int</span> _no_phobject_mapping;
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Add a persistent object to persistent object map </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+
+_PROTOTYPE _EXTERN <span class="Type">int</span> msm_map_object(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">void</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Remove persistent object from persistent object map </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------</span><span class="Comment">*/</span>
+
+_PROTOTYPE _EXTERN <span class="Type">int</span> msm_unmap_object(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Like bcopy except never gets confused by overlap </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> safe_bcopy (<span class="Type">char</span> *from, <span class="Type">char</span> *to, <span class="Type">int</span> size)
+{
+  <span class="Statement">if</span> (size &lt;= <span class="Constant">0</span> || from == to)
+    <span class="Statement">return</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> If the source and destination don't overlap, then bcopy can      </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> handle it.  If they do overlap, but the destination is lower in  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> memory than the source, we'll assume bcopy can handle that.      </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+  <span class="Statement">if</span>(to &lt; from || from + size &lt;= to)
+     (<span class="Type">void</span>)bcopy (from, to, size);
+  <span class="Statement">else</span>
+  {
+
+      <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> Otherwise, we'll copy from the end </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+
+      <span class="Type">register</span> <span class="Type">char</span> *endf = from + size;
+      <span class="Type">register</span> <span class="Type">char</span> *endt = to + size;
+
+
+      <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------</span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> If TO - FROM is large, then we should break the copy into    </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> nonoverlapping chunks of TO - FROM bytes each.  However, if  </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> TO - FROM is small, then the bcopy function call overhead    </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> makes this not worth it.  The crossover point could be about </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> anywhere.  Since I don't think the obvious copy loop is too  </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> bad, I'm trying to err in its favor.                         </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------</span><span class="Comment">*/</span>
+
+      <span class="Statement">if</span> (to - from &lt; <span class="Constant">64</span>)
+      {
+	  <span class="Statement">do</span> {    *--endt = *--endf;
+	     } <span class="Statement">while</span> (endf != from);
+      }
+      <span class="Statement">else</span>
+      {  <span class="Statement">for</span> (;;)
+	 {
+	      endt -= (to - from);
+	      endf -= (to - from);
+
+	      <span class="Statement">if</span>(endt &lt; to)
+		 <span class="Statement">break</span>;
+
+	      (<span class="Type">void</span>)bcopy (endf, endt, to - from);
+	  }
+
+
+          <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> If SIZE wasn't a multiple of TO - FROM, there will be a </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> little left over.  The amount left over is              </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> (endt + (to - from)) - to, which is endt - from.        </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+
+	  (<span class="Type">void</span>)bcopy (from, to, endt - from);
+	}
+    }
+}
+
+        <span class="Comment">/*</span><span class="Comment">-----------</span><span class="Comment">*/</span>
+<span class="PreProc">#endif</span>	<span class="Comment">/*</span><span class="Comment"> Not emacs </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">-----------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define memmove(to, from, size) safe_bcopy ((from), (to), (size))</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> (defined (MEMMOVE_MISSING) || !defined(_LIBC) &amp;&amp; !defined(STDC_HEADERS) &amp;&amp; !defined(USG)) </span><span class="Comment">*/</span>
+
+
+<span class="PreProc">#define min(A, B) ((A) &lt; (B) ? (A) : (B))</span>
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Debugging hook for realloc </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC __ptr_t (*__phrealloc_hook) __P ((<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> __ptr_t __ptr, __malloc_size_t <span class="Type">const</span> __size, <span class="Type">const</span> <span class="Type">char</span> *));
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Resize the given region to the new size, returning a pointer  </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> to the (possibly moved) region.  This is optimized for speed; </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> some benchmarks seem to indicate that greater compactness is  </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> achieved by unconditionally allocating and copying to a       </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> new region.  This module has incestuous knowledge of the      </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> internals of both free and malloc.                            </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC __ptr_t phrealloc (<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span> hdes, <span class="Type">const</span> __ptr_t ptr, __malloc_size_t size, <span class="Type">const</span> <span class="Type">char</span> *name)
+{
+  __ptr_t result;
+
+  <span class="Type">int</span> type,
+      mapped,
+      h_index;
+
+  __malloc_size_t block,
+                  blocks,
+                  oldlimit,
+                  req_size;
+
+
+<span class="PreProc">  #ifdef PTHREAD_SUPPORT</span>
+  (<span class="Type">void</span>)pthread_mutex_lock(&amp;htab_mutex);
+<span class="PreProc">  #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+  <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------</span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> Does this persistent object already exits? If so, we cannot allocate it! </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+  <span class="Statement">if</span>(name != (<span class="Type">const</span> <span class="Type">char</span> *)<span class="Constant">NULL</span> &amp;&amp; msm_phobject_exists(hdes,name))
+  {  errno = <span class="Constant">EEXIST</span>;
+
+<span class="PreProc">     #ifdef PTHREAD_SUPPORT</span>
+     (<span class="Type">void</span>)pthread_mutex_unlock(&amp;htab_mutex);
+<span class="PreProc">     #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+     <span class="Statement">return</span>((__ptr_t *)<span class="Constant">NULL</span>);
+  }
+
+  <span class="Statement">if</span>(size == <span class="Constant">0</span>)
+  {  (<span class="Type">void</span>)phfree (hdes, ptr);
+
+     result = phmalloc (hdes, <span class="Constant">0</span>, name);
+
+<span class="PreProc">     #ifdef PTHREAD_SUPPORT</span>
+     (<span class="Type">void</span>)pthread_mutex_unlock(&amp;htab_mutex);
+<span class="PreProc">     #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+     <span class="Statement">return</span> result;
+  }
+  <span class="Statement">else</span> <span class="Statement">if</span> (ptr == <span class="Constant">NULL</span>)
+  {  result = phmalloc(hdes, size, name);
+
+<span class="PreProc">     #ifdef PTHREAD_SUPPORT</span>
+     (<span class="Type">void</span>)pthread_mutex_unlock(&amp;htab_mutex);
+<span class="PreProc">     #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+     <span class="Statement">return</span> result;
+  }
+
+  <span class="Statement">if</span>(__phrealloc_hook != <span class="Constant">NULL</span>)
+  {
+     result = (*__phrealloc_hook) (hdes, ptr, size, name);
+
+<span class="PreProc">     #ifdef PTHREAD_SUPPORT</span>
+     (<span class="Type">void</span>)pthread_mutex_unlock(&amp;htab_mutex);
+<span class="PreProc">     #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+     <span class="Statement">return</span> result;
+  }
+
+  <span class="Statement">if</span>((h_index = msm_map_objectaddr2index(hdes,ptr)) == (-<span class="Constant">1</span>))
+  {  errno = <span class="Constant">EACCES</span>;
+
+<span class="PreProc">     #ifdef PTHREAD_SUPPORT</span>
+     (<span class="Type">void</span>)pthread_mutex_unlock(&amp;htab_mutex);
+<span class="PreProc">     #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+     <span class="Statement">return</span> <span class="Constant">NULL</span>;
+  }
+
+  block = BLOCK (hdes, ptr);
+
+  req_size = size;
+  type     = _pheapinfo[hdes][block].busy.type;
+  <span class="Statement">switch</span> (type)
+  {
+    <span class="Statement">case</span> <span class="Constant">0</span>:
+
+      <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> Maybe reallocate a large block to a small fragment </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+
+      <span class="Statement">if</span> (size &lt;= BLOCKSIZE / <span class="Constant">2</span>)
+      {
+	  result = phmalloc (hdes, size, (<span class="Type">char</span> *)<span class="Constant">NULL</span>);
+	  <span class="Statement">if</span>(result != <span class="Constant">NULL</span>)
+          {
+	      (<span class="Type">void</span>)memcpy (result, ptr, size);
+
+              _no_phobject_mapping = <span class="Constant">1</span>;
+	      _phfree_internal (hdes, ptr);
+              _no_phobject_mapping = <span class="Constant">1</span>;
+
+              h_index = msm_map_objectname2index(hdes,name);
+
+              (<span class="Type">void</span>)msm_map_setsize(hdes,h_index,req_size);
+
+<span class="PreProc">              #ifdef PTHREAD_SUPPORT</span>
+              (<span class="Type">void</span>)pthread_mutex_unlock(&amp;htab_mutex);
+<span class="PreProc">              #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+	      <span class="Statement">return</span> result;
+          }
+      }
+
+
+      <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> The new size is a large allocation as well; </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> see if we can hold it in place.             </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+
+      blocks = BLOCKIFY (size);
+      <span class="Statement">if</span> (blocks &lt; _pheapinfo[hdes][block].busy.info.size)
+      {
+
+          <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+	  <span class="Comment">/*</span><span class="Comment"> The new size is smaller; return </span><span class="Comment">*/</span>
+	  <span class="Comment">/*</span><span class="Comment"> excess memory to the free list. </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+
+	  _pheapinfo[hdes][block + blocks].busy.type      = <span class="Constant">0</span>;
+	  _pheapinfo[hdes][block + blocks].busy.info.size = _pheapinfo[hdes][block].busy.info.size - blocks;
+	  _pheapinfo[hdes][block].busy.info.size          = blocks;
+
+
+          <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> We have just created a new chunk by splitting a chunk in two.       </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Now we will free this chunk; increment the statistics counter       </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> so it doesn't become wrong when _free_pheap_internal decrements it. </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+	  ++_pheap_chunks_used[hdes];
+
+          _no_phobject_mapping = <span class="Constant">1</span>;
+	  _phfree_internal (hdes, ADDRESS (hdes, block + blocks));
+          _no_phobject_mapping = <span class="Constant">0</span>;
+
+          h_index         = msm_map_objectname2index(hdes,name);
+
+          _phobjectmap[hdes][h_index]-&gt;addr = result;
+	  result = ptr;
+      }
+      <span class="Statement">else</span> <span class="Statement">if</span> (blocks == _pheapinfo[hdes][block].busy.info.size)
+
+
+         <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+         <span class="Comment">/*</span><span class="Comment"> No size change necessary </span><span class="Comment">*/</span>
+         <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+
+         result = ptr;
+      <span class="Statement">else</span>
+      {
+
+         <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------</span><span class="Comment">*/</span>
+         <span class="Comment">/*</span><span class="Comment"> Won't fit, so allocate a new region that will.             </span><span class="Comment">*/</span>
+         <span class="Comment">/*</span><span class="Comment"> Free the old region first in case there is sufficient      </span><span class="Comment">*/</span>
+         <span class="Comment">/*</span><span class="Comment"> adjacent free space to grow without moving.                </span><span class="Comment">*/</span>
+         <span class="Comment">/*</span><span class="Comment"> blocks = _pheapinfo[hdes][block].busy.info.size;           </span><span class="Comment">*/</span>
+         <span class="Comment">/*</span><span class="Comment"> Prevent free from actually returning memory to the system. </span><span class="Comment">*/</span>
+         <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------</span><span class="Comment">*/</span>
+
+	  oldlimit           = _pheaplimit[hdes];
+	  _pheaplimit[hdes] = <span class="Constant">0</span>;
+
+          _no_phobject_mapping = <span class="Constant">1</span>;
+	  _phfree_internal (hdes, ptr);
+          _no_phobject_mapping = <span class="Constant">0</span>;
+
+	  _pheaplimit[hdes] = oldlimit;
+	  result = phmalloc (hdes, size, (<span class="Type">char</span> *)<span class="Constant">NULL</span>);
+	  <span class="Statement">if</span> (result == <span class="Constant">NULL</span>)
+          {
+
+             <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> Now we're really in trouble.  We have to unfree  </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> the thing we just freed.  Unfortunately it might </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> have been coalesced with its neighbours.         </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+
+	      <span class="Statement">if</span>(_pheapindex[hdes] == block)
+	        (<span class="Type">void</span>) phmalloc (hdes, blocks * BLOCKSIZE, (<span class="Type">char</span> *)<span class="Constant">NULL</span>);
+	      <span class="Statement">else</span>
+              {
+		  __ptr_t previous = phmalloc (hdes, (block - _pheapindex[hdes]) * BLOCKSIZE, (<span class="Type">char</span> *)<span class="Constant">NULL</span>);
+		  (<span class="Type">void</span>) phmalloc (hdes, blocks * BLOCKSIZE, (<span class="Type">char</span> *)<span class="Constant">NULL</span>);
+
+                  _no_phobject_mapping = <span class="Constant">1</span>;
+		  _phfree_internal (hdes, previous);
+                  _no_phobject_mapping = <span class="Constant">1</span>;
+              }
+
+              h_index = msm_map_objectname2index(hdes,name);
+
+              msm_unmap_object(hdes,h_index);
+
+<span class="PreProc">              #ifdef PTHREAD_SUPPORT</span>
+              (<span class="Type">void</span>)pthread_mutex_unlock(&amp;htab_mutex);
+<span class="PreProc">              #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+	      <span class="Statement">return</span> <span class="Constant">NULL</span>;
+	  }
+
+	  <span class="Statement">if</span>(ptr != result)
+	     memmove (result, ptr, blocks * BLOCKSIZE);
+	}
+        <span class="Statement">break</span>;
+
+    <span class="Statement">default</span>:
+
+
+         <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+         <span class="Comment">/*</span><span class="Comment"> Old size is a fragment; type is logarithm </span><span class="Comment">*/</span>
+	 <span class="Comment">/*</span><span class="Comment"> to base two of the fragment size.         </span><span class="Comment">*/</span>
+         <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+         <span class="Statement">if</span> (size &gt; (__malloc_size_t) (<span class="Constant">1</span> &lt;&lt; (type - <span class="Constant">1</span>)) &amp;&amp; size &lt;= (__malloc_size_t) (<span class="Constant">1</span> &lt;&lt; type))
+
+
+             <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+	     <span class="Comment">/*</span><span class="Comment"> The new size is the same kind of fragment </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+	     result = ptr;
+         <span class="Statement">else</span>
+	 {
+
+            <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment"> The new size is different; allocate a new space, </span><span class="Comment">*/</span>
+	    <span class="Comment">/*</span><span class="Comment"> and copy the lesser of the new size and the old. </span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+
+	    result = phmalloc (hdes, size, (<span class="Type">char</span> *)<span class="Constant">NULL</span>);
+
+            <span class="Statement">if</span>(result == <span class="Constant">NULL</span>)
+            {  h_index = msm_map_objectname2index(hdes,name);
+
+               msm_unmap_object(hdes,h_index);
+
+<span class="PreProc">               #ifdef PTHREAD_SUPPORT</span>
+               (<span class="Type">void</span>)pthread_mutex_unlock(&amp;htab_mutex);
+<span class="PreProc">               #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+	       <span class="Statement">return</span> <span class="Constant">NULL</span>;
+            }
+
+	    (<span class="Type">void</span>)memcpy (result, ptr, min (size, (__malloc_size_t) <span class="Constant">1</span> &lt;&lt; type));
+	    (<span class="Type">void</span>)phfree (hdes, ptr);
+	}
+        <span class="Statement">break</span>;
+    }
+
+  h_index                           = msm_map_objectname2index(hdes,name);
+  _phobjectmap[hdes][h_index]-&gt;addr = result;
+
+  (<span class="Type">void</span>)msm_map_setsize(hdes,h_index,req_size);
+
+<span class="PreProc">  #ifdef PTHREAD_SUPPORT</span>
+  (<span class="Type">void</span>)pthread_mutex_unlock(&amp;htab_mutex);
+<span class="PreProc">  #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+  <span class="Statement">return</span> result;
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

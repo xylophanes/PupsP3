@@ -1,0 +1,1295 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/embryo.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------------</span>
+<span class="Comment">    Purpose: Embryonic process - functionality is assigned dynamically using PSRP</span>
+<span class="Comment">             and PSRP components of the PUPS environment </span>
+
+<span class="Comment">    Author:  M.A. O'Neill</span>
+<span class="Comment">             Tumbling Dice Ltd</span>
+<span class="Comment">             Gosforth</span>
+<span class="Comment">             Newcastle upon Tyne</span>
+<span class="Comment">             NE3 4RT</span>
+<span class="Comment">             United Kingdom</span>
+
+<span class="Comment">    Version: 3.00 </span>
+<span class="Comment">    Dated:   4th January 2022</span>
+<span class="Comment">    E-mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">----------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> If we have OpenMP support then we also have pthread support </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> (OpenMP is built on pthreads for Linux distributions).      </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#if defined(_OPENMP) &amp;&amp; !defined(PTHREAD_SUPPORT)</span>
+<span class="PreProc">#define PTHREAD_SUPPORT</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+
+<span class="PreProc">#define TEST_THREADS</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;me.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;utils.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;netlib.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;psrp.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/file.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/types.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/mman.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;hipl_hdr.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;signal.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;errno.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;vstamp.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;casino.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;hash.h&gt;</span>
+
+<span class="PreProc">#ifdef PERSISTENT_HEAP_SUPPORT</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;pheap.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PERSISTENT_HEAP_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef PTHREAD_SUPPORT</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;tad.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+
+<span class="PreProc">#include </span><span class="Constant">&lt;math.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stdlib.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">*******************************</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Floating point representation </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">*******************************</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;ftype.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">*****************************</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Version of this application </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">*****************************</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define EMBRYO_VERSION    </span><span class="Constant">&quot;3.00&quot;</span>
+
+<span class="PreProc">#ifdef BUBBLE_MEMORY_SUPPORT</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;bubble.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> BUBBLE_MEMORY_SUPPORT </span><span class="Comment">*/</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">*************************</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Size of persistent heap </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">*************************</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define PHEAP_SIZE </span><span class="Constant">64</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Function called when checkpoint file reloaded but before user code re-entered </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> restartfunc(<span class="Type">void</span>)
+
+{   <span class="Statement">if</span>(appl_verbose == TRUE)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">restart function</span><span class="Special">\n\n\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    }
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Function called when checkpoint file saved </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> ckptfunc(<span class="Type">void</span>)
+
+{   (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">checkpoint function</span><span class="Special">\n\n\n\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Exit function for testfps() [interrupt when processing transactions to/from remote slave] </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> testfps_exitf(<span class="Type">int</span> chid)
+
+{   <span class="Type">int</span> fdes,
+        index;
+
+    index = pups_get_ftab_index_by_id(chid);
+    (<span class="Type">void</span>)pups_fcclose(ftab[index].stream);
+
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Display process status (to attached PSRP client process) </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> psrp_process_status(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+{
+
+<span class="PreProc">   #ifdef CRIU_SUPPORT</span>
+   (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    Binary is Criu enabled (checkpointable)</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+<span class="PreProc">   #endif</span> <span class="Comment">/*</span><span class="Comment"> CRIU_SUPPORT </span><span class="Comment">*/</span>
+
+   (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    Embryo status function</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+   (<span class="Type">void</span>)fflush(psrp_out);
+
+   <span class="Statement">return</span>(PSRP_OK);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Kill process which is running remotely </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> rkill(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+{  <span class="Type">int</span> i,
+       pid;
+
+   <span class="Type">char</span> reply[<span class="Constant">256</span>]   = <span class="Constant">&quot;&quot;</span>,
+        command[<span class="Constant">256</span>] = <span class="Constant">&quot;&quot;</span>;
+
+   <span class="Statement">if</span>(argc == <span class="Constant">1</span> || argc &gt; <span class="Constant">4</span>)
+   {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;Usage: rkill &lt;pid&gt; &lt;host&gt; &lt;port&gt;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+      (<span class="Type">void</span>)fflush(psrp_out);
+
+      <span class="Statement">return</span>(PSRP_OK);
+   }
+
+   (<span class="Type">void</span>)pups_rkill(argv[<span class="Constant">2</span>],argv[<span class="Constant">3</span>],<span class="Constant">&quot;mao&quot;</span>,argv[<span class="Constant">1</span>],<span class="Constant">SIGTERM</span>);
+   <span class="Statement">return</span>(PSRP_OK);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Create a slaved interation client (SIC) and talk to it </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> tsic(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{  <span class="Type">int</span> i,
+       j,
+       ret,
+       cnt        = <span class="Constant">0</span>,
+       havePort   = (-<span class="Constant">1</span>),
+       tail_start = <span class="Constant">1</span>,
+       n_requests = <span class="Constant">0</span>;
+
+   <span class="Type">char</span> reply[<span class="Constant">256</span>]    = <span class="Constant">&quot;&quot;</span>,
+        rcmd[<span class="Constant">256</span>]     = <span class="Constant">&quot;&quot;</span>,
+        hostname[<span class="Constant">256</span>] = <span class="Constant">&quot;notset&quot;</span>,
+        ssh_port[<span class="Constant">256</span>] = <span class="Constant">&quot;&quot;</span>,
+        **replys      = (<span class="Type">char</span> **)<span class="Constant">NULL</span>;
+
+   <span class="Statement">if</span>(argc == <span class="Constant">1</span>)
+   {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;Usage: testsic [-server:port] &lt;command list&gt;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+      (<span class="Type">void</span>)fflush(psrp_out);
+
+      <span class="Statement">return</span>(PSRP_OK);
+   }
+
+
+   <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+   <span class="Comment">/*</span><span class="Comment"> Extract remote hostname and port </span><span class="Comment">*/</span>
+   <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+   (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">Argument vector</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+   (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;===============</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+   (<span class="Type">void</span>)fflush(psrp_out);
+
+   <span class="Statement">for</span>(i=tail_start; i&lt;argc; ++i)
+   {  <span class="Statement">if</span>(argv[<span class="Constant">1</span>][<span class="Constant">0</span>] == <span class="Constant">'-'</span>)
+      {  (<span class="Type">void</span>)strlcpy(hostname,&amp;argv[<span class="Constant">1</span>][<span class="Constant">1</span>],SSIZE);
+         tail_start = <span class="Constant">2</span>;
+
+         <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;strlen(hostname); ++j)
+         {  <span class="Statement">if</span>(hostname[j] == <span class="Constant">':'</span>)
+               havePort = j;
+            <span class="Statement">else</span> <span class="Statement">if</span>(havePort != (-<span class="Constant">1</span>))
+            {  ssh_port[cnt] = hostname[j];
+               ++cnt;
+            }
+         }
+
+         <span class="Statement">if</span>(havePort != (-<span class="Constant">1</span>))
+         {  ssh_port[cnt]      = <span class="Special">'\0'</span>;
+            hostname[havePort] = <span class="Special">'\0'</span>;
+         }
+
+
+      }
+
+      (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;argv[</span><span class="Special">%d</span><span class="Constant">] = </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,i,argv[i]);
+      (<span class="Type">void</span>)fflush(psrp_out);
+   }
+
+
+
+   <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+   <span class="Comment">/*</span><span class="Comment"> Extract command list for remote server </span><span class="Comment">*/</span>
+   <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+   <span class="Statement">for</span>(i=tail_start; i&lt;argc; ++i)
+   {
+
+      <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------</span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> We do not need to explictly background anything -- in fact </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> to do so is an error                                       </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------</span><span class="Comment">*/</span>
+
+      <span class="Statement">if</span>(strin(argv[i],<span class="Constant">&quot;&amp;&quot;</span>) == TRUE)
+      {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;tsic syntax error: </span><span class="Special">\&quot;</span><span class="Constant">&amp;</span><span class="Special">\&quot;</span><span class="Constant"> found</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+         (<span class="Type">void</span>)fflush(psrp_out);
+
+         <span class="Statement">return</span>(PSRP_OK);
+      }
+      <span class="Statement">else</span>
+      {
+
+         <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+         <span class="Comment">/*</span><span class="Comment"> Make sure multiple commands are terminated </span><span class="Comment">*/</span>
+         <span class="Comment">/*</span><span class="Comment"> using semi-colon                           </span><span class="Comment">*/</span>
+         <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+
+         (<span class="Type">void</span>)strlcat(rcmd,argv[i],SSIZE);
+         <span class="Statement">if</span>(i &lt; argc -<span class="Constant">1</span> )
+            (<span class="Type">void</span>)strlcat(rcmd,<span class="Constant">&quot;; &quot;</span>,SSIZE);
+         <span class="Statement">else</span>
+            (<span class="Type">void</span>)strlcat(rcmd,<span class="Constant">&quot;&quot;</span>,  SSIZE);
+
+         ++n_requests;
+      }
+   }
+
+
+   <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+   <span class="Comment">/*</span><span class="Comment"> Display information about SIC </span><span class="Comment">*/</span>
+   <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+
+   (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">SIC info</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+   (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;========</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+   (<span class="Type">void</span>)fflush(psrp_out);
+
+   <span class="Statement">if</span>(strcmp(hostname,<span class="Constant">&quot;&quot;</span>) != <span class="Constant">0</span>)
+   {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;host </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,hostname);
+      (<span class="Type">void</span>)fflush(psrp_out);
+   }
+
+   <span class="Statement">if</span>(strcmp(ssh_port,<span class="Constant">&quot;&quot;</span>) != <span class="Constant">0</span>)
+   {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;port </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,ssh_port);
+      (<span class="Type">void</span>)fflush(psrp_out);
+   }
+
+   (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;command list: </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n\n</span><span class="Constant">&quot;</span>,rcmd);
+   (<span class="Type">void</span>)fflush(psrp_out);
+
+
+   <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+   <span class="Comment">/*</span><span class="Comment"> Process command list </span><span class="Comment">*/</span>
+   <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+
+   <span class="Statement">if</span>(strcmp(hostname,<span class="Constant">&quot;notset&quot;</span>) == <span class="Constant">0</span>)
+      replys = psrp_process_sic_transaction_list((<span class="Type">char</span> *)<span class="Constant">NULL</span>,<span class="Constant">&quot;&quot;</span>,n_requests,rcmd);
+   <span class="Statement">else</span>
+      replys = psrp_process_sic_transaction_list(hostname,ssh_port,n_requests,rcmd);
+
+<span class="PreProc">   #ifdef EMBRYO_DEBUG</span>
+   (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;TRANSACTION SENT</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+   (<span class="Type">void</span>)fflush(psrp_out);
+<span class="PreProc">   #endif</span> <span class="Comment">/*</span><span class="Comment"> EMBRYO_DEBUG </span><span class="Comment">*/</span>
+
+   (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">Replys</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+   (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;======</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+   (<span class="Type">void</span>)fflush(psrp_out);
+
+   <span class="Statement">if</span>(errno != <span class="Constant">0</span>)
+   {  <span class="Statement">if</span>(strcmp(hostname,<span class="Constant">&quot;notset&quot;</span>) == <span class="Constant">0</span>)
+         (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">failed to create (local) [SIC] channel to slaved PSRP client [errno: </span><span class="Special">%d</span><span class="Constant">]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,errno);
+      <span class="Statement">else</span>
+         (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">failed to create (remote) [SIC] channel to slaved PSRP client (on host </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant">) [errno: </span><span class="Special">%d</span><span class="Constant">]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,hostname,errno);
+      (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+   }
+   <span class="Statement">else</span>
+   {  <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;n_requests; ++i)
+      {  <span class="Statement">if</span>(replys[i] != (<span class="Type">void</span> *)<span class="Constant">NULL</span>)
+         {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;reply[</span><span class="Special">%d</span><span class="Constant">]:</span><span class="Special">\n</span><span class="Constant">&quot;</span>,i);
+            (<span class="Type">void</span>)fputs(replys[i],psrp_out);
+            (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;****</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+            (<span class="Type">void</span>)fflush(psrp_out);
+         }
+      }
+   }
+
+   <span class="Statement">if</span>(replys != (<span class="Type">char</span> **)<span class="Constant">NULL</span>)
+      (<span class="Type">void</span>)pups_afree(n_requests,(<span class="Type">void</span> *)replys);
+
+   <span class="Statement">return</span>(PSRP_OK);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Get application information for slot manager </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Slot information function </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> embryo_slot(<span class="Type">int</span> level)
+{   (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;int app (PSRP) embryo </span><span class="Special">%s</span><span class="Constant">: [ANSI C, PUPS MTD D]</span><span class="Special">\n</span><span class="Constant">&quot;</span>,EMBRYO_VERSION);
+
+    <span class="Statement">if</span>(level &gt; <span class="Constant">1</span>)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;(C) 1996-2022 Tumbling Dice</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Author: M.A. ONeill</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Unassigned PSRP dynamic process (built </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+    }
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Application usage function </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> embryo_usage(<span class="Type">void</span>)
+
+{   (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[-state] [-hashtest:FALSE] [-pheaptest:FALSE]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[&gt;&amp; &lt;ASCII log file&gt;]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Signals</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;SIGINIT SIGCHAN SIGPSRP: Process status [PSRP] request (protocol </span><span class="Special">%5.2F</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,PSRP_PROTOCOL_VERSION);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;SIGCLIENT: tell client server is about to segment</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+
+<span class="PreProc">    #ifdef CRUI_SUPPORT</span>
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;SIGCHECK SIGRESTART:      checkpoint and restart signals</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> CRIU_SUPPORT </span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;SIGALIVE: check for existence of client on signal dispatch host</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+}
+
+
+
+
+<span class="PreProc">#ifdef SLOT</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;slotman.h&gt;</span>
+_EXTERN <span class="Type">void</span> (* SLOT)() __attribute__ ((aligned(<span class="Constant">16</span>))) = embryo_slot;
+_EXTERN <span class="Type">void</span> (* USE )() __attribute__ ((aligned(<span class="Constant">16</span>))) = embryo_usage;
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> SLOT </span><span class="Comment">*/</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Application build date </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+_EXTERN <span class="Type">char</span> appl_build_time[<span class="Constant">256</span>] = <span class="Constant">__TIME__</span>;
+_EXTERN <span class="Type">char</span> appl_build_date[<span class="Constant">256</span>] = <span class="Constant">__DATE__</span>;
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Public variables and function pointers used by this application </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _BYTE test_databag[<span class="Constant">1024</span>] = <span class="Constant">&quot;&quot;</span>;
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Functions which are private to this application </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Comment">// Test function </span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> static_test_function_object(<span class="Type">int</span>, <span class="Type">char</span> *[]);
+
+<span class="Comment">// ASCII text generation function </span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> ascii(<span class="Type">int</span>, <span class="Type">char</span> *[]);
+
+<span class="Comment">// Embryo exit function </span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> embryo_exit(<span class="Type">int</span>, <span class="Type">char</span> *[]);
+
+<span class="Comment">// Createand/or destroy asycnronous (test) threads</span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> tthread(<span class="Type">int</span>, <span class="Type">char</span> *[]);
+
+<span class="Comment">// Createand/or destroy asycnronous (test) threads</span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> threadfunc(<span class="Type">void</span> *);
+
+<span class="Comment">// Simple test function to exercise various psrp functions</span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> static_test_function_object(<span class="Type">int</span>, <span class="Type">char</span> *[]);
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Variables which are private to this application </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+
+_BOOLEAN looper = TRUE;
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Software I.D. tag  </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define VTAG  </span><span class="Constant">7493</span>
+
+<span class="Type">extern</span> <span class="Type">int</span> appl_vtag = VTAG;
+
+<span class="Type">typedef</span> <span class="Type">struct</span> {   <span class="Type">int</span>   cnt;
+                   FTYPE x;
+                   <span class="Type">char</span>  name[<span class="Constant">256</span>];
+               } test_type;
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Main - parse command tail </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> pups_main(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   <span class="Type">int</span> i,
+        j,
+        pheap_flags,
+        loc[<span class="Constant">256</span>]        = { [<span class="Constant">0</span> ... <span class="Constant">255</span>] = <span class="Constant">0</span> },
+        iter            = <span class="Constant">0</span>,
+        cnt             = <span class="Constant">0</span>,
+        tdes            = <span class="Constant">0</span>,
+        a,
+        o_index1        = <span class="Constant">0</span>,
+        o_index2        = <span class="Constant">0</span>,
+        o_index3        = <span class="Constant">0</span>,
+        o_index4        = <span class="Constant">0</span>,
+        hdes1           = (-<span class="Constant">1</span>),
+        hdes2           = (-<span class="Constant">1</span>),
+        hdes3           = (-<span class="Constant">1</span>);
+
+    <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span> tsize;
+
+    test_type *h_ptr_1 = (test_type *)<span class="Constant">NULL</span>;
+    FTYPE     *h_ptr_2 = (FTYPE *)    <span class="Constant">NULL</span>;
+    test_type *h_ptr_3 = (test_type *)<span class="Constant">NULL</span>;
+    FTYPE     *h_ptr_4 = (FTYPE *)    <span class="Constant">NULL</span>;
+
+    <span class="Type">char</span> ls_path[<span class="Constant">256</span>] = <span class="Constant">&quot;&quot;</span>,
+         buf[<span class="Constant">256</span>]     = <span class="Constant">&quot;&quot;</span>;
+
+    <span class="Type">void</span> *argvec[<span class="Constant">32</span>] = { [<span class="Constant">0</span> ... <span class="Constant">31</span>] = (<span class="Type">void</span> *)<span class="Constant">NULL</span> };
+
+    FTYPE             tf            = <span class="Constant">1456.82</span>;
+    hash_table_type   *htab         = (hash_table_type *)<span class="Constant">NULL</span>;
+    pthread_t         tid,
+                      tid1,
+                      tid2;
+
+    <span class="Type">FILE</span>              *tstream      = (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>;
+    psrp_channel_type *embryo_sic   = (psrp_channel_type *)<span class="Constant">NULL</span>;
+    _BYTE             *tbuf         = (_BYTE *)<span class="Constant">NULL</span>;
+    FTYPE             *fbuf         = (FTYPE *)<span class="Constant">NULL</span>;
+
+    _BOOLEAN test_hash              = FALSE,
+             test_pheaps            = FALSE;
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Do not allow PSRP clients to connect until we are initialised </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    psrp_ignore_requests();
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Get standard items form the command tail </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+
+    pups_std_init(TRUE,
+                  &amp;argc,
+                  EMBRYO_VERSION,
+                  <span class="Constant">&quot;M.A. O'Neill&quot;</span>,
+                  <span class="Constant">&quot;(PSRP) embryo&quot;</span>,
+                  <span class="Constant">&quot;2022&quot;</span>,
+                  argv);
+
+
+    (<span class="Type">void</span>)pups_register_exit_f(<span class="Constant">&quot;retstartfunc&quot;</span>,&amp;restartfunc,(<span class="Type">char</span> *)<span class="Constant">NULL</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Get the application to tell us what it is </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((ptr = pups_locate(&amp;init,<span class="Constant">&quot;state&quot;</span>,&amp;argc,args,<span class="Constant">0</span>)) != NOT_FOUND)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    I am a PSRP embryo process, I am waiting to be</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    told what to do ...</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       pups_exit(<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Test PUPS/P3 hashing functions </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((ptr = pups_locate(&amp;init,<span class="Constant">&quot;hashtest&quot;</span>,&amp;argc,args,<span class="Constant">0</span>)) != NOT_FOUND)
+       test_hash = TRUE;
+
+
+<span class="PreProc">    #ifdef PERSISTENT_HEAP_SUPPORT</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Test PUPS/P3 persistent heap functions </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(pups_locate(&amp;init,<span class="Constant">&quot;pheaptest&quot;</span>,&amp;argc,args,<span class="Constant">0</span>) != NOT_FOUND)
+        test_pheaps = TRUE;
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> PERSISTENT_HEAP_SUPPORT </span><span class="Comment">*/</span>
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Complain about any unparsed arguments </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+    pups_t_arg_errs(argd,args);
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Initialise PSRP function dispatch handler - note that the embryo is fully dynamic and prepared </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> to import both dynamic functions and data objects                                              </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)psrp_init(PSRP_DYNAMIC_FUNCTION | PSRP_STATIC_DATABAG | PSRP_HOMEOSTATIC_STREAMS,<span class="Constant">NULL</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Attach static functions which can be accessed from PSRP client </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)psrp_attach_static_function(<span class="Constant">&quot;status&quot;</span>,    (<span class="Type">void</span> *)&amp;psrp_process_status);
+    (<span class="Type">void</span>)psrp_attach_static_function(<span class="Constant">&quot;tsic&quot;</span>,      (<span class="Type">void</span> *)&amp;tsic);
+    (<span class="Type">void</span>)psrp_attach_static_function(<span class="Constant">&quot;rkill&quot;</span>,     (<span class="Type">void</span> *)&amp;rkill);
+    (<span class="Type">void</span>)psrp_attach_static_function(<span class="Constant">&quot;tfps&quot;</span>,      &amp;static_test_function_object);
+    (<span class="Type">void</span>)psrp_attach_static_function(<span class="Constant">&quot;tthread&quot;</span>,   (<span class="Type">void</span> *)&amp;tthread);
+    (<span class="Type">void</span>)psrp_attach_static_function(<span class="Constant">&quot;threadfunc&quot;</span>,(<span class="Type">void</span> *)&amp;threadfunc);
+    (<span class="Type">void</span>)psrp_attach_static_function(<span class="Constant">&quot;ascii&quot;</span>,     (<span class="Type">void</span> *)&amp;ascii);
+    (<span class="Type">void</span>)psrp_attach_static_function(<span class="Constant">&quot;leave&quot;</span>,     (<span class="Type">void</span> *)&amp;embryo_exit);
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> We must define static bindinfgs BEFORE loading the default </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> dispatch table. In the case of static bindings, the only   </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> effect of loading a saved dispatch table is to (possibly)  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> add object aliases                                         </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)psrp_load_default_dispatch_table();
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Tell PSRP clients we are ready to service their requests </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+
+    psrp_accept_requests();
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> test PUPS/P3 hashing functions </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(test_hash == TRUE)
+    {  htab = hash_table_create(<span class="Constant">128</span>,<span class="Constant">&quot;hash1&quot;</span>);
+
+       <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">20</span>; ++i)
+       {   loc[i] = (<span class="Type">int</span>)(ran1()*<span class="Constant">1000000.0</span>);
+           tf = (FTYPE)i + <span class="Constant">10</span>;
+           (<span class="Type">void</span>)hash_put_object(loc[i],(<span class="Type">void</span> *)&amp;tf,<span class="Constant">&quot;FTYPE&quot;</span>,<span class="Statement">sizeof</span>(FTYPE),htab);
+       }
+
+       (<span class="Type">void</span>)hash_show_stats(<span class="Constant">stderr</span>, FALSE, htab);
+       (<span class="Type">void</span>)hash_delete_object(loc[<span class="Constant">0</span>],htab);
+       (<span class="Type">void</span>)hash_delete_object(loc[<span class="Constant">9</span>],htab);
+
+       <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;<span class="Constant">20</span>; ++i)
+       {  tf = <span class="Constant">0.0</span>;
+          <span class="Statement">if</span>(hash_get_object(loc[i], (<span class="Type">void</span> *)&amp;tf, <span class="Constant">&quot;FTYPE&quot;</span>, htab) == <span class="Constant">0</span>)
+             (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;TF:</span><span class="Special">%F</span><span class="Constant"> at </span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,tf,loc[i]);
+          <span class="Statement">else</span>
+             (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;location </span><span class="Special">%d</span><span class="Constant"> is empty</span><span class="Special">\n</span><span class="Constant">&quot;</span>,loc[i]);
+       }
+
+       tf = <span class="Constant">9999.0</span>;
+       (<span class="Type">void</span>)hash_put_object(loc[<span class="Constant">0</span>],(<span class="Type">void</span> *)&amp;tf,<span class="Constant">&quot;FTYPE&quot;</span>,<span class="Statement">sizeof</span>(FTYPE),htab);
+       (<span class="Type">void</span>)hash_put_object(loc[<span class="Constant">9</span>],(<span class="Type">void</span> *)&amp;tf,<span class="Constant">&quot;FTYPE&quot;</span>,<span class="Statement">sizeof</span>(FTYPE),htab);
+
+       (<span class="Type">void</span>)hash_show_stats(<span class="Constant">stderr</span>, TRUE, htab);
+       hash_table_destroy(htab);
+
+
+       <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Wait for exit once test is complete </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">while</span>(looper == TRUE)
+           (<span class="Type">void</span>)pups_usleep(<span class="Constant">1000</span>);
+
+       <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Exit from PUPS/PSRP application cleaning up any mess it may have created </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+       pups_exit(<span class="Constant">0</span>);
+    }
+
+
+<span class="PreProc">    #ifdef PERSISTENT_HEAP_SUPPORT</span>
+    <span class="Statement">if</span>(test_pheaps == TRUE)
+    {  (<span class="Type">void</span>)srand48((<span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>)getpid());
+
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Persistent heap test</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;=====================</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+
+       <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Persistent heap flags </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+
+       pheap_flags = CREATE_PHEAP | LIVE_PHEAP;
+
+
+       <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Lets attach a persistent heap </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>((hdes1 = msm_heap_attach(<span class="Constant">&quot;heap1&quot;</span>,
+                                   pheap_flags)) == (-<span class="Constant">1</span>))
+           pups_exit(<span class="Constant">255</span>);
+
+
+       <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Lets attach another persistentheap </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>((hdes2 = msm_heap_attach(<span class="Constant">&quot;heap2&quot;</span>,
+                                   pheap_flags)) == (-<span class="Constant">1</span>))
+           pups_exit(<span class="Constant">255</span>);
+
+
+       <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Non existent heap - should generate error </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>((hdes3 = msm_heap_attach(<span class="Constant">&quot;heap3&quot;</span>,
+                                   ATTACH_PHEAP | LIVE_PHEAP)) == (-<span class="Constant">1</span>))
+       {   (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;NON EXISTENT HEAP ATTACH ERROR</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+           (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Persistent heap 1: allocate object 1 </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(phcalloc(hdes1,PHEAP_SIZE,<span class="Statement">sizeof</span>(test_type),<span class="Constant">&quot;object1&quot;</span>) != (<span class="Type">void</span> *)<span class="Constant">NULL</span>)
+       {  <span class="Type">int</span> i;
+
+          h_ptr_1 = (test_type *)msm_map_objectname2addr(hdes1,<span class="Constant">&quot;object1&quot;</span>);
+
+          <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;PHEAP_SIZE; ++i)
+          {
+
+             <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> Initialise the object </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+
+             h_ptr_1[i].cnt = <span class="Constant">0</span>;
+             h_ptr_1[i].x   = <span class="Constant">0.0</span>;
+
+
+             <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> Give object a name </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+
+             (<span class="Type">void</span>)snprintf(h_ptr_1[i].name,SSIZE,<span class="Constant">&quot;object1[</span><span class="Special">%04d</span><span class="Constant">]&quot;</span>,i);
+
+             (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;heap1 object1 [</span><span class="Special">%04d</span><span class="Constant">]: cnt: </span><span class="Special">%04d</span><span class="Constant"> x: </span><span class="Special">%6.3F</span><span class="Constant"> name: (</span><span class="Special">%-24s</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                                           i,
+                                                                              h_ptr_1[i].cnt,
+                                                                                h_ptr_1[i].x,
+                                                                             h_ptr_1[i].name);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+          }
+
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">Initialised heap1 object 1</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;**************************</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Object already exist so just map it </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">else</span>
+          h_ptr_1 = (test_type *)msm_map_objectname2addr(hdes1,<span class="Constant">&quot;object1&quot;</span>);
+
+
+       <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Persistent heap 1: allocate object 2 </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(phcalloc(hdes1,PHEAP_SIZE,<span class="Statement">sizeof</span>(FTYPE),<span class="Constant">&quot;object2&quot;</span>) != (<span class="Type">void</span> *)<span class="Constant">NULL</span>)
+       {
+
+          <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Pointer to object on persistent heap </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+
+          h_ptr_2 = (test_type *)msm_map_objectname2addr(hdes1,<span class="Constant">&quot;object2&quot;</span>);
+
+
+          <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Initialise the object </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+
+          <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;PHEAP_SIZE; ++i)
+          {  h_ptr_2[o_index2] = <span class="Constant">0.0</span>;
+
+
+             (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;heap1 object2 [</span><span class="Special">%04d</span><span class="Constant">]: value: </span><span class="Special">%6.3F</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                       i,
+                                                              h_ptr_2[i]);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+          }
+
+
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">Initialised heap1 object 2</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;**************************</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Object already exist so just map it </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">else</span>
+          h_ptr_2 = (test_type *)msm_map_objectname2addr(hdes1,<span class="Constant">&quot;object2&quot;</span>);
+
+
+       <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Persinstent heap 2: allocate object 3 </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(phcalloc(hdes2,PHEAP_SIZE,<span class="Statement">sizeof</span>(test_type),<span class="Constant">&quot;object3&quot;</span>) != (<span class="Type">void</span> *)<span class="Constant">NULL</span>)
+       {
+
+          h_ptr_3 = (test_type *)msm_map_objectname2addr(hdes2,<span class="Constant">&quot;object3&quot;</span>);
+
+
+          <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Initialise the object </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+
+          <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;PHEAP_SIZE; ++i)
+          {  h_ptr_3[i].cnt = <span class="Constant">0</span>;
+             h_ptr_3[i].x   = <span class="Constant">0.0</span>;
+
+
+             <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> Give object a name </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+
+             (<span class="Type">void</span>)snprintf(h_ptr_1[i].name,SSIZE,<span class="Constant">&quot;object1[</span><span class="Special">%04d</span><span class="Constant">]&quot;</span>,i);
+
+             (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;heap2 object3 [</span><span class="Special">%04d</span><span class="Constant">]: cnt: </span><span class="Special">%04d</span><span class="Constant">  x: </span><span class="Special">%6.3F</span><span class="Constant">  name: (</span><span class="Special">%-24s</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                                             i,
+                                                                                h_ptr_3[i].cnt,
+                                                                                  h_ptr_3[i].x,
+                                                                               h_ptr_3[i].name);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+          }
+
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">Initialised heap2 object 3</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;**************************</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Object already exist so just map it </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">else</span>
+          h_ptr_3 = (test_type *)msm_map_objectname2addr(hdes2,<span class="Constant">&quot;object3&quot;</span>);
+
+
+       <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Persinstent heap 2: allocate object 4 </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(phcalloc(hdes2,PHEAP_SIZE,<span class="Statement">sizeof</span>(FTYPE),<span class="Constant">&quot;object4&quot;</span>) != (<span class="Type">void</span> *)<span class="Constant">NULL</span>)
+       {
+
+          <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Pointer to object on persistent heap </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+
+          h_ptr_4 = (test_type *)msm_map_objectname2addr(hdes2,<span class="Constant">&quot;object4&quot;</span>);
+
+
+          <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Initialise the object </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+
+          <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;PHEAP_SIZE; ++i)
+          {  h_ptr_4[i] = <span class="Constant">0.0</span>;
+
+
+             (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;heap2 object4 [</span><span class="Special">%04d</span><span class="Constant">]:  value: </span><span class="Special">%6.3F</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                        i,
+                                                               h_ptr_4[i]);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+          }
+
+
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">Initialised heap2 object 4</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;**************************</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Object already exist so just map it </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">else</span>
+          h_ptr_4 = (test_type *)msm_map_objectname2addr(hdes2,<span class="Constant">&quot;object4&quot;</span>);
+
+
+       <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Display the current persistent heap objects and clients </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+       <span class="Comment">/*</span><span class="Comment">--------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Heap 1 </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">--------</span><span class="Comment">*/</span>
+
+       (<span class="Type">void</span>)msm_show_mapped_objects(hdes1,<span class="Constant">stderr</span>);
+
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">**********</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+
+       <span class="Comment">/*</span><span class="Comment">--------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Heap 2 </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">--------</span><span class="Comment">*/</span>
+
+       (<span class="Type">void</span>)msm_show_mapped_objects(hdes2,<span class="Constant">stderr</span>);
+
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">**********</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    }
+
+    (<span class="Type">void</span>)pups_sleep(<span class="Constant">5</span>);
+
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PERSISTENT_HEAP_SUPPORT </span><span class="Comment">*/</span>
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> This is the event loop of the embryo -- it may well interact </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> with windowed applications or file managers                  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">) is waiting to be allocated an application</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,appl_name,getpid(),appl_host);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Test loop for persistent heaps </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">while</span>(looper == TRUE)
+    {    <span class="Type">char</span> strdum[<span class="Constant">256</span>] = <span class="Constant">&quot;&quot;</span>;
+
+<span class="PreProc">         #ifdef PERSISTENT_HEAP_SUPPORT</span>
+         <span class="Statement">if</span>(test_pheaps == TRUE)
+         {
+
+            <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment"> Get random object indexes within heaps </span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+            o_index1 = (<span class="Type">int</span>)(drand48() * (FTYPE)(PHEAP_SIZE - <span class="Constant">1</span>));
+            o_index2 = (<span class="Type">int</span>)(drand48() * (FTYPE)(PHEAP_SIZE - <span class="Constant">1</span>));
+            o_index3 = (<span class="Type">int</span>)(drand48() * (FTYPE)(PHEAP_SIZE - <span class="Constant">1</span>));
+            o_index4 = (<span class="Type">int</span>)(drand48() * (FTYPE)(PHEAP_SIZE - <span class="Constant">1</span>));
+
+
+            <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment"> Update heap 1 objects </span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+
+            ++h_ptr_1[o_index1].cnt;
+            h_ptr_1[o_index1].x += <span class="Constant">0.1</span>;
+            h_ptr_2[o_index2]    = h_ptr_1[o_index1].x + <span class="Constant">0.5</span>;
+
+            (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;heap1 object1 [</span><span class="Special">%04d</span><span class="Constant">]:  cnt:   </span><span class="Special">%04d</span><span class="Constant">  </span><span class="Special">%06.3F</span><span class="Special">\n</span><span class="Constant">&quot;</span>,o_index1,h_ptr_1[o_index1].cnt,h_ptr_1[o_index1].x);
+            (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;heap1 object2 [</span><span class="Special">%04d</span><span class="Constant">]:  value: </span><span class="Special">%06.3F</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,    o_index2,h_ptr_2[o_index2]);
+            (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+            (<span class="Type">void</span>)pups_sleep(<span class="Constant">1</span>);
+
+
+            <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment"> Update heap 2 objects </span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+
+            ++h_ptr_3[o_index2].cnt;
+            h_ptr_3[o_index3].x += <span class="Constant">0.5</span>;
+            h_ptr_4[o_index4]    = h_ptr_3[o_index3].x + <span class="Constant">0.3</span>;
+
+            (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;heap2 object1 [</span><span class="Special">%04d</span><span class="Constant">]:  cnt:   </span><span class="Special">%04d</span><span class="Constant">  </span><span class="Special">%06.3F</span><span class="Special">\n</span><span class="Constant">&quot;</span>,o_index3,h_ptr_3[o_index3].cnt,h_ptr_3[o_index3].x);
+            (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;heap2 object2 [</span><span class="Special">%04d</span><span class="Constant">]:  value: </span><span class="Special">%06.3F</span><span class="Special">\n</span><span class="Constant">&quot;</span>,      o_index4,h_ptr_4[o_index4]);
+            (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+            (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">*************</span><span class="Special">\n\n\n\n</span><span class="Constant">&quot;</span>);
+            (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+            (<span class="Type">void</span>)pups_sleep(<span class="Constant">1</span>);
+         }
+         <span class="Statement">else</span>
+         {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;iteration </span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,iter++);
+            (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+            (<span class="Type">void</span>)pups_sleep(<span class="Constant">1</span>);
+         }
+<span class="PreProc">         #endif</span> <span class="Comment">/*</span><span class="Comment"> PERSISTENT_HEAP_SUPPORT </span><span class="Comment">*/</span>
+    }
+
+<span class="PreProc">    #ifdef PERSISTENT_HEAP_SUPPORT</span>
+    <span class="Statement">if</span>(test_pheaps == TRUE)
+    {
+
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Detach all (attached) persistent heaps </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Comment">/*</span><span class="Comment">--------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Heap 1 </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">--------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(hdes1 != (-<span class="Constant">1</span>))
+       {
+
+          <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Detach heap1 (and delete it) </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+
+          (<span class="Type">void</span>)msm_heap_detach(hdes1, O_DESTROY);
+
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;HEAP1 DETACHED AND DESTROYED</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">--------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Heap 2 </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">--------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(hdes2 != (-<span class="Constant">1</span>))
+       {
+
+          <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Deatch heap2 (and keep it for future mappings) </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+
+          (<span class="Type">void</span>)msm_heap_detach(hdes2, O_KEEP);
+
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;HEAP2 DETACHED</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+    }
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> PERSISTENT_HEAP_SUPPORT </span><span class="Comment">*/</span>
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Exit from PUPS/PSRP application cleaning up any mess it may have created </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    pups_exit(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="PreProc">#ifdef PTHREAD_SUPPORT</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Createand/or destroy asycnronous (test) threads </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> tthread(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   pthread_t tid        = (pthread_t)<span class="Constant">NULL</span>;
+    <span class="Type">char</span>      tname[<span class="Constant">256</span>] = <span class="Constant">&quot;test_thread&quot;</span>;
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> If we have argument kill </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> kill running thread      </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+
+
+    <span class="Statement">if</span>(argc == <span class="Constant">2</span>)
+    {  <span class="Statement">if</span>(strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;-usage&quot;</span>) == <span class="Constant">0</span>    ||
+          strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;-help&quot;</span> ) == <span class="Constant">0</span>     )
+       {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    Usage: tthread [-help] | [&lt;thread name:test_thread&gt;]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fflush(psrp_out);
+
+          <span class="Statement">return</span>(PSRP_OK);
+       }
+       <span class="Statement">else</span>
+          (<span class="Type">void</span>)strlcpy(tname,argv[<span class="Constant">1</span>],SSIZE);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Too many arguments </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">else</span> <span class="Statement">if</span>(argc &gt; <span class="Constant">2</span>)
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    Usage: tthread [-help] | [&lt;thread name:test_thread&gt;]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Start test thread </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+    tid = pupsthread_create(tname,
+                            &amp;threadfunc,
+                            (<span class="Type">void</span> *)<span class="Constant">NULL</span>);
+
+
+    (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    Test thread </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> started</span><span class="Special">\n</span><span class="Constant">&quot;</span>,tname);
+    (<span class="Type">void</span>)fflush(psrp_out);
+
+    <span class="Statement">return</span>(PSRP_OK);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Thread test (payload) function </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> threadfunc(<span class="Type">void</span> *args)
+
+{   <span class="Type">int</span> t_index,
+        cnt = <span class="Constant">0</span>;
+
+    pthread_mutex_t test_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
+
+    t_index = pupsthread_tid2nid(pthread_self());
+
+    (<span class="Type">void</span>)pthread_mutex_lock(&amp;test_mutex);
+
+    <span class="Statement">while</span>(TRUE)
+    {   <span class="Type">int</span> i;
+
+        (<span class="Type">void</span>)pthread_mutex_lock(&amp;ttab_mutex);
+
+        (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> (LWP </span><span class="Special">%d</span><span class="Constant">): I am a test thread (iteration </span><span class="Special">%d</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,ttab[t_index].tfuncname,ttab[t_index].tpid,cnt);
+        (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+        (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ttab_mutex);
+
+        pups_sleep(<span class="Constant">1</span>);
+        ++cnt;
+
+        <span class="Statement">if</span>(cnt == <span class="Constant">25</span>)
+          (<span class="Type">void</span>)pupsthread_exit((<span class="Type">void</span> *)<span class="Constant">NULL</span>);
+
+    }
+
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Simple test function to exercise various psrp functions </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> static_test_function_object(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   <span class="Type">int</span>  i,
+         init,
+         ptr,
+         ret_code;
+
+    <span class="Type">char</span> command[<span class="Constant">256</span>] = <span class="Constant">&quot;&quot;</span>,
+         item[<span class="Constant">256</span>]    = <span class="Constant">&quot;&quot;</span>;
+
+    <span class="Type">FILE</span> *pipestream = (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>;
+
+    <span class="Statement">if</span>(argc &lt; <span class="Constant">2</span>)
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;usage: testfps &lt;pipestream&gt;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+    (<span class="Type">void</span>)strlcpy(command,<span class="Constant">&quot;&quot;</span>,SSIZE);
+    <span class="Statement">for</span>(i=<span class="Constant">1</span>; i&lt;argc; ++i)
+    {  (<span class="Type">void</span>)strlcat(command,argv[i],SSIZE);
+       (<span class="Type">void</span>)strlcat(command,<span class="Constant">&quot; &quot;</span>,    SSIZE);
+    }
+
+    <span class="Statement">if</span>((pipestream = pups_fopen(command,<span class="Constant">&quot;r&quot;</span>,TRUE)) == (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>)
+    {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;testfps: failed to open pipestream </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n</span><span class="Constant">&quot;</span>,command);
+       (<span class="Type">void</span>)fflush(psrp_out);
+
+       <span class="Statement">return</span>(PSRP_OK);
+    }
+
+    (<span class="Type">void</span>)psrp_set_client_exitf(c_client,<span class="Constant">&quot;testfps_client&quot;</span>,&amp;testfps_exitf);
+    (<span class="Type">void</span>)pups_set_ftab_id(fileno(pipestream),c_client);
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Loop to extract data from pipestream </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">do</span> {   (<span class="Type">void</span>)pups_fgets(item,<span class="Constant">256</span>,pipestream);
+
+           <span class="Statement">if</span>(feof(pipestream) == <span class="Constant">0</span>)
+           {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,item);
+              (<span class="Type">void</span>)fflush(psrp_out);
+           }
+       } <span class="Statement">while</span>(feof(pipestream) == <span class="Constant">0</span>);
+
+    (<span class="Type">void</span>)pups_fclose(pipestream);
+    <span class="Statement">return</span>(PSRP_OK);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Terminate embryo </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+
+_PRIVATE <span class="Type">int</span> embryo_exit(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   looper = FALSE;
+
+    (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    Exit ...</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(psrp_out);
+
+    <span class="Statement">return</span>(PSRP_OK);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Test function to send stream of ASDII text to PSRP client process </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> ascii(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   <span class="Type">int</span> i,
+        cnt = <span class="Constant">0</span>;
+
+<span class="PreProc">    #pragma omp parallel reduction(+:cnt)</span>
+    <span class="Statement">while</span>(cnt &lt; <span class="Constant">100000</span>)
+    {    <span class="Type">int</span> j;
+
+         <span class="Statement">if</span>(omp_get_thread_num() == <span class="Constant">0</span>)
+         {  <span class="Statement">if</span>(cnt % <span class="Constant">10000</span> == <span class="Constant">0</span>)
+            {
+               {  (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;count is </span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,cnt);
+                  (<span class="Type">void</span>)fflush(psrp_out);
+               }
+            }
+         }
+
+         (<span class="Type">void</span>)pups_usleep(<span class="Constant">10</span>);
+
+         ++cnt;
+    }
+
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

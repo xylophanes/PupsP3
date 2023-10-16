@@ -1,0 +1,847 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/phmalloc.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">   Memory allocator `phmalloc'.</span>
+<span class="Comment">   Copyright 1990, 1991, 1992, 1993, 1994, 1995 Free Software Foundation, Inc.</span>
+<span class="Comment">		  Written May 1989 by Mike Haertel.</span>
+
+<span class="Comment">   This library is free software; you can redistribute it and/or</span>
+<span class="Comment">   modify it under the terms of the GNU Library General Public License as</span>
+<span class="Comment">   published by the Free Software Foundation; either version 2 of the</span>
+<span class="Comment">   License, or (at your option) any later version.</span>
+
+<span class="Comment">   This library is distributed in the hope that it will be useful,</span>
+<span class="Comment">   but WITHOUT ANY WARRANTY; without even the implied warranty of</span>
+<span class="Comment">   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU</span>
+<span class="Comment">   Library General Public License for more details.</span>
+
+<span class="Comment">   You should have received a copy of the GNU Library General Public</span>
+<span class="Comment">   License along with this library; see the file COPYING.LIB.  If</span>
+<span class="Comment">   not, write to the Free Software Foundation, Inc., 675 Mass Ave,</span>
+<span class="Comment">   Cambridge, MA 02139, USA.</span>
+
+<span class="Comment">   The author may be reached (Email) at the address mike@ai.mit.edu,</span>
+<span class="Comment">   or (US mail) as Mike Haertel c/o Free Software Foundation.</span>
+
+<span class="Comment">   Persistent heap modifications by Mark O'Neill (mao@tumblingdice.co.uk) </span>
+<span class="Comment">   (C) 1998-2022 M.A. O'Neill, Tumbling Dice</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;stdio.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;xtypes.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;errno.h&gt;</span>
+
+<span class="PreProc">#ifndef	_PHMALLOC_INTERNAL</span>
+<span class="PreProc">#define _PHMALLOC_INTERNAL</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;phmalloc.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> _PHMALLOC_INTERNAL </span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Signifies whether heap addresses are local or heap global </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+
+_IMPORT <span class="Type">int</span> addresses_local;
+
+<span class="Comment">// Heap table (for local process)</span>
+_IMPORT heap_type *htable;
+
+<span class="Comment">// How to really get more memory</span>
+__ptr_t (*__phmorecore) __P ((<span class="Type">int</span>, <span class="Type">ptrdiff_t</span> __size)) = __default_phmorecore;
+
+<span class="Comment">// Debugging hook for `malloc'</span>
+__ptr_t (*__phmalloc_hook) __P ((<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, __malloc_size_t __size, <span class="Type">const</span> <span class="Type">char</span> *));
+
+<span class="Comment">//Number of objects in heap</span>
+_IMPORT <span class="Type">int</span> *_phobjects;
+
+<span class="Comment">// Number of objects slots in heap</span>
+_IMPORT <span class="Type">int</span> *_phobjects_allocated;
+
+<span class="Comment">// Pointer to table of significant objects on persistent heaps</span>
+_IMPORT phobmap_type ***_phobjectmap;
+
+<span class="Comment">// Pointer to persistent heap parameter table (on persistent heap)</span>
+_IMPORT <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span> **_pheap_parameters;
+
+<span class="Comment">// Pointer to the base of the first block.  */</span>
+_IMPORT <span class="Type">char</span> **_pheapbase;
+
+<span class="Comment">// Block information table.  Allocated with align/__free (not malloc/free)</span>
+_IMPORT malloc_info **_pheapinfo;
+
+<span class="Comment">// Number of info entries</span>
+_IMPORT __malloc_size_t *pheapsize;
+
+<span class="Comment">// Search index in the info table</span>
+_IMPORT __malloc_size_t *_pheapindex;
+
+<span class="Comment">// Limit of valid info table indices</span>
+_IMPORT __malloc_size_t *_pheaplimit;
+
+<span class="Comment">// Free lists for each fragment size</span>
+_IMPORT <span class="Type">struct</span> list **_phfraghead;
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Add persistent object to persistent object map </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+
+_PROTOTYPE _EXTERN <span class="Type">int</span> msm_map_object(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> intint, <span class="Type">const</span> <span class="Type">void</span> *, <span class="Type">const</span> <span class="Type">char</span> *);
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Remove persistent object from persistent object map </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------</span><span class="Comment">*/</span>
+
+_PROTOTYPE _EXTERN <span class="Type">int</span> msm_unmap_object(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Instrumentation </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+
+_IMPORT __malloc_size_t *_pheap_chunks_used;
+_IMPORT __malloc_size_t *_pheap_bytes_used;
+_IMPORT __malloc_size_t *_pheap_chunks_free;
+_IMPORT __malloc_size_t *_pheap_bytes_free;
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Are you experienced? </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+
+_IMPORT <span class="Type">int</span> *__phmalloc_initialized;
+
+<span class="Type">void</span> (*__malloc_initialize_hook) __P ((<span class="Type">int</span>));
+<span class="Type">void</span> (*__after_phmorecore_hook) __P ((<span class="Type">void</span>));
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Set everything up and remember that we have </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> initialize __P ((<span class="Type">int</span>));
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Aligned allocation </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+
+_PRIVATE  __ptr_t align __P ((<span class="Type">int</span>, __malloc_size_t));
+_PRIVATE  __ptr_t align (<span class="Type">int</span> hdes, __malloc_size_t size)
+{
+  __ptr_t result;
+  <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span> adj;
+
+  result = (*__phmorecore) (hdes, size);
+  adj = (<span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>) ((<span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>) ((<span class="Type">char</span> *) result -
+						  (<span class="Type">char</span> *) <span class="Constant">NULL</span>)) % BLOCKSIZE;
+  <span class="Statement">if</span> (adj != <span class="Constant">0</span>)
+  {
+      adj = BLOCKSIZE - adj;
+      (<span class="Type">void</span>) (*__phmorecore) (hdes, adj);
+      result = (<span class="Type">char</span> *) result + adj;
+  }
+
+  <span class="Statement">if</span>(__after_phmorecore_hook)
+     (*__after_phmorecore_hook) ();
+
+  <span class="Statement">return</span> result;
+}
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Heap initialisation - called by heap_attach function </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> initialize_heap __P ((<span class="Type">int</span>));
+_PUBLIC <span class="Type">int</span> initialize_heap (<span class="Type">int</span> hdes)
+{
+<span class="PreProc">     #ifdef PTHREAD_SUPPORT</span>
+     (<span class="Type">void</span>)pthread_mutex_lock(&amp;htab_mutex);
+<span class="PreProc">     #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+
+     <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> Is heap initialised </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+     <span class="Statement">if</span> (!initialize (hdes))
+     {
+<span class="PreProc">        #ifdef PTHREAD_SUPPORT</span>
+        (<span class="Type">void</span>)pthread_mutex_unlock(&amp;htab_mutex);
+<span class="PreProc">        #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+        <span class="Statement">return</span> (-<span class="Constant">1</span>);
+     }
+
+
+     <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> Heap is not initialised </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+
+     <span class="Statement">else</span> <span class="Statement">if</span>(htable[hdes].exists == FALSE)
+     {  <span class="Type">int</span> i;
+
+
+        <span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> Create mapped object table </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+        _phobjectmap[hdes]   = (phobmap_type **)phmalloc(hdes,PHOBMAP_QUANTUM*<span class="Statement">sizeof</span>(phobmap_type **),
+                                                                                         (<span class="Type">char</span> *)<span class="Constant">NULL</span>);
+
+
+        <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> Initialise the first set of entries in the object table </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+
+        <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;PHOBMAP_QUANTUM; ++i)
+           _phobjectmap[hdes][i] = (phobmap_type *)<span class="Constant">NULL</span>;
+
+
+        <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> Heap root is always first persistent object </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+
+        (<span class="Type">void</span>)msm_map_object(hdes,<span class="Constant">0</span>,(<span class="Type">void</span> *)htable[hdes].sdata,htable[hdes].name);
+        (<span class="Type">void</span>)msm_map_setinfo(hdes,<span class="Constant">0</span>,<span class="Constant">&quot;persistent heap root&quot;</span>);
+        (<span class="Type">void</span>)msm_map_setsize(hdes,<span class="Constant">0</span>,htable[hdes].segment_size);
+
+
+        <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------</span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> Messy - but we must adjust the start and end of heap   </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> pointers to prepare for the first msm_isync_heaptables </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------</span><span class="Comment">*/</span>
+
+        htable[hdes].addresses_local = TRUE;
+        (<span class="Type">void</span>)msm_sync_heaptables(hdes);
+     }
+
+<span class="PreProc">     #ifdef PTHREAD_SUPPORT</span>
+     (<span class="Type">void</span>)pthread_mutex_unlock(&amp;htab_mutex);
+<span class="PreProc">     #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+     <span class="Statement">return</span> <span class="Constant">0</span>;
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Set everything up and remember that we have. </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> initialize (<span class="Type">int</span> hdes)
+{
+
+<span class="PreProc">  #ifdef PTHREAD_SUPPORT</span>
+  (<span class="Type">void</span>)pthread_mutex_lock(&amp;htab_mutex);
+<span class="PreProc">  #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+  <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> If we are importing a persistent heap which already exists                 </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> we need to pull all of the parameters required by the                      </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> memory allocator from the persistent heap. Mark O'Neill 14th November 1997 </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+  <span class="Statement">if</span>(htable[hdes].exists == FALSE)
+  {
+
+     <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> Before doing anything else grab some memory on the persistent heap to </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> store parameters. Mark O'Neill 14th November 1997                     </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+     _pheap_parameters[hdes] = msm_sbrk (hdes, N_PARAMETERS*<span class="Statement">sizeof</span>(<span class="Type">long</span>));
+
+     <span class="Statement">if</span> (__malloc_initialize_hook)
+        (*__malloc_initialize_hook) (hdes);
+
+     pheapsize[hdes] = HEAP / BLOCKSIZE;
+     _pheapinfo[hdes] = (malloc_info *) align (hdes, pheapsize[hdes] * <span class="Statement">sizeof</span> (malloc_info));
+     <span class="Statement">if</span> (_pheapinfo[hdes] == <span class="Constant">NULL</span>)
+     {
+<span class="PreProc">         #ifdef PTHREAD_SUPPORT</span>
+         (<span class="Type">void</span>)pthread_mutex_unlock(&amp;htab_mutex);
+<span class="PreProc">         #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+         <span class="Statement">return</span> <span class="Constant">0</span>;
+     }
+
+     (<span class="Type">void</span>)memset (_pheapinfo[hdes], <span class="Constant">0</span>, pheapsize[hdes] * <span class="Statement">sizeof</span> (malloc_info));
+
+     _pheapinfo[hdes][<span class="Constant">0</span>].free.size = <span class="Constant">0</span>;
+     _pheapinfo[hdes][<span class="Constant">0</span>].free.next = _pheapinfo[hdes][<span class="Constant">0</span>].free.prev = <span class="Constant">0</span>;
+     _pheapindex[hdes]             = <span class="Constant">0</span>;
+     _pheapbase[hdes]              = (<span class="Type">char</span> *) _pheapinfo[hdes];
+
+
+     <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> Account for the _pheapinfo block itself in the statistics </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+
+     _pheap_bytes_used[hdes]  = pheapsize[hdes] * <span class="Statement">sizeof</span> (malloc_info) + <span class="Constant">8</span>*<span class="Statement">sizeof</span>(<span class="Type">int</span>);
+     _pheap_chunks_used[hdes] = <span class="Constant">1</span>;
+
+     _phobjects[hdes]           = <span class="Constant">0</span>;
+     _phobjects_allocated[hdes] = PHOBMAP_QUANTUM;
+
+
+     <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------</span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> Messy - but we must adjust the start and end of heap   </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> pointers to prepare for the first msm_isync_heaptables </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------</span><span class="Comment">*/</span>
+
+     <span class="Comment">//htable[hdes].addresses_local = TRUE;     </span>
+     <span class="Comment">//(void)msm_sync_heaptables(hdes);</span>
+   }
+
+
+
+   <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+   <span class="Comment">/*</span><span class="Comment"> Simply restore existing parameters from persistent heap </span><span class="Comment">*/</span>
+   <span class="Comment">/*</span><span class="Comment"> heap. Mark O'Neill, 14th November 1997                  </span><span class="Comment">*/</span>
+   <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+
+   <span class="Statement">else</span>
+   {
+
+      <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------</span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> We could have a problem here - if the heap has been extended        </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> (and is bigger than PHM_SBRK_SIZE bytes) we will need to munmap it  </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> and then remap it (possibly moving heap to a new location in the    </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> process address space                                               </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+      _pheap_parameters[hdes] = (<span class="Type">void</span> *)((<span class="Type">unsigned</span> <span class="Type">long</span>)htable[hdes].addr + <span class="Statement">sizeof</span>(<span class="Type">long</span>));
+      htable[hdes].segment_size   = _pheap_parameters[hdes][<span class="Constant">17</span>];
+      <span class="Statement">if</span>(htable[hdes].segment_size &gt; PHM_SBRK_SIZE)
+      {
+
+         (<span class="Type">void</span>)msync((caddr_t)htable[hdes].addr,(<span class="Type">size_t</span>)PHM_SBRK_SIZE,MS_SYNC | MS_INVALIDATE);
+
+         (<span class="Type">void</span>)munmap((caddr_t)htable[hdes].addr,(<span class="Type">size_t</span>)PHM_SBRK_SIZE);
+         htable[hdes].addr = (<span class="Type">void</span> *)mmap((caddr_t)htable[hdes].addr,
+                                          (<span class="Type">size_t</span>)htable[hdes].segment_size,
+                                          PROT_READ | PROT_WRITE,
+                                          MAP_SHARED,
+                                          htable[hdes].fd,
+                                          (<span class="Type">off_t</span>)<span class="Constant">0</span>);
+
+
+         <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+         <span class="Comment">/*</span><span class="Comment"> Make addresses local if nessessary </span><span class="Comment">*/</span>
+         <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+
+         <span class="Statement">if</span>(!htable[hdes].addresses_local)
+            (<span class="Type">void</span>)msm_isync_heaptables(hdes);
+
+<span class="PreProc">#ifdef PHMALLOC_DEBUG</span>
+         (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;initialize: persistent heap </span><span class="Special">%d</span><span class="Constant"> dynamically remapped</span><span class="Special">\n</span><span class="Constant">&quot;</span>,hdes);
+         (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PHMALLOC_DEBUG </span><span class="Comment">*/</span>
+
+      }
+      <span class="Statement">else</span>
+      {
+
+         <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+         <span class="Comment">/*</span><span class="Comment"> Make addresses local if nessessary </span><span class="Comment">*/</span>
+         <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+
+         <span class="Statement">if</span>(!htable[hdes].addresses_local)
+            (<span class="Type">void</span>)msm_isync_heaptables(hdes);
+      }
+   }
+
+   __phmalloc_initialized[hdes] = <span class="Constant">1</span>;
+
+<span class="PreProc">   #ifdef PTHREAD_SUPPORT</span>
+   (<span class="Type">void</span>)pthread_mutex_unlock(&amp;htab_mutex);
+<span class="PreProc">   #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+   <span class="Statement">return</span> <span class="Constant">1</span>;
+}
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Get neatly aligned memory, initializing or </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> growing the heap info table as necessary.  </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE __ptr_t phmorecore __P ((<span class="Type">int</span>, __malloc_size_t));
+_PRIVATE __ptr_t phmorecore (<span class="Type">int</span> hdes, __malloc_size_t size)
+{
+  __ptr_t result;
+
+  malloc_info *newinfo = (malloc_info *)<span class="Constant">NULL</span>,
+              *oldinfo = (malloc_info *)<span class="Constant">NULL</span>;
+
+  __malloc_size_t newsize;
+
+<span class="PreProc">  #ifdef PTHREAD_SUPPORT</span>
+  (<span class="Type">void</span>)pthread_mutex_lock(&amp;htab_mutex);
+<span class="PreProc">  #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+  result = align (hdes, size);
+  <span class="Statement">if</span> (result == <span class="Constant">NULL</span>)
+  {
+<span class="PreProc">     #ifdef PTHREAD_SUPPORT</span>
+     (<span class="Type">void</span>)pthread_mutex_unlock(&amp;htab_mutex);
+<span class="PreProc">     #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+     <span class="Statement">return</span> (__ptr_t*)<span class="Constant">NULL</span>;
+  }
+
+  <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> Check if we need to grow the info table </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+
+  <span class="Statement">if</span> ((__malloc_size_t) BLOCK (hdes, (<span class="Type">char</span> *) result + size) &gt; pheapsize[hdes])
+  {
+      newsize = pheapsize[hdes];
+      <span class="Statement">while</span> ((__malloc_size_t) BLOCK (hdes, (<span class="Type">char</span> *) result + size) &gt; newsize)
+      {
+
+<span class="PreProc">#ifdef PHMALLOC_DEBUG</span>
+        (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;BLOCK: </span><span class="Special">%0x%010x</span><span class="Special">\n</span><span class="Constant">&quot;</span>,(__malloc_size_t)BLOCK (hdes, (<span class="Type">char</span> *) result + size));
+        (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PHMALLOC_DEBUG </span><span class="Comment">*/</span>
+
+	newsize *= <span class="Constant">2</span>;
+      }
+
+      newinfo = (malloc_info *) align (hdes, newsize * <span class="Statement">sizeof</span> (malloc_info));
+      <span class="Statement">if</span> (newinfo == <span class="Constant">NULL</span>)
+      {
+	  (*__phmorecore) (hdes, -size);
+
+<span class="PreProc">          #ifdef PTHREAD_SUPPORT</span>
+          (<span class="Type">void</span>)pthread_mutex_unlock(&amp;htab_mutex);
+<span class="PreProc">          #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+	  <span class="Statement">return</span> (__ptr_t*)<span class="Constant">NULL</span>;
+      }
+
+      (<span class="Type">void</span>)memcpy (newinfo, _pheapinfo[hdes], pheapsize[hdes] * <span class="Statement">sizeof</span> (malloc_info));
+      (<span class="Type">void</span>)memset (&amp;newinfo[pheapsize[hdes]], <span class="Constant">0</span>, (newsize - pheapsize[hdes]) * <span class="Statement">sizeof</span> (malloc_info));
+
+      oldinfo = _pheapinfo[hdes];
+      newinfo[BLOCK (hdes, oldinfo)].busy.type = <span class="Constant">0</span>;
+      newinfo[BLOCK (hdes, oldinfo)].busy.info.size = BLOCKIFY (pheapsize[hdes] * <span class="Statement">sizeof</span> (malloc_info));
+      _pheapinfo[hdes] = newinfo;
+
+
+      <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> Account for the _pheapinfo block itself in the statistics </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+
+      _pheap_bytes_used[hdes] += newsize * <span class="Statement">sizeof</span> (malloc_info);
+      ++_pheap_chunks_used[hdes];
+      _phfree_internal (hdes, oldinfo);
+      pheapsize[hdes] = newsize;
+    }
+
+
+  _pheaplimit[hdes] = BLOCK (hdes, (<span class="Type">char</span> *) result + size);
+
+<span class="PreProc">#ifdef PHMALLOC_DEBUG</span>
+  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;MORECORE BLOCK: </span><span class="Special">%d</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,_pheaplimit[hdes],BLOCK (hdes, (<span class="Type">char</span> *)result));
+  (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PHMALLOC_DEBUG </span><span class="Comment">*/</span>
+
+<span class="PreProc">  #ifdef PTHREAD_SUPPORT</span>
+  (<span class="Type">void</span>)pthread_mutex_unlock(&amp;htab_mutex);
+<span class="PreProc">  #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+  <span class="Statement">return</span> result;
+}
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Allocate memory from (persistent) heap. </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC __ptr_t phmalloc (<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span> hdes, __malloc_size_t  size, <span class="Type">const</span> <span class="Type">char</span> *name)
+{ <span class="Type">int</span>             h_index;
+  __ptr_t         result;
+  __malloc_size_t block, blocks, lastblocks, start, req_size, i;
+  <span class="Type">struct</span> list     *next = (<span class="Type">struct</span> list *)<span class="Constant">NULL</span>;
+
+<span class="PreProc">  #ifdef PTHREAD_SUPPORT</span>
+  (<span class="Type">void</span>)pthread_mutex_lock(&amp;htab_mutex);
+<span class="PreProc">  #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+
+  <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> Before we do anything else, check whether we have a valid persistent heap descriptor </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+  <span class="Statement">if</span>(hdes &gt; appl_max_pheaps || htable[hdes].addr == (<span class="Type">void</span> *)<span class="Constant">NULL</span>)
+  {  errno = <span class="Constant">EACCES</span>;
+
+<span class="PreProc">     #ifdef PTHREAD_SUPPORT</span>
+     (<span class="Type">void</span>)pthread_mutex_unlock(&amp;htab_mutex);
+<span class="PreProc">     #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+     <span class="Statement">return</span> (__ptr_t*)<span class="Constant">NULL</span>;
+  }
+
+
+  <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------</span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> Does this persistent object already exits? If so, we cannot allocate it! </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+  <span class="Statement">if</span>(name != (<span class="Type">const</span> <span class="Type">char</span> *)<span class="Constant">NULL</span> &amp;&amp; msm_phobject_exists(hdes,name))
+  {  errno = <span class="Constant">EEXIST</span>;
+
+<span class="PreProc">     #ifdef PTHREAD_SUPPORT</span>
+     (<span class="Type">void</span>)pthread_mutex_unlock(&amp;htab_mutex);
+<span class="PreProc">     #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+     <span class="Statement">return</span>((__ptr_t *)<span class="Constant">NULL</span>);
+  }
+
+
+  <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> ANSI C allows `malloc (0)' to either return NULL, or to return a </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> valid address you can realloc and free (though not dereference). </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#if	0</span>
+<span class="Comment">  if (size == 0)</span>
+<span class="Comment">  {</span>
+<span class="Comment">     #ifdef PTHREAD_SUPPORT</span>
+<span class="Comment">     (void)pthread_mutex_unlock(&amp;htab_mutex);</span>
+<span class="Comment">     #endif</span><span class="Comment"> /* PTHREAD_SUPPORT */</span>
+
+<span class="Comment">     return (__ptr_t*)NULL;</span>
+<span class="Comment">  }</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> 0 </span><span class="Comment">*/</span>
+
+
+  <span class="Statement">if</span> (__phmalloc_hook != <span class="Constant">NULL</span>)
+  {  result = (*__phmalloc_hook) (hdes, size, name);
+
+<span class="PreProc">     #ifdef PTHREAD_SUPPORT</span>
+     (<span class="Type">void</span>)pthread_mutex_unlock(&amp;htab_mutex);
+<span class="PreProc">     #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+     <span class="Statement">return</span> result;
+  }
+
+  req_size = size;
+
+
+  <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------</span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> Does this persistent object already exits? If so, we cannot allocate it! </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+  <span class="Statement">if</span>(name != (<span class="Type">const</span> <span class="Type">char</span> *)<span class="Constant">NULL</span> &amp;&amp; msm_phobject_exists(hdes,name))
+  {  errno = <span class="Constant">EEXIST</span>;
+
+<span class="PreProc">     #ifdef PTHREAD_SUPPORT</span>
+     (<span class="Type">void</span>)pthread_mutex_unlock(&amp;htab_mutex);
+<span class="PreProc">     #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+     <span class="Statement">return</span>((__ptr_t *)<span class="Constant">NULL</span>);
+  }
+
+   <span class="Statement">if</span> (size &lt; <span class="Statement">sizeof</span> (<span class="Type">struct</span> list))
+      size = <span class="Statement">sizeof</span> (<span class="Type">struct</span> list);
+
+
+  <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> Determine the allocation policy based on the request size </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+
+  <span class="Statement">if</span> (size &lt;= BLOCKSIZE / <span class="Constant">2</span>)
+  {
+
+      <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> Small allocation to receive a fragment of a block.        </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> Determine the logarithm to base two of the fragment size. </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+
+      <span class="Type">register</span> __malloc_size_t log = <span class="Constant">1</span>;
+
+      --size;
+      <span class="Statement">while</span> ((size /= <span class="Constant">2</span>) != <span class="Constant">0</span>)
+	++log;
+
+
+      <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> Look in the fragment lists for a   </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> free fragment of the desired size. </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+
+      next = _phfraghead[hdes][log].next;
+      <span class="Statement">if</span> (next != <span class="Constant">NULL</span>)
+      {
+
+          <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------</span><span class="Comment">*/</span>
+	  <span class="Comment">/*</span><span class="Comment"> There are free fragments of this size.                 </span><span class="Comment">*/</span>
+	  <span class="Comment">/*</span><span class="Comment"> Pop a fragment out of the fragment list and return it. </span><span class="Comment">*/</span>
+	  <span class="Comment">/*</span><span class="Comment"> Update the block's nfree and first counters.           </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------</span><span class="Comment">*/</span>
+
+	  result = (__ptr_t) next;
+	  next-&gt;prev-&gt;next = next-&gt;next;
+
+	  <span class="Statement">if</span> (next-&gt;next != <span class="Constant">NULL</span>)
+	    next-&gt;next-&gt;prev = next-&gt;prev;
+
+	  block = BLOCK (hdes, result);
+	  <span class="Statement">if</span> (--_pheapinfo[hdes][block].busy.info.frag.nfree != <span class="Constant">0</span>)
+	    _pheapinfo[hdes][block].busy.info.frag.first = (<span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>)
+	                                                   ((<span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>) ((<span class="Type">char</span> *) next-&gt;next - (<span class="Type">char</span> *) <span class="Constant">NULL</span>)
+	                                                                                          % BLOCKSIZE) &gt;&gt; log;
+
+
+          <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+	  <span class="Comment">/*</span><span class="Comment"> Update the statistics </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+
+	  ++_pheap_chunks_used[hdes];
+	  _pheap_bytes_used[hdes] += <span class="Constant">1</span> &lt;&lt; log;
+	  --_pheap_chunks_free[hdes];
+	  _pheap_bytes_free[hdes] -= <span class="Constant">1</span> &lt;&lt; log;
+      }
+      <span class="Statement">else</span>
+      {
+
+          <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+	  <span class="Comment">/*</span><span class="Comment"> No free fragments of the desired size, so get a new block </span><span class="Comment">*/</span>
+	  <span class="Comment">/*</span><span class="Comment"> and break it into fragments, returning the first.         </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+
+          <span class="Statement">if</span>(_no_phobject_mapping == <span class="Constant">0</span>)
+          {  _no_phobject_mapping = <span class="Constant">1</span>;
+	     result = phmalloc (hdes, BLOCKSIZE, (<span class="Type">char</span> *)<span class="Constant">NULL</span>);
+             _no_phobject_mapping = <span class="Constant">0</span>;
+          }
+          <span class="Statement">else</span>
+             result = phmalloc (hdes, BLOCKSIZE, (<span class="Type">char</span> *)<span class="Constant">NULL</span>);
+
+	  <span class="Statement">if</span> (result == <span class="Constant">NULL</span>)
+          {
+<span class="PreProc">             #ifdef PTHREAD_SUPPORT</span>
+             (<span class="Type">void</span>)pthread_mutex_unlock(&amp;htab_mutex);
+<span class="PreProc">             #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+	     <span class="Statement">return</span> <span class="Constant">NULL</span>;
+          }
+
+
+          <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------</span><span class="Comment">*/</span>
+	  <span class="Comment">/*</span><span class="Comment"> Link all fragments but the first into the free list </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------</span><span class="Comment">*/</span>
+
+	  <span class="Statement">for</span> (i = <span class="Constant">1</span>; i &lt; (__malloc_size_t) (BLOCKSIZE &gt;&gt; log); ++i)
+	  {
+	      next = (<span class="Type">struct</span> list *) ((<span class="Type">char</span> *) result + (i &lt;&lt; log));
+	      next-&gt;next = _phfraghead[hdes][log].next;
+	      next-&gt;prev = &amp;_phfraghead[hdes][log];
+	      next-&gt;prev-&gt;next = next;
+	      <span class="Statement">if</span> (next-&gt;next != <span class="Constant">NULL</span>)
+		next-&gt;next-&gt;prev = next;
+	  }
+
+
+          <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------</span><span class="Comment">*/</span>
+	  <span class="Comment">/*</span><span class="Comment"> Initialize the nfree and first counters for this block </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------</span><span class="Comment">*/</span>
+
+	  block = BLOCK (hdes, result);
+	  _pheapinfo[hdes][block].busy.type = log;
+	  _pheapinfo[hdes][block].busy.info.frag.nfree = i - <span class="Constant">1</span>;
+	  _pheapinfo[hdes][block].busy.info.frag.first = i - <span class="Constant">1</span>;
+
+	  _pheap_chunks_free[hdes] += (BLOCKSIZE &gt;&gt; log) - <span class="Constant">1</span>;
+	  _pheap_bytes_free[hdes]  += BLOCKSIZE - (<span class="Constant">1</span> &lt;&lt; log);
+	  _pheap_bytes_used[hdes]  -= BLOCKSIZE - (<span class="Constant">1</span> &lt;&lt; log);
+	}
+  }
+  <span class="Statement">else</span>
+  {
+
+      <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------</span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> Large allocation to receive one or more blocks.                      </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> Search the free list in a circle starting at the last place visited. </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> If we loop completely around without finding a large enough          </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> space we will have to get more memory from the system.               </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+      blocks = BLOCKIFY (size);
+      start = block = _pheapindex[hdes];
+      <span class="Statement">while</span> (_pheapinfo[hdes][block].free.size &lt; blocks)
+      {
+	  block = _pheapinfo[hdes][block].free.next;
+	  <span class="Statement">if</span> (block == start)
+          {
+
+              <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+	      <span class="Comment">/*</span><span class="Comment"> Need to get more from the system.  Check to see if   </span><span class="Comment">*/</span>
+              <span class="Comment">/*</span><span class="Comment"> the new core will be contiguous with the final free  </span><span class="Comment">*/</span>
+              <span class="Comment">/*</span><span class="Comment"> block; if so we don't need to get as much.           </span><span class="Comment">*/</span>
+              <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+	      block = _pheapinfo[hdes][<span class="Constant">0</span>].free.prev;
+	      lastblocks = _pheapinfo[hdes][block].free.size;
+	      <span class="Statement">if</span> (_pheaplimit[hdes] != <span class="Constant">0</span> &amp;&amp; block + lastblocks == _pheaplimit[hdes]         &amp;&amp;
+		  (*__phmorecore) (hdes,<span class="Constant">0</span>) == ADDRESS (hdes, block + lastblocks)            &amp;&amp;
+		  (phmorecore (hdes, (blocks - lastblocks) * BLOCKSIZE))              != <span class="Constant">NULL</span>)
+              {
+
+                  <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+ 		  <span class="Comment">/*</span><span class="Comment"> Which block we are extending (the `final free    </span><span class="Comment">*/</span>
+ 		  <span class="Comment">/*</span><span class="Comment"> block' referred to above) might have changed, if </span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment"> it got combined with a freed info table.         </span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+
+ 		  block = _pheapinfo[hdes][<span class="Constant">0</span>].free.prev;
+  		  _pheapinfo[hdes][block].free.size += (blocks - lastblocks);
+		  _pheap_bytes_free[hdes] += (blocks - lastblocks) * BLOCKSIZE;
+		  <span class="Statement">continue</span>;
+              }
+
+	      result = phmorecore (hdes, blocks * BLOCKSIZE);
+	      <span class="Statement">if</span> (result == <span class="Constant">NULL</span>)
+              {
+<span class="PreProc">                 #ifdef PTHREAD_SUPPORT</span>
+                 (<span class="Type">void</span>)pthread_mutex_unlock(&amp;htab_mutex);
+<span class="PreProc">                 #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+		 <span class="Statement">return</span> <span class="Constant">NULL</span>;
+              }
+
+	      block = BLOCK (hdes, result);
+	      _pheapinfo[hdes][block].busy.type = <span class="Constant">0</span>;
+	      _pheapinfo[hdes][block].busy.info.size = blocks;
+	      ++_pheap_chunks_used[hdes];
+	      _pheap_bytes_used[hdes] += blocks * BLOCKSIZE;
+
+              <span class="Statement">if</span>(_no_phobject_mapping == <span class="Constant">0</span> &amp;&amp; name != (<span class="Type">void</span> *)<span class="Constant">NULL</span>)
+              {  h_index = msm_get_free_mapslot(hdes);
+                 (<span class="Type">void</span>)msm_map_object(hdes,h_index,result,name);
+                 (<span class="Type">void</span>)msm_map_setinfo(hdes,h_index,<span class="Constant">&quot;persistent GMAP object&quot;</span>);
+                 (<span class="Type">void</span>)msm_map_setsize(hdes,h_index,req_size);
+                 _pheap_parameters[hdes][<span class="Constant">8</span>]     = _phobjects[hdes];
+                 _pheap_parameters[hdes][<span class="Constant">9</span>]     = _phobjects_allocated[hdes];
+              }
+
+<span class="PreProc">              #ifdef PTHREAD_SUPPORT</span>
+              (<span class="Type">void</span>)pthread_mutex_unlock(&amp;htab_mutex);
+<span class="PreProc">              #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+	      <span class="Statement">return</span> result;
+           }
+	}
+
+
+      <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> At this point we have found a suitable free list entry. </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> Figure out how to remove what we need from the list.    </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+
+      result = ADDRESS (hdes, block);
+      <span class="Statement">if</span> (_pheapinfo[hdes][block].free.size &gt; blocks)
+      {
+
+          <span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+	  <span class="Comment">/*</span><span class="Comment"> The block we found has a bit left over,         </span><span class="Comment">*/</span>
+	  <span class="Comment">/*</span><span class="Comment"> so relink the tail end back into the free list. </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+
+	  _pheapinfo[hdes][block + blocks].free.size                     = _pheapinfo[hdes][block].free.size - blocks;
+	  _pheapinfo[hdes][block + blocks].free.next                     = _pheapinfo[hdes][block].free.next;
+	  _pheapinfo[hdes][block + blocks].free.prev                     = _pheapinfo[hdes][block].free.prev;
+	  _pheapinfo[hdes][_pheapinfo[hdes][block].free.prev].free.next = _pheapindex[hdes] = block + blocks;
+          _pheapinfo[hdes][_pheapinfo[hdes][block].free.next].free.prev = _pheapindex[hdes] = block + blocks;
+      }
+      <span class="Statement">else</span>
+      {
+
+          <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+	  <span class="Comment">/*</span><span class="Comment"> The block exactly matches our requirements, </span><span class="Comment">*/</span>
+	  <span class="Comment">/*</span><span class="Comment"> so just remove it from the list.            </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+
+	  _pheapinfo[hdes][_pheapinfo[hdes][block].free.next].free.prev = _pheapinfo[hdes][block].free.prev;
+	  _pheapinfo[hdes][_pheapinfo[hdes][block].free.prev].free.next = _pheapindex[hdes] = _pheapinfo[hdes][block].free.next;
+	  --_pheap_chunks_free[hdes];
+	}
+
+      _pheapinfo[hdes][block].busy.type = <span class="Constant">0</span>;
+      _pheapinfo[hdes][block].busy.info.size = blocks;
+
+      ++_pheap_chunks_used[hdes];
+
+      _pheap_bytes_used[hdes] += blocks * BLOCKSIZE;
+      _pheap_bytes_free[hdes] -= blocks * BLOCKSIZE;
+
+
+      <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> Mark all the blocks of the object just allocated except for the </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> first with a negative number so you can find the first block by </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment"> adding that adjustment.                                         </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+      <span class="Statement">while</span>(--blocks &gt; <span class="Constant">0</span>)
+	_pheapinfo[hdes][block + blocks].busy.info.size = -blocks;
+  }
+
+  <span class="Statement">if</span>(_no_phobject_mapping == <span class="Constant">0</span> &amp;&amp; name != (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+  {  h_index         = msm_get_free_mapslot(hdes);
+
+     (<span class="Type">void</span>)msm_map_object (hdes,h_index,result,name);
+     (<span class="Type">void</span>)msm_map_setinfo(hdes,h_index,<span class="Constant">&quot;persistent GMAP object&quot;</span>);
+     (<span class="Type">void</span>)msm_map_setsize(hdes,h_index,req_size);
+
+     _pheap_parameters[hdes][<span class="Constant">8</span>] = _phobjects[hdes];
+  }
+
+<span class="PreProc">  #ifdef PTHREAD_SUPPORT</span>
+  (<span class="Type">void</span>)pthread_mutex_unlock(&amp;htab_mutex);
+<span class="PreProc">  #endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+  <span class="Statement">return</span> result;
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

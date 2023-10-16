@@ -35,7 +35,7 @@ protect \ PSRP file/directory protection application
 .B -key
 .I file protection key
 ]
->& <log file>
+[2> <log file>]
 .br
 
 .SH DESCRIPTION
@@ -254,6 +254,22 @@ process can send a
 .I killpg(2) 
 to the parents process group (and clobber the child as well as the parent). This is a safety
 feature which could be removed (should the need arise).
+.br
+
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
+.br
+
+.SH ENVIRONMENTAL VARIABLES
+none.
 .br
 
 .SH COPYRIGHT

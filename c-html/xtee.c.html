@@ -1,0 +1,431 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/xtee.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Purpose: Check status of file system before trying to write data to</span>
+<span class="Comment">             it.</span>
+
+<span class="Comment">    Author:  M.A. O'Neill</span>
+<span class="Comment">             Tumbling Dice Ltd</span>
+<span class="Comment">             Gosforth</span>
+<span class="Comment">             Newcastle upon Tyne</span>
+<span class="Comment">             NE3 4RT</span>
+<span class="Comment">             United Kingdom</span>
+
+<span class="Comment">    Version: 2.00 </span>
+<span class="Comment">    Dated:   4th January 2022</span>
+<span class="Comment">    Email:   mao@tumblingdice.co.uk</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;me.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;utils.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;netlib.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;psrp.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;vstamp.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stdlib.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Version of xtee </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define XTEE_VERSION    </span><span class="Constant">&quot;2.00&quot;</span>
+
+
+<span class="PreProc">#ifdef BUBBLE_MEMORY_SUPPORT</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;bubble.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> BUBBLE_MEMORY_SUPPORT </span><span class="Comment">*/</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Version ID (used by CKPT enabled binaries to discard stale checkpoint</span>
+<span class="Comment">    files) ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;vstamp.h&gt;</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Get application information for slot manager ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Slot information function </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> xtee_slot(<span class="Type">int</span> level)
+{   (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;int app xtee </span><span class="Special">%s</span><span class="Constant">: [ANSI C]</span><span class="Special">\n</span><span class="Constant">&quot;</span>,XTEE_VERSION);
+
+    <span class="Statement">if</span>(level &gt; <span class="Constant">1</span>)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;(C) 1999-2022 Tumbling Dice</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Author: M.A. O'Neill</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Extended tee filter (built </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+    }
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Application usage function </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> xtee_usage(<span class="Type">void</span>)
+{   (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[-fifo:FALSE] | &quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[-pipe &lt;command stream&gt; [-detached:FALSE] | &quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[-tee_file &lt;tee file name&gt;]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[-append:FALSE] |</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[-compress:FALSE]]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;[&lt; &lt;input file&gt; 1&gt; &lt;output file&gt; 2&gt; &lt;ASCII log file&gt;]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Signals</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;SIGINIT SIGCHAN SIGPSRP: Process status [PSRP] request (protocol </span><span class="Special">%4.2F</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,PSRP_PROTOCOL_VERSION);
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;SIGCLIENT: tell client server is about to segment</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+
+<span class="PreProc">    #ifdef CRUI_SUPPORT</span>
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;SIGCHECK SIGRESTART:      checkpoint and restart signals</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> CRIU_SUPPORT </span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;SIGALIVE: check for existence of client on signal dispatch host</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+}
+
+
+<span class="PreProc">#ifdef SLOT</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;slotman.h&gt;</span>
+_EXTERN <span class="Type">void</span> (* SLOT)() __attribute__ ((aligned(<span class="Constant">16</span>))) = xtee_slot;
+_EXTERN <span class="Type">void</span> (* USE )() __attribute__ ((aligned(<span class="Constant">16</span>))) = xtee_usage;
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> SLOT </span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Application build date ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_EXTERN <span class="Type">char</span> appl_build_time[SSIZE] = <span class="Constant">__TIME__</span>;
+_EXTERN <span class="Type">char</span> appl_build_date[SSIZE] = <span class="Constant">__DATE__</span>;
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Private variables required by this application ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _BOOLEAN tee_to_fifo         = FALSE;
+_PRIVATE _BOOLEAN tee_to_pipestream   = FALSE;
+_PRIVATE _BOOLEAN do_compress         = FALSE;
+_PRIVATE _BOOLEAN detached            = FALSE;
+
+                                                   <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">char</span> tee_f_name[SSIZE]         = <span class="Constant">&quot;&quot;</span>;      <span class="Comment">/*</span><span class="Comment"> Name of tee file        </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">char</span> line_of_input[SSIZE]      = <span class="Constant">&quot;&quot;</span>;      <span class="Comment">/*</span><span class="Comment"> Line buffer             </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">char</span> compress_command[SSIZE]   = <span class="Constant">&quot;&quot;</span>;;     <span class="Comment">/*</span><span class="Comment"> Compression command     </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">char</span> pipestream_command[SSIZE] = <span class="Constant">&quot;&quot;</span>;      <span class="Comment">/*</span><span class="Comment"> Compression pipestream  </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span> tee_file_des;                         <span class="Comment">/*</span><span class="Comment"> Tee file descriptor     </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span> bytes_read;                           <span class="Comment">/*</span><span class="Comment"> Bytes read (input)      </span><span class="Comment">*/</span>
+                                                   <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Report process status ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> psrp_process_status(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{    (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    Extended tee filter status</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+     (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    =============================</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+     (<span class="Type">void</span>)fflush(psrp_out);
+
+<span class="PreProc">     #ifdef CRIU_SUPPORT</span>
+     (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    Binary is Criu enabled (checkpointable)</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+<span class="PreProc">     #endif</span> <span class="Comment">/*</span><span class="Comment"> CRIU_SUPPORT </span><span class="Comment">*/</span>
+
+     <span class="Statement">if</span>(tee_to_pipestream == TRUE)
+        (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    Teeing stdin to (embedded) pipestream (</span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,pipestream_command);
+     <span class="Statement">else</span> <span class="Statement">if</span>(tee_to_fifo == TRUE)
+        (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    Teeing stdin to (named) FIFO (</span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,tee_f_name);
+     <span class="Statement">else</span>
+     {  <span class="Statement">if</span>(do_compress == TRUE)
+           (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    Teeing stdin (with compression) to regular file </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,tee_f_name);
+        <span class="Statement">else</span>
+           (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;    Teeing stdin to regular file </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,tee_f_name);
+     }
+
+     (<span class="Type">void</span>)fprintf(psrp_out,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+     (<span class="Type">void</span>)fflush(psrp_out);
+
+     <span class="Statement">return</span>(PSRP_OK);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Software I.D. tag (used if CKPT support enabled to discard stale dynamic</span>
+<span class="Comment">    checkpoint files) ...</span>
+<span class="Comment">-------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define VTAG  </span><span class="Constant">3685</span>
+
+<span class="Type">extern</span> <span class="Type">int</span> appl_vtag = VTAG;
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Main entry point to application ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> pups_main(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   _BOOLEAN do_append = FALSE;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Ignore PUPS/P3 requests while initialising </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+
+    psrp_ignore_requests();
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Parse command tail </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+
+    <span class="Comment">/*</span><span class="Comment"> Do standard initialisations </span><span class="Comment">*/</span>
+    pups_std_init(TRUE,
+                  &amp;argc,
+                  XTEE_VERSION,
+                  <span class="Constant">&quot;M.A. O'Neill&quot;</span>,
+                  <span class="Constant">&quot;xtee&quot;</span>,
+                  <span class="Constant">&quot;2022&quot;</span>,
+                  argv);
+
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Enable PUPS/P3 communication </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)psrp_init(PSRP_STATUS_ONLY  | PSRP_HOMEOSTATIC_STREAMS,&amp;psrp_process_status);
+    (<span class="Type">void</span>)psrp_load_default_dispatch_table();
+    (<span class="Type">void</span>)psrp_accept_requests();
+
+    <span class="Statement">if</span>(isatty(<span class="Constant">0</span>) == <span class="Constant">1</span>)
+       pups_error(<span class="Constant">&quot;[xtee] no file attached to stdin&quot;</span>);
+
+    <span class="Statement">if</span>(isatty(<span class="Constant">1</span>) == <span class="Constant">1</span>)
+       pups_error(<span class="Constant">&quot;[xtee] no file attached to stdout&quot;</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> If pipe flag is set divert the O/P to a pipestream </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((ptr = pups_locate(&amp;init,<span class="Constant">&quot;pipe&quot;</span>,&amp;argc,args,<span class="Constant">0</span>)) != NOT_FOUND)
+    {   <span class="Statement">if</span>(strccpy(pipestream_command,pups_str_dec(&amp;ptr,&amp;argc,args)) == (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+           pups_error(<span class="Constant">&quot;[xtee] expecting command stream&quot;</span>);
+
+        tee_to_pipestream = TRUE;
+        tee_file_des = pups_copen(pipestream_command,shell,<span class="Constant">1</span>);
+
+        <span class="Statement">if</span>(appl_verbose == TRUE)
+        {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    Tee file is a command pipeline&quot;</span>);
+
+           <span class="Statement">if</span>(detached == TRUE)
+              (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot; (detached)</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+           <span class="Statement">else</span>
+              (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+           (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+        }
+    }
+    <span class="Statement">else</span>
+    {
+       <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> If fifo flag set then tee file is a System V named FIFO </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(pups_locate(&amp;init,<span class="Constant">&quot;fifo&quot;</span>,&amp;argc,args,<span class="Constant">0</span>) != NOT_FOUND)
+       {  tee_to_fifo = TRUE;
+          <span class="Statement">if</span>(appl_verbose == TRUE)
+          {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    Tee file is a named FIFO</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+          }
+       }
+
+       <span class="Statement">if</span>(pups_locate(&amp;init,<span class="Constant">&quot;compress&quot;</span>,&amp;argc,args,<span class="Constant">0</span>) != NOT_FOUND)
+       {  <span class="Statement">if</span>(tee_to_fifo == TRUE || tee_to_pipestream)
+             pups_error(<span class="Constant">&quot;[xtee] cannot have both compress and pipe or fifo flags set&quot;</span>);
+
+          do_compress = TRUE;
+
+          <span class="Statement">if</span>(appl_verbose == TRUE)
+          {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    Compressing tee'd output</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+          }
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Get tee file name </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>((ptr = pups_locate(&amp;init,<span class="Constant">&quot;tee_file&quot;</span>,&amp;argc,args,<span class="Constant">0</span>)) != NOT_FOUND)
+       {  <span class="Statement">if</span>(strccpy(tee_f_name,pups_str_dec(&amp;ptr,&amp;argc,args)) == (<span class="Type">char</span> *)INVALID_ARG)
+              pups_error(<span class="Constant">&quot;[xtee] expecting tee file name&quot;</span>);
+
+          <span class="Statement">if</span>(appl_verbose == TRUE)
+          {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    Tee file name is </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,tee_f_name);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+          }
+
+          <span class="Statement">if</span>(do_compress == TRUE)
+          {  snprintf(compress_command,SSIZE,<span class="Constant">&quot;xz &gt; </span><span class="Special">%s</span><span class="Constant">&quot;</span>,tee_f_name);
+             tee_file_des = pups_copen(compress_command,shell,<span class="Constant">1</span>);
+          }
+          <span class="Statement">else</span>
+          {  <span class="Statement">if</span>(tee_to_fifo == TRUE)
+                (<span class="Type">void</span>)mkfifo(tee_f_name,<span class="Constant">2</span>);
+             <span class="Statement">else</span>
+                creat(tee_f_name,<span class="PreProc">0</span><span class="Constant">644</span>);
+
+
+             <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> If we are teeing to a regular file are we appending data? </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+
+             <span class="Statement">if</span>((ptr = pups_locate(&amp;init,<span class="Constant">&quot;append&quot;</span>,&amp;argc,args,<span class="Constant">0</span>)) != NOT_FOUND)
+             {  <span class="Statement">if</span>(appl_verbose == TRUE)
+                {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    Append mode (for regular file </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,tee_f_name);
+                   (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+                }
+
+
+                <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+                <span class="Comment">/*</span><span class="Comment"> Eextend regular file </span><span class="Comment">*/</span>
+                <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+
+                tee_file_des = pups_open(tee_f_name,<span class="Constant">1</span>,LIVE);
+		(<span class="Type">void</span>)lseek(tee_file_des,<span class="Constant">0</span>,<span class="Constant">SEEK_END</span>);
+             }
+             <span class="Statement">else</span>
+
+                <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+                <span class="Comment">/*</span><span class="Comment"> Overwrite regular file </span><span class="Comment">*/</span>
+                <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+                tee_file_des = pups_open(tee_f_name,<span class="Constant">1</span>,LIVE);
+          }
+       }
+       <span class="Statement">else</span>
+          pups_error(<span class="Constant">&quot;[xtee] no tee file specfied&quot;</span>);
+
+
+       <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> If we are teeing to a regular file are we appending data? </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(tee_to_fifo == FALSE &amp;&amp; tee_to_pipestream == FALSE &amp;&amp; (ptr = pups_locate(&amp;init,<span class="Constant">&quot;append&quot;</span>,&amp;argc,args,<span class="Constant">0</span>)) != NOT_FOUND)
+       {  do_append = TRUE;
+
+          <span class="Statement">if</span>(appl_verbose == TRUE)
+          {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    Append mode (for regular file </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,tee_f_name);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+          }
+       }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Complain about any unparsed command line items </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+
+    pups_t_arg_errs(argd,args);
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> This is the pups_main part of the program - it takes data from stdin and </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> pushes it to stdout                                                      </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+     <span class="Statement">do</span> {  <span class="Statement">if</span>((bytes_read = read(<span class="Constant">0</span>,line_of_input,SSIZE)) != <span class="Constant">0</span>)
+           {  write(tee_file_des,line_of_input,bytes_read);
+              write(<span class="Constant">1</span>,line_of_input,bytes_read);
+           }
+        } <span class="Statement">while</span>(bytes_read &gt; <span class="Constant">0</span>); <span class="Comment">/*</span><span class="Comment"> Was != 0 </span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(tee_to_fifo == TRUE)
+    {  (<span class="Type">void</span>)close(tee_file_des);
+       unlink(tee_f_name);
+    }
+    <span class="Statement">else</span>
+    {  <span class="Statement">if</span>(tee_to_pipestream == TRUE)
+       {  <span class="Statement">if</span>(detached == TRUE)
+          {  (<span class="Type">void</span>)close(tee_file_des);
+
+             <span class="Statement">if</span>(fork() != <span class="Constant">0</span>)
+                pups_exit(<span class="Constant">0</span>);
+
+             close(<span class="Constant">0</span>);
+             close(<span class="Constant">1</span>);
+             close(<span class="Constant">2</span>);
+          }
+          <span class="Statement">else</span>
+             (<span class="Type">void</span>)close(tee_file_des);
+       }
+       <span class="Statement">else</span>
+          (<span class="Type">void</span>)close(tee_file_des);
+    }
+
+    <span class="Statement">if</span>(appl_verbose == TRUE)
+    {  (<span class="Type">void</span>)strdate(date);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">): finished</span><span class="Special">\n</span><span class="Constant">&quot;</span>,date,appl_name,appl_pid,appl_host,appl_owner);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    }
+
+    pups_exit(<span class="Constant">0</span>);
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

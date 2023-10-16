@@ -22,7 +22,7 @@
    or (US mail) as Mike Haertel c/o Free Software Foundation.
 
    Persistent heap modifications by Mark O'Neill (mao@tumblingdice.co.uk) 
-   (C) 1998-2019 M.A. O'Neill, Tumbling Dice
+   (C) 1998-2022 M.A. O'Neill, Tumbling Dice
 -----------------------------------------------------------------------------*/
 
 #include <stdio.h>
@@ -240,19 +240,19 @@ _PRIVATE int initialize (int hdes)
   (void)pthread_mutex_lock(&htab_mutex);
   #endif /* PTHREAD_SUPPORT */
 
-  /*------------------------------------------------------------------------*/
-  /* If we are importing a persistent heap which already exists             */
-  /* we need to pull all of the parameters required by the                  */
-  /* memory allocator from the shared heap. Mark O'Neill 14th November 1997 */
-  /*------------------------------------------------------------------------*/
+  /*----------------------------------------------------------------------------*/
+  /* If we are importing a persistent heap which already exists                 */
+  /* we need to pull all of the parameters required by the                      */
+  /* memory allocator from the persistent heap. Mark O'Neill 14th November 1997 */
+  /*----------------------------------------------------------------------------*/
 
   if(htable[hdes].exists == FALSE)
   {
 
-     /*-------------------------------------------------------------------*/
-     /* Before doing anything else grab some memory on the shared heap to */
-     /* store parameters. Mark O'Neill 14th November 1997                 */
-     /*-------------------------------------------------------------------*/
+     /*-----------------------------------------------------------------------*/
+     /* Before doing anything else grab some memory on the persistent heap to */
+     /* store parameters. Mark O'Neill 14th November 1997                     */
+     /*-----------------------------------------------------------------------*/
 
      _pheap_parameters[hdes] = msm_sbrk (hdes, N_PARAMETERS*sizeof(long));
 
@@ -535,9 +535,9 @@ _PUBLIC __ptr_t phmalloc (const unsigned int hdes, __malloc_size_t  size, const 
   req_size = size;
 
 
-  /*----------------------------------------------------------------------*/
-  /* Does this shared object already exits? If so, we cannot allocate it! */
-  /*----------------------------------------------------------------------*/
+  /*--------------------------------------------------------------------------*/
+  /* Does this persistent object already exits? If so, we cannot allocate it! */
+  /*--------------------------------------------------------------------------*/
 
   if(name != (const char *)NULL && msm_phobject_exists(hdes,name))
   {  errno = EEXIST;

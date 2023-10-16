@@ -10,7 +10,7 @@ SERVERTOOL \- Starts PSRP server in a new window.
 .I [-usage | -help] 
 .I !PSRP server name!
 .I [PSRP server command tail] 
->& <log file>
+[2> <log file>]
 .br
 
 .SH DESCRIPTION
@@ -34,6 +34,22 @@ are passed to the PSRP server.
 .B -usage 
 prints out help information about
 .I servertool(1)
+.br
+
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
+.br
+
+.SH ENVIRONMENTAL VARIABLES
+none/
 .br
 
 .SH COPYRIGHT

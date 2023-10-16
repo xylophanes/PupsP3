@@ -8,8 +8,8 @@
              NE3 4RT
              United Kingdom
 
-    Dated:   27th September 2019 
-    Version: 5.00 
+    Version: 5.05
+    Dated:   12th July 2023 
     E-mail:  mao@tumblingdice.co.uk
 -------------------------------------------------------------------------*/
 
@@ -38,7 +38,7 @@
 /* Version */
 /***********/
 
-#define PSRPLIB_VERSION    "5.00"
+#define PSRPLIB_VERSION    "5.05"
 
 
 /*-------------*/
@@ -163,7 +163,7 @@
 /* PSRP system defines */
 /*---------------------*/
 
-#define PSRP_PROTOCOL_VERSION          9.00 
+#define PSRP_PROTOCOL_VERSION          9.02 
 #define PSRP_BAG_TABLE_SIZE            128 
 #define PSRP_DISPATCH_TABLE_SIZE       128 
 #define PSRP_ALLOCATION_QUANTUM        128 
@@ -537,7 +537,7 @@ _PROTOTYPE _EXPORT int psrp_find_action_slot_index(const char *);
 // Send request over slaved client channel (peer-to-peer)
 _PROTOTYPE _EXPORT int psrp_write_sic(const psrp_channel_type *, const char *);
 
-// Read reply over slaved client channel (perr-to-peer)
+// Read reply over slaved client channel (peer-to-peer)
 _PROTOTYPE _EXPORT int psrp_read_sic(const psrp_channel_type *, char *);
 
 // Send abort over slaved client channel (perr-to-peer)
@@ -641,6 +641,9 @@ _PROTOTYPE _EXPORT int psrp_critical(const _BOOLEAN);
 
 // Block/unblock client interrupt (via SIGABRT) 
 _PROTOTYPE _EXPORT int psrp_client_block(const _BOOLEAN);
+
+// Is PEN (process execution name) unique? 
+_PROTOTYPE _EXPORT void psrp_pen_unique(void);
 
 
 #ifdef _CPLUSPLUS

@@ -1,12 +1,12 @@
-.TH HTYPE 1 "8th February 2009" "PUPSP3 build tools" "PUPSP3 build tools"
+.TH HTYPE 1 "8th February 2019" "PUPSP3 build tools" "PUPSP3 build tools"
 
 .SH NAME
 HTYPE \- test to see if linux instance is running in a container 
 .br
 
 .SH SYNOPSIS
-.B hytype 
->& <log file>
+.B htype 
+[2> <log file>]
 .br
 
 .SH DESCRIPTION
@@ -16,6 +16,18 @@ The result of the test (HOST or CONTAINER) is sent to
 .I standard ouput.
 .br
 
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
+.br
+
 .SH ENVIRONMENT VARIABLES
 None.
 .br
@@ -23,7 +35,7 @@ None.
 .SH BUGS
 Not really a bug but
 .I htype(1)
-should ideally report if the current Linux isntance is running on a virtual
+should ideally report if the current Linux instance is running in a virtual
 machine.
 .br
 

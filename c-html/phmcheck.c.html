@@ -1,0 +1,286 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/phmcheck.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------</span>
+<span class="Comment">    Standard debugging hooks for `malloc'.</span>
+<span class="Comment">    Copyright 1990, 1991, 1992, 1993, 1994 Free Software Foundation, Inc.</span>
+<span class="Comment">    Written May 1989 by Mike Haertel.</span>
+
+<span class="Comment">    This library is free software; you can redistribute it and/or</span>
+<span class="Comment">    modify it under the terms of the GNU Library General Public License as</span>
+<span class="Comment">    published by the Free Software Foundation; either version 2 of the</span>
+<span class="Comment">    License, or (at your option) any later version.</span>
+
+<span class="Comment">    This library is distributed in the hope that it will be useful,</span>
+<span class="Comment">    but WITHOUT ANY WARRANTY; without even the implied warranty of</span>
+<span class="Comment">    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU</span>
+<span class="Comment">    Library General Public License for more details.</span>
+
+<span class="Comment">    You should have received a copy of the GNU Library General Public</span>
+<span class="Comment">    License along with this library; see the file COPYING.LIB.  If</span>
+<span class="Comment">    not, write to the Free Software Foundation, Inc., 675 Mass Ave,</span>
+<span class="Comment">    Cambridge, MA 02139, USA.</span>
+
+<span class="Comment">    The author may be reached (Email) at the address mike@ai.mit.edu,</span>
+<span class="Comment">    or (US mail) as Mike Haertel c/o Free Software Foundation.</span>
+
+<span class="Comment">    Persistent heap modifications by Mark O'Neill (mao@tumblingdice.co.uk)</span>
+<span class="Comment">    (C) 1998-2022 M.A. O'Neill, Tumbling Dice</span>
+<span class="Comment">--------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifndef	_PHMALLOC_INTERNAL</span>
+<span class="PreProc">#define	_PHMALLOC_INTERNAL</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;phmalloc.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stdio.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> _PHMALLOC_INTERNAL </span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Are you experienced? </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+
+_IMPORT <span class="Type">int</span> *__phmalloc_initialized;
+
+
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Old hook values  </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> (*old_free_hook)       __P ((<span class="Type">int</span>, __ptr_t ptr));
+_PRIVATE __ptr_t (*old_malloc_hook)  __P ((<span class="Type">int</span>, __malloc_size_t size, <span class="Type">char</span> *));
+_PRIVATE __ptr_t (*old_realloc_hook) __P ((<span class="Type">int</span>, __ptr_t ptr, __malloc_size_t size, <span class="Type">char</span> *));
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Function to call when something awful happens </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> (*abortfunc) __P ((<span class="Type">enum</span> mcheck_status));
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Arbitrary magical numbers  </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define MAGICWORD	</span><span class="Constant">0xfedabeeb</span>
+<span class="PreProc">#define MAGICFREE	</span><span class="Constant">0xd8675309</span>
+<span class="PreProc">#define MAGICBYTE	((</span><span class="Type">char</span><span class="PreProc">) </span><span class="Constant">0xd7</span><span class="PreProc">)</span>
+<span class="PreProc">#define MALLOCFLOOD	((</span><span class="Type">char</span><span class="PreProc">) </span><span class="Constant">0x93</span><span class="PreProc">)</span>
+<span class="PreProc">#define FREEFLOOD	((</span><span class="Type">char</span><span class="PreProc">) </span><span class="Constant">0x95</span><span class="PreProc">)</span>
+
+<span class="Type">struct</span> hdr
+{
+                                <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+    __malloc_size_t size;	<span class="Comment">/*</span><span class="Comment"> Exact size requested by user.          </span><span class="Comment">*/</span>
+    <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span> magic;	<span class="Comment">/*</span><span class="Comment"> Magic number to check header integrity </span><span class="Comment">*/</span>
+                                <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+};
+
+
+<span class="PreProc">#if defined(_LIBC) || defined(STDC_HEADERS) || defined(USG)</span>
+<span class="PreProc">#define flood memset</span>
+<span class="PreProc">#else</span>
+_PRIVATE <span class="Type">void</span> flood __P ((__ptr_t, <span class="Type">char</span>, __malloc_size_t));
+
+                                                                   <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">void</span> flood (__ptr_t ptr, <span class="Type">char</span> val, __malloc_size_t size)  <span class="Comment">/*</span><span class="Comment"> MAO Was int but char seems more sensible </span><span class="Comment">*/</span>
+                                                                   <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+{
+  <span class="Type">char</span> *cp = ptr;
+  <span class="Statement">while</span>(size--)
+       *cp++ = val;
+}
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> flood memset </span><span class="Comment">*/</span>
+
+
+_PRIVATE <span class="Type">enum</span> mcheck_status checkhdr __P ((<span class="Type">const</span> <span class="Type">struct</span> hdr *));
+_PRIVATE <span class="Type">enum</span> mcheck_status checkhdr (<span class="Type">const</span> <span class="Type">struct</span> hdr *hdr)
+{
+  <span class="Type">enum</span> mcheck_status status;
+  <span class="Statement">switch</span> (hdr-&gt;magic)
+  {      <span class="Statement">default</span>:
+                  status = MCHECK_HEAD;
+                  <span class="Statement">break</span>;
+
+         <span class="Statement">case</span> MAGICFREE:
+                  status = MCHECK_FREE;
+                  <span class="Statement">break</span>;
+
+         <span class="Statement">case</span> MAGICWORD:
+                  <span class="Statement">if</span>(((<span class="Type">char</span> *) &amp;hdr[<span class="Constant">1</span>])[hdr-&gt;size] != MAGICBYTE)
+	             status = MCHECK_TAIL;
+                  <span class="Statement">else</span>
+	             status = MCHECK_OK;
+                  <span class="Statement">break</span>;
+  }
+
+  <span class="Statement">if</span> (status != MCHECK_OK)
+    (*abortfunc) (status);
+
+  <span class="Statement">return</span> status;
+}
+
+
+_PRIVATE <span class="Type">void</span> freehook __P ((<span class="Type">int</span>, __ptr_t));
+_PRIVATE <span class="Type">void</span> freehook (<span class="Type">int</span> hdes, __ptr_t ptr)
+{
+  <span class="Type">struct</span> hdr *hdr = ((<span class="Type">struct</span> hdr *) ptr) - <span class="Constant">1</span>;
+  checkhdr (hdr);
+
+  hdr-&gt;magic = MAGICFREE;
+  flood (ptr, FREEFLOOD, hdr-&gt;size);
+  __phfree_hook = old_free_hook;
+  (<span class="Type">void</span>)phfree (hdes, hdr);
+  __phfree_hook = freehook;
+}
+
+
+_PRIVATE __ptr_t mallochook __P ((<span class="Type">int</span>, __malloc_size_t, <span class="Type">char</span> *));
+_PRIVATE __ptr_t mallochook (<span class="Type">int</span> hdes, __malloc_size_t size, <span class="Type">char</span> *name)
+{
+  <span class="Type">struct</span> hdr *hdr = (<span class="Type">struct</span> hdr *)<span class="Constant">NULL</span>;
+
+  __phmalloc_hook = old_malloc_hook;
+  hdr = (<span class="Type">struct</span> hdr *) phmalloc (hdes, <span class="Statement">sizeof</span> (<span class="Type">struct</span> hdr) + size + <span class="Constant">1</span>, name);
+  __phmalloc_hook = mallochook;
+
+  <span class="Statement">if</span>(hdr == <span class="Constant">NULL</span>)
+     <span class="Statement">return</span> <span class="Constant">NULL</span>;
+
+  hdr-&gt;size                = size;
+  hdr-&gt;magic               = MAGICWORD;
+  ((<span class="Type">char</span> *) &amp;hdr[<span class="Constant">1</span>])[size] = MAGICBYTE;
+
+  flood ((__ptr_t) (hdr + <span class="Constant">1</span>), MALLOCFLOOD, size);
+  <span class="Statement">return</span> (__ptr_t) (hdr + <span class="Constant">1</span>);
+}
+
+
+_PRIVATE __ptr_t reallochook __P ((<span class="Type">int</span>, __ptr_t, __malloc_size_t, <span class="Type">char</span> *));
+_PRIVATE __ptr_t reallochook (<span class="Type">int</span> hdes, __ptr_t ptr, __malloc_size_t size, <span class="Type">char</span> *name)
+{
+  <span class="Type">struct</span> hdr *hdr = ((<span class="Type">struct</span> hdr *) ptr) - <span class="Constant">1</span>;
+  __malloc_size_t osize = hdr-&gt;size;
+
+  checkhdr (hdr);
+  <span class="Statement">if</span> (size &lt; osize)
+    flood ((<span class="Type">char</span> *) ptr + size, FREEFLOOD, osize - size);
+  __phfree_hook    = old_free_hook;
+  __phmalloc_hook  = old_malloc_hook;
+  __phrealloc_hook = old_realloc_hook;
+  hdr              = (<span class="Type">struct</span> hdr *) phrealloc (hdes, (__ptr_t) hdr, <span class="Statement">sizeof</span> (<span class="Type">struct</span> hdr) + size + <span class="Constant">1</span>,name);
+  __phfree_hook = freehook;
+  __phmalloc_hook = mallochook;
+  __phrealloc_hook = reallochook;
+  <span class="Statement">if</span>(hdr == (<span class="Type">struct</span> hdr *)<span class="Constant">NULL</span>)
+    <span class="Statement">return</span> (__ptr_t)<span class="Constant">NULL</span>;
+
+  hdr-&gt;size                 = size;
+  hdr-&gt;magic               = MAGICWORD;
+  ((<span class="Type">char</span> *) &amp;hdr[<span class="Constant">1</span>])[size] = MAGICBYTE;
+  <span class="Statement">if</span>(size &gt; osize)
+    flood ((<span class="Type">char</span> *) (hdr + <span class="Constant">1</span>) + osize, MALLOCFLOOD, size - osize);
+  <span class="Statement">return</span> (__ptr_t) (hdr + <span class="Constant">1</span>);
+}
+
+
+_PRIVATE <span class="Type">void</span> mabort (<span class="Type">enum</span> mcheck_status status)
+{
+  <span class="Type">const</span> <span class="Type">char</span> *msg = (<span class="Type">char</span> *)<span class="Constant">NULL</span>;
+  <span class="Statement">switch</span> (status)
+  {
+      <span class="Statement">case</span> MCHECK_OK:
+                  msg = <span class="Constant">&quot;memory is consistent, library is buggy&quot;</span>;
+                  <span class="Statement">break</span>;
+
+      <span class="Statement">case</span> MCHECK_HEAD:
+                  msg = <span class="Constant">&quot;memory clobbered before allocated block&quot;</span>;
+                  <span class="Statement">break</span>;
+
+      <span class="Statement">case</span> MCHECK_TAIL:
+                  msg = <span class="Constant">&quot;memory clobbered past end of allocated block&quot;</span>;
+                  <span class="Statement">break</span>;
+
+      <span class="Statement">case</span> MCHECK_FREE:
+                  msg = <span class="Constant">&quot;block freed twice&quot;</span>;
+                  <span class="Statement">break</span>;
+
+      <span class="Statement">default</span>:
+                  msg = <span class="Constant">&quot;bogus mcheck_status, library is buggy&quot;</span>;
+                  <span class="Statement">break</span>;
+  }
+
+<span class="PreProc">#ifdef __GNU_LIBRARY__</span>
+  __libc_fatal (msg);
+<span class="PreProc">#else</span>
+  (<span class="Type">void</span>)fprintf (<span class="Constant">stderr</span>, <span class="Constant">&quot;mcheck: </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>, msg);
+  (<span class="Type">void</span>)fflush (<span class="Constant">stderr</span>);
+  abort ();
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> __GNU_LIBRARY__ </span><span class="Comment">*/</span>
+
+}
+
+
+_PRIVATE <span class="Type">int</span> mcheck_used = <span class="Constant">0</span>;
+
+_PUBLIC <span class="Type">int</span> mcheck (<span class="Type">void</span> (*func) __P ((<span class="Type">enum</span> mcheck_status)))
+{
+  abortfunc = (func != <span class="Constant">NULL</span>) ? func : &amp;mabort;
+
+
+  <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> These hooks may not be safely inserted if malloc is already in use </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+  <span class="Statement">if</span> (!__phmalloc_initialized &amp;&amp; !mcheck_used)
+  {
+      old_free_hook    = __phfree_hook;
+      __phfree_hook    = freehook;
+      old_malloc_hook  = __phmalloc_hook;
+      __phmalloc_hook  = mallochook;
+      old_realloc_hook = __phrealloc_hook;
+      __phrealloc_hook = reallochook;
+      mcheck_used      = <span class="Constant">1</span>;
+  }
+
+  <span class="Statement">return</span> mcheck_used ? <span class="Constant">0</span> : -<span class="Constant">1</span>;
+}
+
+_PUBLIC <span class="Type">enum</span> mcheck_status mprobe (__ptr_t ptr)
+{
+  <span class="Statement">return</span> mcheck_used ? checkhdr (ptr) : MCHECK_DISABLED;
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

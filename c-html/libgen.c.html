@@ -1,0 +1,353 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/libgen.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------------</span>
+<span class="Comment">     Purpose: Generate a library stub from skeleton library template.</span>
+
+<span class="Comment">     Author:  M.A. O'Neill</span>
+<span class="Comment">              Tumbling Dice Ltd</span>
+<span class="Comment">              Gosforth</span>
+<span class="Comment">              Newcastle upon Tyne</span>
+<span class="Comment">              NE3 4RT</span>
+<span class="Comment">              United Kingdom</span>
+
+<span class="Comment">     Version: 2.01</span>
+<span class="Comment">     Dated:   24th May 2022</span>
+<span class="Comment">     E-mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">---------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;stdio.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stdlib.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;xtypes.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;bsd/string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stdlib.h&gt;</span>
+
+<span class="PreProc">#ifdef HAVE_READLINE</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;readline/readline.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;readline/history.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> HAVE_READLINE </span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Version of libgen </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define LIBGEN_VERSION   </span><span class="Constant">&quot;2.01&quot;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> String size </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define SSIZE            </span><span class="Constant">2048</span><span class="PreProc"> </span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Default base path </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifndef DEFAULT_BASEPATH</span>
+<span class="PreProc">#define DEFAULT_BASEPATH    </span><span class="Constant">&quot;./&quot;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> DEFAULT_BASEPATH </span><span class="Comment">*/</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------------</span>
+<span class="Comment">    Strip control characters from string ...</span>
+<span class="Comment">---------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> strstrp(<span class="Type">char</span> *s_in, <span class="Type">char</span> *s_out)
+
+{   <span class="Type">int</span> i,
+        cnt = <span class="Constant">0</span>;
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;strlen(s_in); ++i)
+    {  <span class="Statement">if</span>(s_in[i] == <span class="Special">'\n'</span> || s_in[i] == <span class="Special">'\r'</span>)
+          ++i;
+
+       <span class="Statement">if</span>(s_in[i] == <span class="Special">'\''</span>)
+          s_in[i] = <span class="Constant">','</span>;
+
+       s_out[cnt++] = s_in[i];
+    }
+
+    s_out[cnt] = <span class="Special">'\0'</span>;
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------------</span>
+<span class="Comment">    Read input (with line editing if supported) ...</span>
+<span class="Comment">---------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> read_line(<span class="Type">char</span> *line, <span class="Type">char</span> *prompt)
+
+{   <span class="Type">char</span> *tmp_line = (<span class="Type">char</span> *)<span class="Constant">NULL</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Line must be alpha-numeric characters </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">do</span> {
+
+<span class="PreProc">          #ifdef HAVE_READLINE</span>
+          tmp_line = readline(prompt);
+<span class="PreProc">          #else</span>
+          tmp_line = (<span class="Type">char</span> *)malloc(SSIZE);
+          (<span class="Type">void</span>)write(<span class="Constant">1</span>,prompt,<span class="Statement">sizeof</span>(prompt));
+          (<span class="Type">void</span>)read(<span class="Constant">0</span>,tmp_line,SSIZE);
+<span class="PreProc">          #endif</span> <span class="Comment">/*</span><span class="Comment"> HAVE_READLINE </span><span class="Comment">*/</span>
+
+          (<span class="Type">void</span>)sscanf(tmp_line,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">&quot;</span>,line);
+
+
+          <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Reserved words &quot;q&quot; and &quot;quit&quot; exit application </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">------------------------------------------------</span><span class="Comment">*/</span>
+
+          <span class="Statement">if</span>(strcmp(line,<span class="Constant">&quot;q&quot;</span>) == <span class="Constant">0</span> || strcmp(line,<span class="Constant">&quot;quit&quot;</span>) == <span class="Constant">0</span>)
+             exit(<span class="Constant">1</span>);
+
+        } <span class="Statement">while</span>(strcmp(line,<span class="Constant">&quot;&quot;</span>) == <span class="Constant">0</span>);
+
+    (<span class="Type">void</span>)free(tmp_line);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------------</span>
+<span class="Comment">    Main entry point to process ...</span>
+<span class="Comment">---------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> main(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   <span class="Type">char</span> tmpstr[SSIZE]            = <span class="Constant">&quot;&quot;</span>,
+         functype[SSIZE]          = <span class="Constant">&quot;&quot;</span>,
+         lib_skelplib[SSIZE]      = <span class="Constant">&quot;&quot;</span>,
+         lib_func_skelplib[SSIZE] = <span class="Constant">&quot;&quot;</span>,
+         lib_name[SSIZE]          = <span class="Constant">&quot;&quot;</span>,
+         lib_func_name[SSIZE]     = <span class="Constant">&quot;&quot;</span>,
+         purpose[SSIZE]           = <span class="Constant">&quot;&quot;</span>,
+         libdes[SSIZE]            = <span class="Constant">&quot;&quot;</span>,
+         author[SSIZE]            = <span class="Constant">&quot;&quot;</span>,
+         author_email[SSIZE]      = <span class="Constant">&quot;&quot;</span>,
+         date[SSIZE]              = <span class="Constant">&quot;&quot;</span>,
+         institution[SSIZE]       = <span class="Constant">&quot;&quot;</span>,
+         sed_skelplib[SSIZE]      = <span class="Constant">&quot;&quot;</span>,
+         sed_make_skelplib[SSIZE] = <span class="Constant">&quot;&quot;</span>,
+         sed_cmd[SSIZE]           = <span class="Constant">&quot;&quot;</span>,
+         sed_cmds[SSIZE]          = <span class="Constant">&quot;sed '&quot;</span>;
+
+    _BOOLEAN lib_init             = FALSE;
+
+    <span class="Statement">if</span>(argc == <span class="Constant">1</span> || argc == <span class="Constant">2</span> &amp;&amp; (strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;-usage&quot;</span>) == <span class="Constant">0</span> || strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;-help&quot;</span>) == <span class="Constant">0</span>))
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">PUPS/P3 Library function generator version </span><span class="Special">%s</span><span class="Constant"> (C) Tumbling Dice, 2002-2022 (built </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,LIBGEN_VERSION,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Usage: libgen [skeleton LIB file | skeleton LIB function file]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;LIBGEN is free software, covered by the GNU General Public License, and you are</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;welcome to change it and/or distribute copies of it under certain conditions.</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;See the GPL and LGPL licences at www.gnu.org for further details</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;LIBGEN comes with ABSOLUTELY NO WARRANTY</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Base path is: </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n\n</span><span class="Constant">&quot;</span>,DEFAULT_BASEPATH);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       exit(<span class="Constant">255</span>);
+    }
+    <span class="Statement">else</span> <span class="Statement">if</span>(argc &gt;= <span class="Constant">2</span>)
+    {
+
+       <span class="Statement">if</span>(strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;init&quot;</span>) == <span class="Constant">0</span>)
+       {  lib_init = TRUE;
+          <span class="Statement">if</span>(argc &gt; <span class="Constant">2</span>)
+          {  (<span class="Type">void</span>)strlcpy(lib_skelplib,argv[<span class="Constant">2</span>],SSIZE);
+             (<span class="Type">void</span>)strlcpy(lib_func_skelplib,argv[<span class="Constant">3</span>],SSIZE);
+          }
+          <span class="Statement">else</span> <span class="Statement">if</span>((<span class="Type">char</span> *)getenv(<span class="Constant">&quot;PUPS_SKELLIB&quot;</span>) != (<span class="Type">char</span> *)<span class="Constant">NULL</span> &amp;&amp; (<span class="Type">char</span> *)getenv(<span class="Constant">&quot;PUPS_SKELLIBFUNC&quot;</span>) != (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+          {  (<span class="Type">void</span>)strlcpy(lib_skelplib,(<span class="Type">char</span> *)getenv(<span class="Constant">&quot;PUPS_SKELLIB&quot;</span>),SSIZE);
+             (<span class="Type">void</span>)strlcpy(lib_func_skelplib,(<span class="Type">char</span> *)getenv(<span class="Constant">&quot;PUPS_SKELLIBFUNC&quot;</span>),SSIZE);
+          }
+          <span class="Statement">else</span>
+          {  (<span class="Type">void</span>)snprintf(lib_skelplib,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/lib_skel.c&quot;</span>         ,DEFAULT_BASEPATH,argv[<span class="Constant">2</span>]);
+             (<span class="Type">void</span>)snprintf(lib_func_skelplib,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/lib_skelfunc.c&quot;</span>,DEFAULT_BASEPATH,argv[<span class="Constant">3</span>]);
+          }
+       }
+       <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;add&quot;</span>) == <span class="Constant">0</span>)
+       {  <span class="Statement">if</span>(argc &gt; <span class="Constant">2</span>)
+             (<span class="Type">void</span>)strlcpy(lib_func_skelplib,argv[<span class="Constant">2</span>],SSIZE);
+          <span class="Statement">else</span> <span class="Statement">if</span>((<span class="Type">char</span> *)getenv(<span class="Constant">&quot;PUPS_SKELFUNC&quot;</span>) != (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+             (<span class="Type">void</span>)strlcpy(lib_func_skelplib,(<span class="Type">char</span> *)getenv(<span class="Constant">&quot;PUPS_SKELLIBFUNC&quot;</span>),SSIZE);
+          <span class="Statement">else</span>
+             (<span class="Type">void</span>)snprintf(lib_func_skelplib,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/lib_skelfunc.c&quot;</span>,DEFAULT_BASEPATH);
+
+          lib_init = FALSE;
+       }
+       <span class="Statement">else</span>
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">libgen: </span><span class="Special">\&quot;</span><span class="Constant">init</span><span class="Special">\&quot;</span><span class="Constant"> or </span><span class="Special">\&quot;</span><span class="Constant">add</span><span class="Special">\&quot;</span><span class="Constant"> expected</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+          exit(<span class="Constant">255</span>);
+       }
+    }
+    <span class="Statement">else</span>
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">PUPS/P3 LIB generator version </span><span class="Special">%s</span><span class="Constant">, (C) Tumbling Dice, 2022 (built </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">)1</span><span class="Special">\n</span><span class="Constant">&quot;</span>,LIBGEN_VERSION,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Usage: libgen [skeleton library file]  [skeleton library function file]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;LIBGEN is free software, covered by the GNU General Public License, and you are</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;welcome to change it and/or distribute copies of it under certain conditions.</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;See the GPL and LGPL licences at www.gnu.org for further details</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;LIBGEN comes with ABSOLUTELY NO WARRANTY</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       exit(<span class="Constant">255</span>);
+    }
+
+    <span class="Statement">if</span>(lib_init == TRUE &amp;&amp; access(lib_skelplib,F_OK | R_OK | W_OK) == (-<span class="Constant">1</span>))
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">libgen: cannot find skeleton LIB template file </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n\n</span><span class="Constant">&quot;</span>,lib_skelplib);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       exit(<span class="Constant">255</span>);
+    }
+
+    <span class="Statement">if</span>(access(lib_func_skelplib,F_OK | R_OK | W_OK) == (-<span class="Constant">1</span>))
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">libgen: cannot find skeleton LIB function template file </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n\n</span><span class="Constant">&quot;</span>,lib_func_skelplib);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       exit(<span class="Constant">255</span>);
+    }
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">PUPS/P3 LIB template generator version </span><span class="Special">%s</span><span class="Constant"> (C) M.A. O'Neill, Tumbling Dice, 2022</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,LIBGEN_VERSION);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+    (<span class="Type">void</span>)read_line(lib_name,<span class="Constant">&quot;libgen (LIB name)&gt; &quot;</span>);
+    (<span class="Type">void</span>)strstrp(lib_name,tmpstr);
+    (<span class="Type">void</span>)strlcpy(lib_name,tmpstr,SSIZE);
+
+    <span class="Statement">if</span>(lib_init == FALSE)
+    {  <span class="Type">char</span> filestr[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+       (<span class="Type">void</span>)snprintf(filestr,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">.c&quot;</span>,tmpstr);
+       <span class="Statement">if</span>(access(filestr,F_OK | R_OK | W_OK) == (-<span class="Constant">1</span>))
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">libgen: specific template </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> not found</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,filestr);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+          exit(<span class="Constant">255</span>);
+       }
+    }
+    <span class="Statement">else</span>
+    {  (<span class="Type">void</span>)strlcpy(sed_cmds,<span class="Constant">&quot;&quot;</span>,SSIZE);
+       (<span class="Type">void</span>)snprintf(sed_cmd,SSIZE,<span class="Constant">&quot;'s/@LIBNAME/</span><span class="Special">%s</span><span class="Constant">/g; &quot;</span>,tmpstr);
+       (<span class="Type">void</span>)strlcat(sed_cmds,sed_cmd,SSIZE);
+
+       (<span class="Type">void</span>)read_line(purpose,<span class="Constant">&quot;libgen (purpose of LIB)&gt; &quot;</span>);
+       (<span class="Type">void</span>)strstrp(purpose,tmpstr);
+       (<span class="Type">void</span>)snprintf(sed_cmd,SSIZE,<span class="Constant">&quot;s/@PURPOSE/</span><span class="Special">%s</span><span class="Constant">/g; &quot;</span>,tmpstr);
+       (<span class="Type">void</span>)strlcat(sed_cmds,sed_cmd,SSIZE);
+
+       (<span class="Type">void</span>)read_line(author,<span class="Constant">&quot;libgen (Author)&gt; &quot;</span>);
+       (<span class="Type">void</span>)strstrp(author,tmpstr);
+       (<span class="Type">void</span>)snprintf(sed_cmd,SSIZE,<span class="Constant">&quot;s/@AUTHOR/</span><span class="Special">%s</span><span class="Constant">/g; &quot;</span>,tmpstr);
+       (<span class="Type">void</span>)strlcat(sed_cmds,sed_cmd,SSIZE);
+
+       (<span class="Type">void</span>)read_line(author_email,<span class="Constant">&quot;libgen (Author email)&gt; &quot;</span>);
+       (<span class="Type">void</span>)strstrp(author_email,tmpstr);
+       (<span class="Type">void</span>)snprintf(sed_cmd,SSIZE,<span class="Constant">&quot;s/@EMAIL/</span><span class="Special">%s</span><span class="Constant">/g; &quot;</span>,tmpstr);
+       (<span class="Type">void</span>)strlcat(sed_cmds,sed_cmd,SSIZE);
+
+       (<span class="Type">void</span>)read_line(institution,<span class="Constant">&quot;libgen (Author institution)&gt; &quot;</span>);
+       (<span class="Type">void</span>)strstrp(institution,tmpstr);
+       (<span class="Type">void</span>)snprintf(sed_cmd,SSIZE,<span class="Constant">&quot;s/@INSTITUTION/</span><span class="Special">%s</span><span class="Constant">/g; &quot;</span>,tmpstr);
+       (<span class="Type">void</span>)strlcat(sed_cmds,sed_cmd,SSIZE);
+
+       (<span class="Type">void</span>)read_line(date,<span class="Constant">&quot;libgen (Date)&gt; &quot;</span>);
+       (<span class="Type">void</span>)strstrp(date,tmpstr);
+       (<span class="Type">void</span>)snprintf(sed_cmd,SSIZE,<span class="Constant">&quot;s/@DATE/</span><span class="Special">%s</span><span class="Constant">/g; '&quot;</span>,tmpstr);
+       (<span class="Type">void</span>)strlcat(sed_cmds,sed_cmd,SSIZE);
+
+       (<span class="Type">void</span>)snprintf(sed_skelplib,SSIZE,<span class="Constant">&quot;sed </span><span class="Special">%s</span><span class="Constant"> &lt; </span><span class="Special">%s</span><span class="Constant"> &gt; </span><span class="Special">%s</span><span class="Constant">.c&quot;</span>,sed_cmds,lib_skelplib,lib_name);
+
+       <span class="Statement">if</span>(system(sed_skelplib) == (-<span class="Constant">1</span>))
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">libgen: failed to execute stream editor (sed) command</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+          exit(<span class="Constant">255</span>);
+       }
+    }
+
+    (<span class="Type">void</span>)read_line(lib_func_name,<span class="Constant">&quot;libgen (LIB function name)&gt; &quot;</span>);
+    (<span class="Type">void</span>)strstrp(lib_func_name,tmpstr);
+    (<span class="Type">void</span>)strlcpy(lib_func_name,tmpstr,SSIZE);
+    (<span class="Type">void</span>)snprintf(sed_cmd,SSIZE,<span class="Constant">&quot;'s/@LIB_FUNC_NAME/</span><span class="Special">%s</span><span class="Constant">/g; &quot;</span>,tmpstr);
+    (<span class="Type">void</span>)strlcpy(sed_cmds,<span class="Constant">&quot;&quot;</span>,SSIZE);
+    (<span class="Type">void</span>)strlcat(sed_cmds,sed_cmd,SSIZE);
+
+    (<span class="Type">void</span>)read_line(libdes,<span class="Constant">&quot;libgen (Description of library function&gt; &quot;</span>);
+    (<span class="Type">void</span>)strstrp(lib_func_name,tmpstr);
+    (<span class="Type">void</span>)strstrp(libdes,tmpstr);
+    (<span class="Type">void</span>)snprintf(sed_cmd,SSIZE,<span class="Constant">&quot;s/@LIBDES/</span><span class="Special">%s</span><span class="Constant">/g; &quot;</span>,tmpstr);
+    (<span class="Type">void</span>)strlcat(sed_cmds,sed_cmd,SSIZE);
+    (<span class="Type">void</span>)snprintf(sed_skelplib,SSIZE,<span class="Constant">&quot;sed </span><span class="Special">%s</span><span class="Constant"> &lt; </span><span class="Special">%s</span><span class="Constant"> &gt;&gt; </span><span class="Special">%s</span><span class="Constant">.c&quot;</span>,sed_cmds,lib_func_skelplib,lib_name);
+
+    <span class="Statement">do</span> {    (<span class="Type">void</span>)read_line(functype,<span class="Constant">&quot;libgen (Library function type&gt; &quot;</span>);
+       } <span class="Statement">while</span>(strcmp(functype,<span class="Constant">&quot;_PRIVATE&quot;</span>) != <span class="Constant">0</span> &amp;&amp; strcmp(functype,<span class="Constant">&quot;_PUBLIC&quot;</span>) != <span class="Constant">0</span>);
+
+    (<span class="Type">void</span>)strstrp(functype,tmpstr);
+    (<span class="Type">void</span>)strstrp(libdes,tmpstr);
+    (<span class="Type">void</span>)snprintf(sed_cmd,SSIZE,<span class="Constant">&quot;s/@FTYPE/</span><span class="Special">%s</span><span class="Constant">/g; '&quot;</span>,tmpstr);
+    (<span class="Type">void</span>)strlcat(sed_cmds,sed_cmd,SSIZE);
+    (<span class="Type">void</span>)snprintf(sed_skelplib,SSIZE,<span class="Constant">&quot;sed </span><span class="Special">%s</span><span class="Constant"> &lt; </span><span class="Special">%s</span><span class="Constant"> &gt;&gt; </span><span class="Special">%s</span><span class="Constant">.c&quot;</span>,sed_cmds,lib_func_skelplib,lib_name);
+
+    <span class="Statement">if</span>(system(sed_skelplib) == (-<span class="Constant">1</span>))
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">libgen: failed to execute stream editor (sed) command</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       exit(<span class="Constant">255</span>);
+    }
+
+    <span class="Statement">if</span>(lib_init == TRUE)
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">Library function template </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> appended to </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Constant">.c</span><span class="Special">\&quot;</span><span class="Constant"> (</span><span class="Special">%s</span><span class="Constant">.c initialised)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,
+                                                            lib_func_name,lib_name,lib_name,lib_name);
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">Lbrary function template </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> appended to </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Constant">.c</span><span class="Special">\&quot;\n\n</span><span class="Constant">&quot;</span>,lib_func_name,lib_name);
+
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    exit(<span class="Constant">0</span>);
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

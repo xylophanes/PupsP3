@@ -9,7 +9,7 @@ BUILD_PUPSP3 \- build and install PUPSP3 environment from PUPSP3 source tree.
 .I [usage | --usage] 
 .I [vanilla | cluster]
 .I [logfile]
->& <log file>
+[2> <log file>]
 .br
 
 .SH DESCRIPTION
@@ -48,6 +48,22 @@ specifies the file to which comipliation logs are to be written. Bt default the 
 is specified, the log infromation is written to the termninal. If
 .B filename
 is specified, it is written to that file.
+.br
+
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
+.br
+
+.SH ENVIRONMENTAL VARIABLES
+none.
 .br
 
 .SH COPYRIGHT

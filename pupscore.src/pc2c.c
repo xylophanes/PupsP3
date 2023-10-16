@@ -1,6 +1,6 @@
 /*-------------------------------------------------------------------------------------------
     Purpose: automatic (POSIX) threading of sources which are written to comply with
-             PUPS semantics.
+             PUPS semantics (impemnted as a C pre-processor).
 
     Author:  M.A. O'Neill
              Tumbling Dice Ltd
@@ -9,13 +9,14 @@
              NE3 4RT
              United Kingdom
 
-    Version: 2.00 
-    Dated:   30th August 2019 
+    Version: 2.01 
+    Dated:   24th May 2022
     E-mail:  mao@tumblingdice.co.uk
 -------------------------------------------------------------------------------------------*/
 
 #include <stdio.h>
 #include <string.h>
+#include <bsd/string.h>
 #include <stdlib.h>
 #include <xtypes.h>
 
@@ -29,7 +30,7 @@
 /* Version of pc2c */
 /*-----------------*/
 
-#define PC2C_VERSION   "2.00"
+#define PC2C_VERSION   "2.01"
 
 
 /*-------------*/
@@ -42,109 +43,6 @@
 #define UP             1
 #define DOWN           (-1)
 #define MTABLE_SIZE    256
-
-
-
-
-
-/*-------------------------------------------------------------------------------------------
-    Functions which are private to this application ...
--------------------------------------------------------------------------------------------*/
-
-
-#ifdef BSD_FUNCTION_SUPPORT
-/*-------------------------------------------------------------------------------------------
-    Strlcpy and stlcat function based on OpenBSD functions ...
--------------------------------------------------------------------------------------------*/
-/*------------------*/
-/* Open BSD Strlcat */
-/*------------------*/
-_PRIVATE size_t strlcat(char *dst, const char *src, size_t dsize)
-{
-	const char *odst = dst;
-	const char *osrc = src;
-	size_t      n    = dsize;
-	size_t      dlen;
-
-
-        /*------------------------------------------------------------------*/
-	/* Find the end of dst and adjust bytes left but don't go past end. */
-        /*------------------------------------------------------------------*/
-
-	while (n-- != 0 && *dst != '\0')
-		dst++;
-	dlen = dst - odst;
-	n = dsize - dlen;
-
-	if (n-- == 0)
-		return(dlen + strlen(src));
-	while (*src != '\0') {
-		if (n != 0) {
-			*dst++ = *src;
-			n--;
-		}
-		src++;
-	}
-	*dst = '\0';
-
-
-        /*----------------------------*/
-        /* count does not include NUL */
-        /*----------------------------*/
-
-	return(dlen + (src - osrc));
-}
-
-
-
-
-/*------------------*/
-/* Open BSD strlcpy */
-/*------------------*/
-
-_PRIVATE size_t strlcpy(char *dst, const char *src, size_t dsize)
-{
-	const char   *osrc = src;
-	size_t nleft       = dsize;
-
-
-        /*---------------------------------*/
-	/* Copy as many bytes as will fit. */
-        /*---------------------------------*/
-
-	if (nleft != 0) {
-		while (--nleft != 0) {
-			if ((*dst++ = *src++) == '\0')
-				break;
-		}
-	}
-
-
-        /*-----------------------------------------------------------*/
-	/* Not enough room in dst, add NUL and traverse rest of src. */
-        /*-----------------------------------------------------------*/
-
-	if (nleft == 0) {
-		if (dsize != 0)
-
-                        /*-------------------*/
-                        /* NUL-terminate dst */
-                        /*-------------------*/
-
-			*dst = '\0';
-		while (*src++)
-			;
-	}
-
-
-        /*----------------------------*/
-        /* count does not include NUL */
-        /*----------------------------*/
-
-	return(src - osrc - 1);
-}
-#endif /* BSD_FUNCTION_SUPPORT */
-
 
 
 
@@ -310,7 +208,7 @@ _PUBLIC int main(int argc, char *argv[])
     char arglist[32][SSIZE] = { "" };
 
     (void)fprintf(stderr,"\nPUPS parallel C  to C translation tool version %s\n",PC2C_VERSION);
-    (void)fprintf(stderr,"(C) Tumbling Dice, 2006-2019 (built %s %s)\n\n",__TIME__,__DATE__);
+    (void)fprintf(stderr,"(C) Tumbling Dice, 2006-2022 (built %s %s)\n\n",__TIME__,__DATE__);
 
     if(isatty(0) == 1 || isatty(1) == 1)
     {  (void)fprintf(stderr,"Usage: pc2c < <input PUPS parallel C file> > <output C file>\n\n");
@@ -321,7 +219,7 @@ _PUBLIC int main(int argc, char *argv[])
        (void)fprintf(stderr,"See the GPL and LGPL licences at www.gnu.org for further details\n");
        (void)fprintf(stderr,"PC2C comes with ABSOLUTELY NO WARRANTY\n\n");
 
-       exit(-1);
+       exit(255);
     }
 
     init_mtable();
@@ -379,7 +277,7 @@ next_line: (void)fgets(line,SSIZE,stdin);
            {  (void)fprintf(stderr,"%d: PUPS-C syntax error: %s\n",l_cnt,rstrpch(line,'\n'));
               (void)fflush(stderr);
 
-              exit(-1);
+              exit(255);
            }           
 
 
@@ -478,7 +376,7 @@ next_line: (void)fgets(line,SSIZE,stdin);
            {  (void)fprintf(stderr,"%d: PUPS-C syntax error: %s\n",l_cnt,rstrpch(line,'\n'));
               (void)fflush(stderr);
 
-              exit(-1);
+              exit(255);
            }           
 
 
@@ -499,7 +397,7 @@ next_line: (void)fgets(line,SSIZE,stdin);
               {  (void)fprintf(stderr,"%d: PUPS-C syntax error: %s\n",l_cnt,rstrpch(line,'\n'));
                  (void)fflush(stderr);
 
-                 exit(-1);
+                 exit(255);
               }
            }
 
@@ -512,7 +410,7 @@ next_line: (void)fgets(line,SSIZE,stdin);
            {  (void)fprintf(stderr,"%d: PUPS-C syntax error: %s\n",l_cnt,rstrpch(line,'\n'));
               (void)fflush(stderr);
 
-              exit(-1);
+              exit(255);
            }
 
 
@@ -566,7 +464,7 @@ next_line: (void)fgets(line,SSIZE,stdin);
                  {  (void)fprintf(stderr,"%d: PUPS-C syntax error: %s\n",l_cnt,rstrpch(line,'\n'));
                     (void)fflush(stderr);
 
-                    exit(-1);
+                    exit(255);
                  }
               }
 
@@ -757,7 +655,7 @@ _PRIVATE _BOOLEAN is_function_head(char *line)
     {  (void)fprintf(stderr,"%d: ANSI PUPS-C syntax error %s\n",l_cnt,rstrpch(line,'\n'));
        (void)fflush(stderr);
 
-       exit(-1);
+       exit(255);
     }
 
 
@@ -796,7 +694,7 @@ _PRIVATE _BOOLEAN is_function_head(char *line)
        {  (void)fprintf(stderr,"%d: PUPS parallel C syntax error %s\n",h_cnt,rstrpch(f_head_line,'\n'));
           (void)fflush(stderr);
 
-          exit(-1);
+          exit(255);
        }
 
 
@@ -822,7 +720,7 @@ _PRIVATE _BOOLEAN is_function_head(char *line)
           {  (void)fprintf(stderr,"%d: PUPS-C syntax error %s\n",h_cnt,rstrpch(f_head_line,'\n'));
              (void)fflush(stderr);
 
-             exit(-1);
+             exit(255);
           }
        }
 
@@ -867,7 +765,7 @@ _PRIVATE _BOOLEAN is_function_head(char *line)
           {  (void)fprintf(stderr,"%d: PUPS-C syntax error %s\n",l_cnt,rstrpch(line,'\n'));
              (void)fflush(stderr);
 
-             exit(-1);
+             exit(255);
           }
 
           if(fname[0] == '*')
@@ -958,7 +856,7 @@ _PRIVATE _BOOLEAN is_function_head(char *line)
                             {  (void)fprintf(stderr,"%d: PUPS-C syntax error: %s\n",h_cnt,rstrpch(f_head_line,'\n'));
                                (void)fflush(stderr);
 
-                               exit(-1);
+                               exit(255);
                             } 
 
                             is_rootthreaded   = FALSE;
@@ -1004,7 +902,7 @@ _PRIVATE _BOOLEAN is_function_head(char *line)
                             {  (void)fprintf(stderr,"%d: PUPS-C syntax error: %s\n",h_cnt,rstrpch(f_head_line,'\n'));
                                (void)fflush(stderr);
 
-                               exit(-1);
+                               exit(255);
                             } 
 
                             if((n_bras = nbras(stripped_line)) == 0)
@@ -1025,7 +923,7 @@ _PRIVATE _BOOLEAN is_function_head(char *line)
                {  (void)fprintf(stderr,"%d: PUPS-C syntax error: %s\n",h_cnt,rstrpch(f_head_line,'\n'));
                   (void)fflush(stderr);
 
-                  exit(-1);
+                  exit(255);
                }
 
 
@@ -1037,7 +935,7 @@ _PRIVATE _BOOLEAN is_function_head(char *line)
                {  (void)fprintf(stderr,"%d: PUPS-C syntax error: %s\n",l_cnt,rstrpch(line,'\n'));
                   (void)fflush(stderr);
 
-                  exit(-1);
+                  exit(255);
                }
 
 
@@ -1075,7 +973,7 @@ _PRIVATE _BOOLEAN is_function_head(char *line)
                           {  (void)fprintf(stderr,"Premature end of file\n");
                              (void)fflush(stderr);
 
-                             exit(-1);
+                             exit(255);
                           }
 
                           n_bras = nbras(stripped_line);
@@ -1559,7 +1457,7 @@ _PRIVATE _BOOLEAN defined(char *mutex)
     {  (void)fprintf(stderr,"pc2c: mutex table full (max %d user defined mutexes)\n",MTABLE_SIZE);
        (void)fflush(stderr);
 
-       exit(-1);
+       exit(255);
     }
 
 
@@ -1665,7 +1563,7 @@ _PRIVATE void skip_pre_substituted_text(char *line)
                {  (void)fprintf(stderr,"%d: PUPS-C syntax error: %s\n",l_cnt,rstrpch(line,'\n'));
                   (void)fflush(stderr);
 
-                  exit(-1);
+                  exit(255);
                }
 
 
@@ -2061,7 +1959,7 @@ _PRIVATE void tkey_transform(char *line)
     {  (void)fprintf(stderr,"%d: PUPS-C syntax error: %s\n",l_cnt,rstrpch(line,'\n'));
        (void)fflush(stderr);
 
-       exit(-1);
+       exit(255);
     }
 
 
@@ -2108,7 +2006,7 @@ _PRIVATE void tkey_bind_transform(char *line)
     {  (void)fprintf(stderr,"%d: PUPS-C syntax error: %s\n",l_cnt,rstrpch(line,'\n'));
        (void)fflush(stderr);
 
-       exit(-1);
+       exit(255);
     }
 
     (void)fprintf(stdout,"\n\n/*>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>*/\n");
@@ -2140,7 +2038,7 @@ _PRIVATE void tkey_free_transform(char *line)
     {  (void)fprintf(stderr,"%d: PUPS-C syntax error: %s\n",l_cnt,rstrpch(line,'\n'));
        (void)fflush(stderr);
 
-       exit(-1);
+       exit(255);
     }
 
     (void)fprintf(stdout,"\n\n/*>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>*/\n");
@@ -2170,7 +2068,7 @@ _PRIVATE void use_fmutex_define(char *line)
     {  (void)fprintf(stderr,"%d: PUPS-C syntax error: %s\n",l_cnt,rstrpch(line,'\n'));
        (void)fflush(stderr);
 
-       exit(-1);
+       exit(255);
     }
 
 
@@ -2209,7 +2107,7 @@ _PRIVATE void default_fmutex_define(char *line)
     {  (void)fprintf(stderr,"%d: PUPS-C syntax error: %s\n",l_cnt,rstrpch(line,'\n'));
        (void)fflush(stderr);
 
-       exit(-1);
+       exit(255);
     }
 
     if(strcmp(arglist[0],"inbuilt") == 0)

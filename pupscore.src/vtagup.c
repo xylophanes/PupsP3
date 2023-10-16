@@ -9,7 +9,7 @@
              United Kingdom
 
     Version: 2.02
-    Dated:   18th September 2019 
+    Dated:   4th January 2022
     E-mail:  mao@tumblingdice.co.uk
 -----------------------------------------------------------------------------*/
 
@@ -63,7 +63,7 @@ int main(int argc, char *argv[])
     struct   stat buf;
 
     if(argc < 3 || argc > 5 || strcmp(argv[1],"-help") == 0)
-    {  (void)fprintf(stderr,"\nvtagup version %s, (C) Tumbling Dice 2000-2019 (built %s %s)\n\n",VTAGUP_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nvtagup version %s, (C) Tumbling Dice 2000-2022 (built %s %s)\n\n",VTAGUP_VERSION,__TIME__,__DATE__);
        (void)fprintf(stderr,"VTAGUP is free software, covered by the GNU General Public License, and you are\n");
        (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
        (void)fprintf(stderr,"See the GPL and LGPL licences at www.gnu.org for further details\n");
@@ -80,7 +80,7 @@ int main(int argc, char *argv[])
        {  (void)fprintf(stderr,"\nvtagup: expecting build tag value\n\n");
           (void)fflush(stderr);
 
-          exit(-1);
+          exit(255);
        }
 
        cnt += 2;
@@ -90,7 +90,7 @@ int main(int argc, char *argv[])
     {  (void)fprintf(stderr,"vtagup: cannot open %s\n",argv[cnt + 2]);
        (void)fflush(stderr);
 
-       exit(-1);
+       exit(255);
     }
       
     (void)stat(argv[cnt + 2],&buf);
@@ -99,7 +99,7 @@ int main(int argc, char *argv[])
        (void)fflush(stderr);
 
        (void)fclose(stream);
-       exit(-1);
+       exit(255);
     }
 
     while(1)
@@ -111,7 +111,7 @@ int main(int argc, char *argv[])
            (void)fflush(stderr);
 
            (void)fclose(stream);
-           exit(-1);
+           exit(255);
         }
 
 

@@ -1,0 +1,1411 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/tadlib.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------</span>
+<span class="Comment">    Purpose: thread and DLL support for PUPS environment</span>
+
+<span class="Comment">    Author:  M.A. O'Neill</span>
+<span class="Comment">             Tumbling Dice Ltd</span>
+<span class="Comment">             Gosforth</span>
+<span class="Comment">             Newcastle upon Tyne</span>
+<span class="Comment">             NE3 4RT</span>
+<span class="Comment">             United Kingdom</span>
+
+<span class="Comment">    Version: 2.00 </span>
+<span class="Comment">    Dated:   4th January 2022</span>
+<span class="Comment">    E-mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> If we have OpenMP support then we also have pthread support </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> (OpenMP is built on pthreads for Linux distributions).      </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#if defined(_OPENMP) &amp;&amp; !defined(PTHREAD_SUPPORT)</span>
+<span class="PreProc">#define PTHREAD_SUPPORT</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef PTHREAD_SUPPORT </span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;me.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;utils.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;psrp.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;errno.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/types.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;signal.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;syscall.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Get signal mapping appropriate to OS and hardware architecture </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define __DEFINE__</span>
+<span class="PreProc">#if defined(I386) || defined (X86_64)</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sig.linux.x86.h&gt;</span>
+<span class="PreProc">#endif</span>
+
+<span class="PreProc">#ifdef ARMV6L</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sig.linux.arm.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> ARMV6L </span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef ARMV7L</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sig.linux.arm.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> ARMV7L </span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef AARCH64</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sig.linux.arm.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> AARCH64 </span><span class="Comment">*/</span>
+
+<span class="PreProc">#undef   __NOT_LIB_SOURCE__</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;tad.h&gt;</span>
+<span class="PreProc">#define  __NOT_LIB_SOURCE__</span>
+<span class="PreProc">#undef __DEFINE__</span>
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------</span>
+<span class="Comment">    Get application information for slot manager ...</span>
+<span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Slot information function </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _ROOT_THREAD <span class="Type">void</span> tadlib_slot(<span class="Type">int</span> level)
+{   (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;lib threadlib </span><span class="Special">%s</span><span class="Constant">: [ANSI C]</span><span class="Special">\n</span><span class="Constant">&quot;</span>,TADLIB_VERSION);
+
+    <span class="Statement">if</span>(level &gt; <span class="Constant">1</span>)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;(C) 2002-2022 Tumbling Dice</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Author: M.A. O'Neill</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;PUPS/P3 thread and DLL support library (built </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    }
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+}
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Segment identification for thread library </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef SLOT</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;slotman.h&gt;</span>
+_EXTERN <span class="Type">void</span> (* SLOT )() __attribute__ ((aligned(<span class="Constant">16</span>))) = tadlib_slot;
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> SLOT </span><span class="Comment">*/</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Public variables exported by this library (note this is not the best </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> way of exporting the thread table -- it would be better to have all  </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> the manipulation of the thread table done by functions defined here  </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> which are themselves _PUBLIC functions of this library)              </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------</span><span class="Comment">*/</span>
+                                                                                 <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+_PUBLIC  pthread_mutex_t ttab_mutex    = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP; <span class="Comment">/*</span><span class="Comment"> Mutex for thread ttab access </span><span class="Comment">*/</span>
+_PRIVATE <span class="Type">int</span>             ttab_index    = (-<span class="Constant">1</span>);                                   <span class="Comment">/*</span><span class="Comment"> Current index into ttab      </span><span class="Comment">*/</span>
+_PUBLIC  <span class="Type">int</span>             n_threads     = <span class="Constant">0</span>;                                      <span class="Comment">/*</span><span class="Comment"> Number of running threads    </span><span class="Comment">*/</span>
+_PUBLIC  ttab_type       ttab[MAX_THREADS];                                      <span class="Comment">/*</span><span class="Comment"> Thread table                 </span><span class="Comment">*/</span>
+                                                                                 <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Functions which are private to this modules </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Thread laucher - initialise thread as PUPS thread and </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> call its payload function                             </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PROTOTYPE _PRIVATE _THREADSAFE <span class="Type">int</span> pupsthread_launch(<span class="Type">void</span> *);
+
+<span class="Comment">// Initialise thread table</span>
+_PROTOTYPE _PRIVATE <span class="Type">void</span> pupsthread_init_ttab(<span class="Type">void</span>);
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Variables which are private to this moudle </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE pthread_key_t   pupsthread_error_key                        = (-<span class="Constant">1</span>);
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------</span>
+<span class="Comment">    Set per thread error number ...</span>
+<span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC _THREADSAFE <span class="Type">void</span> pupsthread_set_errno(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span> thread_errno)
+
+{   (<span class="Type">void</span>)pthread_setspecific(pupsthread_error_key, (<span class="Type">const</span> <span class="Type">void</span> *)&amp;thread_errno);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------</span>
+<span class="Comment">    Handler for SIGTHREAD (asychronous thread termination) ...</span>
+<span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _THREADSAFE <span class="Type">int</span> att_handler(<span class="Type">int</span> signum)
+
+{
+
+<span class="PreProc">    #ifdef TADLIB_DEBUG</span>
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;THREAD TERMINATED</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> TADLIB_DEBUG </span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pthread_exit((<span class="Type">void</span> *)<span class="Constant">NULL</span>);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------</span>
+<span class="Comment">    Handler for SIGTHREADSTOP and SIGTHREADRESTART (stop and restarts</span>
+<span class="Comment">    threads) ...</span>
+<span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+_PRIVATE _THREADSAFE <span class="Type">int</span> att_pausecont_handler(<span class="Type">int</span> signum)
+
+{   <span class="Type">int</span> ret_signum;    <span class="Comment">// Return signal from sigwait()</span>
+    sigset_t sigmask;  <span class="Comment">// Set of signals that sigwait() is waiting for</span>
+
+
+<span class="PreProc">    #ifdef TADLIB_DEBUG</span>
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;STARTSTOP HANDLER</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> TADLIB_DEBUG </span><span class="Comment">*/</span>
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Spurius restart signal </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(signum == SIGTHREADRESTART)
+    {
+
+<span class="PreProc">      #ifdef TADLIB_DEBUG</span>
+      (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;SPURIOUS SIGTHREADRESTART</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+      (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+<span class="PreProc">      #endif</span> <span class="Comment">/*</span><span class="Comment"> TADLIB_DEBUG </span><span class="Comment">*/</span>
+
+       <span class="Statement">return</span>(<span class="Constant">0</span>);
+    }
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set up signal mask for sigwait() </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)sigemptyset(&amp;sigmask);
+
+    (<span class="Type">void</span>)sigaddset  (&amp;sigmask,SIGTHREAD);
+    (<span class="Type">void</span>)sigaddset  (&amp;sigmask,SIGTHREADRESTART);
+
+<span class="PreProc">    #ifdef TADLIB_DEBUG</span>
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;THREAD STOP</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> TADLIB_DEBUG </span><span class="Comment">*/</span>
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Wait for signal in mask to be delivered </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)sigwait(&amp;sigmask,&amp;ret_signum);
+
+
+<span class="PreProc">    #ifdef TADLIB_DEBUG</span>
+    <span class="Statement">if</span>(ret_signum == SIGTHREAD)
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;GOT SIGNAL SIGTHREAD</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    <span class="Statement">else</span> <span class="Statement">if</span>(ret_signum == SIGTHREADRESTART)
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;GOT SIGNAL SIGTHREADRESTART</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> TADLIB_DEBUG </span><span class="Comment">*/</span>
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> SIGTHREAD received - asynchronously cancel thread </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(ret_signum == SIGTHREAD)
+    {
+
+<span class="PreProc">       #ifdef TADLIB_DEBUG</span>
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;THREAD TERMINATED</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+<span class="PreProc">       #endif</span> <span class="Comment">/*</span><span class="Comment"> TADLIB_DEBUG </span><span class="Comment">*/</span>
+
+       (<span class="Type">void</span>)pthread_exit((<span class="Type">void</span> *)<span class="Constant">NULL</span>);
+    }
+
+<span class="PreProc">    #ifdef TADLIB_DEBUG</span>
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;THREAD RESTART</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+<span class="PreProc">    #endif</span> <span class="Comment">/*</span><span class="Comment"> TADLIB_DEBUG </span><span class="Comment">*/</span>
+
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------</span>
+<span class="Comment">    Get per thread error number ...</span>
+<span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC _THREADSAFE <span class="Type">int</span> pupsthread_get_errno(<span class="Type">void</span>)
+
+{   <span class="Type">int</span> *ret = (<span class="Type">int</span> *)<span class="Constant">NULL</span>;
+
+    ret = (<span class="Type">int</span> *)pthread_getspecific(pupsthread_error_key);
+    <span class="Statement">return</span>((*ret));
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Is this the root thread (e.g. not a POSIX thread or part of an OMP</span>
+<span class="Comment">    gang) ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC _THREADSAFE _BOOLEAN pupsthread_is_root_thread(<span class="Type">void</span>)
+
+{   <span class="Statement">if</span>(appl_root_tid == (-<span class="Constant">1</span>) || appl_root_tid == syscall(SYS_gettid))
+    {  pups_set_errno(OK);
+       <span class="Statement">return</span>(TRUE);
+    }
+
+    pups_set_errno(<span class="Constant">EACCES</span>);
+    <span class="Statement">return</span>(FALSE);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------</span>
+<span class="Comment">   Translate function name to tid ...</span>
+<span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC pthread_t pupsthread_tfuncname2tid(<span class="Type">const</span> <span class="Type">char</span> *tfuncname)
+
+{   <span class="Type">int</span>       i;
+    pthread_t tid;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Sanity check </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(tfuncname == (<span class="Type">const</span> <span class="Type">char</span> *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>((pthread_t)<span class="Constant">NULL</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Make sure we don't clash with (exiting) thread which </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> will modify ttab                                     </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pthread_mutex_lock(&amp;ttab_mutex);
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;MAX_THREADS; ++i)
+    {  <span class="Statement">if</span>(strcmp(ttab[i].tfuncname,tfuncname) == <span class="Constant">0</span>)
+       {  tid = ttab[i].tid;
+          (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ttab_mutex);
+
+          pups_set_errno(OK);
+          <span class="Statement">return</span>(tid);
+       }
+    }
+    (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ttab_mutex);
+
+    pups_set_errno(<span class="Constant">ESRCH</span>);
+    <span class="Statement">return</span>((pthread_t)<span class="Constant">NULL</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------</span>
+<span class="Comment">    Translate tid to function name ...</span>
+<span class="Comment">--------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> pupsthread_tid2tfuncname(<span class="Type">const</span> pthread_t tid, <span class="Type">char</span> *tfuncname)
+
+{   <span class="Type">int</span>  i;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Sanity check </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(tfuncname == (<span class="Type">char</span> *)<span class="Constant">NULL</span> || tid == (<span class="Type">const</span> pthread_t)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Make sure we don't clash with (exiting) thread which </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> will modify ttab                                     </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pthread_mutex_lock(&amp;ttab_mutex);
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;MAX_THREADS; ++i)
+    {  <span class="Statement">if</span>(ttab[i].tid == tid)
+       {  (<span class="Type">void</span>)strlcpy(tfuncname,ttab[i].tfuncname,SSIZE);
+          (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ttab_mutex);
+
+          pups_set_errno(OK);
+          <span class="Statement">return</span>(<span class="Constant">0</span>);
+       }
+    }
+    (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ttab_mutex);
+
+    pups_set_errno(<span class="Constant">ESRCH</span>);
+    <span class="Statement">return</span>(-<span class="Constant">1</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Translate function name to ttab index (nid) ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> pupsthread_tfuncname2nid(<span class="Type">const</span> <span class="Type">char</span> *tfuncname)
+
+{   <span class="Type">int</span> i;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Sanity check </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(tfuncname == (<span class="Type">const</span> <span class="Type">char</span> *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Make sure we don't clash with (exiting) thread which </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> will modify ttab                                     </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pthread_mutex_lock(&amp;ttab_mutex);
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;MAX_THREADS; ++i)
+    {  <span class="Statement">if</span>(strcmp(ttab[i].tfuncname,tfuncname) == <span class="Constant">0</span>)
+       {  (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ttab_mutex);
+
+          pups_set_errno(OK);
+          <span class="Statement">return</span>(i);
+       }
+    }
+    (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ttab_mutex);
+
+    pups_set_errno(<span class="Constant">ESRCH</span>);
+    <span class="Statement">return</span>(-<span class="Constant">1</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">   Translate ttab index (nid) to function name ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> pupsthread_nid2tfuncname(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span> nid, <span class="Type">char</span> *tfuncname)
+
+{   <span class="Type">int</span> i;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Sanity check </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(tfuncname == (<span class="Type">char</span> *)<span class="Constant">NULL</span> || nid &gt; MAX_THREADS)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Make sure we don't clash with (exiting) thread which </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> will modify ttab                                     </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pthread_mutex_lock(&amp;ttab_mutex);
+    (<span class="Type">void</span>)strlcpy(tfuncname,ttab[nid].tfuncname,SSIZE);
+    (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ttab_mutex);
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Translate tid to ttab index (nid) ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> pupsthread_tid2nid(<span class="Type">const</span> pthread_t tid)
+
+{   <span class="Type">int</span> i;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Sanity check </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(tid == (<span class="Type">const</span> pthread_t)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Make sure we don't clash with (exiting) thread which </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> will modify ttab                                     </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pthread_mutex_lock(&amp;ttab_mutex);
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;MAX_THREADS; ++i)
+    {  <span class="Statement">if</span>(ttab[i].tid == tid)
+       {  (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ttab_mutex);
+
+          pups_set_errno(OK);
+          <span class="Statement">return</span>(i);
+       }
+    }
+    (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ttab_mutex);
+
+    pups_set_errno(<span class="Constant">ESRCH</span>);
+    <span class="Statement">return</span>(-<span class="Constant">1</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">   Translate ttab index (nid) to tid ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC pthread_t pupsthread_nid2tid(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span> nid)
+
+{   <span class="Type">int</span>       i;
+    pthread_t tid = (pthread_t)<span class="Constant">NULL</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Sanity check </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(nid &gt; MAX_THREADS)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>((pthread_t)<span class="Constant">NULL</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Make sure we don't clash with (exiting) thread which </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> will modify ttab                                     </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pthread_mutex_lock(&amp;ttab_mutex);
+    tid = ttab[nid].tid;
+    (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ttab_mutex);
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(tid);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Translate (LWP) tpid to ttab index (nid) ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> pupsthread_tpid2nid(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span> tpid)
+
+{   <span class="Type">int</span> i;
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Make sure we don't clash with (exiting) thread which </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> will modify ttab                                     </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pthread_mutex_lock(&amp;ttab_mutex);
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;MAX_THREADS; ++i)
+    {  <span class="Statement">if</span>(ttab[i].tpid == tpid)
+       {  (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ttab_mutex);
+
+          pups_set_errno(OK);
+          <span class="Statement">return</span>(i);
+       }
+    }
+    (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ttab_mutex);
+
+    pups_set_errno(<span class="Constant">ESRCH</span>);
+    <span class="Statement">return</span>(-<span class="Constant">1</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Translate ttab index (nid) to (LWP) tpid ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> pupsthread_nid2tpid(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span> nid)
+
+{   <span class="Type">int</span> i,
+        tpid;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Sanity check </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(nid &gt; MAX_THREADS)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Make sure we don't clash with (exiting) thread which </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> will modify ttab                                     </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pthread_mutex_lock(&amp;ttab_mutex);
+    tpid = ttab[nid].tpid;
+    (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ttab_mutex);
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(tpid);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------------</span>
+<span class="Comment">    Get index to next free slot in thread table ...</span>
+<span class="Comment">--------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> pupsthread_get_slot(<span class="Type">void</span>)
+
+{   <span class="Type">int</span> i;
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> We need to lock this section as we can only have one </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> thread manipulating ttab at any one time             </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pthread_mutex_lock(&amp;ttab_mutex);
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;MAX_THREADS; ++i)
+    {  <span class="Statement">if</span>(ttab[i].tid == (pthread_t)<span class="Constant">NULL</span>)
+       {  <span class="Statement">if</span>(i == n_threads)
+             n_threads = i + <span class="Constant">1</span>;
+
+          (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ttab_mutex);
+          <span class="Statement">return</span>(i);
+       }
+    }
+
+    (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ttab_mutex);
+    <span class="Statement">return</span>(-<span class="Constant">1</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------</span>
+<span class="Comment">    Find thread table entry given tid ...</span>
+<span class="Comment">---------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> pupsthread_find_slot(pthread_t tid)
+
+{  <span class="Type">int</span> i;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Sanity check </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(tid == (<span class="Type">const</span> pthread_t)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> We need to lock this section as we can only have one </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> thread manipulating ttab at any one time             </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pthread_mutex_lock(&amp;ttab_mutex);
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;MAX_THREADS; ++i)
+    {  <span class="Statement">if</span>(ttab[i].tid == tid)
+       {  (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ttab_mutex);
+          <span class="Statement">return</span>(i);
+       }
+    }
+
+    (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ttab_mutex);
+    <span class="Statement">return</span>(-<span class="Constant">1</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------</span>
+<span class="Comment">    Clear a thread table entry ...</span>
+<span class="Comment">---------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> pupsthread_clear_slot(<span class="Type">unsigned</span> <span class="Type">int</span> t_index)
+
+{   <span class="Type">char</span> tio_name[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+    <span class="Statement">if</span>(t_index &gt;= MAX_THREADS)
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> We need to lock this section as we can only have one </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> thread manipulating ttab at any one time             </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pthread_mutex_lock(&amp;ttab_mutex);
+
+    ttab[t_index].tid        = (pthread_t)<span class="Constant">NULL</span>;
+    ttab[t_index].tpid       = (-<span class="Constant">1</span>);
+    ttab[t_index].tfunc      = (<span class="Type">void</span> *)<span class="Constant">NULL</span>;
+    ttab[t_index].targs      = (<span class="Type">void</span> *)<span class="Constant">NULL</span>;
+    (<span class="Type">void</span>)strlcpy(ttab[t_index].tfuncname,<span class="Constant">&quot;none&quot;</span>,SSIZE);
+    (<span class="Type">void</span>)strlcpy(ttab[t_index].state,    <span class="Constant">&quot;&quot;</span>,SSIZE);
+
+    --n_threads;
+
+    (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ttab_mutex);
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------------------</span>
+<span class="Comment">    Show ttab entry for active thread ...</span>
+<span class="Comment">--------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> pupsthread_show_threadinfo(<span class="Type">const</span> <span class="Type">FILE</span> *stream, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span> nid)
+
+{
+
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Sanity check </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(stream == (<span class="Type">const</span> <span class="Type">FILE</span> *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Range error (ttab bounds) </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(nid &gt; MAX_THREADS)
+    {  pups_set_errno(<span class="Constant">ERANGE</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check to see thread corresponding to nid exists </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pthread_mutex_lock(&amp;ttab_mutex);
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Only the root thread can process </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> PSRP requests                    </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(pupsthread_is_root_thread() == FALSE)
+       pups_error(<span class="Constant">&quot;[pups_show_threadinfo] attempt by non root thread to perform PUPS/P3 global thread operation&quot;</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Thread does not exist </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">else</span> <span class="Statement">if</span>(ttab[nid].tid == (pthread_t)<span class="Constant">NULL</span>)
+    {   (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ttab_mutex);
+
+       pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    Thread: </span><span class="Special">%04d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,nid);
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    ============</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(stream);
+
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    tpid [LWP]      :  </span><span class="Special">%04d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,                         ttab[nid].tpid);
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    tid             :  </span><span class="Special">%016lx</span><span class="Special">\n</span><span class="Constant">&quot;</span>,                       (<span class="Type">unsigned</span> <span class="Type">long</span>)ttab[nid].tid);
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    payload function:  </span><span class="Special">\&quot;</span><span class="Special">%-32s</span><span class="Special">\&quot;</span><span class="Constant"> (at </span><span class="Special">%016lx</span><span class="Constant"> virtual)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,ttab[nid].tfuncname,(<span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>)ttab[nid].tid);
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    argument pointer:  </span><span class="Special">%016lx</span><span class="Special">\n</span><span class="Constant">&quot;</span>,                       (<span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>)ttab[nid].targs);
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    state           :  </span><span class="Special">%-16s</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,                       ttab[nid].state);
+
+    (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ttab_mutex);
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------------------</span>
+<span class="Comment">    Show ttab entries for PSRP servers active threads ...</span>
+<span class="Comment">--------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> pupsthread_show_ttab(<span class="Type">const</span> <span class="Type">FILE</span> *stream)
+
+{   <span class="Type">int</span> i,
+        threads = <span class="Constant">0</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Sanity check </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(stream == (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Only the root thread can process </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> PSRP requests                    </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(pupsthread_is_root_thread() == FALSE)
+       pups_error(<span class="Constant">&quot;[pups_show_ttab] attempt by non root thread to perform PUPS/P3 global thread operation&quot;</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Make sure we don't clash with (exiting) thread which </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> will modify ttab                                     </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pthread_mutex_lock(&amp;ttab_mutex);
+
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    Active threads</span><span class="Special">\n</span><span class="Constant">&quot;</span>,appl_name,getpid(),appl_host);
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    ==============</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(stream);
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;MAX_THREADS; ++i)
+    {  <span class="Statement">if</span>(ttab[i].tid != (pthread_t)<span class="Constant">NULL</span>)
+       {  <span class="Type">int</span>  d_index;
+          <span class="Type">char</span> psrp_object_info[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+          <span class="Statement">if</span>((d_index = lookup_psrp_object_by_handle(ttab[i].tfunc)) != (-<span class="Constant">1</span>))
+          {  <span class="Type">char</span> typestr[<span class="Constant">246</span>] = <span class="Constant">&quot;&quot;</span>;
+
+             <span class="Statement">if</span>(psrp_object_list[d_index].object_type == PSRP_STATIC_FUNCTION)
+                (<span class="Type">void</span>)strlcpy(typestr,<span class="Constant">&quot;static psrp function&quot;</span>,SSIZE);
+             <span class="Statement">else</span> <span class="Statement">if</span>(psrp_object_list[d_index].object_type == PSRP_DYNAMIC_FUNCTION)
+                (<span class="Type">void</span>)strlcpy(typestr,<span class="Constant">&quot;dynamic psrp function&quot;</span>,SSIZE);
+             <span class="Statement">else</span>
+                (<span class="Type">void</span>)strlcpy(typestr,<span class="Constant">&quot;psrp object&quot;</span>,SSIZE);
+
+             (<span class="Type">void</span>)snprintf(psrp_object_info,SSIZE,<span class="Constant">&quot; [</span><span class="Special">%-16s</span><span class="Constant"> </span><span class="Special">\&quot;</span><span class="Special">%-16s</span><span class="Special">\&quot;</span><span class="Constant">]&quot;</span>,typestr,psrp_object_list[d_index].object_tag[<span class="Constant">0</span>]);
+          }
+          (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    </span><span class="Special">%04d</span><span class="Constant">: tname: </span><span class="Special">\&quot;</span><span class="Special">%-32s</span><span class="Special">\&quot;</span><span class="Constant"> (payload </span><span class="Special">\&quot;</span><span class="Special">%-32s</span><span class="Special">\&quot;</span><span class="Constant">, tid </span><span class="Special">%016lx</span><span class="Constant"> (LWP </span><span class="Special">%04d</span><span class="Constant">) at </span><span class="Special">%016lx</span><span class="Constant"> virtual) state: </span><span class="Special">%-16s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,i,
+                                                                                                                        ttab[i].tfuncname,
+                                                                                                                         psrp_object_info,
+                                                                                                           (<span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>)ttab[i].tid,
+                                                                                                                             ttab[i].tpid,
+                                                                                                         (<span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>)ttab[i].tfunc,
+                                                                                                                            ttab[i].state);
+          (<span class="Type">void</span>)fflush(stream);
+
+          ++threads;
+       }
+    }
+
+    <span class="Statement">if</span>(threads == <span class="Constant">0</span>)
+       (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;    no active threads [other than root thread] (</span><span class="Special">%04d</span><span class="Constant"> slots available)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,MAX_THREADS);
+    <span class="Statement">else</span> <span class="Statement">if</span>(threads == <span class="Constant">1</span>)
+       (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">    </span><span class="Special">%04d</span><span class="Constant"> active thread (</span><span class="Special">%04d</span><span class="Constant"> slots available)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,<span class="Constant">1</span>,MAX_THREADS - <span class="Constant">1</span>);
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">\n\n</span><span class="Constant">    </span><span class="Special">%04d</span><span class="Constant"> active threads (</span><span class="Special">%04d</span><span class="Constant"> slots available</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,threads,MAX_THREADS - threads);
+    (<span class="Type">void</span>)fflush(stream);
+
+    (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ttab_mutex);
+    pups_set_errno(OK);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------------</span>
+<span class="Comment">    Initialise thread table (note this function IS threadsafe as it gets run</span>
+<span class="Comment">    only once by the root thread before any other threads are created) ...</span>
+<span class="Comment">--------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> pupsthread_init_ttab(<span class="Type">void</span>)
+{   <span class="Type">int</span> i;
+
+    n_threads = <span class="Constant">0</span>;
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;MAX_THREADS; ++i)
+    {  ttab[i].tid        = (pthread_t)<span class="Constant">NULL</span>;
+       ttab[i].tpid       = (-<span class="Constant">1</span>);
+       ttab[i].tfunc      = (<span class="Type">void</span> *)<span class="Constant">NULL</span>;
+       ttab[i].targs      = (<span class="Type">void</span> *)<span class="Constant">NULL</span>;
+       (<span class="Type">void</span>)strlcpy(ttab[i].tfuncname,<span class="Constant">&quot;none&quot;</span>,SSIZE);
+       (<span class="Type">void</span>)strlcpy(ttab[i].state,    <span class="Constant">&quot;&quot;</span>,SSIZE);
+    }
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------</span>
+<span class="Comment">    Thread initialisation routine called by main in a PUPS application</span>
+<span class="Comment">    which is threaded ...</span>
+<span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> pupsthread_init(<span class="Type">void</span>)
+
+{   _IMMORTAL _BOOLEAN once = FALSE;
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Only the root thread can process </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> PSRP requests                    </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(pupsthread_is_root_thread() == FALSE)
+       pups_error(<span class="Constant">&quot;[pupsthread_init] attempt by non root thread to perform PUPS/P3 global thread operation&quot;</span>);
+
+    <span class="Statement">if</span>(once == FALSE)
+    {  pupsthread_init_ttab();
+       once = TRUE;
+    }
+
+    pups_set_errno(OK);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------</span>
+<span class="Comment">    Create a new thread (setting up the threads environment). The first</span>
+<span class="Comment">    argument is the address of the payload function ...</span>
+<span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC pthread_t pupsthread_create(<span class="Type">const</span> <span class="Type">char</span> *tfuncname,  <span class="Comment">// Payload function to be run by thread</span>
+                                    <span class="Type">const</span> <span class="Type">void</span>     *tfunc,  <span class="Comment">// Thread payload function</span>
+                                    <span class="Type">const</span> <span class="Type">void</span>     *targs)  <span class="Comment">// Argument list (string)</span>
+
+{   <span class="Type">int</span> ret,
+        t_index;
+
+    sigset_t       sigmask;
+    pthread_t      tid;
+    pthread_attr_t attr;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Sanity check </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(tfuncname == (<span class="Type">const</span> <span class="Type">char</span> *)<span class="Constant">NULL</span> || tfunc == (<span class="Type">const</span> <span class="Type">char</span> *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>((pthread_t)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>((t_index = pupsthread_get_slot()) == (-<span class="Constant">1</span>))
+    {  pups_set_errno(<span class="Constant">ENOSPC</span>);
+       <span class="Statement">return</span>((pthread_t)<span class="Constant">NULL</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set up (default) attributes for the thread we are about to create </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pthread_attr_init(&amp;attr);
+    (<span class="Type">void</span>)pthread_attr_setstacksize(&amp;attr,DEFAULT_STACKSIZE);
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set up mask for signals which will be blocked in all threads      </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> other than the root thread                                        </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)sigfillset(&amp;sigmask);
+
+    (<span class="Type">void</span>)sigdelset (&amp;sigmask,SIGTHREAD);         <span class="Comment">// Used by pupsthread_cancel()</span>
+    (<span class="Type">void</span>)sigdelset (&amp;sigmask,SIGTHREADSTOP);     <span class="Comment">// Used by pupsthread_pause()</span>
+    (<span class="Type">void</span>)sigdelset (&amp;sigmask,SIGTHREADRESTART);  <span class="Comment">// Used by pupsthread_cont()</span>
+
+    (<span class="Type">void</span>)pthread_sigmask(SIG_SETMASK,&amp;sigmask,(sigset_t *)<span class="Constant">NULL</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Handler for asychronous thread exit </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pups_sighandle(SIGTHREAD,       <span class="Constant">&quot;thread_handler&quot;</span>,          (<span class="Type">void</span> *)att_handler,          &amp;sigmask);
+    (<span class="Type">void</span>)pups_sighandle(SIGTHREADSTOP,   <span class="Constant">&quot;thread_pausecont_handler&quot;</span>,(<span class="Type">void</span> *)att_pausecont_handler,&amp;sigmask);
+    (<span class="Type">void</span>)pups_sighandle(SIGTHREADRESTART,<span class="Constant">&quot;thread_pausecont_handler&quot;</span>,(<span class="Type">void</span> *)att_pausecont_handler,&amp;sigmask);
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set up slot for new thread </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pthread_mutex_lock(&amp;ttab_mutex);
+
+    ttab[t_index].tfunc    = tfunc;
+    ttab[t_index].targs    = targs;
+    ttab[t_index].sigmask  = sigmask;
+
+    (<span class="Type">void</span>)strlcpy(ttab[t_index].tfuncname,tfuncname,SSIZE);
+    (<span class="Type">void</span>)strlcpy(ttab[t_index].state,<span class="Constant">&quot;run&quot;</span>,SSIZE);
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> We have finished accessing the thread table - release mutex </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ttab_mutex);
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Create the thread (returning NULL if we get an error) </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((ret = pthread_create(&amp;tid,&amp;attr,(<span class="Type">void</span> *)pupsthread_launch,(<span class="Type">void</span> *)&amp;t_index)) == (-<span class="Constant">1</span>))
+    {
+
+       <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Thread creation has failed - clear thread table entry </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------</span><span class="Comment">*/</span>
+
+       (<span class="Type">void</span>)pupsthread_clear_slot(t_index);
+
+
+       <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Set error for this thread </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+       pups_set_errno(<span class="Constant">ENOEXEC</span>);
+       <span class="Statement">return</span>((pthread_t)<span class="Constant">NULL</span>);
+    }
+    <span class="Statement">else</span>
+       pups_usleep(<span class="Constant">10000</span>);
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(tid);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------</span>
+<span class="Comment">    Thread launcher - perform thread initilisation and then start payload</span>
+<span class="Comment">    function ...</span>
+<span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _THREADSAFE <span class="Type">int</span> pupsthread_launch(<span class="Type">void</span> *arg)
+
+{   <span class="Type">int</span> t_index,
+        (*tfunc)(<span class="Type">void</span> *);
+
+    <span class="Type">void</span> *targs = (<span class="Type">void</span> *)<span class="Constant">NULL</span>;
+
+    <span class="Statement">if</span>(arg == (<span class="Type">void</span> *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Payload function is first argument </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+
+    t_index            = *((<span class="Type">int</span> *)arg);
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Fill reamining fields in thread table entry </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pthread_mutex_lock(&amp;ttab_mutex);
+
+    ttab[t_index].tid     = pthread_self();
+    ttab[t_index].tpid    = syscall(SYS_gettid);
+    tfunc                 = ttab[t_index].tfunc;
+    targs                 = ttab[t_index].targs;
+
+    (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ttab_mutex);
+
+    <span class="Statement">if</span>((tfunc)(targs) == (-<span class="Constant">1</span>))
+    {
+
+       <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Thread has aborted with errors </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+
+       pups_set_errno(<span class="Constant">ENOEXEC</span>);
+       (<span class="Type">void</span>)pthread_exit((<span class="Type">void</span> *)<span class="Constant">NULL</span>);
+    }
+
+    pups_set_errno(OK);
+    (<span class="Type">void</span>)pthread_exit((<span class="Type">void</span> *)<span class="Constant">NULL</span>);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------</span>
+<span class="Comment">    Pause thread ...</span>
+<span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> pupsthread_pause(<span class="Type">const</span> pthread_t tid)
+
+{   <span class="Type">int</span> t_index;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Sanity check </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(tid == (<span class="Type">const</span> pthread_t)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> We cannot pause root thread </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(tid == appl_root_tid)
+    {  pups_set_errno(<span class="Constant">EPERM</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Get index into table of active threads </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pthread_mutex_lock(&amp;ttab_mutex);
+    <span class="Statement">if</span>((t_index = pupsthread_find_slot(tid)) == (-<span class="Constant">1</span>))
+    {  (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ttab_mutex);
+
+       pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check to see if thread is already paused </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(strcmp(ttab[t_index].state,<span class="Constant">&quot;pause&quot;</span>) == <span class="Constant">0</span>)
+    {  (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ttab_mutex);
+
+       pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    (<span class="Type">void</span>)pthread_kill(tid,SIGTHREADSTOP);
+    (<span class="Type">void</span>)strlcpy(ttab[t_index].state,<span class="Constant">&quot;pause&quot;</span>,SSIZE);
+
+    (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ttab_mutex);
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------</span>
+<span class="Comment">    Restart thread ...</span>
+<span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> pupsthread_cont(pthread_t tid)
+
+{   <span class="Type">int</span> t_index;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Sanity check </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(tid == (<span class="Type">const</span> pthread_t)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> We cannot pause root thread </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(tid == appl_root_tid)
+    {  pups_set_errno(<span class="Constant">EPERM</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Get index into table of active threads </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pthread_mutex_lock(&amp;ttab_mutex);
+    <span class="Statement">if</span>((t_index = pupsthread_find_slot(tid)) == (-<span class="Constant">1</span>))
+    {  (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ttab_mutex);
+
+       pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check to see if thread is already running </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(strcmp(ttab[t_index].state,<span class="Constant">&quot;run&quot;</span>) == <span class="Constant">0</span>)
+    {  (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ttab_mutex);
+
+       pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Thread is paused - restart it </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">else</span>
+    {  (<span class="Type">void</span>)pthread_kill(tid,SIGTHREADRESTART);
+       (<span class="Type">void</span>)strlcpy(ttab[t_index].state,<span class="Constant">&quot;run&quot;</span>,SSIZE);
+    }
+
+    (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ttab_mutex);
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------</span>
+<span class="Comment">    Cancel a thread -- in the PUPS environment cancelling of threads</span>
+<span class="Comment">    is asychronous so the thread terminates immediately ...</span>
+<span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> pupsthread_cancel(<span class="Type">const</span> pthread_t tid)
+
+{   <span class="Type">int</span>  t_index;
+    <span class="Type">char</span> tio_name[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Sanity check </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(tid == (<span class="Type">const</span> pthread_t)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> We cannot cancel root thread </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(tid == appl_root_tid)
+    {  pups_set_errno(<span class="Constant">EPERM</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Get index into table of active threads </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pthread_mutex_lock(&amp;ttab_mutex);
+    <span class="Statement">if</span>((t_index = pupsthread_find_slot(tid)) == (-<span class="Constant">1</span>))
+    {  (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ttab_mutex);
+
+       pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Terminate the thread asynchronously </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pthread_kill(tid,SIGTHREAD);
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Clear table entry for this thread </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pupsthread_clear_slot(t_index);
+    (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ttab_mutex);
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to cancel all currently running threads except caller ...</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> pupsthread_cancel_all_other_threads(<span class="Type">void</span>)
+
+{   <span class="Type">int</span> i,
+        mytid,
+        my_index;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Caller must be the root thread </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+
+    mytid = syscall(SYS_gettid);
+    <span class="Statement">if</span>(mytid == appl_root_tid)
+    {  pups_set_errno(<span class="Constant">EPERM</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Only the root thread can process </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> PSRP requests                    </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(pupsthread_is_root_thread() == FALSE)
+       pups_error(<span class="Constant">&quot;[pupsthread_cancel_all_other_threads] attempt by non root thread to perform PUPS/P3 global thread operation&quot;</span>);
+
+    (<span class="Type">void</span>)pthread_mutex_lock(&amp;ttab_mutex);
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;n_threads; ++i)
+    {  <span class="Statement">if</span>(ttab[i].tid == pthread_self())
+          my_index = i;
+       <span class="Statement">else</span> <span class="Statement">if</span>(ttab[i].tid != (pthread_t)<span class="Constant">NULL</span>)
+          (<span class="Type">void</span>)pupsthread_cancel(ttab[i].tid);
+    }
+    (<span class="Type">void</span>)pthread_mutex_unlock(&amp;ttab_mutex);
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------</span>
+<span class="Comment">    Terminate a thread deleting its thread table entry ...</span>
+<span class="Comment">----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC _THREADSAFE <span class="Type">void</span> pupsthread_exit(<span class="Type">void</span> *retval)
+
+{   <span class="Type">int</span>       t_index;
+    pthread_t tid;
+
+    tid = pthread_self();
+
+    pups_set_errno(OK);
+
+    <span class="Statement">if</span>((t_index = pupsthread_tid2nid(tid)) == (-<span class="Constant">1</span>))
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>;
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Clear table entry for this thread </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)pupsthread_clear_slot(t_index);
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Finally terminate the thread </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+
+    pthread_exit(retval);
+}
+
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> PTHREAD_SUPPORT </span><span class="Comment">*/</span>
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

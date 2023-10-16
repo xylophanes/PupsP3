@@ -9,7 +9,7 @@
              United Kingdom
 
     Version: 2.00 
-    Dated:   30th August 2019 
+    Dated:   4th January 2022
     E-mail:  mao@tumblingdice.co.uk
 ------------------------------------------------------------------------------*/
 
@@ -33,13 +33,11 @@
 /*--------------------------------------------*/
 /* Defines used by meta virtual memory mapper */
 /*--------------------------------------------*/
-
-
 /***********/
 /* Version */
 /***********/
 
-#define MVM_VERSION          "2.00"
+#define MVMLIB_VERSION       "2.00"
 
 
 /*-------------*/

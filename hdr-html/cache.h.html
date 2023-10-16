@@ -1,0 +1,452 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.5.1.src.git/include.libs/cache.h.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="cpp">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Error { color: #ffffff; background-color: #ff6060; padding-bottom: 1px; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Purpose: header for PUPS fast cache library</span>
+
+<span class="Comment">    Author:  M.A. O'Neill,</span>
+<span class="Comment">             Tumbling Dice,</span>
+<span class="Comment">             Gosforth,</span>
+<span class="Comment">             Tyne and Wear NE3 4RT.</span>
+
+<span class="Comment">    Version: 4.14 </span>
+<span class="Comment">    Dated:   18th September 2023 </span>
+<span class="Comment">    E-mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifndef CACHELIB_HDR</span>
+<span class="PreProc">#define CACHELIB_HDR</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;pthread.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Make sure c2man is happy </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;c2man.h&gt;</span>
+
+<span class="PreProc">#ifndef __C2MAN__</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;me.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;ansi.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;utils.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;tiff.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;tiffio.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;ctype.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> __C2MAN__ </span><span class="Comment">*/</span>
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Defines which are local to this module </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">*********</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Version </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">*********</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define CACHELIB_VERSION        </span><span class="Constant">&quot;4.12&quot;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> String size </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define SSIZE                   </span><span class="Constant">2048</span>
+
+
+<span class="Comment">// Maximum caches in the cache table</span>
+<span class="PreProc">#define MAX_CACHES              </span><span class="Constant">256</span><span class="PreProc"> </span>
+
+<span class="Comment">// Maximum number of objects per cache block</span>
+<span class="PreProc">#define MAX_CACHE_BLOCK_OBJECTS </span><span class="Constant">256</span><span class="PreProc"> </span>
+
+
+<span class="Comment">// Definitions of byte storage units</span>
+<span class="PreProc">#define KILOBYTE                </span><span class="Constant">1024</span>
+<span class="PreProc">#define MEGABYTE                (</span><span class="Constant">1024</span><span class="PreProc">*</span><span class="Constant">1024</span><span class="PreProc">)</span>
+<span class="PreProc">#define GIGABYTE                (</span><span class="Constant">1024</span><span class="PreProc">*</span><span class="Constant">1024</span><span class="PreProc">*</span><span class="Constant">1024</span><span class="PreProc">)</span>
+
+
+<span class="Comment">// Block allocation quantum (for extending cache</span>
+<span class="PreProc">#define BLOCK_ALLOC_QUANTUM     </span><span class="Constant">8192</span><span class="PreProc"> </span>
+
+
+<span class="Comment">// Block access and usage flags</span>
+<span class="PreProc">#define BLOCK_HAVELOCK          (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt;  </span><span class="Constant">0</span><span class="PreProc">)</span>
+<span class="PreProc">#define BLOCK_NOLOCK            (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt;  </span><span class="Constant">0</span><span class="PreProc">)</span>
+<span class="PreProc">#define BLOCK_USED              (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt;  </span><span class="Constant">1</span><span class="PreProc">) </span>
+<span class="PreProc">#define BLOCK_WRLOCK            (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt;  </span><span class="Constant">2</span><span class="PreProc">) </span>
+<span class="PreProc">#define BLOCK_RDLOCK            (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt;  </span><span class="Constant">3</span><span class="PreProc">) </span>
+<span class="PreProc">#define BLOCK_LOADED            (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt;  </span><span class="Constant">4</span><span class="PreProc">) </span>
+<span class="PreProc">#define ANY_CACHE_BLOCK         (-</span><span class="Constant">1</span><span class="PreProc">     ) </span>
+<span class="PreProc">#define ALL_CACHE_BLOCKS        (-</span><span class="Constant">1</span><span class="PreProc">     ) </span>
+
+
+<span class="Comment">// Taglist size</span>
+<span class="PreProc">#define MAX_TAGLIST_SIZE        </span><span class="Constant">4096</span>
+
+
+<span class="Comment">// Tag flags</span>
+<span class="PreProc">#define DEFAULT_TAG             </span><span class="Constant">0</span>
+<span class="PreProc">#define SCRATCH_TAG             </span><span class="Constant">9999</span>
+<span class="PreProc">#define ALL_CACHE_TAGS          (-</span><span class="Constant">1</span><span class="PreProc">)</span>
+
+<span class="Comment">// Block flags</span>
+<span class="PreProc">#define BLOCK_IMMORTAL          (-</span><span class="Constant">1</span><span class="PreProc">)</span>
+
+<span class="Comment">// Cache archive flags</span>
+<span class="PreProc">#define COMPRESS                (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt;  </span><span class="Constant">0</span><span class="PreProc">)</span>
+<span class="PreProc">#define DELETE                  (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt;  </span><span class="Constant">1</span><span class="PreProc">) </span>
+
+
+<span class="Comment">// Cache mapping flags</span>
+<span class="PreProc">#define CACHE_MMAP              (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt;  </span><span class="Constant">0</span><span class="PreProc">)</span>
+<span class="PreProc">#define CACHE_PRIVATE           (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt;  </span><span class="Constant">1</span><span class="PreProc">)</span>
+<span class="PreProc">#define CACHE_PUBLIC            (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt;  </span><span class="Constant">2</span><span class="PreProc">)</span>
+<span class="PreProc">#define CACHE_POPULATE          (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt;  </span><span class="Constant">3</span><span class="PreProc">)</span>
+<span class="PreProc">#define CACHE_DEPOPULATE        (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt;  </span><span class="Constant">4</span><span class="PreProc">)</span>
+<span class="PreProc">#define CACHE_USE_MAPINFO       (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt;  </span><span class="Constant">5</span><span class="PreProc">) </span>
+<span class="PreProc">#define CACHE_BUSY              (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt;  </span><span class="Constant">6</span><span class="PreProc">)</span>
+<span class="PreProc">#define CACHE_BUILD             (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt;  </span><span class="Constant">7</span><span class="PreProc">)</span>
+<span class="PreProc">#define CACHE_EXTEND            (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt;  </span><span class="Constant">8</span><span class="PreProc">)</span>
+<span class="PreProc">#define CACHE_DELETE_IFILES     (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt;  </span><span class="Constant">9</span><span class="PreProc">)</span>
+<span class="PreProc">#define CACHE_LOCK              (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">10</span><span class="PreProc">)</span>
+<span class="PreProc">#define CACHE_UNLOCK            (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">11</span><span class="PreProc">)</span>
+<span class="PreProc">#define CACHE_HAVELOCK          (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">12</span><span class="PreProc">)</span>
+<span class="PreProc">#define CACHE_WRLOCK            (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">13</span><span class="PreProc">)</span>
+<span class="PreProc">#define CACHE_RDLOCK            (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">14</span><span class="PreProc">)</span>
+<span class="PreProc">#define CACHE_LIVE              (</span><span class="Constant">1</span><span class="PreProc"> &lt;&lt; </span><span class="Constant">15</span><span class="PreProc">)</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">  Types which are defined by this module </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Dynamic cache structure </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">typedef</span> <span class="Type">struct</span> { <span class="Type">void</span>     *object_ptr[MAX_CACHE_BLOCK_OBJECTS];                     <span class="Comment">// Pointers to objects within cache block</span>
+               } block_mtype;
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Cache structure </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+
+<span class="Type">typedef</span> <span class="Type">struct</span> {
+
+                    <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+                    <span class="Comment">/*</span><span class="Comment"> Common to all blocks in cache </span><span class="Comment">*/</span>
+                    <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+
+                    <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span> crc;                                          <span class="Comment">// CRC for cache buffer</span>
+                    <span class="Type">unsigned</span> <span class="Type">char</span>     path[SSIZE];                                  <span class="Comment">// Path to cache (in filesystem)</span>
+                    <span class="Type">unsigned</span> <span class="Type">char</span>     name[SSIZE];                                  <span class="Comment">// Name of this cache</span>
+                    <span class="Type">unsigned</span> <span class="Type">char</span>     mapinfo_name[SSIZE];                          <span class="Comment">// Name of memory mapped information file</span>
+                    <span class="Type">unsigned</span> <span class="Type">char</span>     mmap_name[SSIZE];                             <span class="Comment">// Name of memory mapped file</span>
+                    pthread_mutex_t   mutex;                                        <span class="Comment">// Access mutex</span>
+                    <span class="Type">int</span>               mapinfo_fd;                                   <span class="Comment">// File descriptor of mapinfo file</span>
+                    <span class="Type">int</span>               mmap_fd;                                      <span class="Comment">// File descriptor of memory mapped file</span>
+                    <span class="Type">char</span>              march[SSIZE];                                 <span class="Comment">// Machine architecture</span>
+                    <span class="Type">char</span>              auxinfo[SSIZE];                               <span class="Comment">// Auxilliary information</span>
+                    <span class="Type">unsigned</span> <span class="Type">int</span>      mmap;                                         <span class="Comment">// Memory mapping flags</span>
+                    <span class="Type">int</span>               u_blocks;                                     <span class="Comment">// Number of used blocks in cache</span>
+                    <span class="Type">int</span>               n_blocks;                                     <span class="Comment">// Number of object blocks in cache</span>
+                    <span class="Type">int</span>               n_objects;                                    <span class="Comment">// Number of objects in cache block</span>
+                    <span class="Type">char</span>              object_desc[MAX_CACHE_BLOCK_OBJECTS][SSIZE];  <span class="Comment">// Description of object</span>
+                    _BOOLEAN          busy;                                         <span class="Comment">// Cache busy</span>
+                    <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span> cache_size;                                   <span class="Comment">// Size of entire cache</span>
+                    <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span> block_size;                                   <span class="Comment">// Size of one cache block</span>
+                    <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span> object_offset[MAX_CACHE_BLOCK_OBJECTS];       <span class="Comment">// Offsets to objects in cache block</span>
+                    <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span> object_size[MAX_CACHE_BLOCK_OBJECTS];         <span class="Comment">// Sizes of cache block objects</span>
+                    <span class="Type">unsigned</span> <span class="Type">int</span>      colsize;                                      <span class="Comment">// Cache-cordination list size</span>
+
+
+                    <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+                    <span class="Comment">/*</span><span class="Comment"> Specific to each block in cache </span><span class="Comment">*/</span>
+                    <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+
+                    <span class="Type">void</span>              *cache_ptr;                                   <span class="Comment">// Pointer to base of contiguous block of cache memory</span>
+                    block_mtype       *blockmap;                                    <span class="Comment">// Pointer mapping into cache block</span>
+                    <span class="Type">unsigned</span> <span class="Type">int</span>      *tag;                                         <span class="Comment">// Block tags</span>
+                    _BYTE             *flags;                                       <span class="Comment">// Block flags</span>
+                    <span class="Type">int</span>               *lifetime;                                    <span class="Comment">// Block lifetime (-1) - IMMORTAL implies block is not volatile</span>
+                    <span class="Type">unsigned</span> <span class="Type">int</span>      *hubness;                                     <span class="Comment">// Block hubness</span>
+                    <span class="Type">unsigned</span> <span class="Type">int</span>      *binding;                                     <span class="Comment">// Block binding </span>
+                    pthread_rwlock_t  *rwlock;                                      <span class="Comment">// Block access rwlocks</span>
+               } cache_type;
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Taglist structure </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+<span class="Type">typedef</span> <span class="Type">struct</span> {    <span class="Type">int</span>          tag;                                               <span class="Comment">// Block tag identifier</span>
+                    <span class="Type">unsigned</span> <span class="Type">int</span> tagged_blocks;                                     <span class="Comment">// Blocks tagged with this tag identifier</span>
+               } taglist_type;
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Public variables exported by this module ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef __NOT_LIB_SOURCE__</span>
+<span class="PreProc">#else</span> <span class="Comment">/*</span><span class="Comment"> External variable declarations </span><span class="Comment">*/</span>
+<span class="PreProc">#   undef  _EXPORT</span>
+<span class="PreProc">#   define _EXPORT</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> __NOT_LIB_SOURCE__</span>
+
+
+<span class="Error">/</span><span class="Comment">*------------------------------------------------------------------------------</span>
+<span class="Comment">    Public functions exported by this module ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="Comment">// Get index of cache (from its name)</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_name2index(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Get name of cache (from its index)</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_index2name(<span class="Type">const</span> _BOOLEAN, <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Initialise the cache table</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_table_init(<span class="Type">void</span>);
+
+<span class="Comment">// Add object to cache (prior to creating cache)</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_add_object(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Create cache</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_create(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">int</span>, <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span> *, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Sync cache */</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_msync(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Cache live</span>
+_PUBLIC <span class="Type">int</span> cache_live(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Cache dead </span>
+_PUBLIC <span class="Type">int</span> cache_dead(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Destroy cache</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_destroy(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Display cache statistics</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_display_statistics(<span class="Type">const</span> _BOOLEAN, <span class="Type">FILE</span> *, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Display cache table </span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_display(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">FILE</span> *);
+
+<span class="Comment">// Get size of cache object</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_object_size(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Access object in cache</span>
+_PROTOTYPE _EXTERN <span class="Type">const</span> <span class="Type">void</span> *cache_access_object(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Map 2D (image) array to cache</span>
+_PROTOTYPE _EXTERN <span class="Type">void</span> **cache_map_2D_array(<span class="Type">const</span> <span class="Type">void</span> *, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>);
+
+<span class="Comment">// Write contents of cache to file</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_write(<span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Get size of cached object</span>
+_PROTOTYPE _EXTERN <span class="Type">long</span> <span class="Type">int</span> cache_get_object_size(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Get size of cache (object) block</span>
+_PROTOTYPE _EXTERN <span class="Type">long</span> <span class="Type">int</span> cache_get_block_size(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Show statistics for all blocks in specified cache</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_show_blocktag_stats(<span class="Type">const</span> _BOOLEAN, <span class="Type">FILE</span> *, <span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Reset all block (read/write) locks in cache </span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_reset_blocklocks(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Number of blocks in cache</span>
+_PROTOTYPE _EXTERN <span class="Type">long</span> <span class="Type">int</span> cache_get_blocks(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span> c_index);
+
+<span class="Comment">// Number of objects per cache block</span>
+_PROTOTYPE _EXTERN <span class="Type">long</span> <span class="Type">int</span> cache_get_objects(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span> c_index);
+
+<span class="Comment">// Get mapinfo file name </span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_get_mapinfo_name(<span class="Type">const</span> _BOOLEAN, <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Get cache (memory) map file name</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_get_mmap_name(<span class="Type">const</span> _BOOLEAN, <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Is cache memory mapped?</span>
+_PROTOTYPE _EXTERN _BOOLEAN cache_is_mapped(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Is cache memory mapped at specified location (in file system)? */</span>
+_PROTOTYPE _EXTERN _BOOLEAN cache_is_mapped_at(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Is cache (already) loaded?</span>
+_PROTOTYPE _EXTERN _BOOLEAN cache_already_loaded(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">unsigned</span> <span class="Type">int</span> *);
+
+<span class="Comment">// Is cache allocated? </span>
+_PROTOTYPE _EXTERN <span class="Type">void</span> *cache_is_allocated(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Write cache mapping information</span>
+_PROTOTYPE _EXTERN <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span> cache_write_mapinfo(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Read cache mapping information</span>
+_PROTOTYPE _EXTERN <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span> cache_read_mapinfo (<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Archive cache</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_archive(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Uncompress cache</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_extract(<span class="Type">const</span> <span class="Type">char</span> *);
+
+<span class="Comment">// Is cache block used? </span>
+_PROTOTYPE _EXTERN _BOOLEAN cache_block_used(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Get number of used blocks in cache</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_blocks_used(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Reset number of used blocks in cache to zero</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_blocks_reset_used(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Lock block</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_lock_block(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Unlock block</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_unlock_block(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Set/reset cache used flag */</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_block_set_used(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> _BOOLEAN);
+
+<span class="Comment">// Is cache in use? */</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_in_use(<span class="Type">const</span> _BOOLEAN,  <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Is block in use - must lock block before calling this function</span>
+_PROTOTYPE _EXTERN _BOOLEAN cache_block_in_use(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Set cache busy</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_set_busy(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> _BOOLEAN);
+
+<span class="Comment">// Is cache busy?</span>
+_PROTOTYPE _EXTERN _BOOLEAN cache_is_busy(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Add data (object) to cache block</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_add_block(<span class="Type">const</span> <span class="Type">void</span> *,
+                                       <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>,
+                                       <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>,
+                                       <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>,
+                                       <span class="Type">const</span> <span class="Type">int</span>,
+                                       <span class="Type">const</span> <span class="Type">int</span>,
+                                       <span class="Type">const</span> _BOOLEAN,
+                                       <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Delete a block data from cache</span>
+_PROTOTYPE _EXTERN _BOOLEAN cache_delete_block(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Restore a block of data to cache</span>
+_PROTOTYPE _EXTERN _BOOLEAN cache_restore_block(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Clear cache</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_clear(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Merge pair of caches */</span>
+_PUBLIC <span class="Type">int</span> cache_merge(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Get string repesentation of blockag i.d</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_get_blocktag_id_str(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">char</span> *);
+
+<span class="Comment">// Get tag of specified cache block </span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_get_blocktag(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Set tag of specified cache block </span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_set_blocktag(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Change tags of specified cache blocks</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_change_blocktag(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Get lifetime of specified cache block </span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_get_blocklifetime(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Set lifetime of specified cache block </span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_set_blocklifetime(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Get hubness of specified cache block </span>
+_PROTOTYPE _EXTERN <span class="Type">unsigned</span> <span class="Type">int</span> cache_get_blockhubness(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Set hubness of specified cache block </span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_set_blockhubness(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Get binding of specified cache block </span>
+_PROTOTYPE _EXTERN <span class="Type">unsigned</span> <span class="Type">int</span> cache_get_blockbinding(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Set binding of specified cache block </span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_set_blockbinding(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Get co-ordination list size for cache</span>
+_PROTOTYPE _EXTERN <span class="Type">unsigned</span> <span class="Type">int</span> cache_get_colsize(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Set co-ordination list size for cache</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_set_colsize(<span class="Type">const</span> _BOOLEAN, <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Compact cache</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_compact(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">int</span>);
+
+<span class="Comment">// Resize cache</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_resize(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Lock cache</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_lock(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Unlock cache</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_unlock(<span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Is cache is private? (read only)</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_is_private(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Is cache is preloaded? </span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_is_private(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Set cache auxilliary data field</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_set_auxinfo(<span class="Type">const</span> _BOOLEAN, <span class="Type">const</span> <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+<span class="Comment">// Get cache auxilliary data field</span>
+_PROTOTYPE _EXTERN <span class="Type">int</span> cache_get_auxinfo(<span class="Type">const</span> _BOOLEAN, <span class="Type">char</span> *, <span class="Type">const</span> <span class="Type">unsigned</span> <span class="Type">int</span>);
+
+
+<span class="PreProc">#undef _EXPORT</span>
+<span class="PreProc">#ifdef CPLUSPLUS</span>
+<span class="PreProc">#   define _EXPORT </span><span class="Type">extern</span><span class="PreProc"> C</span>
+<span class="PreProc">#else</span>
+<span class="PreProc">#   define _EXPORT </span><span class="Type">extern</span>
+<span class="PreProc">#endif</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> Floret library </span><span class="Comment">*/</span>
+
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

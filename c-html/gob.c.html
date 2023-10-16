@@ -1,0 +1,376 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/gob.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------------------------------</span>
+<span class="Comment">     Purpose: creates a mouth (gob hole) into which data for payload application is cat'ed</span>
+
+<span class="Comment">     Author:  M.A. O'Neill</span>
+<span class="Comment">              Tumbling Dice Ltd</span>
+<span class="Comment">              Gosforth</span>
+<span class="Comment">              Newcastle upon Tyne</span>
+<span class="Comment">              NE3 4RT</span>
+<span class="Comment">              United Kingdom</span>
+
+<span class="Comment">     Version: 2.03 </span>
+<span class="Comment">     Dated:   24th May 2022</span>
+<span class="Comment">     E-mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">-----------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;stdio.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;bsd/string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;signal.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/types.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/stat.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;fcntl.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stdlib.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;xtypes.h&gt;</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Defines which are local to this application ...</span>
+<span class="Comment">------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Version of gob </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define GOB_VERSION   </span><span class="Constant">&quot;2.03&quot;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> String size </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define SSIZE         </span><span class="Constant">2048</span><span class="PreProc"> </span>
+
+<span class="PreProc">#ifndef FALSE </span>
+<span class="PreProc">#define FALSE </span><span class="Constant">0</span><span class="PreProc"> </span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> FALSE </span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifndef TRUE</span>
+<span class="PreProc">#define TRUE </span><span class="Constant">255</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> TRUE </span><span class="Comment">*/</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------------------------</span>
+<span class="Comment">    Variables which are private to this application ...</span>
+<span class="Comment">------------------------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">static</span> <span class="Type">char</span> hostname[SSIZE]      = <span class="Constant">&quot;&quot;</span>;
+<span class="Type">static</span> <span class="Type">char</span> pen[SSIZE]           = <span class="Constant">&quot;&quot;</span>;
+<span class="Type">static</span> <span class="Type">char</span> gob_fifo_name[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+<span class="Type">static</span> <span class="Type">int</span>  delete_on_exit       = FALSE;
+<span class="Type">static</span> <span class="Type">int</span>  verbose              = FALSE;
+<span class="Type">static</span> <span class="Type">int</span>  indes                = (-<span class="Constant">1</span>);
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Handle SIGTERM and SIGINT </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> gob_exit(<span class="Type">int</span> signum)
+
+{   <span class="Statement">if</span>(delete_on_exit == TRUE)
+    {  (<span class="Type">void</span>)unlink(gob_fifo_name);
+
+       <span class="Statement">if</span>(verbose == TRUE)
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): exit (gob hole </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> deleted)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,pen,getpid(),hostname,gob_fifo_name);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+
+       exit(<span class="Constant">0</span>);
+    }
+
+    <span class="Statement">if</span>(verbose == TRUE)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): exit</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,pen,getpid(),hostname);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    }
+
+    exit(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> FIFO homeostat </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> gob_fifo_homeostat(<span class="Type">int</span> signum)
+
+{   <span class="Type">int</span>           bytes_read = (-<span class="Constant">1</span>);
+    <span class="Type">unsigned</span> <span class="Type">char</span> buf[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+    <span class="Statement">if</span>(access(gob_fifo_name,F_OK | R_OK) == (-<span class="Constant">1</span>))
+    {
+
+       <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Suck contents of (stale) FIFO which has become nameless </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">---------------------------------------------------------</span><span class="Comment">*/</span>
+
+       (<span class="Type">void</span>)fcntl(indes,F_SETFL,O_NONBLOCK);
+       bytes_read = read(indes,buf,SSIZE);
+
+       <span class="Statement">if</span>(bytes_read &gt; <span class="Constant">0</span>)
+       {  <span class="Statement">if</span>(verbose == TRUE)
+          {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;gob [</span><span class="Special">%s</span><span class="Constant">] version </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">) flushing stale gob hole [</span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant">]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,
+                                                     pen,GOB_VERSION,getpid(),hostname,gob_fifo_name);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+          }
+
+          (<span class="Type">void</span>)write(<span class="Constant">1</span>,buf,bytes_read);
+       }
+
+       (<span class="Type">void</span>)close(indes);
+
+       <span class="Statement">if</span>(mknod(gob_fifo_name,<span class="PreProc">0</span><span class="Constant">600</span> | S_IFIFO,<span class="Constant">0</span>) == (-<span class="Constant">1</span>))
+       {  <span class="Statement">if</span>(verbose == TRUE)
+          {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;gob [</span><span class="Special">%s</span><span class="Constant">] version </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">) failed to creat gob hole </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant">]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,
+                                                     pen,GOB_VERSION,getpid(),hostname,gob_fifo_name);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+          }
+
+          exit(<span class="Constant">255</span>);
+       }
+       indes = open(gob_fifo_name,<span class="Constant">2</span>);
+
+       <span class="Statement">if</span>(verbose == TRUE)
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): gob hole </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> lost - restoring</span><span class="Special">\n</span><span class="Constant">&quot;</span>,pen,getpid(),hostname,gob_fifo_name);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Reset signal handler </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)signal(<span class="Constant">SIGALRM</span>,(<span class="Type">void</span> *)&amp;gob_fifo_homeostat);
+    (<span class="Type">void</span>)alarm(<span class="Constant">1</span>);
+
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Main entry point for application </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> main(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   <span class="Type">int</span>  i,
+         bytes_read,
+         decoded      = <span class="Constant">0</span>,
+         end_of_data  = TRUE;
+
+    <span class="Type">char</span>          newstr[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+    <span class="Type">unsigned</span> <span class="Type">char</span> buf[SSIZE]    = <span class="Constant">&quot;&quot;</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Get process execution name </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)strncpy(pen,argv[<span class="Constant">0</span>],SSIZE);
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Exit signal handlers </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)signal(<span class="Constant">SIGTERM</span>,(<span class="Type">void</span> *)&amp;gob_exit);
+    (<span class="Type">void</span>)signal(<span class="Constant">SIGINT</span>, (<span class="Type">void</span> *)&amp;gob_exit);
+    (<span class="Type">void</span>)signal(<span class="Constant">SIGALRM</span>,(<span class="Type">void</span> *)&amp;gob_fifo_homeostat);
+    (<span class="Type">void</span>)alarm(<span class="Constant">1</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Get hostname </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)gethostname(hostname,SSIZE);
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Decode command tail arguments </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(isatty(<span class="Constant">1</span>) == <span class="Constant">1</span>)
+    {  <span class="Statement">if</span>(argc == <span class="Constant">1</span> || strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;-usage&quot;</span>) == <span class="Constant">0</span> || strcmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;-help&quot;</span>) == <span class="Constant">0</span>)
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">gob version </span><span class="Special">%s</span><span class="Constant">, (C) Tumbling Dice 2005-2022 (built </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,GOB_VERSION,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;GOB is free software, covered by the GNU General Public License, and you are</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;welcome to change it and/or distribute copies of it under certain conditions.</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;See the GPL and LGPL licences at www.gnu.org for further details</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;GOB comes with ABSOLUTELY NO WARRANTY</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">Usage: gob [-usage | -help] | [-pen &lt;execution name&gt;] !-hole &lt;gob hole FIFO name&gt;!</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+          exit(<span class="Constant">255</span>);
+       }
+    }
+
+    <span class="Statement">for</span>(i=<span class="Constant">1</span>; i&lt;argc; ++i)
+    {  <span class="Statement">if</span>(strcmp(argv[i],<span class="Constant">&quot;-verbose&quot;</span>) == <span class="Constant">0</span>)
+          verbose = TRUE;
+       <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(argv[i],<span class="Constant">&quot;-pen&quot;</span>) == <span class="Constant">0</span>)
+       {  <span class="Statement">if</span>(fork() == <span class="Constant">0</span>)
+          {  <span class="Type">int</span>  j,
+                  cnt = <span class="Constant">1</span>;
+
+             <span class="Type">char</span> args[<span class="Constant">32</span>][SSIZE]  = { <span class="Constant">&quot;&quot;</span> },
+                  *argptr[<span class="Constant">32</span>]      = { <span class="Constant">NULL</span> };
+
+             <span class="Statement">if</span>(i == argc - <span class="Constant">1</span> || argv[i+<span class="Constant">1</span>][<span class="Constant">0</span>] == <span class="Constant">'-'</span>)
+             {  <span class="Statement">if</span>(verbose == TRUE)
+                {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): expecting process execution name</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,pen,getpid(),hostname);
+                   (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+                }
+
+                exit(<span class="Constant">255</span>);
+             }
+
+             (<span class="Type">void</span>)strlcpy(args[<span class="Constant">0</span>],argv[i+<span class="Constant">1</span>],SSIZE);
+             <span class="Statement">for</span>(j=<span class="Constant">1</span>; j&lt;argc; ++j)
+             {  <span class="Statement">if</span>(j != i &amp;&amp; j != i+<span class="Constant">1</span>)
+                {  (<span class="Type">void</span>)strlcpy(args[cnt],argv[j],SSIZE);
+                   argptr[cnt] = (<span class="Type">char</span> *)&amp;args[cnt];
+                   ++cnt;
+                }
+             }
+
+             (<span class="Type">void</span>)strlcpy(args[<span class="Constant">0</span>],argv[i+<span class="Constant">1</span>],SSIZE);
+
+             (<span class="Type">void</span>)strlcpy(args[cnt],<span class="Constant">&quot;</span><span class="Special">\0</span><span class="Constant">&quot;</span>,SSIZE);
+             argptr[<span class="Constant">0</span>]   = (<span class="Type">char</span> *)&amp;args[<span class="Constant">0</span>];
+
+              <span class="Statement">if</span>(verbose == TRUE)
+              {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): executing as </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n\n</span><span class="Constant">&quot;</span>,pen,getpid(),hostname,argptr[<span class="Constant">0</span>]);
+                 (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+              }
+
+              (<span class="Type">void</span>)execvp(<span class="Constant">&quot;gob&quot;</span>,argptr);
+
+              <span class="Statement">if</span>(verbose == TRUE)
+              {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): failed to exec (gob) child process</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,pen,getpid(),hostname);
+                 (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+              }
+
+              exit(<span class="Constant">255</span>);
+          }
+          <span class="Statement">else</span>
+             _exit(<span class="Constant">255</span>);
+       }
+       <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(argv[i],<span class="Constant">&quot;-hole&quot;</span>) == <span class="Constant">0</span>)
+       {  <span class="Statement">if</span>(i == argc -<span class="Constant">1</span> || argv[i+<span class="Constant">1</span>][<span class="Constant">0</span>] == <span class="Constant">'-'</span>)
+          {  <span class="Statement">if</span>(verbose == TRUE)
+             {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): no gob hole FIFO specified</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,pen,getpid(),hostname);
+                (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+             }
+
+             exit(<span class="Constant">255</span>);
+          }
+
+          (<span class="Type">void</span>)strlcpy(gob_fifo_name,argv[i+<span class="Constant">1</span>],SSIZE);
+          ++i;
+          decoded += <span class="Constant">2</span>;
+       }
+    }
+
+    <span class="Statement">if</span>(decoded &lt; argc - <span class="Constant">2</span>)
+    {   <span class="Statement">if</span>(verbose == TRUE)
+        {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): unparsed command tail arguments</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,pen,getpid(),hostname);
+           (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+        }
+
+        exit(<span class="Constant">255</span>);
+    }
+
+    <span class="Statement">if</span>(strcmp(gob_fifo_name,<span class="Constant">&quot;&quot;</span>) == <span class="Constant">0</span>)
+       (<span class="Type">void</span>)sprintf(gob_fifo_name,<span class="Constant">&quot;gob.</span><span class="Special">%d</span><span class="Constant">.</span><span class="Special">%s</span><span class="Constant">.fifo&quot;</span>,getpid(),hostname);
+
+    <span class="Statement">if</span>(access(gob_fifo_name,F_OK) == (-<span class="Constant">1</span>))
+    {  delete_on_exit = TRUE;
+       <span class="Statement">if</span>(mknod(gob_fifo_name,<span class="PreProc">0</span><span class="Constant">600</span> | S_IFIFO,<span class="Constant">0</span>) == (-<span class="Constant">1</span>))
+       {  <span class="Statement">if</span>(verbose == TRUE)
+          {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;gob [</span><span class="Special">%s</span><span class="Constant">] version </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">) failed to creat gob hole </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant">]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,
+                                                     pen,GOB_VERSION,getpid(),hostname,gob_fifo_name);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+          }
+
+          exit(<span class="Constant">255</span>);
+       }
+       <span class="Statement">else</span>
+          (<span class="Type">void</span>)strlcpy(newstr,<span class="Constant">&quot;new&quot;</span>,SSIZE);
+    }
+
+    <span class="Statement">if</span>(verbose == TRUE)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">gob [</span><span class="Special">%s</span><span class="Constant">] version </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">) started using </span><span class="Special">%s</span><span class="Constant"> gob hole </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n\n</span><span class="Constant">&quot;</span>,
+                                          pen,GOB_VERSION,getpid(),hostname,newstr,gob_fifo_name);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    }
+
+    indes = open(gob_fifo_name,<span class="Constant">2</span>);
+    <span class="Statement">do</span> {   bytes_read = read(indes,buf,SSIZE);
+
+           <span class="Statement">if</span>(bytes_read &gt; <span class="Constant">0</span>)
+           {  <span class="Statement">if</span>(end_of_data == TRUE)
+              {  <span class="Statement">if</span>(verbose == TRUE)
+                 {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;gob [</span><span class="Special">%s</span><span class="Constant">] version </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">) new data stream established [frgm gob hole </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant">]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,
+                                                                              pen,GOB_VERSION,getpid(),hostname,gob_fifo_name);
+                    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+                 }
+
+                 end_of_data = FALSE;
+              }
+
+              (<span class="Type">void</span>)write(<span class="Constant">1</span>,buf,bytes_read);
+              <span class="Statement">if</span>(bytes_read != SSIZE)
+                 end_of_data = TRUE;
+           }
+
+       } <span class="Statement">while</span>(<span class="Constant">1</span>);
+
+    exit(<span class="Constant">0</span>);
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

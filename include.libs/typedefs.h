@@ -1,6 +1,6 @@
 /*-------------------------------------------------------------------------------------------------
     The PUPS bubble memory library.
-    (C) M.A. O'Neill, 8th June 2018, mao@tumblingdice.co.uk
+    (C) M.A. O'Neill, 4th January 2021, mao@tumblingdice.co.uk
 -------------------------------------------------------------------------------------------------*/
 
 #ifndef TYPEDEFS_H
@@ -67,16 +67,5 @@ typedef struct ftable_struct {
   int      fd;
   off_t    seek_ptr;
 } ftable_entry;
-
-
-
-/*---------------------------------------------------------------------------*/
-/*  This is the path _ckpt_recover() uses to find ckpt.? files.  It's        */
-/*  embedded in a struct so it can be passed into / returned from functions. */
-/*---------------------------------------------------------------------------*/
-
-typedef struct pname {
-  char name[SSIZE];
-} pname_type;
 
 #endif /* TYPEDEFS_H */

@@ -1,4 +1,4 @@
-.TH ASK 1 "7th December  2003" "PUPSP3 Scripts" "PUPSP3 Scripts"
+.TH ASK 1 "27th March 2020" "PUPSP3 Scripts" "PUPSP3 Scripts"
 
 .SH NAME
 ASK \- prompt for text string 
@@ -7,9 +7,11 @@ ASK \- prompt for text string
 .SH SYNOPSIS
 .B ask 
 .B [-usage | -help]
+|
+.B [-clear]
 .I [payload command]
 .I [prompt string] 
->& <log file>
+[2> <log file>]
 .br
 
 .SH DESCRIPTION
@@ -29,9 +31,15 @@ of
 .I ask(1)
 and is used to circumvent signal scheduling problems in shellscripts which call
 .I ask(1)
-for input
+for input.
+If a command is prefixed with '!' it is passed to the shell via the
+.I system(3)
+command processor.
+.I ask(1)
+keeps a history of the text-strings entered using the Gnu
+.I readline(3)
+library.
 .br
-
 
 .SH OPTIONS
 
@@ -39,6 +47,12 @@ for input
 display help and copyright information for the
 .I ask(1)
 filter.
+.br
+
+.B -clear
+tells
+.I ask(1)
+to clear text-string history.
 .br
 
 .B prompt
@@ -67,6 +81,17 @@ and
 active when running a payload command. Otherwise signal handling is default.
 .br
 
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
+.br
 
 .SH ENVIRONMENT VARIABLES
 None.
@@ -79,3 +104,6 @@ None.
 .SH PROGRAMMER
 M.A. O'Neill.
 .br
+
+.SH SEE ALSO
+system(3), readline(3)

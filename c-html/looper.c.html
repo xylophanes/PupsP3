@@ -1,0 +1,144 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/looper.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Looper payload (for testing)                  </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> M.A. O'Neill, Tumbling Dice, 4th January 2021 </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="PreProc">#include </span><span class="Constant">&lt;stdio.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stdlib.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;signal.h&gt;</span>
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Check signals </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define SIGCHECK     SIGRTMIN + </span><span class="Constant">11</span>
+<span class="PreProc">#define SIGRESTART   SIGRTMIN + </span><span class="Constant">12</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Dummy system call </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+<span class="Type">int</span> alarm_handler(<span class="Type">int</span> signum)
+
+{
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;ALARM</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+    (<span class="Type">void</span>)alarm(<span class="Constant">2</span>);
+    (<span class="Type">void</span>)signal(<span class="Constant">SIGALRM</span>,(<span class="Type">void</span> *)alarm_handler);
+
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Restart any system calls </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">int</span> cont_handler(<span class="Type">void</span>)
+
+{
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;CHECKPOINT</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+    (<span class="Type">void</span>)usleep(<span class="Constant">1000</span>);
+
+
+    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;RESTART</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+    (<span class="Type">void</span>)alarm(<span class="Constant">2</span>);
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> main entry point </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+<span class="Type">int</span> main(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{  <span class="Type">int</span> iter = <span class="Constant">0</span>;
+
+
+   <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+   <span class="Comment">/*</span><span class="Comment"> Schedule an alarm </span><span class="Comment">*/</span>
+   <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+   (<span class="Type">void</span>)alarm(<span class="Constant">2</span>);
+
+
+   <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+   <span class="Comment">/*</span><span class="Comment"> Handle SIGARLM </span><span class="Comment">*/</span>
+   <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+
+   (<span class="Type">void</span>)signal(<span class="Constant">SIGALRM</span>,   (<span class="Type">void</span> *)alarm_handler);
+
+
+   <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+   <span class="Comment">/*</span><span class="Comment"> Handle (checkpoint) restart </span><span class="Comment">*/</span>
+   <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+
+   (<span class="Type">void</span>)signal(<span class="Constant">SIGCONT</span>,   (<span class="Type">void</span> *)cont_handler);
+   (<span class="Type">void</span>)signal(SIGRESTART,(<span class="Type">void</span> *)cont_handler);
+
+
+   <span class="Comment">/*</span><span class="Comment">-----------</span><span class="Comment">*/</span>
+   <span class="Comment">/*</span><span class="Comment"> Main loop </span><span class="Comment">*/</span>
+   <span class="Comment">/*</span><span class="Comment">-----------</span><span class="Comment">*/</span>
+
+   <span class="Statement">while</span>(<span class="Constant">1</span>)
+   {    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;iteration </span><span class="Special">%d</span><span class="Constant"> </span><span class="Special">\n</span><span class="Constant">&quot;</span>,iter++);
+        (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+        (<span class="Type">void</span>)sleep(<span class="Constant">1</span>);
+   }
+}
+
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

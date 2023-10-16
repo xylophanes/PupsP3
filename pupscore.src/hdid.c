@@ -8,13 +8,14 @@
              NE3 4RT
              United Kingdom
 
-    Version: 2.00 
-    Dated:   30th August 2019 
+    Version: 2.02 
+    Dated:   24th May 2022
     E-mail:  mao@tumblingdice.co.uk
 ---------------------------------------------------------------------------*/
 
 #include <stdio.h>
 #include <string.h>
+#include <bsd/string.h>
 #include <stdlib.h>
 
 #include <sys/ioctl.h>
@@ -26,7 +27,7 @@
 /* Version of hdid */
 /*-----------------*/
 
-#define HDID_VERSION    "2.00"
+#define HDID_VERSION    "2.02"
 
 
 /*-------------*/
@@ -42,103 +43,6 @@
 
 _PROTOTYPE _PRIVATE int ecryptstr(int, char *, char *);
 _PROTOTYPE _PRIVATE _BOOLEAN strin(char *, char *);
-
-
-
-
-#ifdef BSD_FUNCTION_SUPPORT
-/*------------------------------------------------------------------------
-    Strlcpy and stlcat function based on OpenBSD functions ...
-------------------------------------------------------------------------*/
-/*------------------*/
-/* Open BSD Strlcat */
-/*------------------*/
-_PRIVATE size_t strlcat(char *dst, const char *src, size_t dsize)
-{
-	const char *odst = dst;
-	const char *osrc = src;
-	size_t      n    = dsize;
-	size_t      dlen;
-
-
-        /*------------------------------------------------------------------*/
-	/* Find the end of dst and adjust bytes left but don't go past end. */
-        /*------------------------------------------------------------------*/
-
-	while (n-- != 0 && *dst != '\0')
-		dst++;
-	dlen = dst - odst;
-	n = dsize - dlen;
-
-	if (n-- == 0)
-		return(dlen + strlen(src));
-	while (*src != '\0') {
-		if (n != 0) {
-			*dst++ = *src;
-			n--;
-		}
-		src++;
-	}
-	*dst = '\0';
-
-
-        /*----------------------------*/
-        /* count does not include NUL */
-        /*----------------------------*/
-
-	return(dlen + (src - osrc));
-}
-
-
-
-
-/*------------------*/
-/* Open BSD strlcpy */
-/*------------------*/
-
-_PRIVATE size_t strlcpy(char *dst, const char *src, size_t dsize)
-{
-	const char   *osrc = src;
-	size_t nleft       = dsize;
-
-
-        /*---------------------------------*/
-	/* Copy as many bytes as will fit. */
-        /*---------------------------------*/
-
-	if (nleft != 0) {
-		while (--nleft != 0) {
-			if ((*dst++ = *src++) == '\0')
-				break;
-		}
-	}
-
-
-        /*-----------------------------------------------------------*/
-	/* Not enough room in dst, add NUL and traverse rest of src. */
-        /*-----------------------------------------------------------*/
-
-	if (nleft == 0) {
-		if (dsize != 0)
-
-                        /*-------------------*/
-                        /* NUL-terminate dst */
-                        /*-------------------*/
-
-			*dst = '\0';
-		while (*src++)
-			;
-	}
-
-
-        /*----------------------------*/
-        /* count does not include NUL */
-        /*----------------------------*/
-
-	return(src - osrc - 1);
-}
-#endif /* BSD_FUNCTION_SUPPORT */
-
 
 
 
@@ -163,7 +67,7 @@ _PUBLIC int main(int argc, char *argv[])
 
     (void)gethostname(hostname,SSIZE);
     if(argc == 1 || strcmp(argv[1],"-usage") == 0 || strcmp(argv[1],"-help") == 0)
-    {  (void)fprintf(stderr,"\nhdid version %s, (C) Tumbling Dice 2003-2019 (built %s %s)\n\n",HDID_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nhdid version %s, (C) Tumbling Dice 2003-2022 (built %s %s)\n\n",HDID_VERSION,__TIME__,__DATE__);
        (void)fprintf(stderr,"HDID is free software, covered by the GNU General Public License, and you are\n");
        (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
        (void)fprintf(stderr,"See the GPL and LGPL licences at www.gnu.org for further details\n");
@@ -171,7 +75,7 @@ _PUBLIC int main(int argc, char *argv[])
        (void)fprintf(stderr,"\nUsage: hdid [-usage | -help] | [-ecrypt <seed>] [disk device name | default]\n\n");
        (void)fflush(stderr);
 
-       exit(-1);
+       exit(255);
     }
     else if(argc == 2)
     {  if(strin(argv[1],"/dev/") == TRUE)
@@ -190,7 +94,7 @@ _PUBLIC int main(int argc, char *argv[])
              {  (void)fprintf(stderr,"hdid (%d@%s): encryption (%s) seed must be an integer (>= 0)\n",getpid(),hostname,argv[3]);
                 (void)fflush(stderr);
 
-                exit(-1);
+                exit(255);
              }
 
              dev_index = 3;
@@ -204,7 +108,7 @@ _PUBLIC int main(int argc, char *argv[])
        {  (void)fprintf(stderr,"hdid (%d@%s): expecting \"-ecrypt\" parameter\n",getpid(),hostname);
           (void)fflush(stderr);
 
-          exit(-1);
+          exit(255);
        }
 
        if(strin(argv[dev_index],"/dev/") == TRUE)
@@ -231,7 +135,7 @@ _PUBLIC int main(int argc, char *argv[])
     {  (void)fprintf(stderr,"hdid (%d@%s): failed to open (disk) device \"%s\"\n",getpid(),hostname,hd_device);
        (void)fflush(stderr);
 
-       exit(-1);
+       exit(255);
     }
 
     if(ioctl(ddes,HDIO_GET_IDENTITY,(void *)&disk_info) == (-1))
@@ -239,7 +143,7 @@ _PUBLIC int main(int argc, char *argv[])
        (void)fflush(stderr);
 
        (void)close(ddes);
-       exit(-1);
+       exit(255);
     }
 
     (void)close(ddes);

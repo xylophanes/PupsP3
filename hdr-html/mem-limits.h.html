@@ -1,0 +1,159 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.5.1.src.git/include.libs/mem-limits.h.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="cpp">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------------</span>
+<span class="Comment">   Includes for memory limit warnings.</span>
+<span class="Comment">   Copyright (C) 1990, 1993, 1994 Free Software Foundation, Inc.</span>
+<span class="Comment">   Copyright (C) 2001-2022, Mark O'Neill, Tumbling Dice &lt;mao@tumblingdice.co.uk&gt;</span>
+
+<span class="Comment">   This file is based on part of the GNU C Library.</span>
+
+<span class="Comment">   The GNU C Library is free software; you can redistribute it and/or</span>
+<span class="Comment">   modify it under the terms of the GNU Library General Public License as</span>
+<span class="Comment">   published by the Free Software Foundation; either version 2 of the</span>
+<span class="Comment">   License, or (at your option) any later version.</span>
+
+<span class="Comment">   The GNU C Library is distributed in the hope that it will be useful,</span>
+<span class="Comment">   but WITHOUT ANY WARRANTY; without even the implied warranty of</span>
+<span class="Comment">   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU</span>
+<span class="Comment">   Library General Public License for more details.</span>
+
+<span class="Comment">   You should have received a copy of the GNU Library General Public</span>
+<span class="Comment">   License along with the GNU C Library; see the file COPYING.LIB.  If</span>
+<span class="Comment">   not, write to the Free Software Foundation, Inc., 675 Mass Ave,</span>
+<span class="Comment">   Cambridge, MA 02139, USA.</span>
+<span class="Comment">--------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Some systems need this before &lt;sys/resource.h&gt;. </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/types.h&gt;</span>
+
+<span class="PreProc">#ifdef _LIBC</span>
+<span class="PreProc">#   include </span><span class="Constant">&lt;sys/resource.h&gt;</span>
+<span class="PreProc">#else</span>
+<span class="PreProc">#   define LIM_DATA </span><span class="Constant">1000000</span>
+<span class="PreProc">#   include </span><span class="Constant">&lt;sys/time.h&gt;</span>
+<span class="PreProc">#   include </span><span class="Constant">&lt;sys/resource.h&gt;</span>
+
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> _LIBC </span><span class="Comment">*/</span>
+
+
+<span class="PreProc">#ifdef emacs</span>
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> The important properties of this type are that 1) it's a pointer, and  </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> 2) arithmetic on it should work as if the size of the object pointed   </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> to has a size of 1.                                                    </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef __STDC__</span>
+    <span class="Type">typedef</span> <span class="Type">void</span> *POINTER;
+<span class="PreProc">#else</span>
+    <span class="Type">typedef</span> <span class="Type">char</span> *POINTER;
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> __STDC__ </span><span class="Comment">*/</span>
+
+<span class="Type">typedef</span> <span class="Type">unsigned</span> <span class="Type">long</span> SIZE;
+
+<span class="PreProc">#ifdef NULL</span>
+<span class="PreProc">#   undef </span><span class="Constant">NULL</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> NULL </span><span class="Comment">*/</span>
+
+<span class="PreProc">#define </span><span class="Constant">NULL</span><span class="PreProc"> ((POINTER) </span><span class="Constant">0</span><span class="PreProc">)</span>
+
+<span class="Type">extern</span> POINTER start_of_data ();
+<span class="PreProc">#ifdef DATA_SEG_BITS</span>
+<span class="PreProc">#   define EXCEEDS_LISP_PTR(ptr) (((EMACS_UINT) (ptr) &amp; ~DATA_SEG_BITS) &gt;&gt; VALBITS)</span>
+<span class="PreProc">#else</span>
+<span class="PreProc">#   define EXCEEDS_LISP_PTR(ptr) ((EMACS_UINT) (ptr) &gt;&gt; VALBITS)</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> DATA_SEG_BITS </span><span class="Comment">*/</span>
+
+
+       <span class="Comment">/*</span><span class="Comment">-----------</span><span class="Comment">*/</span>
+<span class="PreProc">#else</span>  <span class="Comment">/*</span><span class="Comment"> not emacs </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-----------</span><span class="Comment">*/</span>
+
+<span class="Type">extern</span> <span class="Type">char</span> etext;
+<span class="PreProc">#define start_of_data() &amp;etext</span>
+
+       <span class="Comment">/*</span><span class="Comment">-----------</span><span class="Comment">*/</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> Not emacs </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-----------</span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> start of data space; can be changed by calling malloc_init </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">static</span> POINTER data_space_start;
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Number of bytes of writable memory we can expect to be able to get </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">static</span> <span class="Type">unsigned</span> <span class="Type">int</span> lim_data;
+
+<span class="PreProc">#ifdef NO_LIM_DATA</span>
+
+<span class="Type">static</span> <span class="Type">void</span> get_lim_data ()
+{
+  lim_data = (-<span class="Constant">1</span>);
+}
+
+
+      <span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+<span class="PreProc">#else</span> <span class="Comment">/*</span><span class="Comment"> NO_LIM_DATA </span><span class="Comment">*/</span>
+      <span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+<span class="Type">static</span> <span class="Type">void</span> get_lim_data (<span class="Type">void</span>)
+{
+  <span class="Type">extern</span> <span class="Type">long</span> ulimit ();
+
+  lim_data = (-<span class="Constant">1</span>);
+
+  <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment"> Use the ulimit call, if we seem to have it. </span><span class="Comment">*/</span>
+  <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+
+  lim_data =  ulimit (<span class="Constant">3</span>, <span class="Constant">0</span>);
+  lim_data -= (<span class="Type">long</span>) data_space_start;
+}
+
+       <span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> NO_LIM_DATA </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

@@ -8,13 +8,14 @@
              NE3 4RT
              United Kingdom
 
-    Version: 2.02 
-    Dated:   18th September 2019 
+    Version: 4.04 
+    Dated:   24th May 2022 
     E-mail:  mao@tumblingdice.co.uk
 -----------------------------------------------------------------------------------------*/
 
 #include <stdio.h>
 #include <string.h>
+#include <bsd/string.h>
 #include <signal.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -35,14 +36,22 @@
 /* Version */
 /*---------*/
 
-#define ASK_VERSION  "2.02"
+#define ASK_VERSION     "4.04"
 
 
-/*-------------*?
+/*-------------*/
 /* String size */
 /*-------------*/
 
-#define SSIZE        2048 
+#define SSIZE           2048 
+
+
+/*---------*/
+/* History */
+/*---------*/
+
+#define ASK_MAX_HISTORY 1024
+
 
 
 /*----------------------------------------------------------------------------------------
@@ -52,100 +61,113 @@
 _PRIVATE int child_pid = (-1);
 
 
+/*----------------------------------------------------------------------------------------
+    Look for the occurence of string s2 within string s1 ...
+----------------------------------------------------------------------------------------*/
+
+_PRIVATE _BOOLEAN strin(char *s1, char *s2)
+
+{   int i,
+        cmp_size,
+        chk_limit;
+
+    if(strlen(s2) > strlen(s1))
+       return(FALSE);
+
+    chk_limit = strlen(s1) - strlen(s2) + 1;
+    cmp_size  = strlen(s2);
+
+    for(i=0; i<chk_limit; ++i)
+       if(strncmp(&s1[i],s2,cmp_size) == 0)
+          return(TRUE);
+
+    return(FALSE);
+}
 
 
-#ifdef BSD_FUNCTION_SUPPORT
-/*---------------------------------------------------------------------------------------
-    Strlcpy and stlcat function based on OpenBSD functions ...
+
+
+/*----------------------------------------------------------------------------------------
+    Test for empty string (contains only whitespace and control chars) ...
+----------------------------------------------------------------------------------------*/
+
+_PRIVATE _BOOLEAN strempty(const char *s)
+
+{   size_t i,
+           size;
+
+    if(s == (const char *)NULL)
+       return(-1);
+
+    size = strlen(s);
+
+
+    /*------------------------------*/
+    /* Do not process empnty string */
+    /*------------------------------*/
+
+    if(size > 0)
+    {  for(i=0; i<strlen(s); ++i)
+       {  if(s[i] != ' ' && s[i] != '\n')
+             return(FALSE);
+       }
+
+       return(TRUE);
+    }
+
+    return(-1);
+}
+
+
+
+
+/*--------------------------------------------------------------------------------------
+    Routine to copy a string filtering out characters which have been
+    marked as excluded ...
 --------------------------------------------------------------------------------------*/
-/*------------------*/
-/* Open BSD Strlcat */
-/*------------------*/
-_PRIVATE size_t strlcat(char *dst, const char *src, size_t dsize)
-{
-	const char *odst = dst;
-	const char *osrc = src;
-	size_t      n    = dsize;
-	size_t      dlen;
+
+_PUBLIC size_t strexccpy(const char *s1, char *s2, const char *ex_ch)
+
+{   size_t i,
+           j,
+           k,
+           size_1,
+           size_2;
+
+    if(s1    == (const char *)NULL    ||
+       s2    == (char *)      NULL    ||
+       ex_ch == (const char *)NULL     )
+       return(-1);
+
+    size_1 = strlen(s1);
+    size_2 = strlen(ex_ch);
 
 
-        /*------------------------------------------------------------------*/
-	/* Find the end of dst and adjust bytes left but don't go past end. */
-        /*------------------------------------------------------------------*/
+    /*-----------------------------*/
+    /* Do not process empty string */
+    /*-----------------------------*/
 
-	while (n-- != 0 && *dst != '\0')
-		dst++;
-	dlen = dst - odst;
-	n = dsize - dlen;
+    if(size_1 > 0 && size_2 > 0)
+    {
+       j = 0;
+       for(i=0; i<size_1; ++i)
+       {   for(k=0; k<size_2; ++k)
+           {  if(s1[i] == ex_ch[k])
+                 goto exclude;
+           }
 
-	if (n-- == 0)
-		return(dlen + strlen(src));
-	while (*src != '\0') {
-		if (n != 0) {
-			*dst++ = *src;
-			n--;
-		}
-		src++;
-	}
-	*dst = '\0';
+           s2[j] = s1[i];
+           ++j;
 
+exclude:   continue;
 
-        /*----------------------------*/
-        /* count does not include NUL */
-        /*----------------------------*/
+       }
 
-	return(dlen + (src - osrc));
+       return(j);
+    }
+
+    return(-1);
 }
-
-
-
-
-/*------------------*/
-/* Open BSD strlcpy */
-/*------------------*/
-
-_PRIVATE size_t strlcpy(char *dst, const char *src, size_t dsize)
-{
-	const char   *osrc = src;
-	size_t nleft       = dsize;
-
-
-        /*---------------------------------*/
-	/* Copy as many bytes as will fit. */
-        /*---------------------------------*/
-
-	if (nleft != 0) {
-		while (--nleft != 0) {
-			if ((*dst++ = *src++) == '\0')
-				break;
-		}
-	}
-
-
-        /*-----------------------------------------------------------*/
-	/* Not enough room in dst, add NUL and traverse rest of src. */
-        /*-----------------------------------------------------------*/
-
-	if (nleft == 0) {
-		if (dsize != 0)
-
-                        /*-------------------*/
-                        /* NUL-terminate dst */
-                        /*-------------------*/
-
-			*dst = '\0';
-		while (*src++)
-			;
-	}
-
-
-        /*----------------------------*/
-        /* count does not include NUL */
-        /*----------------------------*/
-
-	return(src - osrc - 1);
-}
-#endif /* BSD_FUNCTION_SUPPORT */
 
 
 
@@ -162,7 +184,7 @@ _PRIVATE int exit_handler(int signum)
     (void)fprintf(stderr,"\n");
     (void)fflush(stderr);
 
-    (void)exit(-1);
+    (void)exit(255);
 }
 
 
@@ -224,29 +246,56 @@ _PUBLIC int main(int argc, char *argv[])
          status,
          out,
          err,
-         prompt_index = 1;
+         prompt_index                    = 1;
 
-    char value[SSIZE]  = "";
+    _BOOLEAN looper                      = TRUE;
+
+    char     value[SSIZE]                = "",
+             ask_history[SSIZE]          = "",
+             ask_history_pathname[SSIZE] = "";
+;
+    FILE     *out_stream                 = (FILE *)NULL;
 
     if(argc == 2 && (strcmp(argv[1],"-usage") == 0 || strcmp(argv[1],"-help") == 0))
     {  
-       (void)fprintf(stderr,"\nask version %s, (C) Tumbling Dice 2003-2019 (built %s %s)\n\n",ASK_VERSION,__TIME__,__DATE__);
+       (void)fprintf(stderr,"\nask version %s, (C) Tumbling Dice 2003-2022 (built %s %s)\n\n",ASK_VERSION,__TIME__,__DATE__);
        (void)fprintf(stderr,"ASK is free software, covered by the GNU General Public License, and you are\n");
        (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
        (void)fprintf(stderr,"See the GPL and LGPL licences at www.gnu.org for further details\n");
        (void)fprintf(stderr,"ASK comes with ABSOLUTELY NO WARRANTY\n\n");
 
-       (void)fprintf(stderr,"\nUsage: ask [payload] [prompt]\n\n");
+       (void)fprintf(stderr,"\nUsage: ask [-help | -usage] | [-clear] [payload] [prompt]\n\n");
        (void)fflush(stderr);
 
        exit(1);
     }
 
+
+
+    #ifdef HAVE_READLINE
+    /*-------------------------------*/
+    /* Get (readline) history if any */
+    /*-------------------------------*/
+
+    (void)snprintf(ask_history_pathname,SSIZE,"/tmp/ask.%d.history",getuid());
+
+    if(argc == 2 && strcmp(argv[1],"-clear") == 0)
+    {  (void)unlink(ask_history_pathname); 
+       prompt_index = 2;
+    }
+
+    (void)snprintf(ask_history,SSIZE,ask_history_pathname);
+    if(access(ask_history,F_OK | R_OK) != (-1))
+    {  (void)history_truncate_file(ask_history,ASK_MAX_HISTORY);
+       (void)read_history(ask_history);
+    }
+    #endif /* HAVE_READLINE */
+
     if(isatty(0) != 1)
     {  (void)fprintf(stderr,"ask: standard I/O is not associated with a terminal\n");
        (void)fflush(stderr);
 
-       exit(-1);
+       exit(255);
     } 
 
     if(argc == 3)
@@ -306,41 +355,161 @@ _PUBLIC int main(int argc, char *argv[])
     /* Main loop of the ask command */
     /*------------------------------*/
 
-    do {    
+    out_stream = fdopen(out,"w"); 
+    do {     
 
-            #ifdef HAVE_READLINE
-            if(argc == 1)
-               (void)strlcpy(value,readline("ask> "),SSIZE);
+            char prompt[SSIZE]       = "",
+		 history_line[SSIZE] = "";
+            
+	    #ifdef HAVE_READLINE  
+            if(argc == 1 || argv[prompt_index] == (char *)NULL)
+            {  (void)strlcpy(value,readline("ask> "),SSIZE);
+               if(strempty(value) == FALSE && strexccpy(value,history_line,"\t") > 0)
+                  (void)add_history(history_line);
+            }
             else
-            {  char prompt[SSIZE] = "";
+            {
 
-               (void)snprintf(prompt,SSIZE,"%s> ",argv[prompt_index]);
+	       /*---------------------------------------*/
+	       /* If prompt starts with a '^' character */
+	       /* insert newline                        */
+               /*---------------------------------------*/
+
+	       if(argv[prompt_index][0] == '^')
+               {  unsigned int i,
+		               cnt  = 0;
+
+		  char space[SSIZE] = "";
+
+		  /*-------------------*/
+                  /* Whitespace filler */
+		  /*-------------------*/
+
+		  for(i=1; i<strlen(argv[prompt_index]); ++i)
+	          {  if(argv[prompt_index][i] == ' ')
+	             {  space[cnt] = ' ';
+		        ++cnt;
+	             }
+		     else
+                     {  space[cnt] = '\0';
+		        break;
+                     }
+                  }
+
+                  (void)snprintf(prompt,SSIZE,"%s\n%s> ",(char *)&argv[prompt_index][1],space);
+	       }
+	       else
+                  (void)snprintf(prompt,SSIZE,"%s> ",argv[prompt_index]);
+
                (void)strlcpy(value,readline(prompt),SSIZE);
+               if(strempty(value) == FALSE && strexccpy(value,history_line,"\t") > 0)
+                  (void)add_history(history_line);
             }
             #else
             if(argc == 1)
                (void)fprintf(stderr,"ask> ");
             else
-               (void)fprintf(stderr,"%s> ",argv[prompt_index]);
-            (void)fflush(stderr);
+            {   
+		    
+	       /*---------------------------------------*/
+	       /* If prompt starts with a '^' character */
+	       /* insert newline                        */
+               /*---------------------------------------*/
+
+	       if(argv[prompt_index][0] == '^')
+               {  unsigned int i,
+		               cnt  = 0;
+
+		  char space[SSIZE] = "";
+
+		  /*-------------------*/
+                  /* Whitespace filler */
+		  /*-------------------*/
+
+		  for(i=1; i<strlen(argv[prompt_index]); ++i)
+	          {  if(argv[prompt_index][i] == ' ')
+	             {  space[cnt] = ' ';
+		        ++cnt;
+	             }
+		     else
+                     {  space[cnt] = '\0';
+		        break;
+                     }
+                  }
+
+                  (void)snprintf(prompt,SSIZE,"%s\n%s>",(char *)&argv[prompt_index][1],space);
+	       }
+	       else
+                  (void)snprintf(prompt,SSIZE,"%s> ",argv[prompt_index]);
+
+	       (void)fprintf(stderr,"%s",prompt);
+               (void)fflush(stderr);
+            }
 
             (void)fgets(value,256,stdin);
             #endif /* HAVE_READLINE */
 
-	    if((ret = no_space(value)) >= 0)
-	    {  FILE *out_stream = (FILE *)NULL;
 
-               out_stream = fdopen(out,"w"); 
-               (void)fprintf(out_stream,"%s\n",(char *)&value[ret]);
-               (void)fflush(out_stream);
+            /*---------------------------------------------*/
+            /* Value of !ls tells ask to list the contents */
+            /* of the current working directory            */
+            /*---------------------------------------------*/
+
+            looper  = TRUE;
+            if(strin(value,"!") == TRUE)
+            {  int  n_spaces              = 0;
+               char ls_output_buffer[256] = "";
+
+               /*-------------------------*/
+               /* Skip any leading spaces */
+               /*-------------------------*/
+
+               while(value[n_spaces] == ' ')
+                    ++n_spaces;
+
+               (void)fprintf(stdout,"\n");
+               (void)fflush(stdout);
+
+               (void)system((char *)&value[n_spaces+1]);
+
+               (void)fprintf(stdout,"\n");
+               (void)fflush(stdout);
             }
 
-	    if(ret == (-1))
-	    {  (void)fprintf(stderr,"ask: expecting one argument only\n\n");
-	       (void)fflush(stderr);
-	    }
 
-       } while(ret < 0);
+            /*--------------------------------*/
+            /* Ask only expects one parameter */
+            /*--------------------------------*/
 
+            else
+	    {  if((ret = no_space(value)) >= 0)
+               {  (void)fprintf(out_stream,"%s\n",(char *)&value[ret]);
+                  (void)fflush(out_stream);
+
+                  looper = FALSE;
+               }
+
+
+               /*-------*/
+               /* Error */
+               /*-------*/
+
+	       else 
+               {  (void)fprintf(stderr,"ask: expecting one argument only\n\n");
+	          (void)fflush(stderr);
+	       }
+            }
+       } while(looper == TRUE);
+
+
+    /*-----------------------*/
+    /* Save readline history */
+    /*-----------------------*/
+
+    #ifdef HAVE_READLINE
+    (void)write_history(ask_history);
+    #endif /* HAVE_READLINE */
+
+    (void)fclose(out_stream);
     return(0); 
 }

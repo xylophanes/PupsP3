@@ -1,10 +1,14 @@
-#--------------------------------------------------------------------------------------
+#-------------------------------------------------
 # Makefile for jmalloc - the bubble memory library
-# M.A. O'Neill, Tumbling Dice 23/01/2018 
-#--------------------------------------------------------------------------------------
+# M.A. O'Neill, Tumbling Dice 04/01/2022 
+#-------------------------------------------------
+#-------------------------------------------------
+# -fcommon is needed becasue gcc does not handle
+# extern instantiation without it (is this a bug?)
+#-------------------------------------------------
 
 CC	=	gcc
-CFLAGS	=	TARGET_CFLAGS TARGET_ARCHDEPCFLAGS -DP3_SUPPORT -I. -I../include.libs -fPIC -finline-functions
+CFLAGS	=	TARGET_CFLAGS TARGET_ARCHDEPCFLAGS -DP3_SUPPORT -I. -I../include.libs -fcommon -fPIC -finline-functions
 FFLAGS	=	-g -DDEBUG -DPUPS_SUPPORT
 
 SOURCES	=	jmalloc.c cmain.o
@@ -27,13 +31,32 @@ libbubble.a:	$(OBJECTS)
 .c.o:
 		$(CC) -c $(CFLAGS) $*.c
 
-.PHONY:		 clean
+
+#--------------
+# Clean section
+#--------------
+
+.PHONY:		clean
 clean:
 		@rm -f *.o libbubble.a libbubble.so
+
+.PHONY:		cleanall
+cleanall:
+		@rm -f *.o libbubble.a libbubble.so
+
+
+#----------------
+# Install section
+#----------------
 
 .PHONY:		install
 install:	build
 		@cp -f *.o libbubble.a libbubble.so ../lib.TARGET_LIBEXT
+
+
+#------------------
+# Uninstall section
+#------------------
 
 .PHONY:		uninstall
 uninstall:	@rm -f ../lib.TARGET_LIBEXT/libbubble.a

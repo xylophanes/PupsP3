@@ -1,0 +1,986 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/kepher.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------------</span>
+<span class="Comment">     Purpose: Garbage collector </span>
+
+<span class="Comment">     Author:  M.A. O'Neill</span>
+<span class="Comment">              Tumbling Dice Ltd</span>
+<span class="Comment">              Gosforth</span>
+<span class="Comment">              Newcastle upon Tyne</span>
+<span class="Comment">              NE3 4RT</span>
+<span class="Comment">              United Kingdom</span>
+
+<span class="Comment">     Version: 3.01</span>
+<span class="Comment">     Dated:   24th May 2022</span>
+<span class="Comment">     E-mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">---------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;stdio.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stdlib.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;bsd/string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;signal.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/types.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/stat.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;fcntl.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;dirent.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;time.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;xtypes.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------------</span>
+<span class="Comment">    Definitions which are local to this application ...</span>
+<span class="Comment">---------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Version of kepher </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define KEPHER_VERSION    </span><span class="Constant">&quot;3.01&quot;</span>
+<span class="PreProc">#define EXTENSION_LIST    </span><span class="Constant">&quot;fifo tmp run agf pheap lid lock&quot;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> String size </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define SSIZE             </span><span class="Constant">2048</span><span class="PreProc"> </span>
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------------</span>
+<span class="Comment">    Variables which are private to this application ...</span>
+<span class="Comment">---------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">char</span>     hostname[SSIZE]            = <span class="Constant">&quot;&quot;</span>;
+_PRIVATE <span class="Type">char</span>     mdir[SSIZE]                = <span class="Constant">&quot;/tmp&quot;</span>;
+_PRIVATE <span class="Type">char</span>     pname[SSIZE]               = <span class="Constant">&quot;&quot;</span>;
+_PRIVATE <span class="Type">char</span>     kepherRun[SSIZE]           = <span class="Constant">&quot;&quot;</span>;
+_PRIVATE <span class="Type">char</span>     date[SSIZE]                = <span class="Constant">&quot;&quot;</span>;
+_PRIVATE _BOOLEAN do_verbose                 = FALSE;
+_PRIVATE _BOOLEAN do_delete                  = FALSE;
+_PRIVATE _BOOLEAN do_protect                 = FALSE;
+_PRIVATE _BOOLEAN do_exit_empty              = FALSE;
+_PRIVATE <span class="Type">DIR</span>      *dirp                      = (<span class="Type">DIR</span> *)<span class="Constant">NULL</span>;
+_PRIVATE <span class="Type">struct</span>   dirent *next_item          = (<span class="Type">struct</span> dirent *)<span class="Constant">NULL</span>;
+_PRIVATE <span class="Type">char</span>     nextFile[SSIZE]            = <span class="Constant">&quot;&quot;</span>;
+_PRIVATE <span class="Type">char</span>     nextPathFile[SSIZE]        = <span class="Constant">&quot;&quot;</span>;
+_PRIVATE <span class="Type">char</span>     nextPathShadow[SSIZE]      = <span class="Constant">&quot;&quot;</span>;
+_PRIVATE <span class="Type">char</span>     ignoreExtensionList[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+_PRIVATE <span class="Type">int</span>      nfiles                     = <span class="Constant">0</span>;
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------------</span>
+<span class="Comment">    Local functions ...</span>
+<span class="Comment">---------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef HAVE_PROCFS</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------------------------------------------------</span>
+<span class="Comment">   Translate process name to PID ...</span>
+<span class="Comment">---------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> getPidFromPname(<span class="Type">char</span> *pname)
+
+{   <span class="Type">DIR</span>    *pdirp            = (<span class="Type">DIR</span> *)<span class="Constant">NULL</span>;
+    <span class="Type">struct</span> dirent *next_item = (<span class="Type">struct</span> dirent *)<span class="Constant">NULL</span>;
+
+    <span class="Type">int</span>    pid   = (-<span class="Constant">1</span>),
+           found = <span class="Constant">0</span>;
+
+    pdirp = opendir(<span class="Constant">&quot;/proc&quot;</span>);
+    <span class="Statement">while</span>((next_item = readdir(pdirp)) != (<span class="Type">struct</span> dirent *)<span class="Constant">NULL</span>)
+    {   <span class="Type">int</span> next_pid = (-<span class="Constant">1</span>);
+
+        <span class="Statement">if</span>(sscanf(next_item-&gt;d_name,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">&quot;</span>,&amp;next_pid) == <span class="Constant">1</span>)
+        {  <span class="Type">FILE</span> *stream       = (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>;
+
+           <span class="Type">char</span> pathname[SSIZE]   = <span class="Constant">&quot;&quot;</span>,
+                strdum[SSIZE]     = <span class="Constant">&quot;&quot;</span>,
+                next_pname[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+           (<span class="Type">void</span>)snprintf(pathname,SSIZE,<span class="Constant">&quot;/proc/</span><span class="Special">%s</span><span class="Constant">/status&quot;</span>,next_item-&gt;d_name);
+           <span class="Statement">if</span>((stream = fopen(pathname,<span class="Constant">&quot;r&quot;</span>)) != (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>)
+           {  (<span class="Type">void</span>)fscanf(stream,<span class="Constant">&quot;</span><span class="Special">%s%s</span><span class="Constant">&quot;</span>,strdum,next_pname);
+              (<span class="Type">void</span>)fclose(stream);
+           }
+
+           <span class="Statement">if</span>(strcmp(pname,next_pname) == <span class="Constant">0</span>)
+           {  ++found;
+              pid = next_pid;
+           }
+        }
+    }
+
+    <span class="Statement">if</span>(found != <span class="Constant">1</span>)
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+
+    <span class="Statement">return</span>(pid);
+}
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> HAVE_PROCFS </span><span class="Comment">*/</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------</span>
+<span class="Comment">    Look for the occurence of string s2 within string s1 ...</span>
+<span class="Comment">------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _BOOLEAN strin(<span class="Type">char</span> *s1, <span class="Type">char</span> *s2)
+
+{   <span class="Type">int</span> i,
+        cmp_size,
+        chk_limit;
+
+    <span class="Statement">if</span>(strlen(s2) &gt; strlen(s1))
+       <span class="Statement">return</span>(FALSE);
+
+    chk_limit = strlen(s1) - strlen(s2) + <span class="Constant">1</span>;
+    cmp_size  = strlen(s2);
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;chk_limit; ++i)
+    {  <span class="Statement">if</span>(strncmp(&amp;s1[i],s2,cmp_size) == <span class="Constant">0</span>)
+          <span class="Statement">return</span>(TRUE);
+    }
+
+    <span class="Statement">return</span>(FALSE);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------</span>
+<span class="Comment">    Return current date ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> strdate(<span class="Type">char</span> *date)
+
+{   <span class="Type">time_t</span> tval;
+
+    (<span class="Type">void</span>)time(&amp;tval);
+    (<span class="Type">void</span>)strcpy(date,ctime(&amp;tval));
+    date[strlen(date) - <span class="Constant">1</span>] = <span class="Special">'\0'</span>;
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------</span>
+<span class="Comment">    Extract process identifier from file name</span>
+<span class="Comment">-------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> getPidFromFname(<span class="Type">char</span> *fname)
+
+{   <span class="Type">int</span> i,
+        pid  = (-<span class="Constant">1</span>),
+        cnt  = <span class="Constant">0</span>,
+        cpos = <span class="Constant">0</span>;
+
+    <span class="Type">char</span> tmpstr[SSIZE]   = <span class="Constant">&quot;&quot;</span>,
+         strdum[SSIZE]   = <span class="Constant">&quot;&quot;</span>,
+         filePath[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+    <span class="Type">struct</span> stat statBuf;
+
+    (<span class="Type">void</span>)snprintf(filePath,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/</span><span class="Special">%s</span><span class="Constant">&quot;</span>,mdir,fname);
+    (<span class="Type">void</span>)stat(filePath,&amp;statBuf);
+
+    <span class="Statement">if</span>(getuid() != statBuf.st_uid)
+    {  (<span class="Type">void</span>)lstat(filePath,&amp;statBuf);
+       <span class="Statement">if</span>(getuid() != statBuf.st_uid)
+          <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Extract PID                         </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Stale PSRP/P3 communication channel </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(strncmp(fname,<span class="Constant">&quot;psrp#&quot;</span>,<span class="Constant">5</span>) == <span class="Constant">0</span>)
+    {  (<span class="Type">void</span>)strcpy(tmpstr,fname);
+
+       <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;strlen(tmpstr); ++i)
+       {  <span class="Statement">if</span>(tmpstr[i] ==<span class="Constant">'#'</span> || tmpstr[i] == <span class="Constant">'.'</span> || tmpstr[i] == <span class="Constant">':'</span>)
+             tmpstr[i] = <span class="Constant">' '</span>;
+       }
+
+       <span class="Statement">if</span>(sscanf(tmpstr,<span class="Constant">&quot;</span><span class="Special">%s%s%s%s%s%d</span><span class="Constant">&quot;</span>,strdum,strdum,strdum,strdum,strdum,&amp;pid) == <span class="Constant">6</span>)
+          <span class="Statement">return</span>(pid);
+       <span class="Statement">else</span>
+          <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Stale PSRP/P3 stdio lockpost </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">else</span> <span class="Statement">if</span>(strncmp(fname,<span class="Constant">&quot;pups.&quot;</span>,<span class="Constant">5</span>) == <span class="Constant">0</span>)
+    {  (<span class="Type">void</span>)strcpy(tmpstr,fname);
+
+       <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;strlen(tmpstr); ++i)
+       {  <span class="Statement">if</span>(tmpstr[i] ==<span class="Constant">'#'</span> || tmpstr[i] == <span class="Constant">'.'</span> || tmpstr[i] == <span class="Constant">':'</span>)
+             tmpstr[i] = <span class="Constant">' '</span>;
+       }
+
+       <span class="Statement">if</span>(sscanf(tmpstr,<span class="Constant">&quot;</span><span class="Special">%s%s%s%s%s%d</span><span class="Constant">&quot;</span>,strdum,strdum,strdum,strdum,strdum,&amp;pid) == <span class="Constant">6</span>)
+          <span class="Statement">return</span>(pid);
+       <span class="Statement">else</span>
+          <span class="Statement">return</span>(-<span class="Constant">1</span>);
+
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Other file which may have become stale </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">else</span>
+    {  <span class="Type">char</span> tmpstr2[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+       (<span class="Type">void</span>)strcpy(tmpstr,fname);
+       <span class="Statement">for</span>(i=strlen(tmpstr); i&gt;<span class="Constant">0</span>; --i)
+       {   <span class="Statement">if</span>(tmpstr[i] == <span class="Constant">'.'</span> || tmpstr[i] == <span class="Constant">'_'</span> || tmpstr[i] ==<span class="Constant">'#'</span> || tmpstr[i] ==<span class="Constant">':'</span>)
+           {  tmpstr[i] = <span class="Constant">' '</span>;
+              ++cnt;
+              cpos = i;
+
+              <span class="Statement">if</span>(cnt == <span class="Constant">3</span>)
+                 <span class="Statement">break</span>;
+           }
+       }
+
+       (<span class="Type">void</span>)strcpy(tmpstr2,(<span class="Type">char</span> *)&amp;tmpstr[cpos]);
+       (<span class="Type">void</span>)strcpy(tmpstr,tmpstr2);
+
+       <span class="Statement">if</span>(cnt &gt;= <span class="Constant">2</span>)
+       {  <span class="Type">char</span> extension[SSIZE]  = <span class="Constant">&quot;&quot;</span>,
+               extension2[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+
+          <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Files of form ...&lt;pid&gt;.&lt;ext&gt;... </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+
+          <span class="Statement">if</span>(sscanf(tmpstr,<span class="Constant">&quot;</span><span class="Special">%d%s</span><span class="Constant">&quot;</span>,&amp;pid,extension)          == <span class="Constant">2</span>    ||
+             sscanf(tmpstr,<span class="Constant">&quot;</span><span class="Special">%s%d%s</span><span class="Constant">&quot;</span>,strdum,&amp;pid,extension) == <span class="Constant">3</span>     )
+          {
+
+
+             <span class="Comment">/*</span><span class="Comment">---------------------------------------------------</span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> These are the file types we are allowed to remove </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment">---------------------------------------------------</span><span class="Comment">*/</span>
+
+             <span class="Statement">if</span>(strin(ignoreExtensionList,extension) == TRUE)
+                <span class="Statement">return</span>(-<span class="Constant">1</span>);
+             <span class="Statement">else</span> <span class="Statement">if</span>(strin(EXTENSION_LIST,extension) == FALSE)
+                <span class="Statement">return</span>(-<span class="Constant">1</span>);
+             <span class="Statement">else</span>
+                <span class="Statement">return</span>(pid);
+          }
+
+
+          <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment"> Files of form ...&lt;pid&gt;.&lt;ext&gt;.&lt;ext&gt;... </span><span class="Comment">*/</span>
+          <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+          <span class="Statement">else</span> <span class="Statement">if</span>(sscanf(tmpstr,<span class="Constant">&quot;</span><span class="Special">%d%s%s</span><span class="Constant">&quot;</span>,&amp;pid,extension2,extension) == <span class="Constant">3</span>)
+          {
+
+             <span class="Comment">/*</span><span class="Comment">---------------------------------------------------</span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> These are the file types we are allowed to remove </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment">---------------------------------------------------</span><span class="Comment">*/</span>
+
+             <span class="Statement">if</span>(strin(ignoreExtensionList,extension) == TRUE)
+                <span class="Statement">return</span>(-<span class="Constant">1</span>);
+             <span class="Statement">else</span> <span class="Statement">if</span>(strin(EXTENSION_LIST,extension) == FALSE)
+                <span class="Statement">return</span>(-<span class="Constant">1</span>);
+             <span class="Statement">else</span>
+                <span class="Statement">return</span>(pid);
+
+          }
+          <span class="Statement">else</span> <span class="Statement">if</span>(sscanf(tmpstr,<span class="Constant">&quot;</span><span class="Special">%s%s%d</span><span class="Constant">&quot;</span>,extension,extension2,&amp;pid) == <span class="Constant">3</span>)
+          {  <span class="Statement">if</span>((strcmp(extension,<span class="Constant">&quot;in&quot;</span>) != <span class="Constant">0</span> || strcmp(extension,<span class="Constant">&quot;out&quot;</span>) != <span class="Constant">0</span>) &amp;&amp; strcmp(extension,<span class="Constant">&quot;ipm&quot;</span>) != <span class="Constant">0</span>)
+                 <span class="Statement">return</span>(-<span class="Constant">1</span>);
+          }
+       }
+    }
+
+    <span class="Statement">return</span>(-<span class="Constant">1</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------</span>
+<span class="Comment">    Delete a file ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> deleteFile(_BOOLEAN do_verbose, _BOOLEAN shadowed, <span class="Type">int</span> pid, <span class="Type">char</span> *fname)
+
+{   <span class="Type">char</span> rm_cmd[SSIZE]  = <span class="Constant">&quot;&quot;</span>,
+         pidInfo[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Delete primary file </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)snprintf(rm_cmd,SSIZE,<span class="Constant">&quot;rm -rf </span><span class="Special">%s</span><span class="Constant">/</span><span class="Special">%s</span><span class="Constant">&quot;</span>,mdir,fname);
+    (<span class="Type">void</span>)system(rm_cmd);
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Delete shadow </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(do_protect == TRUE)
+    {  (<span class="Type">void</span>)snprintf(rm_cmd,SSIZE,<span class="Constant">&quot;rm -rf </span><span class="Special">%s</span><span class="Constant">/.</span><span class="Special">%s</span><span class="Constant">&quot;</span>,mdir,fname);
+       (<span class="Type">void</span>)system(rm_cmd);
+    }
+
+    <span class="Statement">if</span>(shadowed == TRUE)
+       --nfiles;
+
+    <span class="Statement">if</span>(pid != (-<span class="Constant">1</span>))
+       (<span class="Type">void</span>)snprintf(pidInfo,SSIZE,<span class="Constant">&quot; (monitor pid </span><span class="Special">%d</span><span class="Constant">) &quot;</span>,pid);
+
+    <span class="Statement">if</span>(do_verbose == TRUE)
+    {  (<span class="Type">void</span>)strdate(date);
+       <span class="Statement">if</span>(strncmp(fname,<span class="Constant">&quot;psrp#&quot;</span>,<span class="Constant">5</span>) == <span class="Constant">0</span>)
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> kepher (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): stale PSRP/P3 communication channel </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Constant">removed (from </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                              date,getpid(),hostname,fname,pidInfo,mdir);
+       }
+       <span class="Statement">else</span> <span class="Statement">if</span>(strncmp(fname,<span class="Constant">&quot;pups.&quot;</span>,<span class="Constant">5</span>) == <span class="Constant">0</span>)
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> kepher (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): stale PSRP/P3 stdio lockpost </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Constant">removed (from </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n</span><span class="Constant">&quot;</span>,
+                                                                      date,getpid(),hostname,fname,pidInfo,mdir);
+       }
+       <span class="Statement">else</span>
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> kepher (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): stale file </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Constant">removed (from </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                     date,getpid(),hostname,fname,pidInfo,mdir);
+       }
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> If we have a lid file we also need to smash the associated stale lock </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(strin(fname,<span class="Constant">&quot;.lid.&quot;</span>) == TRUE)
+    {  <span class="Type">int</span> i;
+
+       <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;strlen(fname) - <span class="Constant">4</span>; ++i)
+       {  <span class="Statement">if</span>(strncmp((<span class="Type">char</span> *)&amp;fname[i],<span class="Constant">&quot;.lid&quot;</span>,<span class="Constant">4</span>) == <span class="Constant">0</span>)
+          {  <span class="Type">char</span> tmpstr[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+
+             (<span class="Type">void</span>)strcpy(tmpstr,fname);
+             tmpstr[i] = <span class="Special">'\0'</span>;
+
+             (<span class="Type">void</span>)snprintf(rm_cmd,SSIZE,<span class="Constant">&quot;rm -f </span><span class="Special">%s</span><span class="Constant">/</span><span class="Special">%s</span><span class="Constant">.lock&quot;</span>,mdir,tmpstr);
+             (<span class="Type">void</span>)system(rm_cmd);
+
+             <span class="Statement">if</span>(do_protect == TRUE)
+             {  (<span class="Type">void</span>)snprintf(rm_cmd,SSIZE,<span class="Constant">&quot;rm -f </span><span class="Special">%s</span><span class="Constant">/.</span><span class="Special">%s</span><span class="Constant">.lock&quot;</span>,mdir,tmpstr);
+                (<span class="Type">void</span>)system(rm_cmd);
+             }
+
+             <span class="Statement">if</span>(do_verbose == TRUE)
+             {  (<span class="Type">void</span>)strdate(date);
+                (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> kepher (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): stale lock </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Constant">.lock</span><span class="Special">\&quot;</span><span class="Constant"> smashed (in </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,date,getpid(),hostname,tmpstr,mdir);
+                (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+             }
+             <span class="Statement">break</span>;
+          }
+       }
+    }
+
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------</span>
+<span class="Comment">    Create shadow files ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> create_shadowFiles(_BOOLEAN do_create_shadowfiles, <span class="Type">DIR</span> *dirp)
+
+{   <span class="Type">char</span> fileName[SSIZE]   = <span class="Constant">&quot;&quot;</span>,
+         shadowFile[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+    <span class="Type">struct</span> stat buf;
+
+    (<span class="Type">void</span>)rewinddir(dirp);
+    <span class="Statement">while</span>((next_item = readdir(dirp)) != (<span class="Type">struct</span> dirent *)<span class="Constant">NULL</span>)
+    {   <span class="Statement">if</span>(strcmp(next_item-&gt;d_name,<span class="Constant">&quot;.&quot;</span>) != <span class="Constant">0</span> &amp;&amp; strcmp(next_item-&gt;d_name,<span class="Constant">&quot;.&quot;</span>) != <span class="Constant">0</span>)
+        {  (<span class="Type">void</span>)snprintf(fileName,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/</span><span class="Special">%s</span><span class="Constant">&quot;</span>,mdir,next_item-&gt;d_name);
+           (<span class="Type">void</span>)stat(fileName,&amp;buf);
+
+
+           <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> Directories are not protected </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+
+           <span class="Statement">if</span>(next_item-&gt;d_name[<span class="Constant">0</span>] != <span class="Constant">'.'</span> &amp;&amp; !S_ISDIR(buf.st_mode))
+           {  ++nfiles;
+
+              <span class="Statement">if</span>(do_create_shadowfiles == TRUE)
+              {  (<span class="Type">void</span>)snprintf(shadowFile,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/.</span><span class="Special">%s</span><span class="Constant">&quot;</span>,mdir,next_item-&gt;d_name);
+
+                 <span class="Statement">if</span>(link(fileName,shadowFile) == (-<span class="Constant">1</span>))
+                 {  <span class="Statement">if</span>(do_verbose == TRUE)
+                    {  (<span class="Type">void</span>)strdate(date);
+                       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): WARNING could not link shadow file to </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n</span><span class="Constant">&quot;</span>,date,getpid(),hostname,next_item-&gt;d_name);
+                       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+                    }
+                 }
+              }
+           }
+        }
+    }
+
+    <span class="Statement">return</span>(nfiles);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------</span>
+<span class="Comment">    Destroy shadow files ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> destroy_shadowFiles(<span class="Type">void</span>)
+
+{   <span class="Type">char</span>        shadowFile[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+    <span class="Type">struct</span> stat buf;
+
+    <span class="Statement">while</span>((next_item = readdir(dirp)) != (<span class="Type">struct</span> dirent *)<span class="Constant">NULL</span>)
+    {   <span class="Statement">if</span>(strcmp(next_item-&gt;d_name,<span class="Constant">&quot;.&quot;</span>) != <span class="Constant">0</span> &amp;&amp; strcmp(next_item-&gt;d_name,<span class="Constant">&quot;..&quot;</span>) != <span class="Constant">0</span>)
+        {  (<span class="Type">void</span>)snprintf(shadowFile,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/</span><span class="Special">%s</span><span class="Constant">&quot;</span>,mdir,next_item-&gt;d_name);
+           (<span class="Type">void</span>)stat(next_item-&gt;d_name,&amp;buf);
+
+           <span class="Statement">if</span>(shadowFile[<span class="Constant">0</span>] == <span class="Constant">'.'</span>)
+           {  <span class="Statement">if</span>(unlink(shadowFile) == (-<span class="Constant">1</span>))
+              {  <span class="Statement">if</span>(do_verbose == TRUE)
+                 {  (<span class="Type">void</span>)strdate(date);
+                    (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): WARNING could not unlink shadow file from </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n</span><span class="Constant">&quot;</span>,date,getpid(),hostname,(<span class="Type">char</span> *)&amp;next_item-&gt;d_name[<span class="Constant">1</span>]);
+                    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+                 }
+              }
+           }
+        }
+    }
+
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------</span>
+<span class="Comment">    Handle SIGTERM, SIGINT, SIGQUIT, SIGHUP ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> term_handler(<span class="Type">int</span> signum)
+
+{    <span class="Statement">if</span>(do_verbose == TRUE)
+     {  (<span class="Type">void</span>)strdate(date);
+        (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> kepher (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): exiting (signal </span><span class="Special">%d</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,date,getpid(),hostname,signum);
+        (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+     }
+
+     (<span class="Type">void</span>)unlink(kepherRun);
+
+
+     <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> Delete the monitor directory if specified </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+     <span class="Statement">if</span>(do_delete == TRUE)
+     {  <span class="Type">char</span> rm_cmd[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+        (<span class="Type">void</span>)closedir(dirp);
+
+        <span class="Statement">if</span>(do_verbose == TRUE)
+        {  (<span class="Type">void</span>)strdate(date);
+           (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> kepher (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): monitor directory </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> deleted</span><span class="Special">\n</span><span class="Constant">&quot;</span>,date,getpid(),hostname,mdir);
+           (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+        }
+
+        (<span class="Type">void</span>)snprintf(rm_cmd,SSIZE,<span class="Constant">&quot;rm -rf </span><span class="Special">%s</span><span class="Constant">&quot;</span>,mdir);
+        (<span class="Type">void</span>)system(rm_cmd);
+     }
+     <span class="Statement">else</span> <span class="Statement">if</span>(do_protect == TRUE)
+     {  (<span class="Type">void</span>)destroy_shadowFiles();
+        (<span class="Type">void</span>)closedir(dirp);
+     }
+
+     exit(<span class="Constant">1</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------</span>
+<span class="Comment">    Ignore files which have file extensions which are on the ignore list ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _BOOLEAN ignoreFile(<span class="Type">char</span> *fileName)
+
+{   <span class="Type">char</span>     *extn_ptr = (<span class="Type">char</span> *)<span class="Constant">NULL</span>;
+    _BOOLEAN looper    = TRUE;
+
+    extn_ptr = rindex(fileName,<span class="Constant">'.'</span>);
+    <span class="Statement">if</span>(extn_ptr == (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+
+       <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> File has no extension </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">return</span>(FALSE);
+    <span class="Statement">else</span>
+       ++extn_ptr;
+
+    <span class="Statement">if</span>(strin(EXTENSION_LIST,extn_ptr) == TRUE)
+    {
+
+       <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> We are ignoring files with given extension </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">return</span>(TRUE);
+    }
+
+    <span class="Statement">return</span>(FALSE);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------------</span>
+<span class="Comment">    Main entry point for application ...</span>
+<span class="Comment">-------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> main(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   <span class="Type">int</span>      i;
+    <span class="Type">int</span>      decoded           = <span class="Constant">0</span>;
+    <span class="Type">int</span>      mpid              = (-<span class="Constant">1</span>);
+    _BOOLEAN looper            = TRUE;
+    <span class="Type">struct</span>   stat statBuf;
+    <span class="Type">int</span>      nextPid           = (-<span class="Constant">1</span>);
+    <span class="Type">int</span>      kpid              = (-<span class="Constant">1</span>);
+    <span class="Type">FILE</span>     *krstream         = (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>;
+
+    (<span class="Type">void</span>)gethostname(hostname,SSIZE);
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Parse command tail </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;argc; ++i)
+    {  <span class="Statement">if</span>(strcmp(argv[i],<span class="Constant">&quot;-usage&quot;</span>) == <span class="Constant">0</span> || strcmp(argv[i],<span class="Constant">&quot;-help&quot;</span>) == <span class="Constant">0</span>)
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">KEPHER is free software, covered by the GNU General Public License, and you are</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;welcome to change it and/or distribute copies of it under certain conditions.</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;See the GPL and LGPL licences at www.gnu.org for further details</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;KEPHER comes with ABSOLUTELY NO WARRANTY</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">kepher lightweight garbage collector version </span><span class="Special">%s</span><span class="Constant">, (C) Tumbling Dice, 2010-2022 (built </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,KEPHER_VERSION,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Usage: kepher [-help | -usage] | [-verbose:FALSE]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;              [-mpid &lt;monitor pid | monitor pname&gt;]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;              [-mdir &lt;directory to clean:/tmp&gt;]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;              [-ignore &lt;file list&gt;]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;              [-protect:FALSE]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;              [-delete:FALSE]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;              [-exit_empty:FALSE]</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;              [&gt;&amp; &lt;error/log file&gt;]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+          exit(<span class="Constant">0</span>);
+       }
+       <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(argv[i],<span class="Constant">&quot;-verbose&quot;</span>) == <span class="Constant">0</span>)
+       {  do_verbose = TRUE;
+          ++decoded;
+       }
+       <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(argv[i],<span class="Constant">&quot;-protect&quot;</span>) == <span class="Constant">0</span>)
+       {  do_protect = TRUE;
+          ++decoded;
+       }
+       <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(argv[i],<span class="Constant">&quot;-delete&quot;</span>) == <span class="Constant">0</span>)
+       {  do_delete = TRUE;
+          ++decoded;
+       }
+       <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(argv[i],<span class="Constant">&quot;-exit_empty&quot;</span>) == <span class="Constant">0</span>)
+       {  do_exit_empty = TRUE;
+          ++decoded;
+       }
+       <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(argv[i],<span class="Constant">&quot;-mdir&quot;</span>) == <span class="Constant">0</span>)
+       {  <span class="Statement">if</span>(i == argc - <span class="Constant">1</span> || argv[i+<span class="Constant">1</span>][<span class="Constant">0</span>] == <span class="Constant">'-'</span>)
+          {  <span class="Statement">if</span>(do_verbose == TRUE)
+             {  (<span class="Type">void</span>)strdate(date);
+                (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> kepher (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): EFFOR expecting monitor directory name</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                            date,getpid(),hostname);
+                (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+             }
+
+             exit(<span class="Constant">255</span>);
+          }
+          (<span class="Type">void</span>)strcpy(mdir,argv[i+<span class="Constant">1</span>]);
+
+          ++i;
+          decoded += <span class="Constant">2</span>;
+       }
+       <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(argv[i],<span class="Constant">&quot;-ignore&quot;</span>) == <span class="Constant">0</span>)
+       {  <span class="Statement">if</span>(i == argc - <span class="Constant">1</span> || argv[i+<span class="Constant">1</span>][<span class="Constant">0</span>] == <span class="Constant">'-'</span>)
+          {  <span class="Statement">if</span>(do_verbose == TRUE)
+             {  (<span class="Type">void</span>)strdate(date);
+                (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> kepher (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): EFFOR expecting list of (space-separeted) file extensions</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                                               date,getpid(),hostname);
+                (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+             }
+
+             exit(<span class="Constant">255</span>);
+          }
+          (<span class="Type">void</span>)strcpy(ignoreExtensionList,argv[i+<span class="Constant">1</span>]);
+
+          ++i;
+          decoded += <span class="Constant">2</span>;
+       }
+       <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(argv[i],<span class="Constant">&quot;-mpid&quot;</span>) == <span class="Constant">0</span>)
+       {  <span class="Statement">if</span>(i == argc - <span class="Constant">1</span> || argv[i+<span class="Constant">1</span>][<span class="Constant">0</span>] == <span class="Constant">'-'</span>)
+          {  <span class="Statement">if</span>(do_verbose == TRUE)
+             {  (<span class="Type">void</span>)strdate(date);
+                (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> kepher (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): ERROR expecting monitor pid name</span><span class="Special">\n</span><span class="Constant">&quot;</span>,date,getpid(),hostname);
+                (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+             }
+
+             exit(<span class="Constant">255</span>);
+          }
+
+          <span class="Statement">if</span>(sscanf(argv[i+<span class="Constant">1</span>],<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">&quot;</span>,&amp;mpid) != <span class="Constant">1</span> || mpid &lt;= <span class="Constant">0</span>)
+          {
+
+<span class="PreProc">             #ifndef HAVE_PROCFS</span>
+             <span class="Statement">if</span>(do_verbose == TRUE)
+             {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;kepher (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): ERROR monitor process must be interger (&gt;0)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,getpid(),hostname);
+                (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+             }
+             exit(<span class="Constant">255</span>);
+<span class="PreProc">             #endif</span> <span class="Comment">/*</span><span class="Comment"> !HAVE_PROCFS </span><span class="Comment">*/</span>
+
+<span class="PreProc">             #ifdef HAVE_PROCFS</span>
+             (<span class="Type">void</span>)sscanf(argv[i+<span class="Constant">1</span>],<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">&quot;</span>,pname);
+             <span class="Statement">if</span>((mpid = getPidFromPname(pname)) == (-<span class="Constant">1</span>))
+             {  <span class="Statement">if</span>(do_verbose == TRUE)
+                {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;kepher (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): ERROR process </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> not parsed (does not exist or not unique)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                                                   getpid(),hostname,pname);
+                   (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+                }
+                exit(<span class="Constant">255</span>);
+             }
+<span class="PreProc">             #endif</span> <span class="Comment">/*</span><span class="Comment"> HAVE_PROCFS </span><span class="Comment">*/</span>
+
+          }
+
+          ++i;
+          decoded += <span class="Constant">2</span>;
+       }
+
+    }
+
+    <span class="Statement">if</span>(do_verbose == TRUE)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    kepher lightweight garbage collector (version </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">    (C) M.A. O'Neill, Tumbling Dice, 2010-2022</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                                                                         KEPHER_VERSION);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    Process </span><span class="Special">%d</span><span class="Constant"> on host </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> monitoring </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> for stale .tmp, .fifo, .run, .lock and .lid files</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                                                             getpid(),hostname,mdir);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    Stale PSRP/P3 communications channels and lockposts will also be removed</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+
+       <span class="Statement">if</span>(mpid != (-<span class="Constant">1</span>))
+<span class="PreProc">          #ifdef HAVE_PROCFS</span>
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    Process will terminate if monitored process </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">) is terminated</span><span class="Special">\n</span><span class="Constant">&quot;</span>,pname,mpid);
+<span class="PreProc">          #else</span>
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    Process will terminate if monitored process (</span><span class="Special">%d</span><span class="Constant">) is terminated</span><span class="Special">\n</span><span class="Constant">&quot;</span>,mpid);
+<span class="PreProc">          #endif</span> <span class="Comment">/*</span><span class="Comment"> HAVE_PROCFS </span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(do_exit_empty == TRUE)
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    Process will terminate if monitored directory </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">) is empty</span><span class="Special">\n</span><span class="Constant">&quot;</span>,mdir,mpid);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Is someone already monitoring this directory </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)snprintf(kepherRun,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/kepher.run&quot;</span>,mdir);
+    <span class="Statement">if</span>(access(kepherRun,F_OK | R_OK | W_OK) == (-<span class="Constant">1</span>))
+    {  <span class="Statement">if</span>(close(creat(kepherRun,<span class="PreProc">0</span><span class="Constant">600</span>)) == (-<span class="Constant">1</span>))
+       {  <span class="Statement">if</span>(do_verbose == TRUE)
+          {  (<span class="Type">void</span>)strdate(date);
+             (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> kepher (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): ERROR failed to create run file in </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> (are permissions correct?)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                                                  date,getpid(),hostname,mdir);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+          }
+
+          exit(<span class="Constant">255</span>);
+       }
+       <span class="Statement">else</span> <span class="Statement">if</span>(do_verbose == TRUE)
+       {  (<span class="Type">void</span>)strdate(date);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> kepher (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): created run file in </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n</span><span class="Constant">&quot;</span>,date,getpid(),hostname,mdir);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+       }
+
+       krstream = fopen(kepherRun,<span class="Constant">&quot;w&quot;</span>);
+       (<span class="Type">void</span>)fprintf(krstream,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,getpid());
+       (<span class="Type">void</span>)fclose(krstream);
+    }
+    <span class="Statement">else</span>
+    {  <span class="Statement">if</span>((krstream = fopen(kepherRun,<span class="Constant">&quot;r+&quot;</span>)) == (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>)
+       {  <span class="Statement">if</span>(do_verbose == TRUE)
+          {  (<span class="Type">void</span>)strdate(date);
+             (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> kepher (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): ERROR failed to open run file in </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> (are permissions correct?)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                                                date,getpid(),hostname,mdir);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+          }
+
+          exit(<span class="Constant">255</span>);
+       }
+
+       (<span class="Type">void</span>)fscanf(krstream,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Constant">&quot;</span>,&amp;kpid);
+       <span class="Statement">if</span>(kpid != getpid() &amp;&amp; kill(kpid,<span class="Constant">SIGCONT</span>) != (-<span class="Constant">1</span>))
+       {  <span class="Statement">if</span>(do_verbose == TRUE)
+          {  (<span class="Type">void</span>)strdate(date);
+             (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> kepher (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): ERROR </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;</span><span class="Constant"> is already being monitored (by kepher process </span><span class="Special">%d</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                                       date,getpid(),hostname,mdir,kpid);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+          }
+
+          exit(<span class="Constant">1</span>);
+       }
+       <span class="Statement">else</span>
+       {  <span class="Statement">if</span>(do_verbose == TRUE)
+          {  (<span class="Type">void</span>)strdate(date);
+             (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> kepher (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): smashing kepher lock (for dead kepher process </span><span class="Special">%d</span><span class="Constant">)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                               date,getpid(),hostname,kpid);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+          }
+
+          (<span class="Type">void</span>)rewind(krstream);
+          (<span class="Type">void</span>)fprintf(krstream,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,getpid());
+          (<span class="Type">void</span>)fflush(krstream);
+       }
+
+       (<span class="Type">void</span>)fclose(krstream);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Initialise signal handlers </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)signal(<span class="Constant">SIGTERM</span>,(<span class="Type">void</span> *)&amp;term_handler);
+    (<span class="Type">void</span>)signal(<span class="Constant">SIGINT</span> ,(<span class="Type">void</span> *)&amp;term_handler);
+    (<span class="Type">void</span>)signal(<span class="Constant">SIGQUIT</span>,(<span class="Type">void</span> *)&amp;term_handler);
+    (<span class="Type">void</span>)signal(<span class="Constant">SIGHUP</span> ,(<span class="Type">void</span> *)&amp;term_handler);
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check all command line items are decoded </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(decoded != argc - <span class="Constant">1</span>)
+    {  <span class="Statement">if</span>(do_verbose == TRUE)
+       {  (<span class="Type">void</span>)strdate(date);
+          (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> kepher (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): command tail items unparsed</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                           date,getpid(),hostname);
+       }
+
+       exit(<span class="Constant">255</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Monitor list of files - as soon as owner is terminated (and fails to  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> delete the file) remove it so system is not drowned in stale files    </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> This program is named in honour of the dung beetle Kepher nigroaeneus </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> which performs a similar task on the lowveld in East and South Africa </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(access(mdir,F_OK  | R_OK | W_OK) == (-<span class="Constant">1</span>))
+    {  <span class="Statement">if</span>(do_verbose == TRUE)
+       {  <span class="Statement">if</span>(do_verbose == TRUE)
+          {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> kepher (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): ERROR cannot find/access directory </span><span class="Special">\&quot;</span><span class="Special">%s</span><span class="Special">\&quot;\n</span><span class="Constant">&quot;</span>,
+                                                                       date,getpid(),hostname,mdir);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+          }
+       }
+
+       exit(<span class="Constant">255</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Monitor nominate directory </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+    dirp = opendir(mdir);
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Build shadow files for nominated directory </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(do_protect == TRUE)
+       (<span class="Type">void</span>)create_shadowFiles(TRUE,dirp);
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)create_shadowFiles(FALSE,dirp);
+
+    <span class="Statement">while</span>(looper == TRUE)
+    {   <span class="Statement">if</span>(mpid != (-<span class="Constant">1</span>) &amp;&amp; kill(mpid,<span class="Constant">SIGCONT</span>) == (-<span class="Constant">1</span>))
+           looper = FALSE;
+        <span class="Statement">else</span> <span class="Statement">if</span>(do_exit_empty == TRUE &amp;&amp; nfiles &lt;= <span class="Constant">0</span>)
+           looper = FALSE;
+
+        <span class="Statement">if</span>(looper == TRUE)
+        {  <span class="Statement">if</span>((next_item = readdir(dirp)) == (<span class="Type">struct</span> dirent *)<span class="Constant">NULL</span>)
+              (<span class="Type">void</span>)rewinddir(dirp);
+           <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(next_item-&gt;d_name,<span class="Constant">&quot;.&quot;</span>) != <span class="Constant">0</span> &amp;&amp; strcmp(next_item-&gt;d_name,<span class="Constant">&quot;..&quot;</span>) != <span class="Constant">0</span>)
+           {   (<span class="Type">void</span>)strcpy(nextFile,next_item-&gt;d_name);
+
+
+               <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment"> Files associated with PUPS/P3 processes </span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment"> and shells                              </span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment">-----------------------------------------</span><span class="Comment">*/</span>
+
+               <span class="Statement">if</span>((nextPid = getPidFromFname(nextFile)) != (-<span class="Constant">1</span>))
+               {  <span class="Statement">if</span>(kill(nextPid,<span class="Constant">SIGCONT</span>) == (-<span class="Constant">1</span>))
+                     (<span class="Type">void</span>)deleteFile(TRUE, FALSE, nextPid, nextFile);
+               }
+
+
+               <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment"> Protect regular files (with shadows) </span><span class="Comment">*/</span>
+               <span class="Comment">/*</span><span class="Comment">--------------------------------------</span><span class="Comment">*/</span>
+
+               <span class="Statement">else</span> <span class="Statement">if</span>(do_protect == TRUE)
+               {
+
+                  <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment"> Shadow exists but shadowed file does not </span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment"> relink shadowed file                     </span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+
+                  (<span class="Type">void</span>)snprintf(nextPathFile,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/</span><span class="Special">%s</span><span class="Constant">&quot;</span>,mdir,(<span class="Type">char</span> *)&amp;nextFile[<span class="Constant">1</span>]);
+                  <span class="Statement">if</span>(nextFile[<span class="Constant">0</span>] == <span class="Constant">'.'</span> &amp;&amp; access(nextPathFile,F_OK | R_OK | W_OK) == (-<span class="Constant">1</span>))
+                  {  (<span class="Type">void</span>)snprintf(nextPathShadow,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/</span><span class="Special">%s</span><span class="Constant">&quot;</span>,mdir,nextFile);
+                     (<span class="Type">void</span>)link(nextPathShadow,nextPathFile);
+
+                     <span class="Statement">if</span>(do_verbose == TRUE)
+                     {  (<span class="Type">void</span>)strdate(date);
+                        (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> kepher (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): file </span><span class="Special">\%</span><span class="Constant">s</span><span class="Special">\&quot;</span><span class="Constant"> lost - relinking</span><span class="Special">\n</span><span class="Constant">&quot;</span>,date,getpid(),hostname,(<span class="Type">char</span> *)&amp;nextFile[<span class="Constant">1</span>]);
+                        (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+                     }
+                  }
+
+
+                  <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment"> File without shadow - delete it     </span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment"> if it doesn't have a file extension </span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment"> we are ignoring                     </span><span class="Comment">*/</span>
+                  <span class="Comment">/*</span><span class="Comment">-------------------------------------</span><span class="Comment">*/</span>
+
+                  <span class="Statement">else</span> <span class="Statement">if</span>(nextFile[<span class="Constant">0</span>] != <span class="Constant">'.'</span>)
+                  {  (<span class="Type">void</span>)snprintf(nextPathShadow,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/.</span><span class="Special">%s</span><span class="Constant">&quot;</span>,mdir,nextFile);
+
+                     <span class="Statement">if</span>(access(nextPathShadow,F_OK | R_OK | W_OK) == (-<span class="Constant">1</span>))
+                     {  <span class="Statement">if</span>(ignoreFile(nextFile) == FALSE)
+                        {  <span class="Statement">if</span>(strcmp(nextFile,<span class="Constant">&quot;kepher.run&quot;</span>) != <span class="Constant">0</span>)
+                           {  (<span class="Type">void</span>)deleteFile(FALSE, TRUE, (-<span class="Constant">1</span>), nextFile);
+
+                              <span class="Statement">if</span>(do_verbose == TRUE)
+                              {  (<span class="Type">void</span>)strdate(date);
+                                 (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> kepher (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): file </span><span class="Special">\%</span><span class="Constant">s</span><span class="Special">\&quot;</span><span class="Constant"> has no shadow - deleting</span><span class="Special">\n</span><span class="Constant">&quot;</span>,date,getpid(),hostname,nextFile);
+                                 (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+                              }
+                           }
+                           <span class="Statement">else</span>
+                           {  (<span class="Type">void</span>)snprintf(nextPathFile,SSIZE,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant">/</span><span class="Special">%s</span><span class="Constant">&quot;</span>,mdir,nextFile);
+                              (<span class="Type">void</span>)link(nextPathFile,nextPathShadow);
+
+                              <span class="Statement">if</span>(do_verbose == TRUE)
+                              {  (<span class="Type">void</span>)strdate(date);
+                                 (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> kepher (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): cannot delete </span><span class="Special">\&quot;</span><span class="Constant">kepher.run</span><span class="Special">\&quot;\n</span><span class="Constant">&quot;</span>,date,getpid(),hostname);
+                                 (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+                              }
+                           }
+                        }
+                     }
+                  }
+               }
+            }
+
+            (<span class="Type">void</span>)usleep(<span class="Constant">10000</span>);
+        }
+    }
+
+    <span class="Statement">if</span>(do_verbose == TRUE &amp;&amp; kill(mpid,<span class="Constant">SIGCONT</span>) == (-<span class="Constant">1</span>))
+    {  (<span class="Type">void</span>)strdate(date);
+
+<span class="PreProc">       #ifdef HAVE_PROCFS</span>
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> kepher (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): Finished (monitor process </span><span class="Special">\&quot;</span><span class="Special">%d</span><span class="Constant"> (</span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\&quot;</span><span class="Constant"> has exited)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                   date,getpid(),hostname,mpid,pname);
+<span class="PreProc">       #else</span>
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> kepher (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">): Finished (monitor process </span><span class="Special">\&quot;</span><span class="Special">%d</span><span class="Special">\&quot;</span><span class="Constant"> has exited)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                    date,getpid(),hostname,mpid);
+<span class="PreProc">       #endif</span> <span class="Comment">/*</span><span class="Comment"> HAVE_PROCFS </span><span class="Comment">*/</span>
+
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    }
+
+    (<span class="Type">void</span>)term_handler(<span class="Constant">9999</span>);
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

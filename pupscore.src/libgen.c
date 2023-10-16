@@ -8,8 +8,8 @@
               NE3 4RT
               United Kingdom
 
-     Version: 2.00
-     Dated:   2nd September 2019 
+     Version: 2.01
+     Dated:   24th May 2022
      E-mail:  mao@tumblingdice.co.uk
 ---------------------------------------------------------------------------------------*/
 
@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <xtypes.h>
 #include <string.h>
+#include <bsd/string.h>
 #include <stdlib.h>
 
 #ifdef HAVE_READLINE
@@ -30,7 +31,7 @@
 /* Version of libgen */
 /*-------------------*/
 
-#define LIBGEN_VERSION   "2.00"
+#define LIBGEN_VERSION   "2.01"
 
 
 /*-------------*/
@@ -47,102 +48,6 @@
 #ifndef DEFAULT_BASEPATH
 #define DEFAULT_BASEPATH    "./"
 #endif /* DEFAULT_BASEPATH */
-
-
-
-
-#ifdef BSD_FUNCTION_SUPPORT
-/*--------------------------------------------------------------------------------------
-    Strlcpy and stlcat function based on OpenBSD functions ...
---------------------------------------------------------------------------------------*/
-/*------------------*/
-/* Open BSD Strlcat */
-/*------------------*/
-_PRIVATE size_t strlcat(char *dst, const char *src, size_t dsize)
-{
-	const char *odst = dst;
-	const char *osrc = src;
-	size_t      n    = dsize;
-	size_t      dlen;
-
-
-        /*------------------------------------------------------------------*/
-	/* Find the end of dst and adjust bytes left but don't go past end. */
-        /*------------------------------------------------------------------*/
-
-	while (n-- != 0 && *dst != '\0')
-		dst++;
-	dlen = dst - odst;
-	n = dsize - dlen;
-
-	if (n-- == 0)
-		return(dlen + strlen(src));
-	while (*src != '\0') {
-		if (n != 0) {
-			*dst++ = *src;
-			n--;
-		}
-		src++;
-	}
-	*dst = '\0';
-
-
-        /*----------------------------*/
-        /* count does not include NUL */
-        /*----------------------------*/
-
-	return(dlen + (src - osrc));
-}
-
-
-
-
-/*------------------*/
-/* Open BSD strlcpy */
-/*------------------*/
-
-_PRIVATE size_t strlcpy(char *dst, const char *src, size_t dsize)
-{
-	const char   *osrc = src;
-	size_t nleft       = dsize;
-
-
-        /*---------------------------------*/
-	/* Copy as many bytes as will fit. */
-        /*---------------------------------*/
-
-	if (nleft != 0) {
-		while (--nleft != 0) {
-			if ((*dst++ = *src++) == '\0')
-				break;
-		}
-	}
-
-
-        /*-----------------------------------------------------------*/
-	/* Not enough room in dst, add NUL and traverse rest of src. */
-        /*-----------------------------------------------------------*/
-
-	if (nleft == 0) {
-		if (dsize != 0)
-
-                        /*-------------------*/
-                        /* NUL-terminate dst */
-                        /*-------------------*/
-
-			*dst = '\0';
-		while (*src++)
-			;
-	}
-
-
-        /*----------------------------*/
-        /* count does not include NUL */
-        /*----------------------------*/
-
-	return(src - osrc - 1);
-}
-#endif /* BSD_FUNCTION_SUPPORT */
 
 
 
@@ -239,7 +144,7 @@ _PUBLIC int main(int argc, char *argv[])
     _BOOLEAN lib_init             = FALSE;
 
     if(argc == 1 || argc == 2 && (strcmp(argv[1],"-usage") == 0 || strcmp(argv[1],"-help") == 0))
-    {  (void)fprintf(stderr,"\nPUPS/P3 Library function generator version %s (C) Tumbling Dice, 2002-2019 (built %s %s)\n",LIBGEN_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nPUPS/P3 Library function generator version %s (C) Tumbling Dice, 2002-2022 (built %s %s)\n",LIBGEN_VERSION,__TIME__,__DATE__);
        (void)fprintf(stderr,"Usage: libgen [skeleton LIB file | skeleton LIB function file]\n\n");
        (void)fflush(stderr);
        (void)fprintf(stderr,"LIBGEN is free software, covered by the GNU General Public License, and you are\n");
@@ -249,7 +154,7 @@ _PUBLIC int main(int argc, char *argv[])
        (void)fprintf(stderr,"Base path is: \"%s\"\n\n",DEFAULT_BASEPATH);
        (void)fflush(stderr);
 
-       exit(-1);
+       exit(255);
     }
     else if(argc >= 2)
     {  
@@ -283,11 +188,11 @@ _PUBLIC int main(int argc, char *argv[])
        {  (void)fprintf(stderr,"\nlibgen: \"init\" or \"add\" expected\n\n");
           (void)fflush(stderr);
 
-          exit(-1);
+          exit(255);
        }
     }
     else
-    {  (void)fprintf(stderr,"\nPUPS/P3 LIB generator version %s, (C) Tumbling Dice, 2019 (built %s %s)1\n",LIBGEN_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nPUPS/P3 LIB generator version %s, (C) Tumbling Dice, 2022 (built %s %s)1\n",LIBGEN_VERSION,__TIME__,__DATE__);
        (void)fprintf(stderr,"Usage: libgen [skeleton library file]  [skeleton library function file]\n\n");
        (void)fflush(stderr);
        (void)fprintf(stderr,"LIBGEN is free software, covered by the GNU General Public License, and you are\n");
@@ -296,24 +201,24 @@ _PUBLIC int main(int argc, char *argv[])
        (void)fprintf(stderr,"LIBGEN comes with ABSOLUTELY NO WARRANTY\n\n");
        (void)fflush(stderr);
 
-       exit(-1);
+       exit(255);
     }
 
     if(lib_init == TRUE && access(lib_skelplib,F_OK | R_OK | W_OK) == (-1))
     {  (void)fprintf(stderr,"\nlibgen: cannot find skeleton LIB template file \"%s\"\n\n",lib_skelplib);
        (void)fflush(stderr);
 
-       exit(-1);
+       exit(255);
     }
 
     if(access(lib_func_skelplib,F_OK | R_OK | W_OK) == (-1))
     {  (void)fprintf(stderr,"\nlibgen: cannot find skeleton LIB function template file \"%s\"\n\n",lib_func_skelplib);
        (void)fflush(stderr);
 
-       exit(-1);
+       exit(255);
     }
 
-    (void)fprintf(stderr,"\nPUPS/P3 LIB template generator version %s (C) M.A. O'Neill, Tumbling Dice, 2019\n\n",LIBGEN_VERSION);
+    (void)fprintf(stderr,"\nPUPS/P3 LIB template generator version %s (C) M.A. O'Neill, Tumbling Dice, 2022\n\n",LIBGEN_VERSION);
     (void)fflush(stderr); 
 
     (void)read_line(lib_name,"libgen (LIB name)> ");
@@ -328,7 +233,7 @@ _PUBLIC int main(int argc, char *argv[])
        {  (void)fprintf(stderr,"\nlibgen: specific template \"%s\" not found\n\n",filestr);
           (void)fflush(stderr);
 
-          exit(-1);
+          exit(255);
        }
     }
     else
@@ -367,7 +272,7 @@ _PUBLIC int main(int argc, char *argv[])
        {  (void)fprintf(stderr,"\nlibgen: failed to execute stream editor (sed) command\n\n");
           (void)fflush(stderr);
 
-          exit(-1);
+          exit(255);
        }
     }
 
@@ -398,7 +303,7 @@ _PUBLIC int main(int argc, char *argv[])
     {  (void)fprintf(stderr,"\nlibgen: failed to execute stream editor (sed) command\n\n");
        (void)fflush(stderr);
 
-       exit(-1);
+       exit(255);
     }
 
     if(lib_init == TRUE)

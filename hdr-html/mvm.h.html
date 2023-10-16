@@ -1,0 +1,253 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.5.1.src.git/include.libs/mvm.h.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="cpp">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Purpose: header for meta virtual paged object library.</span>
+
+<span class="Comment">    Author:  M.A. O'Neill</span>
+<span class="Comment">             Tumbling Dice Ltd</span>
+<span class="Comment">             Gosforth</span>
+<span class="Comment">             Newcastle upon Tyne</span>
+<span class="Comment">             NE3 4RT</span>
+<span class="Comment">             United Kingdom</span>
+
+<span class="Comment">    Version: 2.00 </span>
+<span class="Comment">    Dated:   4th January 2022</span>
+<span class="Comment">    E-mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifndef MVM_HDR</span>
+<span class="PreProc">#define MVM_HDR</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Keep c2man happy </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;c2man.h&gt;</span>
+
+<span class="PreProc">#ifndef __C2MAN__</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;me.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;ansi.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;utils.h&gt;</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> __C2MAN__ </span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Defines used by meta virtual memory mapper </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">*********</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Version </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">*********</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define MVMLIB_VERSION       </span><span class="Constant">&quot;2.00&quot;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> String size </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define SSIZE                 </span><span class="Constant">2048</span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> MV table parameters </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define MVM_TABLE_SIZE        </span><span class="Constant">1024</span><span class="PreProc"> </span>
+<span class="PreProc">#define PAGE_NOT_USED         (-</span><span class="Constant">9999</span><span class="PreProc">)</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Supported page scheduling policies </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define MVM_AGED_AND_ORDERED  </span><span class="Constant">1</span>
+<span class="PreProc">#define MVM_ROUND_ROBIN       </span><span class="Constant">2</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Mmemory access states </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define MVM_READ_ONLY         </span><span class="Constant">1</span>
+<span class="PreProc">#define MVM_READ_WRITE        </span><span class="Constant">2</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Lock flags </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define MVM_LOCK_FLAG_1       </span><span class="Constant">1</span>
+<span class="PreProc">#define MVM_LOCK_FLAG_2       </span><span class="Constant">2</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Allocation quantum for MVM system </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define MVM_QUANTUM           </span><span class="Constant">16</span>
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Offset for shared MVM files </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef SUPPORT_SHARED_MVM</span>
+<span class="PreProc">#define MVM_OFFSET            </span><span class="Constant">0</span><span class="PreProc"> </span>
+<span class="PreProc">#else</span>
+<span class="PreProc">#define MVM_OFFSET            </span><span class="Constant">0</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> SUPPORT_SHARED_MVM </span><span class="Comment">*/</span>
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Types required by meta virtual memory mapper </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Page status information datastructure </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">typedef</span> <span class="Type">struct</span> {   <span class="Type">int</span>       v_page_usage;          <span class="Comment">// Times object has been accessed </span>
+                   <span class="Type">int</span>             v_page;          <span class="Comment">// Index of object in virtual array</span>
+                   _BOOLEAN        locked;          <span class="Comment">// TRUE if page in use </span>
+                   <span class="Type">void</span>  *v_page_location;          <span class="Comment">// Address of object</span>
+               } page_status_type;
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Meta virtual memory mapper datastructure </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">typedef</span> <span class="Type">struct</span> {   <span class="Type">char</span>     name[SSIZE];            <span class="Comment">// Name of this virtual memory </span>
+                   <span class="Type">int</span>      v_page_slots;           <span class="Comment">// Number of pages in virtual memory </span>
+                   <span class="Type">int</span>      max_page_slots;         <span class="Comment">// Number of pages in physical memory</span>
+                   <span class="Type">int</span>      page_slots;             <span class="Comment">// Number of pages in use</span>
+                   <span class="Type">int</span>      next_lock;              <span class="Comment">// Number of items on lock list</span>
+                   <span class="Type">int</span>      max_lock;               <span class="Comment">// Current maximum size of lock list</span>
+                   <span class="Type">int</span>      ulist_ptr;              <span class="Comment">// Usage list pointer</span>
+                   <span class="Type">int</span>      clock_ptr;              <span class="Comment">// Usage list clock pointer</span>
+                   <span class="Type">int</span>      r_w_state;              <span class="Comment">// Memory access (read/write) state</span>
+                   <span class="Type">int</span>      sched_policy;           <span class="Comment">// Page scehduling policy</span>
+                   <span class="Type">int</span>      current_lock_state;     <span class="Comment">// Current page lock state flag</span>
+                   <span class="Type">int</span>      fd;                     <span class="Comment">// Backing device descriptor</span>
+                   <span class="Type">long</span> <span class="Type">int</span> v_page_base;            <span class="Comment">// Base (backing) address of mvm pages</span>
+                   <span class="Type">long</span> <span class="Type">int</span> v_page_size;            <span class="Comment">// Size of page in bytes</span>
+                   _BOOLEAN aged_and_ordered;       <span class="Comment">// TRUE if aged and ordered</span>
+                   _BOOLEAN initialised;            <span class="Comment">// True if mvm memory initialised</span>
+                   <span class="Type">int</span>      *v_page_map;            <span class="Comment">// Mapping between phys and virt pages</span>
+                   <span class="Type">int</span>      *lock_map;              <span class="Comment">// Indices of locked physical pages</span>
+                   <span class="Type">void</span>     **vmem;                 <span class="Comment">// The virtual memory</span>
+                   <span class="Type">int</span>      *usage_map;             <span class="Comment">// Index physical pages by usage</span>
+                   page_status_type *page_status;   <span class="Comment">// Page status array</span>
+               } mvm_type;
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Public function prototype exported by module ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifndef __NOT_LIB_SOURCE__</span>
+
+<span class="PreProc">#else</span> <span class="Comment">/*</span><span class="Comment"> External variable declarations </span><span class="Comment">*/</span>
+<span class="PreProc">#   undef  _EXPORT</span>
+<span class="PreProc">#   define _EXPORT</span>
+<span class="PreProc">#endif</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Prototype bindings ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Comment">// Show MVM objects attached to current application</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> mvm_show_mvm_objects(<span class="Type">FILE</span> *);
+
+<span class="Comment">// Show meta virtual memory object statistics</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> show_mvm(mvm_type *);
+
+<span class="Comment">// Change cache size of meta virtual memory object</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> mvm_set_cache_size(<span class="Type">int</span>, mvm_type);
+
+<span class="Comment">// Page a dynamic (data) object</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> mvm_page(<span class="Type">int</span>        ,        <span class="Comment">// Page to cache</span>
+                                mvm_type  *);       <span class="Comment">// Meta virtual memory mapper</span>
+
+
+<span class="Comment">// Age and order pages of dynamic object</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> mvm_age_and_order(mvm_type *);
+
+<span class="Comment">// Initialise meta virtual memory object object</span>
+_PROTOTYPE _EXPORT <span class="Type">void</span> **mvm_init(<span class="Type">char</span>      *,     <span class="Comment">// Name of virtual memory</span>
+                                   _BOOLEAN   ,     <span class="Comment">// Memory initialisation flag</span>
+                                   <span class="Type">int</span>        ,     <span class="Comment">// Memeory access type</span>
+                                   <span class="Type">int</span>        ,     <span class="Comment">// Page scheduling policy</span>
+                                   <span class="Type">int</span>        ,     <span class="Comment">// Pages in virtual memory</span>
+                                   <span class="Type">int</span>        ,     <span class="Comment">// Pages in physical memory</span>
+                                   <span class="Type">int</span>        ,     <span class="Comment">// Backing store descriptor</span>
+                                   <span class="Type">long</span>       ,     <span class="Comment">// Page size in virtual memory</span>
+                                   mvm_type  *);    <span class="Comment">// Virtual memory structure</span>
+
+<span class="Comment">// Destroy meta virtual memory object</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> mvm_destroy(mvm_type *);
+
+<span class="Comment">// Reset virtual cache after meta virtual memory access operations</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> mvm_reset_pager(mvm_type *);
+
+<span class="Comment">// Create swapfile associated with MVM object</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> mvm_create_named_swapfile(<span class="Type">char</span> *, <span class="Type">int</span>, <span class="Type">long</span>);
+
+<span class="Comment">// Create MVM swapfile using open file handle</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> mvm_create_swapfile(<span class="Type">int</span>, <span class="Type">int</span>, <span class="Type">long</span>);
+
+<span class="Comment">// Delete swapfile associated with MVM object</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span> mvm_delete_swapfile(<span class="Type">int</span>, <span class="Type">char</span> *);
+
+<span class="Comment">// Mark memory as being initialised</span>
+_PROTOTYPE _EXPORT <span class="Type">int</span>  mvm_initialised(mvm_type *);
+
+
+<span class="PreProc">#undef _EXPORT</span>
+<span class="PreProc">#ifdef CPLUSPLUS</span>
+<span class="PreProc">#   define _EXPORT </span><span class="Type">extern</span><span class="PreProc"> C</span>
+<span class="PreProc">#else</span>
+<span class="PreProc">#   define _EXPORT </span><span class="Type">extern</span>
+<span class="PreProc">#endif</span>
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> Meta virtual paged memory library </span><span class="Comment">*/</span>
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

@@ -1,0 +1,2387 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/larraylib.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+ <span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------</span>
+<span class="Comment">    Purpose: sparse matrix support library.</span>
+
+<span class="Comment">    Author:  Mark O'Neill</span>
+<span class="Comment">             Tumbling Dice Ltd</span>
+<span class="Comment">             Gosforth</span>
+<span class="Comment">             Newcastle upon Tyne</span>
+<span class="Comment">             NE3 4RT</span>
+<span class="Comment">             United Kingdom</span>
+
+<span class="Comment">    Version: 2.00 </span>
+<span class="Comment">    Dated:   4th January 2022</span>
+<span class="Comment">    E-mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="PreProc">#include </span><span class="Constant">&lt;stdio.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;me.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;utils.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/types.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;limits.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;errno.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;ftype.h&gt;</span>
+
+<span class="PreProc">#undef   __NOT_LIB_SOURCE__</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;larray.h&gt;</span>
+<span class="PreProc">#define  __NOT_LIB_SOURCE__</span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Functions which are private to this library </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+
+_PROTOTYPE _PRIVATE <span class="Type">int</span> skip_comments(<span class="Type">FILE</span> *);
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Variables which are private to this library </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Slot and usage functions - used by slot manager </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Slot usage function </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> larray_slot(<span class="Type">int</span> level)
+{   (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;lib larraylib </span><span class="Special">%s</span><span class="Constant">: [ANSI C]</span><span class="Special">\n</span><span class="Constant">&quot;</span>,LARRAY_VERSION);
+
+    <span class="Statement">if</span>(level &gt; <span class="Constant">1</span>)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;(C) 2013-2022 Tumbling Dice</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Author: M.A. O'Neill</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;PUPS/P3 sparse matrix support library (built </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+    }
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    fflush(<span class="Constant">stderr</span>);
+}
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Segment identification for larray library </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef SLOT</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;slotman.h&gt;</span>
+_EXTERN <span class="Type">void</span> (* SLOT )() __attribute__ ((aligned(<span class="Constant">16</span>))) = larray_slot;
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> SLOT </span><span class="Comment">*/</span>
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Destroy list vector ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC vlist_type *lvector_destroy(vlist_type *vector)
+
+{   <span class="Type">int</span> i;
+
+    <span class="Statement">if</span>(vector == (vlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>(vector-&gt;index != (<span class="Type">int</span> *)<span class="Constant">NULL</span>)
+       (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)vector-&gt;index);
+
+    <span class="Statement">if</span>(vector-&gt;value != (FTYPE *)<span class="Constant">NULL</span>)
+      (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)vector-&gt;value);
+
+    vector-&gt;allocated  = <span class="Constant">0</span>;
+    vector-&gt;used       = <span class="Constant">0</span>;
+    vector-&gt;components = <span class="Constant">0</span>;
+
+    (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)vector);
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Destroy list array ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC mlist_type *lmatrix_destroy(mlist_type *matrix)
+
+{   <span class="Type">int</span> i,
+        j;
+
+    <span class="Statement">if</span>(matrix == (mlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;matrix-&gt;rows; ++i)
+    {  <span class="Statement">if</span>(matrix-&gt;vector[i] != (vlist_type *)<span class="Constant">NULL</span>)
+          (<span class="Type">void</span>)lvector_destroy((<span class="Type">void</span> *)matrix-&gt;vector[i]);
+    }
+    (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)matrix-&gt;vector);
+
+    matrix-&gt;rows = <span class="Constant">0</span>;
+    matrix-&gt;cols = <span class="Constant">0</span>;
+
+    (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)matrix);
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Create list array (and populate it from pattern array) ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC mlist_type *lmatrix_create(<span class="Type">FILE</span> *stream, <span class="Type">int</span> rows, <span class="Type">int</span> cols, FTYPE *pattern_array)
+
+{   <span class="Type">int</span> i,
+        j,
+        size;
+
+    FTYPE matrix_compression = <span class="Constant">0.0</span>;
+    mlist_type *matrix       = (mlist_type *)<span class="Constant">NULL</span>;
+
+    <span class="Statement">if</span>(cols &lt; <span class="Constant">0</span> || cols == <span class="Constant">0</span> &amp;&amp; pattern_array != (FTYPE *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>((matrix = (mlist_type *)pups_malloc(<span class="Statement">sizeof</span>(mlist_type))) == (mlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">ENOMEM</span>);
+       <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    matrix-&gt;rows = rows;
+    matrix-&gt;cols = cols;
+
+    <span class="Statement">if</span>((matrix-&gt;vector = (vlist_type **)pups_calloc(cols,<span class="Statement">sizeof</span>(vlist_type *))) == (vlist_type **)<span class="Constant">NULL</span>)
+    {  (<span class="Type">void</span>)lmatrix_destroy(matrix);
+
+       pups_set_errno(<span class="Constant">ENOMEM</span>);
+       <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;rows; ++i)
+    {  <span class="Statement">if</span>((matrix-&gt;vector[i] = (vlist_type *)pups_malloc(<span class="Statement">sizeof</span>(vlist_type))) == (vlist_type *)<span class="Constant">NULL</span>)
+       {   (<span class="Type">void</span>)lmatrix_destroy(matrix);
+
+           pups_set_errno(<span class="Constant">ENOMEM</span>);
+           <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+       }
+       <span class="Statement">else</span>
+       {  matrix-&gt;vector[i]-&gt;components = cols;
+          matrix-&gt;vector[i]-&gt;allocated  = <span class="Constant">0</span>;
+          matrix-&gt;vector[i]-&gt;used       = <span class="Constant">0</span>;
+       }
+
+       <span class="Statement">if</span>(pattern_array != (FTYPE *)<span class="Constant">NULL</span>)
+       {  <span class="Type">int</span> pos,
+              allocated = <span class="Constant">0</span>;
+
+          size      = <span class="Constant">0</span>;
+          <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;cols; ++j)
+          {  pos = i*cols + j;
+
+
+             <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> Allocate memory in quanta of ALLOC_MEM </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> We do this to make sure that memory is </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment"> used optimally                         </span><span class="Comment">*/</span>
+             <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+             <span class="Statement">if</span>(size == <span class="Constant">0</span> &amp;&amp; allocated == <span class="Constant">0</span>)
+             {  allocated = LARRAY_ALLOC_QUANTUM;
+
+                <span class="Statement">if</span>((matrix-&gt;vector[i]-&gt;index = (<span class="Type">int</span> *)pups_calloc(LARRAY_ALLOC_QUANTUM,<span class="Statement">sizeof</span>(<span class="Type">int</span>))) == (<span class="Type">int</span> *)<span class="Constant">NULL</span>)
+                {   (<span class="Type">void</span>)lmatrix_destroy(matrix);
+
+                    pups_set_errno(<span class="Constant">ENOMEM</span>);
+                    <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+                }
+
+                <span class="Statement">if</span>((matrix-&gt;vector[i]-&gt;value = (FTYPE *)pups_calloc(LARRAY_ALLOC_QUANTUM,<span class="Statement">sizeof</span>(FTYPE))) == (FTYPE *)<span class="Constant">NULL</span>)
+                {   (<span class="Type">void</span>)lmatrix_destroy(matrix);
+
+                    pups_set_errno(<span class="Constant">ENOMEM</span>);
+                    <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+                }
+
+             }
+             <span class="Statement">else</span> <span class="Statement">if</span>(size == allocated)
+             {  allocated += LARRAY_ALLOC_QUANTUM;
+
+                <span class="Statement">if</span>((matrix-&gt;vector[i]-&gt;index = (<span class="Type">int</span> *)  pups_realloc((<span class="Type">void</span> *)matrix-&gt;vector[i]-&gt;index,allocated*<span class="Statement">sizeof</span>(<span class="Type">int</span>))) == (<span class="Type">int</span> *)<span class="Constant">NULL</span>)
+                {   (<span class="Type">void</span>)lmatrix_destroy(matrix);
+
+                    pups_set_errno(<span class="Constant">ENOMEM</span>);
+                    <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+                }
+
+
+                <span class="Statement">if</span>((matrix-&gt;vector[i]-&gt;value = (FTYPE *)pups_realloc((<span class="Type">void</span> *)matrix-&gt;vector[i]-&gt;value,allocated*<span class="Statement">sizeof</span>(FTYPE))) == (FTYPE *)<span class="Constant">NULL</span>)
+                {   (<span class="Type">void</span>)lmatrix_destroy(matrix);
+
+                    pups_set_errno(<span class="Constant">ENOMEM</span>);
+                    <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+                }
+             }
+
+             <span class="Statement">if</span>(pattern_array[pos] != <span class="Constant">0.0</span>)
+             {  matrix-&gt;vector[i]-&gt;value[size] = pattern_array[pos];
+                matrix-&gt;vector[i]-&gt;index[size] = j;
+                ++size;
+             }
+          }
+
+          matrix-&gt;vector[i]-&gt;allocated = allocated;
+          matrix-&gt;vector[i]-&gt;used      = size;
+
+          <span class="Statement">if</span>(size &lt; cols)
+          {  matrix-&gt;vector[i]-&gt;state = DEFLATED;
+
+             <span class="Statement">if</span>(size != <span class="Constant">0</span>)
+                <span class="Comment">/*</span><span class="Comment"> Compute compression factor (for this row) </span><span class="Comment">*/</span>
+                matrix_compression += (FTYPE)size/(FTYPE)cols;
+          }
+          <span class="Statement">else</span>
+             matrix-&gt;vector[i]-&gt;state = INFLATED;
+       }
+    }
+
+    <span class="Statement">if</span>(stream != (<span class="Type">FILE</span> *)<span class="Constant">NULL</span> &amp;&amp; matrix_compression != <span class="Constant">0.0</span>)
+    {  (<span class="Type">void</span>)strdate(date);
+       (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">):  List array compression factor is </span><span class="Special">%5.2F%%</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                     date,appl_name,appl_pid,appl_host,appl_owner,<span class="Constant">100.0</span> - (<span class="Constant">100.0</span>*matrix_compression/(FTYPE)rows));
+       (<span class="Type">void</span>)fflush(stream);
+    }
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(matrix);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Create list vector from pattern vector ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC vlist_type *lvector_create(<span class="Type">FILE</span> *stream, <span class="Type">int</span> components, FTYPE *pattern_vector)
+
+{   <span class="Type">int</span> i,
+        size      = <span class="Constant">0</span>,
+        allocated = <span class="Constant">0</span>;
+
+    vlist_type *vector = (vlist_type *)<span class="Constant">NULL</span>;
+
+    <span class="Statement">if</span>((vector = (vlist_type *)pups_malloc(<span class="Statement">sizeof</span>(vlist_type))) == (vlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">ENOMEM</span>);
+       <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    vector-&gt;components = components;
+    <span class="Statement">if</span>(pattern_vector == (FTYPE *)<span class="Constant">NULL</span>)
+    {
+
+       <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Simply allocate memory for specified vector </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">---------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>((vector-&gt;index = (<span class="Type">int</span>   *)pups_calloc(components,<span class="Statement">sizeof</span>(<span class="Type">int</span>))) == (<span class="Type">int</span> *)<span class="Constant">NULL</span>)
+       {  (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)vector);
+
+          pups_set_errno(<span class="Constant">ENOMEM</span>);
+          <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+       }
+
+       <span class="Statement">if</span>((vector-&gt;value = (FTYPE *)pups_calloc(components,<span class="Statement">sizeof</span>(FTYPE))) == (FTYPE *)<span class="Constant">NULL</span>)
+       {  (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)vector-&gt;index);
+          (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)vector);
+
+          pups_set_errno(<span class="Constant">ENOMEM</span>);
+          <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+       }
+
+       vector-&gt;allocated  = components;
+       <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;components; ++i)
+       {  vector-&gt;index[i] = i;
+          vector-&gt;value[i] = <span class="Constant">0.0</span>;
+       }
+
+       vector-&gt;state = NONE;
+    }
+    <span class="Statement">else</span>
+    {
+
+       <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Load pattern vector making optimal </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> use of memory                      </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+
+       allocated = LARRAY_ALLOC_QUANTUM;
+
+       <span class="Statement">if</span>((vector-&gt;index = (<span class="Type">int</span> *)pups_calloc(allocated,<span class="Statement">sizeof</span>(<span class="Type">int</span>))) == (<span class="Type">int</span> *)<span class="Constant">NULL</span>)
+       {  (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)vector);
+
+          pups_set_errno(<span class="Constant">ENOMEM</span>);
+          <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+       }
+
+       <span class="Statement">if</span>((vector-&gt;value = (FTYPE *)pups_calloc(allocated,<span class="Statement">sizeof</span>(FTYPE))) == (FTYPE *)<span class="Constant">NULL</span>)
+       {  (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)vector-&gt;index);
+          (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)vector);
+
+          pups_set_errno(<span class="Constant">ENOMEM</span>);
+          <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+       }
+
+       <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;components; ++i)
+       {  <span class="Statement">if</span>(size == allocated)
+          {  allocated += LARRAY_ALLOC_QUANTUM;
+
+             <span class="Statement">if</span>((vector-&gt;index = (<span class="Type">int</span> *)pups_realloc((<span class="Type">void</span> *)vector-&gt;index,allocated*<span class="Statement">sizeof</span>(<span class="Type">int</span>))) == (<span class="Type">int</span> *)<span class="Constant">NULL</span>)
+             {  (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)vector-&gt;index);
+                (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)vector-&gt;value);
+                (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)vector);
+
+                pups_set_errno(<span class="Constant">ENOMEM</span>);
+                <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+             }
+
+             <span class="Statement">if</span>((vector-&gt;value = (FTYPE *)pups_realloc((<span class="Type">void</span> *)vector-&gt;value,allocated*<span class="Statement">sizeof</span>(FTYPE))) == (FTYPE *)<span class="Constant">NULL</span>)
+             {  (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)vector-&gt;index);
+                (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)vector-&gt;value);
+                (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)vector);
+
+                pups_set_errno(<span class="Constant">ENOMEM</span>);
+                <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+             }
+          }
+
+          <span class="Statement">if</span>(pattern_vector[i] != <span class="Constant">0.0</span>)
+          {  vector-&gt;value[size]  = pattern_vector[i];
+             vector-&gt;index[size]  = i;
+             ++size;
+          }
+       }
+
+       vector-&gt;allocated = allocated;
+       vector-&gt;used      = size;
+
+       <span class="Statement">if</span>(stream != (<span class="Type">FILE</span> *)<span class="Constant">NULL</span> &amp;&amp; size != components)
+       {  (<span class="Type">void</span>)strdate(date);
+          (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">)  List vector compression factor is </span><span class="Special">%5.2F%%</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                        date,appl_name,appl_pid,appl_host,appl_owner,<span class="Constant">100.0</span> - (<span class="Constant">100.0</span>*(FTYPE)size/(FTYPE)components));
+          (<span class="Type">void</span>)fflush(stream);
+       }
+
+       vector-&gt;state = DEFLATED;
+    }
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(vector);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Do a fast re-initialisation of a pattern vector ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> fastResetPatternVector(<span class="Type">int</span> cols, FTYPE *pattern_vector, vlist_type *vector)
+
+{   <span class="Type">int</span> i;
+
+    <span class="Statement">if</span>(cols               &lt;  <span class="Constant">0</span>                     ||
+       cols               != vector-&gt;components    ||
+       pattern_vector     == (FTYPE *)<span class="Constant">NULL</span>         ||
+       vector             == (vlist_type *)<span class="Constant">NULL</span>    ||
+       vector-&gt;components == <span class="Constant">0</span>                     ||
+       vector-&gt;used       == <span class="Constant">0</span>                      )
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;vector-&gt;used; ++i)
+    {  <span class="Statement">if</span>(vector-&gt;value[i] != <span class="Constant">0.0</span>)
+          pattern_vector[vector-&gt;index[i]] = <span class="Constant">0.0</span>;
+    }
+
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Copy list array ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC mlist_type *lmatrix_copy(mlist_type *from)
+
+{   <span class="Type">int</span> i,
+        j;
+
+    mlist_type *to = (mlist_type *)<span class="Constant">NULL</span>;
+
+    <span class="Statement">if</span>(from == (mlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>((to = (mlist_type *)pups_malloc(<span class="Statement">sizeof</span>(mlist_type))) == (mlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">ENOMEM</span>);
+       <span class="Statement">return</span>(mlist_type *)<span class="Constant">NULL</span>;
+    }
+
+
+    <span class="Statement">if</span>((to-&gt;vector = (vlist_type **)pups_calloc(from-&gt;rows,<span class="Statement">sizeof</span>(vlist_type *))) == (vlist_type **)<span class="Constant">NULL</span>)
+    {  (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)to);
+
+       pups_set_errno(<span class="Constant">ENOMEM</span>);
+       <span class="Statement">return</span>(mlist_type *)<span class="Constant">NULL</span>;
+    }
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;from-&gt;rows; ++i)
+    {  <span class="Statement">if</span>(from-&gt;vector[i]-&gt;allocated &gt; <span class="Constant">0</span>)
+       {  <span class="Statement">if</span>((to-&gt;vector[i] = (vlist_type *)lvector_create((<span class="Type">FILE</span> *)<span class="Constant">NULL</span>,from-&gt;vector[i]-&gt;allocated,<span class="Constant">NULL</span>)) == (vlist_type *)<span class="Constant">NULL</span>)
+          {  lmatrix_destroy(to);
+
+             pups_set_errno(<span class="Constant">ENOMEM</span>);
+             <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+          }
+          <span class="Statement">else</span>
+          {  <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;from-&gt;vector[i]-&gt;allocated; ++j)
+             {  to-&gt;vector[i]-&gt;index[j] = from-&gt;vector[i]-&gt;index[j];
+                to-&gt;vector[i]-&gt;value[j] = from-&gt;vector[i]-&gt;value[j];
+             }
+          }
+       }
+
+       to-&gt;vector[i]-&gt;allocated = from-&gt;vector[i]-&gt;allocated;
+    }
+
+    (<span class="Type">void</span>)strlcpy(to-&gt;name,from-&gt;name,SSIZE);
+    to-&gt;rows = from-&gt;rows;
+    to-&gt;cols = from-&gt;cols;
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(to);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Copy list vector ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC vlist_type *lvector_copy(vlist_type *from)
+
+{   <span class="Type">int</span> i;
+
+    vlist_type *to = (vlist_type *)<span class="Constant">NULL</span>;
+
+    <span class="Statement">if</span>(from == (vlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>((to = lvector_create((<span class="Type">FILE</span> *)<span class="Constant">NULL</span>,from-&gt;allocated,<span class="Constant">NULL</span>)) == (vlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">ENOMEM</span>);
+       <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;from-&gt;used; ++i)
+    {  to-&gt;index[i] = from-&gt;index[i];
+       to-&gt;value[i] = from-&gt;value[i];
+    }
+
+    (<span class="Type">void</span>)strlcpy(to-&gt;name,from-&gt;name,SSIZE);
+    to-&gt;allocated = from-&gt;allocated;
+    to-&gt;used      = from-&gt;used;
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(to);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Squeeze zero value elements out of a list vector deflating it ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC vlist_type *lvector_deflate(<span class="Type">FILE</span> *stream, _BOOLEAN keep_vector, FTYPE *vector_squeeze_percent, vlist_type *vector)
+
+{   <span class="Type">int</span> i,
+        size                 = <span class="Constant">0</span>,
+        allocated            = <span class="Constant">0</span>,
+        vector_zero_elements = <span class="Constant">0.0</span>;
+
+    FTYPE squeeze_percent    = <span class="Constant">0.0</span>;
+
+    vlist_type *tmp_vector      = (vlist_type *)<span class="Constant">NULL</span>,
+               *squeezed_vector = (vlist_type *)<span class="Constant">NULL</span>;
+
+    <span class="Statement">if</span>(vector == (vlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>((squeezed_vector = (vlist_type *)pups_malloc(<span class="Statement">sizeof</span>(vlist_type))) == (vlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">ENOMEM</span>);
+       <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    allocated = LARRAY_ALLOC_QUANTUM;
+    <span class="Statement">if</span>((squeezed_vector-&gt;index = (<span class="Type">int</span> *)pups_calloc(allocated,<span class="Statement">sizeof</span>(<span class="Type">int</span>))) == (<span class="Type">int</span> *)<span class="Constant">NULL</span>)
+    {  (<span class="Type">void</span>)lvector_destroy(squeezed_vector);
+
+       pups_set_errno(<span class="Constant">ENOMEM</span>);
+       <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>((squeezed_vector-&gt;value = (FTYPE *)pups_calloc(allocated,<span class="Statement">sizeof</span>(FTYPE))) == (FTYPE *)<span class="Constant">NULL</span>)
+    {  (<span class="Type">void</span>)lvector_destroy(squeezed_vector);
+
+       pups_set_errno(<span class="Constant">ENOMEM</span>);
+       <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;vector-&gt;used; ++i)
+    {  <span class="Statement">if</span>(vector-&gt;value[i] != <span class="Constant">0.0</span>)
+       {  squeezed_vector-&gt;index[size] = vector-&gt;index[i];
+          squeezed_vector-&gt;value[size] = vector-&gt;value[i];
+          ++size;
+       }
+       <span class="Statement">else</span>
+          ++vector_zero_elements;
+
+       <span class="Statement">if</span>(size == allocated)
+       {  allocated += LARRAY_ALLOC_QUANTUM;
+
+          <span class="Statement">if</span>((squeezed_vector-&gt;index = (<span class="Type">int</span> *)pups_malloc(<span class="Statement">sizeof</span>(<span class="Type">int</span>))) == (<span class="Type">int</span> *)<span class="Constant">NULL</span>)
+          {  (<span class="Type">void</span>)lvector_destroy(squeezed_vector);
+
+             pups_set_errno(<span class="Constant">ENOMEM</span>);
+             <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+          }
+
+          <span class="Statement">if</span>((squeezed_vector-&gt;value = (FTYPE *)pups_calloc(allocated,<span class="Statement">sizeof</span>(FTYPE))) == (FTYPE *)<span class="Constant">NULL</span>)
+          {  (<span class="Type">void</span>)lvector_destroy(squeezed_vector);
+
+             pups_set_errno(<span class="Constant">ENOMEM</span>);
+             <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+          }
+       }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Initially, vector is inflated </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+
+    squeezed_vector-&gt;state = INFLATED;
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Compute deflation statistics </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(vector_zero_elements &gt; <span class="Constant">0</span>)
+    {
+
+       <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Mark vector as deflated </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+
+       squeezed_vector-&gt;state = DEFLATED;
+
+       <span class="Statement">if</span>(vector_squeeze_percent != (FTYPE *)<span class="Constant">NULL</span>)
+          *vector_squeeze_percent = squeeze_percent;
+
+       squeeze_percent = <span class="Constant">100.0</span> * (FTYPE)size / (FTYPE)vector-&gt;components;
+       <span class="Statement">if</span>(stream != (<span class="Type">FILE</span> *)<span class="Constant">NULL</span> &amp;&amp; size != vector-&gt;components)
+       {  (<span class="Type">void</span>)strdate(date);
+          (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">)  List vector deflated by </span><span class="Special">%6.3f</span><span class="Constant"> </span><span class="Special">%%</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                         date,appl_name,appl_pid,appl_host,appl_owner,
+                                                                      squeeze_percent);
+          (<span class="Type">void</span>)fflush(stream);
+       }
+    }
+    <span class="Statement">else</span> <span class="Statement">if</span>(vector_squeeze_percent != (FTYPE *)<span class="Constant">NULL</span>)
+       *vector_squeeze_percent = <span class="Constant">0.0</span>;
+
+    (<span class="Type">void</span>)strlcpy(squeezed_vector-&gt;name,vector-&gt;name,SSIZE);
+    squeezed_vector-&gt;components = vector-&gt;components;
+    squeezed_vector-&gt;allocated  = allocated;
+    squeezed_vector-&gt;used       = size;
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Destroy input vector now its been squeezed </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(keep_vector == FALSE)
+       vector = lvector_destroy(vector);
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(squeezed_vector);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Squeeze zero value elements out of a list matrix deflating it ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC mlist_type *lmatrix_deflate(<span class="Type">FILE</span> *stream, _BOOLEAN keep_matrix, FTYPE *matrix_squeeze_percent, mlist_type *matrix)
+
+{   <span class="Type">int</span> i,
+        cnt = <span class="Constant">0</span>;
+
+    FTYPE vector_squeeze_percent,
+          squeeze_percent = <span class="Constant">0.0</span>;
+
+    mlist_type *squeezed_matrix = (mlist_type *)<span class="Constant">NULL</span>;
+
+    <span class="Statement">if</span>(matrix == (mlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>((squeezed_matrix = (mlist_type *)pups_malloc(<span class="Statement">sizeof</span>(mlist_type))) == (mlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">ENOMEM</span>);
+       <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>((squeezed_matrix-&gt;vector = (vlist_type **)pups_calloc(matrix-&gt;rows,<span class="Statement">sizeof</span>(vlist_type *))) == (vlist_type **)<span class="Constant">NULL</span>)
+    {   (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)squeezed_matrix);
+
+        pups_set_errno(<span class="Constant">ENOMEM</span>);
+        <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    squeezed_matrix-&gt;rows = matrix-&gt;rows;
+    squeezed_matrix-&gt;cols = matrix-&gt;cols;
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;matrix-&gt;rows; ++i)
+    {  <span class="Statement">if</span>(matrix-&gt;vector[i] != (vlist_type *)<span class="Constant">NULL</span>)
+       {  <span class="Statement">if</span>((squeezed_matrix-&gt;vector[i] = lvector_deflate((<span class="Type">FILE</span> *)<span class="Constant">NULL</span>,FALSE,&amp;vector_squeeze_percent,matrix-&gt;vector[i])) == (vlist_type *)<span class="Constant">NULL</span>)
+          {  pups_set_errno(<span class="Constant">ENOMEM</span>);
+             <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+          }
+
+          matrix-&gt;vector[i] =  (vlist_type *)<span class="Constant">NULL</span>;
+          squeeze_percent   += vector_squeeze_percent;
+          ++cnt;
+       }
+    }
+
+    <span class="Statement">if</span>(squeeze_percent &gt; <span class="Constant">0.0</span> &amp;&amp; stream != (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>)
+    {  <span class="Statement">if</span>(matrix_squeeze_percent != (FTYPE *)<span class="Constant">NULL</span>)
+          *matrix_squeeze_percent = squeeze_percent / (FTYPE)cnt;
+
+       (<span class="Type">void</span>)strdate(date);
+       (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant"> (</span><span class="Special">%d</span><span class="Constant">@</span><span class="Special">%s</span><span class="Constant">:</span><span class="Special">%s</span><span class="Constant">)  List matrix deflated by </span><span class="Special">%5.2F</span><span class="Constant"> </span><span class="Special">%%</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                      date,appl_name,appl_pid,appl_host,appl_owner,
+                                                    (squeeze_percent) / (FTYPE)cnt);
+       (<span class="Type">void</span>)fflush(stream);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Destroy input matrix now its been squeezed </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(keep_matrix == FALSE)
+       (<span class="Type">void</span>)lmatrix_destroy(matrix);
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(squeezed_matrix);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Get the next element in (deflated) vector ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC FTYPE lvector_get_list_value(<span class="Type">int</span> pos, <span class="Type">int</span> *component, vlist_type *vector)
+
+{   <span class="Statement">if</span>(vector == (vlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(<span class="Constant">0.0</span>);
+    }
+    <span class="Statement">else</span> <span class="Statement">if</span>(pos &lt; <span class="Constant">0</span> || pos &gt;= vector-&gt;used)
+    {  pups_set_errno(<span class="Constant">ERANGE</span>);
+       <span class="Statement">return</span>(<span class="Constant">0.0</span>);
+    }
+
+    pups_set_errno(OK);
+
+    *component = vector-&gt;index[pos];
+    <span class="Statement">return</span>(vector-&gt;value[pos]);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Get list vector component (can be slow as we need to search for it) ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC FTYPE lvector_get_component_value(<span class="Type">int</span> component, vlist_type *vector)
+
+{   <span class="Type">int</span> i;
+
+    <span class="Statement">if</span>(vector == (vlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(<span class="Constant">0.0</span>);
+    }
+    <span class="Statement">else</span> <span class="Statement">if</span>(component &lt; <span class="Constant">0</span> || component &gt;= vector-&gt;components)
+    {  pups_set_errno(<span class="Constant">ERANGE</span>);
+       <span class="Statement">return</span>(<span class="Constant">0.0</span>);
+    }
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;vector-&gt;used; ++i)
+    {  <span class="Statement">if</span>(vector-&gt;index[i] == component)
+       {  pups_set_errno(OK);
+          <span class="Statement">return</span>(vector-&gt;value[i]);
+       }
+    }
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(<span class="Constant">0.0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Inflate a list vector so zero componets are present ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC vlist_type *lvector_inflate(_BOOLEAN keep_vector, vlist_type *vector)
+
+{   <span class="Type">int</span> i;
+
+    vlist_type *inflated_vector = (vlist_type *)<span class="Constant">NULL</span>;
+
+    <span class="Statement">if</span>(vector == (vlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>((inflated_vector = lvector_create((<span class="Type">FILE</span> *)<span class="Constant">NULL</span>,vector-&gt;components,<span class="Constant">NULL</span>)) == (vlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">ENOMEM</span>);
+       <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Inflate the vector </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;vector-&gt;used; ++i)
+    {  <span class="Statement">if</span>(vector-&gt;value[i] != <span class="Constant">0.0</span>)
+          inflated_vector-&gt;value[vector-&gt;index[i]] = vector-&gt;value[i];
+    }
+
+    (<span class="Type">void</span>)strlcpy(inflated_vector-&gt;name,vector-&gt;name,SSIZE);
+    inflated_vector-&gt;allocated = vector-&gt;components;
+    inflated_vector-&gt;used      = vector-&gt;components;
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Mark vector as inflated </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+
+    inflated_vector-&gt;state = INFLATED;
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Destroy deflated vector </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(keep_vector == FALSE)
+       (<span class="Type">void</span>)lvector_destroy(vector);
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(inflated_vector);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Inflate a list matrix so zero componets are present ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC mlist_type *lmatrix_inflate(_BOOLEAN keep_matrix, mlist_type *matrix)
+
+{   <span class="Type">int</span> i;
+
+    mlist_type *inflated_matrix = (mlist_type *)<span class="Constant">NULL</span>;
+
+    <span class="Statement">if</span>(matrix == (mlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>((inflated_matrix = (mlist_type *)pups_malloc(<span class="Statement">sizeof</span>(mlist_type))) == (mlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">ENOMEM</span>);
+       <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>((inflated_matrix-&gt;vector = (vlist_type **)pups_calloc(matrix-&gt;rows,<span class="Statement">sizeof</span>(vlist_type *))) == (vlist_type **)<span class="Constant">NULL</span>)
+    {   (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)inflated_matrix);
+
+        pups_set_errno(<span class="Constant">ENOMEM</span>);
+        <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    inflated_matrix-&gt;rows = matrix-&gt;rows;
+    inflated_matrix-&gt;cols = matrix-&gt;cols;
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;matrix-&gt;rows; ++i)
+    {  <span class="Statement">if</span>(matrix-&gt;vector[i]-&gt;used &gt; <span class="Constant">0</span>)
+       {  <span class="Statement">if</span>((inflated_matrix-&gt;vector[i] = lvector_inflate(TRUE,matrix-&gt;vector[i])) == (vlist_type *)<span class="Constant">NULL</span>)
+          {  (<span class="Type">void</span>)lmatrix_destroy(inflated_matrix);
+
+             pups_set_errno(<span class="Constant">ENOMEM</span>);
+             <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+          }
+       }
+       <span class="Statement">else</span>
+       {  <span class="Statement">if</span>((inflated_matrix-&gt;vector[i] = lvector_create((<span class="Type">FILE</span> *)<span class="Constant">NULL</span>,matrix-&gt;cols,<span class="Constant">NULL</span>)) == (vlist_type *)<span class="Constant">NULL</span>)
+          {  (<span class="Type">void</span>)lmatrix_destroy(inflated_matrix);
+
+             pups_set_errno(<span class="Constant">ENOMEM</span>);
+             <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+          }
+       }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Destroy input matrix </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(keep_matrix == FALSE)
+       (<span class="Type">void</span>)lmatrix_destroy(matrix);
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(inflated_matrix);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Get next element in specified row vector of (deflated) matrix ... </span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC FTYPE lmatrix_get_list_value(<span class="Type">int</span> row, <span class="Type">int</span> pos, <span class="Type">int</span> *col, mlist_type *matrix)
+
+{   <span class="Statement">if</span>(matrix == (mlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(<span class="Constant">0.0</span>);
+    }
+    <span class="Statement">else</span> <span class="Statement">if</span>(row &lt; <span class="Constant">0</span> || row &gt; matrix-&gt;rows || pos &lt; <span class="Constant">0</span> || pos &gt;= matrix-&gt;vector[row]-&gt;used)
+    {  pups_set_errno(<span class="Constant">ERANGE</span>);
+       <span class="Statement">return</span>(<span class="Constant">0.0</span>);
+    }
+    *col = matrix-&gt;vector[row]-&gt;index[pos];
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(matrix-&gt;vector[row]-&gt;value[pos]);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Get value of matrix element (may be slow as search is required) ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC FTYPE lmatrix_get_element_value(<span class="Type">int</span> row, <span class="Type">int</span> col, mlist_type *matrix)
+
+{    <span class="Type">int</span> i;
+
+     <span class="Statement">if</span>(matrix == (mlist_type *)<span class="Constant">NULL</span>)
+     {  pups_set_errno(<span class="Constant">EINVAL</span>);
+        <span class="Statement">return</span>(<span class="Constant">0.0</span>);
+     }
+     <span class="Statement">else</span> <span class="Statement">if</span>(row &lt; <span class="Constant">0</span> || row &gt; matrix-&gt;rows || col &lt; <span class="Constant">0</span> || col &gt; matrix-&gt;vector[row]-&gt;components)
+     {  pups_set_errno(<span class="Constant">ERANGE</span>);
+        <span class="Statement">return</span>(<span class="Constant">0.0</span>);
+     }
+
+     <span class="Statement">if</span>(matrix-&gt;vector[row] == (vlist_type *)<span class="Constant">NULL</span>)
+     {  pups_set_errno(OK);
+        <span class="Statement">return</span>(<span class="Constant">0.0</span>);
+     }
+     <span class="Statement">else</span>
+     {  <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;matrix-&gt;vector[row]-&gt;used; ++i)
+        {  <span class="Statement">if</span>(matrix-&gt;vector[row]-&gt;index[i] == col)
+           {  pups_set_errno(OK);
+              <span class="Statement">return</span>(matrix-&gt;vector[row]-&gt;value[i]);
+           }
+        }
+     }
+
+     pups_set_errno(OK);
+     <span class="Statement">return</span>(<span class="Constant">0.0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Normalise list array ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> lmatrix_normalise(mlist_type *lmatrix)
+
+{   <span class="Type">int</span> i,
+        j;
+
+    FTYPE max_val = <span class="Constant">0.0</span>;
+
+    <span class="Statement">if</span>(lmatrix == (mlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;lmatrix-&gt;rows; ++i)
+    {  <span class="Statement">if</span>(lmatrix-&gt;vector[i]-&gt;used &gt; <span class="Constant">0</span>)
+       {  <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;lmatrix-&gt;vector[i]-&gt;used; ++j)
+          {  <span class="Statement">if</span>(max_val &lt; lmatrix-&gt;vector[i]-&gt;value[j])
+                max_val = lmatrix-&gt;vector[i]-&gt;value[j];
+          }
+       }
+    }
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;lmatrix-&gt;rows; ++i)
+    {  <span class="Statement">if</span>(lmatrix-&gt;vector[i]-&gt;used &gt; <span class="Constant">0</span>)
+       {  <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;lmatrix-&gt;vector[i]-&gt;used; ++j)
+              lmatrix-&gt;vector[i]-&gt;value[j] /= max_val;
+       }
+    }
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Normalise list vector ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> lvector_normalise(vlist_type *vector)
+
+{   <span class="Type">int</span> i;
+
+    FTYPE max_val = <span class="Constant">0.0</span>;
+
+    <span class="Statement">if</span>(vector == (vlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;vector-&gt;used; ++i)
+    {  <span class="Statement">if</span>(max_val &lt; vector-&gt;value[i])
+          max_val = vector-&gt;value[i];
+    }
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;vector-&gt;used; ++i)
+       vector-&gt;value[i] /= max_val;
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Print list vector ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> lvector_print(<span class="Type">FILE</span> *stream, <span class="Type">int</span> cols, vlist_type *vector)
+
+{    <span class="Type">int</span> i,
+         cnt = <span class="Constant">0</span>;
+
+     <span class="Statement">if</span>(stream == (<span class="Type">FILE</span> *)<span class="Constant">NULL</span> || vector == (vlist_type *)<span class="Constant">NULL</span>)
+     {  pups_set_errno(<span class="Constant">EINVAL</span>);
+        <span class="Statement">return</span>(-<span class="Constant">1</span>);
+     }
+
+
+     <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> Print vector statistics </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+
+     <span class="Statement">if</span>(strcmp(vector-&gt;name,<span class="Constant">&quot;&quot;</span>) != <span class="Constant">0</span>)
+     {  (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">Name: </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,vector-&gt;name);
+        (<span class="Type">void</span>)fflush(stream);
+     }
+
+     <span class="Statement">if</span>(vector-&gt;state == DEFLATED)
+     {  FTYPE compression_factor;
+
+        compression_factor = <span class="Constant">100.0</span> - (<span class="Constant">100.0</span> * (FTYPE)vector-&gt;used / (FTYPE)vector-&gt;components);
+
+        <span class="Statement">if</span>(vector-&gt;auxdata == (auxdata_type *)<span class="Constant">NULL</span>)
+           (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">Components: </span><span class="Special">%4d</span><span class="Constant"> deflated allocated </span><span class="Special">%4d</span><span class="Constant"> used </span><span class="Special">%4d</span><span class="Constant"> compression </span><span class="Special">%6.3f%%</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                                       vector-&gt;components,
+                                                                                        vector-&gt;allocated,
+                                                                                             vector-&gt;used,
+                                                                                       compression_factor);
+        <span class="Statement">else</span>
+           (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">Components: </span><span class="Special">%4d</span><span class="Constant"> deflated allocated </span><span class="Special">%3d</span><span class="Constant"> used </span><span class="Special">%4d</span><span class="Constant"> compression </span><span class="Special">%6.3f%%</span><span class="Constant"> auxdata</span><span class="Special">\n</span><span class="Constant">&quot;</span>,
+                                                                                               vector-&gt;components,
+                                                                                                vector-&gt;allocated,
+                                                                                                     vector-&gt;used,
+                                                                                               compression_factor);
+     }
+     <span class="Statement">else</span>
+     {  <span class="Statement">if</span>(vector-&gt;auxdata == (auxdata_type *)<span class="Constant">NULL</span>)
+           (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;Components: </span><span class="Special">%4d</span><span class="Constant"> (inflated)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,vector-&gt;components);
+        <span class="Statement">else</span>
+           (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;Components: </span><span class="Special">%4d</span><span class="Constant"> (inflated) auxdata</span><span class="Special">\n</span><span class="Constant">&quot;</span>,vector-&gt;components);
+     }
+     (<span class="Type">void</span>)fflush(stream);
+
+
+     <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> No non zero components </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+     <span class="Statement">if</span>(vector-&gt;used == <span class="Constant">0</span>)
+     {  pups_set_errno(OK);
+        <span class="Statement">return</span>(<span class="Constant">0</span>);
+     }
+
+
+     <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> Print deflated vector </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+
+     <span class="Statement">if</span>(vector-&gt;state == DEFLATED)
+     {  <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;vector-&gt;used; ++i)
+        {  (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">%-4d</span><span class="Constant"> </span><span class="Special">%15E</span><span class="Constant">&quot;</span>,vector-&gt;index[i],vector-&gt;value[i]);
+           (<span class="Type">void</span>)fflush(stream);
+
+           <span class="Statement">if</span>(i == vector-&gt;used - <span class="Constant">1</span> || cnt == cols)
+           {  (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+              cnt = <span class="Constant">0</span>;
+           }
+           <span class="Statement">else</span>
+           {  (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">\t</span><span class="Constant">&quot;</span>);
+              ++cnt;
+           }
+
+           (<span class="Type">void</span>)fflush(stream);
+        }
+     }
+
+
+     <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> Print inflated vector </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+
+     <span class="Statement">else</span>
+     {  <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;vector-&gt;components; ++i)
+        {  (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">%15E</span><span class="Constant">&quot;</span>,vector-&gt;value[i]);
+           (<span class="Type">void</span>)fflush(stream);
+
+           <span class="Statement">if</span>(i == vector-&gt;components - <span class="Constant">1</span> || cnt == cols)
+           {  (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+              cnt = <span class="Constant">0</span>;
+           }
+           <span class="Statement">else</span>
+           {  (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">\t</span><span class="Constant">&quot;</span>);
+              ++cnt;
+           }
+        }
+     }
+
+
+     <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> Save auxiallary data (if any) </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+
+     <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;vector-&gt;used; ++i)
+     {  <span class="Statement">if</span>(vector-&gt;auxdata != (auxdata_type *)<span class="Constant">NULL</span>)
+        {   _PROTOTYPE <span class="Type">int</span> (*save)(<span class="Type">FILE</span> *, <span class="Type">void</span> *);
+
+            <span class="Statement">if</span>(vector-&gt;auxdata[i].save == (<span class="Type">void</span> *)<span class="Constant">NULL</span> || vector-&gt;auxdata[i].data == (<span class="Type">void</span> *)<span class="Constant">NULL</span>)
+            {  pups_set_errno(<span class="Constant">EINVAL</span>);
+               <span class="Statement">return</span>(-<span class="Constant">1</span>);
+            }
+
+            save = vector-&gt;auxdata[i].save;
+            <span class="Statement">if</span>((*save)(stream,vector-&gt;auxdata[i].data) == (-<span class="Constant">1</span>))
+            {  pups_set_errno(<span class="Constant">EPERM</span>);
+               <span class="Statement">return</span>(-<span class="Constant">1</span>);
+            }
+        }
+     }
+
+     (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+     (<span class="Type">void</span>)fflush(stream);
+
+     pups_set_errno(OK);
+     <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Save list vector to (ASCII) file - note we cannot save auxillary data</span>
+<span class="Comment">    in ASCII mode ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> lvector_save_to_file(<span class="Type">char</span> *filename, vlist_type *vector)
+
+{   <span class="Type">FILE</span> *stream = (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>;
+
+    <span class="Statement">if</span>(filename == (<span class="Type">char</span> *)<span class="Constant">NULL</span> || strcmp(filename,<span class="Constant">&quot;&quot;</span>) == <span class="Constant">0</span> || vector == (vlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    <span class="Statement">if</span>(access(filename,F_OK | R_OK | W_OK) == (-<span class="Constant">1</span>))
+    {  <span class="Type">int</span> fildes = (-<span class="Constant">1</span>);
+
+       <span class="Statement">if</span>(fildes = creat(filename,<span class="PreProc">0</span><span class="Constant">600</span>) == (-<span class="Constant">1</span>))
+       {  pups_set_errno(<span class="Constant">EACCES</span>);
+          <span class="Statement">return</span>(-<span class="Constant">1</span>);
+       }
+       <span class="Statement">else</span>
+          (<span class="Type">void</span>)close(fildes);
+    }
+
+    <span class="Statement">if</span>((stream = pups_fopen(filename,<span class="Constant">&quot;w&quot;</span>,LIVE)) == (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EACCES</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">#--------------------------------------------------------------------------</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;#    List vector (ASCII format 1.00)</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;#    (C) M.A. O'Neill, Tumbling Dice 2022</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;#--------------------------------------------------------------------------</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(stream);
+
+    <span class="Statement">if</span>(lvector_print(stream,<span class="Constant">4</span>,vector) == (-<span class="Constant">1</span>))
+    {  (<span class="Type">void</span>)pups_fclose(stream);
+
+       pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)pups_fclose(stream);
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Save list vector to (binary) file ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> lvector_save_to_binary_file(<span class="Type">char</span> *filename, vlist_type *vector)
+
+{   <span class="Type">int</span> i,
+        fildes = (-<span class="Constant">1</span>);
+
+    <span class="Statement">if</span>(filename == (<span class="Type">char</span> *)<span class="Constant">NULL</span> || strcmp(filename,<span class="Constant">&quot;&quot;</span>) == <span class="Constant">0</span> || vector == (vlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    <span class="Statement">if</span>(access(filename,F_OK | R_OK | W_OK) == (-<span class="Constant">1</span>))
+    {  <span class="Type">int</span> fildes = (-<span class="Constant">1</span>);
+
+       <span class="Statement">if</span>(fildes = creat(filename,<span class="PreProc">0</span><span class="Constant">600</span>) == (-<span class="Constant">1</span>))
+       {  pups_set_errno(<span class="Constant">EACCES</span>);
+          <span class="Statement">return</span>(-<span class="Constant">1</span>);
+       }
+       <span class="Statement">else</span>
+          (<span class="Type">void</span>)close(fildes);
+    }
+
+    <span class="Statement">if</span>((fildes = pups_open(filename,<span class="Constant">2</span>,LIVE)) == (-<span class="Constant">1</span>))
+    {  pups_set_errno(<span class="Constant">EACCES</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    <span class="Statement">if</span>(lvector_save_to_binary_fildes(fildes,vector) == (-<span class="Constant">1</span>))
+    {  (<span class="Type">void</span>)pups_close(fildes);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)pups_close(fildes);
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Save list vector to open file descriptor ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> lvector_save_to_binary_fildes(<span class="Type">int</span> fildes, vlist_type *vector)
+
+{   <span class="Type">int</span> i;
+
+    <span class="Statement">if</span>(fildes &lt; <span class="Constant">0</span>)
+    {  pups_set_errno(EBADFD);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+    <span class="Statement">else</span> <span class="Statement">if</span>(vector == (vlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    <span class="Statement">if</span>(write(fildes,VLIST_MAGIC,<span class="Constant">5</span>*<span class="Statement">sizeof</span>(<span class="Type">char</span>)) != <span class="Constant">5</span>*<span class="Statement">sizeof</span>(<span class="Type">char</span>))
+    {  pups_set_errno(<span class="Constant">EACCES</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    <span class="Statement">if</span>(write(fildes,vector-&gt;name,SSIZE*<span class="Statement">sizeof</span>(<span class="Type">char</span>)) != SSIZE*<span class="Statement">sizeof</span>(<span class="Type">char</span>))
+    {  pups_set_errno(<span class="Constant">EACCES</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    <span class="Statement">if</span>(write(fildes,&amp;vector-&gt;state,<span class="Statement">sizeof</span>(<span class="Type">int</span>))      != <span class="Statement">sizeof</span>(<span class="Type">int</span>))
+    {  pups_set_errno(<span class="Constant">EACCES</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    <span class="Statement">if</span>(write(fildes,&amp;vector-&gt;components,<span class="Statement">sizeof</span>(<span class="Type">int</span>)) != <span class="Statement">sizeof</span>(<span class="Type">int</span>))
+    {  pups_set_errno(<span class="Constant">EACCES</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    <span class="Statement">if</span>(write(fildes,&amp;vector-&gt;allocated,<span class="Statement">sizeof</span>(<span class="Type">int</span>))  != <span class="Statement">sizeof</span>(<span class="Type">int</span>))
+    {  pups_set_errno(<span class="Constant">EACCES</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    <span class="Statement">if</span>(write(fildes,&amp;vector-&gt;used,<span class="Statement">sizeof</span>(<span class="Type">int</span>))  != <span class="Statement">sizeof</span>(<span class="Type">int</span>))
+    {  pups_set_errno(<span class="Constant">EACCES</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    <span class="Statement">if</span>(write(fildes,vector-&gt;index,vector-&gt;used*<span class="Statement">sizeof</span>(<span class="Type">int</span>)) != vector-&gt;allocated*<span class="Statement">sizeof</span>(<span class="Type">int</span>))
+    {  pups_set_errno(<span class="Constant">EACCES</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    <span class="Statement">if</span>(write(fildes,vector-&gt;value,vector-&gt;used*<span class="Statement">sizeof</span>(FTYPE)) != vector-&gt;allocated*<span class="Statement">sizeof</span>(FTYPE))
+    {  pups_set_errno(<span class="Constant">EACCES</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Save auxiallary data (if any) </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;vector-&gt;used; ++i)
+    {  <span class="Statement">if</span>(vector-&gt;auxdata != (auxdata_type *)<span class="Constant">NULL</span>)
+       {   _PROTOTYPE <span class="Type">int</span> (*bsave)(<span class="Type">int</span>, <span class="Type">void</span> *);
+
+           <span class="Statement">if</span>(vector-&gt;auxdata[i].bsave == (<span class="Type">void</span> *)<span class="Constant">NULL</span> || vector-&gt;auxdata[i].data == (<span class="Type">void</span> *)<span class="Constant">NULL</span>)
+           {  pups_set_errno(<span class="Constant">EINVAL</span>);
+              <span class="Statement">return</span>(-<span class="Constant">1</span>);
+           }
+
+           bsave = vector-&gt;auxdata[i].bsave;
+           <span class="Statement">if</span>((*bsave)(fildes,vector-&gt;auxdata[i].data) == (-<span class="Constant">1</span>))
+           {  pups_set_errno(<span class="Constant">EPERM</span>);
+              <span class="Statement">return</span>(-<span class="Constant">1</span>);
+           }
+       }
+    }
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Scan a list vector ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC vlist_type *lvector_scan(<span class="Type">FILE</span> *stream)
+
+{   <span class="Type">int</span> i,
+        allocated,
+        used,
+        components;
+
+    <span class="Type">char</span> strdum[SSIZE] = <span class="Constant">&quot;&quot;</span>,
+         state[SSIZE]  = <span class="Constant">&quot;&quot;</span>,
+         name[SSIZE]   = <span class="Constant">&quot;&quot;</span>,
+         item[SSIZE]   = <span class="Constant">&quot;&quot;</span>;
+
+    vlist_type *vector = (vlist_type *)<span class="Constant">NULL</span>;
+
+    <span class="Statement">if</span>(stream == (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EBADF</span>);
+       <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    (<span class="Type">void</span>)skip_comments(stream);
+    <span class="Statement">if</span>(fgets(item,SSIZE,stream) == (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EBADF</span>);
+       <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Is the vector named? </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(strncmp(item,<span class="Constant">&quot;Name:&quot;</span>,<span class="Constant">5</span>) == <span class="Constant">0</span>)
+    {  <span class="Statement">if</span>(sscanf(item,<span class="Constant">&quot;</span><span class="Special">%s%s</span><span class="Constant">&quot;</span>,strdum,name) &lt; <span class="Constant">2</span>)
+       {  pups_set_errno(<span class="Constant">EBADF</span>);
+          <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+       }
+
+       (<span class="Type">void</span>)skip_comments(stream);
+       <span class="Statement">if</span>(fgets(item,SSIZE,stream) == (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+       {  pups_set_errno(<span class="Constant">EBADF</span>);
+          <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+       }
+    }
+
+    <span class="Statement">if</span>(sscanf(item,<span class="Constant">&quot;</span><span class="Special">%s%d%s%s%d%s%d</span><span class="Constant">&quot;</span>,strdum,&amp;components,state,strdum,&amp;allocated,strdum,&amp;used) &lt; <span class="Constant">7</span>)
+    {  pups_set_errno(<span class="Constant">EBADF</span>);
+       <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>((vector = pups_malloc(<span class="Statement">sizeof</span>(vlist_type))) == (vlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">ENOMEM</span>);
+       <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    vector-&gt;components = components;
+    vector-&gt;allocated  = used;
+    vector-&gt;used       = used;
+
+    <span class="Statement">if</span>(strcmp(state,<span class="Constant">&quot;inflated&quot;</span>) == <span class="Constant">0</span>)
+       vector-&gt;state = INFLATED;
+    <span class="Statement">else</span> <span class="Statement">if</span>(strcmp(state,<span class="Constant">&quot;deflated&quot;</span>) == <span class="Constant">0</span>)
+       vector-&gt;state = DEFLATED;
+
+    (<span class="Type">void</span>)strlcpy(vector-&gt;name,name,SSIZE);
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> No non-zero components </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(vector-&gt;used == <span class="Constant">0</span>)
+    {  (<span class="Type">void</span>)pups_set_errno(OK);
+       <span class="Statement">return</span>(vector);
+    }
+
+    <span class="Statement">if</span>((vector-&gt;index = (<span class="Type">int</span> *)pups_calloc(vector-&gt;allocated,<span class="Statement">sizeof</span>(<span class="Type">int</span>))) == (<span class="Type">int</span> *)<span class="Constant">NULL</span>)
+    {  (<span class="Type">void</span>)lvector_destroy(vector);
+
+       pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>((vector-&gt;value = (FTYPE *)pups_calloc(vector-&gt;allocated,<span class="Statement">sizeof</span>(FTYPE))) == (FTYPE *)<span class="Constant">NULL</span>)
+    {  (<span class="Type">void</span>)lvector_destroy(vector);
+
+       pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    (<span class="Type">void</span>)skip_comments(stream);
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;vector-&gt;used; ++i)
+    {  <span class="Statement">if</span>(vector-&gt;state == DEFLATED)
+       {  <span class="Statement">if</span>(fscanf(stream,<span class="Constant">&quot;</span><span class="Special">%4d%15E</span><span class="Constant">&quot;</span>,&amp;vector-&gt;index[i],&amp;vector-&gt;value[i]) != <span class="Constant">2</span>)
+          {  (<span class="Type">void</span>)lvector_destroy(vector);
+
+             pups_set_errno(<span class="Constant">EINVAL</span>);
+             <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+          }
+       }
+       <span class="Statement">else</span> <span class="Statement">if</span>(vector-&gt;state == INFLATED)
+       {  <span class="Statement">if</span>(fscanf(stream,<span class="Constant">&quot;</span><span class="Special">%15E</span><span class="Constant">&quot;</span>,&amp;vector-&gt;value[i]) != <span class="Constant">1</span>)
+          {  (<span class="Type">void</span>)lvector_destroy(vector);
+
+             pups_set_errno(<span class="Constant">EINVAL</span>);
+             <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+          }
+          <span class="Statement">else</span>
+             vector-&gt;index[i] = i;
+       }
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Get auxiallary data (if any) </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;vector-&gt;used; ++i)
+    {  <span class="Statement">if</span>(vector-&gt;auxdata != (auxdata_type *)<span class="Constant">NULL</span>)
+       {   _PROTOTYPE <span class="Type">void</span> *(*load)(<span class="Type">FILE</span> *, <span class="Type">void</span> *);
+
+           <span class="Statement">if</span>(vector-&gt;auxdata[i].load == (<span class="Type">void</span> *)<span class="Constant">NULL</span> || vector-&gt;auxdata[i].data == (<span class="Type">void</span> *)<span class="Constant">NULL</span>)
+           {  pups_set_errno(<span class="Constant">EINVAL</span>);
+              <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+           }
+
+           load = vector-&gt;auxdata[i].load;
+           <span class="Statement">if</span>((vector-&gt;auxdata[i].data = (*load)(stream,vector-&gt;auxdata[i].data)) == (<span class="Type">void</span> *)<span class="Constant">NULL</span>)
+           {  pups_set_errno(<span class="Constant">EPERM</span>);
+              <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+           }
+       }
+    }
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(vector);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Skip lines starting with '#' or &quot;\n&quot; character ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> skip_comments(<span class="Type">FILE</span> *stream)
+
+{   <span class="Type">char</span> next_char,
+         line[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+    <span class="Statement">do</span> {    next_char = fgetc(stream);
+
+
+            <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment"> Strip comment if we need to </span><span class="Comment">*/</span>
+            <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+
+            <span class="Statement">if</span>(next_char == <span class="Constant">'#'</span>)
+               (<span class="Type">void</span>)fgets(line,SSIZE,stream);
+
+       } <span class="Statement">while</span> (next_char == <span class="Constant">' '</span> || next_char == <span class="Special">'\t'</span> || next_char == <span class="Special">'\n'</span> || next_char == <span class="Constant">'#'</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Push character back into stream </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)ungetc(next_char,stream);
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Load list vector from (ASCII) file ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC vlist_type *lvector_load_from_file(<span class="Type">char</span> *filename)
+
+{   <span class="Type">int</span>  i;
+    <span class="Type">char</span> strdum[SSIZE]   = <span class="Constant">&quot;&quot;</span>;
+    <span class="Type">FILE</span> *stream       = (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>;
+    vlist_type *vector = (vlist_type *)<span class="Constant">NULL</span>;
+
+    <span class="Statement">if</span>(filename == (<span class="Type">char</span> *)<span class="Constant">NULL</span> || strcmp(filename,<span class="Constant">&quot;&quot;</span>) == <span class="Constant">0</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>((stream = pups_fopen(filename,<span class="Constant">&quot;r&quot;</span>,LIVE)) == (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EACCES</span>);
+       <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Skip file header </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)skip_comments(stream);
+
+    <span class="Statement">if</span>((vector = lvector_scan(stream)) == (vlist_type *)<span class="Constant">NULL</span>)
+    {  (<span class="Type">void</span>)pups_fclose(stream);
+
+       pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+    }
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)pups_fclose(stream);
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(vector);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Load list vector from (binary) file ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC vlist_type *lvector_load_from_binary_file(<span class="Type">char</span> *filename)
+
+{   <span class="Type">int</span>        fildes  = (-<span class="Constant">1</span>);
+    vlist_type *vector = (vlist_type *)<span class="Constant">NULL</span>;
+
+    <span class="Statement">if</span>(filename == (<span class="Type">char</span> *)<span class="Constant">NULL</span> || strcmp(filename,<span class="Constant">&quot;&quot;</span>) == <span class="Constant">0</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>((fildes = pups_open(filename,<span class="Constant">2</span>,LIVE)) == (-<span class="Constant">1</span>))
+    {  (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)vector);
+
+       pups_set_errno(<span class="Constant">EACCES</span>);
+       <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>((vector = lvector_load_from_binary_fildes(fildes)) == (vlist_type *)<span class="Constant">NULL</span>)
+    {  (<span class="Type">void</span>)pups_close(fildes);
+       <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+    }
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)pups_close(fildes);
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(vector);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Save list vector to (binary) file descriptor  ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC vlist_type *lvector_load_from_binary_fildes(<span class="Type">int</span> fildes)
+
+{   <span class="Type">int</span> i;
+
+    <span class="Type">char</span>       vector_magic[<span class="Constant">5</span>] = <span class="Constant">&quot;&quot;</span>;
+    vlist_type *vector         = (vlist_type *)<span class="Constant">NULL</span>;
+
+    <span class="Statement">if</span>(fildes &lt; <span class="Constant">0</span>)
+    {  pups_set_errno(EBADFD);
+       <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>((vector = (vlist_type *)pups_malloc(<span class="Statement">sizeof</span>(vlist_type))) == (vlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">ENOMEM</span>);
+       <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>(read(fildes,vector_magic,<span class="Constant">5</span>*<span class="Statement">sizeof</span>(<span class="Type">char</span>)) != <span class="Constant">5</span>*<span class="Statement">sizeof</span>(<span class="Type">char</span>))
+    {  (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)vector);
+
+       pups_set_errno(<span class="Constant">EACCES</span>);
+       <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+    }
+    <span class="Statement">else</span> <span class="Statement">if</span>(strncmp(vector_magic,VLIST_MAGIC,<span class="Constant">5</span>) != <span class="Constant">0</span>)
+    {  (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)vector);
+
+       pups_set_errno(<span class="Constant">EBADF</span>);
+       <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>(read(fildes,vector-&gt;name,SSIZE*<span class="Statement">sizeof</span>(<span class="Type">char</span>)) != SSIZE*<span class="Statement">sizeof</span>(<span class="Type">char</span>))
+    {  (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)vector);
+
+       pups_set_errno(<span class="Constant">EACCES</span>);
+       <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>(read(fildes,&amp;vector-&gt;state,<span class="Statement">sizeof</span>(<span class="Type">int</span>)) != <span class="Statement">sizeof</span>(<span class="Type">int</span>))
+    {  (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)vector);
+
+       pups_set_errno(<span class="Constant">EACCES</span>);
+       <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>(read(fildes,&amp;vector-&gt;components,<span class="Statement">sizeof</span>(<span class="Type">int</span>)) != <span class="Statement">sizeof</span>(<span class="Type">int</span>))
+    {  (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)vector);
+
+       pups_set_errno(<span class="Constant">EACCES</span>);
+       <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>(read(fildes,&amp;vector-&gt;allocated,<span class="Statement">sizeof</span>(<span class="Type">int</span>)) != <span class="Statement">sizeof</span>(<span class="Type">int</span>))
+    {  (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)vector);
+
+       pups_set_errno(<span class="Constant">EACCES</span>);
+       <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>(read(fildes,&amp;vector-&gt;used,<span class="Statement">sizeof</span>(<span class="Type">int</span>)) != <span class="Statement">sizeof</span>(<span class="Type">int</span>))
+    {  (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)vector);
+
+       pups_set_errno(<span class="Constant">EACCES</span>);
+       <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>((vector-&gt;index = (<span class="Type">int</span> *)pups_calloc(vector-&gt;used,<span class="Statement">sizeof</span>(<span class="Type">int</span>))) == (<span class="Type">int</span> *)<span class="Constant">NULL</span>)
+    {  (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)vector);
+
+       pups_set_errno(<span class="Constant">EACCES</span>);
+       <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>((vector-&gt;value = (FTYPE *)pups_calloc(vector-&gt;used,<span class="Statement">sizeof</span>(FTYPE))) == (FTYPE *)<span class="Constant">NULL</span>)
+    {  (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)vector-&gt;index);
+       (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)vector);
+
+       pups_set_errno(<span class="Constant">EACCES</span>);
+       <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>(read(fildes,vector-&gt;index,vector-&gt;used*<span class="Statement">sizeof</span>(<span class="Type">int</span>)) != vector-&gt;used*<span class="Statement">sizeof</span>(<span class="Type">int</span>))
+    {  (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)vector-&gt;index);
+       (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)vector-&gt;value);
+       (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)vector);
+
+       pups_set_errno(<span class="Constant">EACCES</span>);
+       <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>(read(fildes,vector-&gt;value,vector-&gt;used*<span class="Statement">sizeof</span>(FTYPE)) != vector-&gt;used*<span class="Statement">sizeof</span>(FTYPE))
+    {  (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)vector-&gt;index);
+       (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)vector-&gt;value);
+       (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)vector);
+
+       pups_set_errno(<span class="Constant">EACCES</span>);
+       <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Get auxiallary data (if any) </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;vector-&gt;used; ++i)
+    {  <span class="Statement">if</span>(vector-&gt;auxdata != (auxdata_type *)<span class="Constant">NULL</span>)
+       {   _PROTOTYPE <span class="Type">void</span> *(*bload)(<span class="Type">int</span>, <span class="Type">void</span> *);
+
+           <span class="Statement">if</span>(vector-&gt;auxdata[i].bload == (<span class="Type">void</span> *)<span class="Constant">NULL</span> || vector-&gt;auxdata[i].data == (<span class="Type">void</span> *)<span class="Constant">NULL</span>)
+           {  pups_set_errno(<span class="Constant">EINVAL</span>);
+              <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+           }
+
+           bload = vector-&gt;auxdata[i].bload;
+           <span class="Statement">if</span>((vector-&gt;auxdata[i].data = (*bload)(fildes,vector-&gt;auxdata[i].data)) == (<span class="Type">void</span> *)<span class="Constant">NULL</span>)
+           {  pups_set_errno(<span class="Constant">EPERM</span>);
+              <span class="Statement">return</span>((vlist_type *)<span class="Constant">NULL</span>);
+           }
+       }
+    }
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(vector);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Print list matrix ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> lmatrix_print(<span class="Type">FILE</span> *stream, <span class="Type">int</span> cols, mlist_type *matrix)
+
+{   <span class="Type">int</span> i;
+
+    <span class="Statement">if</span>(stream == (<span class="Type">FILE</span> *)<span class="Constant">NULL</span> || matrix == (mlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Print vector statistics </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(strcmp(matrix-&gt;name,<span class="Constant">&quot;&quot;</span>) != <span class="Constant">0</span>)
+    {  (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">Name: </span><span class="Special">%s</span><span class="Special">\n</span><span class="Constant">&quot;</span>,matrix-&gt;name);
+       (<span class="Type">void</span>)fflush(stream);
+    }
+
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Special">%4d</span><span class="Constant"> rows x </span><span class="Special">%4d</span><span class="Constant"> cols</span><span class="Special">\n</span><span class="Constant">&quot;</span>,matrix-&gt;rows,matrix-&gt;cols);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;matrix-&gt;rows; ++i)
+    {  (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;# Row </span><span class="Special">%4d</span><span class="Constant"> &quot;</span>,i);
+       (<span class="Type">void</span>)fflush(stream);
+
+       <span class="Statement">if</span>(lvector_print(stream,cols,matrix-&gt;vector[i]) == (-<span class="Constant">1</span>))
+       {  pups_set_errno(<span class="Constant">EINVAL</span>);
+          <span class="Statement">return</span>(-<span class="Constant">1</span>);
+       }
+    }
+
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Save list matrix to (ASCII) file ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> lmatrix_save_to_file(<span class="Type">char</span> *filename, mlist_type *matrix)
+
+{   <span class="Type">FILE</span> *stream = (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>;
+
+    <span class="Statement">if</span>(filename == (<span class="Type">char</span> *)<span class="Constant">NULL</span> || strcmp(filename,<span class="Constant">&quot;&quot;</span>) == <span class="Constant">0</span> || matrix == (mlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    <span class="Statement">if</span>(access(filename,F_OK | R_OK | W_OK) == (-<span class="Constant">1</span>))
+    {  <span class="Type">int</span> fildes = (-<span class="Constant">1</span>);
+
+       <span class="Statement">if</span>(fildes = creat(filename,<span class="PreProc">0</span><span class="Constant">600</span>) == (-<span class="Constant">1</span>))
+       {  pups_set_errno(<span class="Constant">EACCES</span>);
+          <span class="Statement">return</span>(-<span class="Constant">1</span>);
+       }
+       <span class="Statement">else</span>
+          (<span class="Type">void</span>)close(fildes);
+    }
+
+    <span class="Statement">if</span>((stream = pups_fopen(filename,<span class="Constant">&quot;w&quot;</span>,LIVE)) == (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EACCES</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">#--------------------------------------------------------------------------</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;#    List matrix (ASCII format 1.00)</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;#    (C) M.A. O'Neill, Tumbling Dice 2022</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;#--------------------------------------------------------------------------</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(stream);
+
+    <span class="Statement">if</span>(lmatrix_print(stream,<span class="Constant">4</span>,matrix) == (-<span class="Constant">1</span>))
+    {  (<span class="Type">void</span>)pups_fclose(stream);
+
+       pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)pups_fclose(stream);
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Save list matrix to (binary) file ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> lmatrix_save_to_binary_file(<span class="Type">char</span> *filename, mlist_type *matrix)
+
+{   <span class="Type">int</span> i,
+        fildes = (-<span class="Constant">1</span>);
+
+    <span class="Statement">if</span>(filename == (<span class="Type">char</span> *)<span class="Constant">NULL</span> || strcmp(filename,<span class="Constant">&quot;&quot;</span>) == <span class="Constant">0</span> || matrix == (mlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    <span class="Statement">if</span>(access(filename,F_OK | R_OK | W_OK) == (-<span class="Constant">1</span>))
+    {  <span class="Type">int</span> fildes = (-<span class="Constant">1</span>);
+
+       <span class="Statement">if</span>(fildes = creat(filename,<span class="PreProc">0</span><span class="Constant">600</span>) == (-<span class="Constant">1</span>))
+       {  pups_set_errno(<span class="Constant">EACCES</span>);
+          <span class="Statement">return</span>(-<span class="Constant">1</span>);
+       }
+       <span class="Statement">else</span>
+          (<span class="Type">void</span>)close(fildes);
+    }
+
+    <span class="Statement">if</span>((fildes = pups_open(filename,<span class="Constant">2</span>,LIVE)) == (-<span class="Constant">1</span>))
+    {  pups_set_errno(<span class="Constant">EACCES</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    <span class="Statement">if</span>(lmatrix_save_to_binary_fildes(fildes,matrix) == (-<span class="Constant">1</span>))
+    {  (<span class="Type">void</span>)pups_close(fildes);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)pups_close(fildes);
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Save list matrix to (binary) file descriptor ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> lmatrix_save_to_binary_fildes(<span class="Type">int</span> fildes, mlist_type *matrix)
+
+{   <span class="Type">int</span> i;
+
+    <span class="Statement">if</span>(fildes &lt; <span class="Constant">0</span>)
+    {  pups_set_errno(EBADFD);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+    <span class="Statement">else</span> <span class="Statement">if</span>(matrix == (mlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    <span class="Statement">if</span>(write(fildes,MLIST_MAGIC,<span class="Constant">5</span>*<span class="Statement">sizeof</span>(<span class="Type">char</span>)) != <span class="Constant">5</span>*<span class="Statement">sizeof</span>(<span class="Type">char</span>))
+    {  pups_set_errno(<span class="Constant">EACCES</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    <span class="Statement">if</span>(write(fildes,matrix-&gt;name,SSIZE*<span class="Statement">sizeof</span>(<span class="Type">char</span>)) != SSIZE*<span class="Statement">sizeof</span>(<span class="Type">char</span>))
+    {  pups_set_errno(<span class="Constant">EACCES</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    <span class="Statement">if</span>(write(fildes,&amp;matrix-&gt;rows,<span class="Statement">sizeof</span>(<span class="Type">int</span>)) != <span class="Statement">sizeof</span>(<span class="Type">int</span>))
+    {  pups_set_errno(<span class="Constant">EACCES</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    <span class="Statement">if</span>(write(fildes,&amp;matrix-&gt;cols,<span class="Statement">sizeof</span>(<span class="Type">int</span>)) != <span class="Statement">sizeof</span>(<span class="Type">int</span>))
+    {  pups_set_errno(<span class="Constant">EACCES</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;matrix-&gt;rows; ++i)
+    {   <span class="Statement">if</span>(lvector_save_to_binary_fildes(fildes,matrix-&gt;vector[i]) == (-<span class="Constant">1</span>))
+           <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Scan a list matrix ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC mlist_type *lmatrix_scan(<span class="Type">FILE</span> *stream)
+
+{   <span class="Type">int</span> i,
+        rows,
+        cols;
+
+    <span class="Type">char</span> strdum[SSIZE] = <span class="Constant">&quot;&quot;</span>,
+         name[SSIZE]   = <span class="Constant">&quot;&quot;</span>,
+         item[SSIZE]   = <span class="Constant">&quot;&quot;</span>;
+
+    mlist_type *matrix = (mlist_type *)<span class="Constant">NULL</span>;
+
+    <span class="Statement">if</span>(stream == (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EBADF</span>);
+       <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    (<span class="Type">void</span>)skip_comments(stream);
+    <span class="Statement">if</span>(fgets(item,SSIZE,stream) == (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EBADF</span>);
+       <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Is the matrix named? </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(strncmp(item,<span class="Constant">&quot;Name:&quot;</span>,<span class="Constant">5</span>) == <span class="Constant">0</span>)
+    {  <span class="Statement">if</span>(sscanf(item,<span class="Constant">&quot;</span><span class="Special">%s%s</span><span class="Constant">&quot;</span>,strdum,name) &lt; <span class="Constant">2</span>)
+       {  pups_set_errno(<span class="Constant">EBADF</span>);
+          <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+       }
+
+       (<span class="Type">void</span>)skip_comments(stream);
+       <span class="Statement">if</span>(fgets(item,SSIZE,stream) == (<span class="Type">char</span> *)<span class="Constant">NULL</span>)
+       {  pups_set_errno(<span class="Constant">EBADF</span>);
+          <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+       }
+    }
+
+    <span class="Statement">if</span>(sscanf(item,<span class="Constant">&quot;</span><span class="Special">%d%s%s%d</span><span class="Constant">&quot;</span>,&amp;rows,strdum,strdum,&amp;cols) &lt; <span class="Constant">4</span>)
+    {  pups_set_errno(<span class="Constant">EBADF</span>);
+       <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>((matrix = (mlist_type *)pups_malloc(<span class="Statement">sizeof</span>(mlist_type))) == (mlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">ENOMEM</span>);
+       <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>((matrix-&gt;vector = (vlist_type **)pups_calloc(rows,<span class="Statement">sizeof</span>(vlist_type *))) == (vlist_type **)<span class="Constant">NULL</span>)
+    {  (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)matrix);
+
+       pups_set_errno(<span class="Constant">ENOMEM</span>);
+       <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    (<span class="Type">void</span>)skip_comments(stream);
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;rows; ++i)
+    {  <span class="Statement">if</span>((matrix-&gt;vector[i] = lvector_scan(stream)) == (vlist_type *)<span class="Constant">NULL</span>)
+       {  (<span class="Type">void</span>)lmatrix_destroy(matrix);
+
+          pups_set_errno(<span class="Constant">ENOMEM</span>);
+          <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+       }
+    }
+
+    (<span class="Type">void</span>)strlcpy(matrix-&gt;name,name,SSIZE);
+    matrix-&gt;rows = rows;
+    matrix-&gt;cols =cols;
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(matrix);
+
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Load list matrix from (ASCII) file ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC mlist_type *lmatrix_load_from_file(<span class="Type">char</span> *filename)
+
+{   <span class="Type">int</span>   i;
+    <span class="Type">char</span>  strdum[SSIZE]  = <span class="Constant">&quot;&quot;</span>;
+    <span class="Type">FILE</span> *stream       = (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>;
+    mlist_type *matrix = (mlist_type *)<span class="Constant">NULL</span>;
+
+    <span class="Statement">if</span>(filename == (<span class="Type">char</span> *)<span class="Constant">NULL</span> || strcmp(filename,<span class="Constant">&quot;&quot;</span>) == <span class="Constant">0</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>((stream = pups_fopen(filename,<span class="Constant">&quot;r&quot;</span>,LIVE)) == (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EACCES</span>);
+       <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Skip file header </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)skip_comments(stream);
+
+    <span class="Statement">if</span>((matrix = lmatrix_scan(stream)) == (mlist_type *)<span class="Constant">NULL</span>)
+    {  (<span class="Type">void</span>)pups_fclose(stream);
+
+       pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+    }
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)pups_fclose(stream);
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(matrix);
+}
+
+
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Load list matrix from (binary) file ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC mlist_type *lmatrix_load_from_binary_file(<span class="Type">char</span> *filename)
+
+{   <span class="Type">int</span>        fildes  = (-<span class="Constant">1</span>);
+    mlist_type *matrix = (mlist_type *)<span class="Constant">NULL</span>;
+
+    <span class="Statement">if</span>(filename == (<span class="Type">char</span> *)<span class="Constant">NULL</span> || strcmp(filename,<span class="Constant">&quot;&quot;</span>) == <span class="Constant">0</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>((fildes = pups_open(filename,<span class="Constant">2</span>,LIVE)) == (-<span class="Constant">1</span>))
+    {  pups_set_errno(<span class="Constant">EACCES</span>);
+       <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>((matrix = lmatrix_load_from_binary_fildes(fildes)) == (mlist_type *)<span class="Constant">NULL</span>)
+    {  (<span class="Type">void</span>)pups_close(fildes);
+       <span class="Statement">return</span>(mlist_type *)<span class="Constant">NULL</span>;
+    }
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)pups_close(fildes);
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(matrix);
+}
+
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Save list matrix to (binary) file descriptor  ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC mlist_type *lmatrix_load_from_binary_fildes(<span class="Type">int</span> fildes)
+
+{   <span class="Type">int</span>        i;
+    <span class="Type">char</span>       matrix_magic[<span class="Constant">5</span>] = <span class="Constant">&quot;&quot;</span>;
+    mlist_type *matrix         = (mlist_type *)<span class="Constant">NULL</span>;
+
+    <span class="Statement">if</span>(fildes &lt; <span class="Constant">0</span>)
+    {  pups_set_errno(EBADFD);
+       <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>((matrix = (mlist_type *)pups_malloc(<span class="Statement">sizeof</span>(mlist_type))) == (mlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">ENOMEM</span>);
+       <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>(read(fildes,matrix_magic,<span class="Constant">5</span>*<span class="Statement">sizeof</span>(<span class="Type">char</span>)) != <span class="Constant">5</span>*<span class="Statement">sizeof</span>(<span class="Type">char</span>))
+    {  (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)matrix);
+
+       pups_set_errno(<span class="Constant">EACCES</span>);
+       <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+    }
+    <span class="Statement">else</span> <span class="Statement">if</span>(strncmp(matrix_magic,MLIST_MAGIC,<span class="Constant">5</span>) != <span class="Constant">0</span>)
+    {  (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)matrix);
+
+       pups_set_errno(<span class="Constant">EBADF</span>);
+       <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>(read(fildes,matrix-&gt;name,SSIZE*<span class="Statement">sizeof</span>(<span class="Type">char</span>)) != SSIZE*<span class="Statement">sizeof</span>(<span class="Type">char</span>))
+    {  (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)matrix);
+
+       pups_set_errno(<span class="Constant">EACCES</span>);
+       <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>(read(fildes,&amp;matrix-&gt;rows,<span class="Statement">sizeof</span>(<span class="Type">int</span>)) != <span class="Statement">sizeof</span>(<span class="Type">int</span>))
+    {  (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)matrix);
+
+       pups_set_errno(<span class="Constant">EACCES</span>);
+       <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>(read(fildes,&amp;matrix-&gt;cols,<span class="Statement">sizeof</span>(<span class="Type">int</span>)) != <span class="Statement">sizeof</span>(<span class="Type">int</span>))
+    {  (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)matrix);
+
+       pups_set_errno(<span class="Constant">EACCES</span>);
+       <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">if</span>((matrix-&gt;vector = (vlist_type **)pups_calloc(matrix-&gt;rows,<span class="Statement">sizeof</span>(vlist_type *))) == (vlist_type **)<span class="Constant">NULL</span>)
+    {  (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)matrix);
+
+       pups_set_errno(<span class="Constant">ENOMEM</span>);
+       <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+    }
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;matrix-&gt;rows; ++i)
+    {  <span class="Statement">if</span>((matrix-&gt;vector[i] = lvector_load_from_binary_fildes(fildes)) == (vlist_type *)<span class="Constant">NULL</span>)
+       {  (<span class="Type">void</span>)lmatrix_destroy(matrix);
+          <span class="Statement">return</span>((mlist_type *)<span class="Constant">NULL</span>);
+       }
+    }
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(matrix);
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Set list vector name ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> lvector_set_name(<span class="Type">char</span> *name, vlist_type *vector)
+
+{   <span class="Statement">if</span>(name == (<span class="Type">char</span> *)<span class="Constant">NULL</span> || strcmp(name,<span class="Constant">&quot;&quot;</span>) == <span class="Constant">0</span> || vector == (vlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    (<span class="Type">void</span>)strlcpy(vector-&gt;name,name,SSIZE);
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Set list matrix name ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> lmatrix_set_name(<span class="Type">char</span> *name, mlist_type *matrix)
+
+{   <span class="Statement">if</span>(name == (<span class="Type">char</span> *)<span class="Constant">NULL</span> || strcmp(name,<span class="Constant">&quot;&quot;</span>) == <span class="Constant">0</span> || matrix == (mlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    (<span class="Type">void</span>)strlcpy(matrix-&gt;name,name,SSIZE);
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Get list vector inflation state ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> lvector_get_state(vlist_type *vector)
+
+{   <span class="Statement">if</span>(vector == (vlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(vector-&gt;state);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Get list vector size ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> lvector_get_size(vlist_type *vector)
+
+{   <span class="Statement">if</span>(vector == (vlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(vector-&gt;components);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Get list matrix size ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> lmatrix_get_size(mlist_type *matrix, <span class="Type">int</span> *rows, <span class="Type">int</span> *cols)
+
+{   <span class="Statement">if</span>(matrix == (mlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    *rows = matrix-&gt;rows;
+    *cols = matrix-&gt;cols;
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Get allocated size of list vector ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> lvector_get_allocated(vlist_type *vector)
+
+{   <span class="Statement">if</span>(vector == (vlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(vector-&gt;allocated);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Get size list vector (non zero elements in correspondign vector) ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> lvector_get_used(vlist_type *vector)
+
+{   <span class="Statement">if</span>(vector == (vlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(vector-&gt;used);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Get list vector compression factor ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC FTYPE lvector_get_compression_factor(vlist_type *vector)
+
+{   FTYPE compression_factor;
+
+    <span class="Statement">if</span>(vector == (vlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    <span class="Statement">if</span>(vector-&gt;state == INFLATED)
+    {  pups_set_errno(OK);
+       <span class="Statement">return</span>(<span class="Constant">0.0</span>);
+    }
+
+    compression_factor = <span class="Constant">100.0</span> - (<span class="Constant">100.0</span> * (FTYPE)vector-&gt;allocated / (FTYPE)vector-&gt;components);
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(compression_factor);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Get list matrix compression factor ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC FTYPE lmatrix_get_compression_factor(mlist_type *matrix)
+
+{   <span class="Type">int</span> i;
+
+    FTYPE compression_factor,
+          sum_compression_factor = <span class="Constant">0.0</span>;
+
+    <span class="Statement">if</span>(matrix == (mlist_type *)<span class="Constant">NULL</span>)
+    {  pups_set_errno(<span class="Constant">EINVAL</span>);
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+    }
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;matrix-&gt;rows; ++i)
+    {  <span class="Statement">if</span>(matrix-&gt;vector[i]-&gt;used &gt; <span class="Constant">0</span>)
+          compression_factor = <span class="Constant">100.0</span> - (<span class="Constant">100.0</span> * (FTYPE)matrix-&gt;vector[i]-&gt;used / (FTYPE)matrix-&gt;vector[i]-&gt;components);
+       <span class="Statement">else</span>
+          compression_factor = <span class="Constant">100.0</span>;
+
+       sum_compression_factor += compression_factor;
+    }
+    sum_compression_factor /= (FTYPE)matrix-&gt;rows;
+
+    pups_set_errno(OK);
+    <span class="Statement">return</span>(compression_factor);
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

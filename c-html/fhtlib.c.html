@@ -1,0 +1,1246 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/fhtlib.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Double 'in place' Fast Hartley transform routine. This routine is based</span>
+<span class="Comment">    upon the Pascal version of the Fast Hartley routine described in &quot;Byte&quot;</span>
+<span class="Comment">    April 1988 edition.</span>
+
+<span class="Comment">    Author:  M.A. O'Neill</span>
+<span class="Comment">             Tumbling Dice Ltd</span>
+<span class="Comment">             Gosforth</span>
+<span class="Comment">             Newcastle upon Tyne</span>
+<span class="Comment">             NE3 4RT</span>
+<span class="Comment">             United Kingdom</span>
+
+<span class="Comment">   Version: 2.02</span>
+<span class="Comment">   Dated:   4th January 2022</span>
+<span class="Comment">   E-mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;me.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;nfo.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;utils.h&gt;</span>
+
+<span class="PreProc">#undef   __NOT_LIB_SOURCE__</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;fht.h&gt;</span>
+<span class="PreProc">#define  __NOT_LIB_SOURCE__</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;utils.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Slot and usage functions - used by slot manager ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Slot usage function </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> fhtlib_slot(<span class="Type">int</span> level)
+{   (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;lib fhtlib </span><span class="Special">%s</span><span class="Constant">: [ANSI C]</span><span class="Special">\n</span><span class="Constant">&quot;</span>,FHT_VERSION);
+
+    <span class="Statement">if</span>(level &gt; <span class="Constant">1</span>)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;(C) 1985-2022 Tumbling Dice</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;Author: M.A. O'Neill</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;PUPS/P3 fast Fourier/Hartley transform library (built </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+    }
+    <span class="Statement">else</span>
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+    (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Segment identification for fhtlib library ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#ifdef SLOT</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;slotman.h&gt;</span>
+_EXTERN <span class="Type">void</span> (* SLOT )() __attribute__ ((aligned(<span class="Constant">16</span>))) = fhtlib_slot;
+<span class="PreProc">#endif</span> <span class="Comment">/*</span><span class="Comment"> SLOT </span><span class="Comment">*/</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Prototypes private to this application ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="Comment">// Find power of two represented by input number</span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> get_pwr(<span class="Type">int</span>);
+
+<span class="Comment">// Index permutation routine</span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> permute(<span class="Type">int</span>, <span class="Type">int</span>);
+
+<span class="Comment">// Generate trig tables</span>
+_PROTOTYPE _PRIVATE <span class="Type">void</span> trig_table(<span class="Type">int</span>);
+
+<span class="Comment">// Modify retrograde indexes</span>
+_PROTOTYPE _PRIVATE <span class="Type">int</span> modify(<span class="Type">int</span>, <span class="Type">int</span>, <span class="Type">int</span>, <span class="Type">int</span>, <span class="Type">int</span>);
+
+<span class="Comment">// Butterfly transform an index pair</span>
+_PROTOTYPE _PRIVATE <span class="Type">void</span> butterfly(<span class="Type">int</span>,       \
+                                   <span class="Type">int</span>,       \
+                                   <span class="Type">int</span>,       \
+                                   <span class="Type">int</span>,       \
+                                   <span class="Type">int</span>,       \
+                                   FTYPE [],  \
+                                   FTYPE []);
+
+<span class="Comment">// Routine to swap a pair of pointers</span>
+_PROTOTYPE _PRIVATE <span class="Type">void</span> swap_pointers(FTYPE *, FTYPE *);
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Private global variables used by all the Hartley library </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">  procedures                                              </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> i,
+             j,
+             k,
+             trg_ind,
+             trg_inc,
+             power,
+             t_a,
+             f_a,
+             size,
+             section,
+             s_start,
+             s_end,
+             st;
+
+_PRIVATE FTYPE start,
+               step,
+               *sne   = (FTYPE *)<span class="Constant">NULL</span>,
+               *csn   = (FTYPE *)<span class="Constant">NULL</span>;;
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">            Find power of two represented by input number.</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> get_pwr(<span class="Type">int</span> arg)
+
+{   <span class="Type">int</span> i = <span class="Constant">0</span>;
+
+    <span class="Statement">while</span>(arg != <span class="Constant">1</span>)
+    {  arg = arg &gt;&gt; <span class="Constant">1</span>;
+       ++i;
+    }
+    <span class="Statement">return</span>(i);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">   Permutation routine. This routine re-orders the data before the butterly </span>
+<span class="Comment">   transform routine is called ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> permute(<span class="Type">int</span> b_index, <span class="Type">int</span> pwr)
+
+{   <span class="Type">int</span> i,
+        r,
+        s,
+        j = <span class="Constant">0</span>;
+
+   <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;pwr; ++i)
+   {  s       = b_index &gt;&gt; <span class="Constant">1</span>;
+      j       = (j &lt;&lt; <span class="Constant">1</span>) + b_index - (s &lt;&lt; <span class="Constant">1</span>);
+      b_index = s;
+   }
+   <span class="Statement">return</span>(j);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">   Calculate the trignometric functions required by the FHT and store values.</span>
+<span class="Comment">   For a N point transform, the trignometric functions will be calculated  at</span>
+<span class="Comment">   intervals of Nths of a turn ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> trig_table(<span class="Type">int</span> size)
+
+{   <span class="Type">int</span> i;
+
+    FTYPE omega,
+          angle = <span class="Constant">0.0</span>;
+
+    sne = (FTYPE *)pups_calloc(size,<span class="Statement">sizeof</span>(FTYPE));
+    csn = (FTYPE *)pups_calloc(size,<span class="Statement">sizeof</span>(FTYPE));
+
+    omega = <span class="Constant">2.0</span> * PI / size;
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;size; ++i)
+    {  sne[i] = SIN(angle);
+       csn[i] = COS(angle);
+       angle  += omega;
+    }
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">   Calculate the address of the retrograde index for the sine term for the</span>
+<span class="Comment">   dual place alogrithm, if it is required ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">int</span> modify(<span class="Type">int</span>    power,
+                    <span class="Type">int</span>  s_start,
+                    <span class="Type">int</span>    s_end,
+                    <span class="Type">int</span>  b_index,
+                    <span class="Type">int</span>     size)
+
+{   <span class="Type">int</span> ret;
+
+    <span class="Statement">if</span>(s_end == b_index <span class="Comment">/*</span><span class="Comment"> || power &lt; 3 </span><span class="Comment">*/</span>)
+       ret = b_index;
+    <span class="Statement">else</span>
+       ret = (power &lt;&lt; <span class="Constant">1</span>) + s_start + s_end - b_index;
+    <span class="Statement">return</span>(ret);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">   Butterfly transform an index pair ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> butterfly(<span class="Type">int</span> trig_ind,
+                        <span class="Type">int</span>     size,
+                        <span class="Type">int</span>      i_1,
+                        <span class="Type">int</span>      i_2,
+                        <span class="Type">int</span>      i_3,
+                        FTYPE  f_a[],
+                        FTYPE  t_a[])
+
+{   t_a[i_1] = f_a[i_1] + f_a[i_2]*csn[trig_ind] + f_a[i_3]*sne[trig_ind];
+    trig_ind += size &gt;&gt; <span class="Constant">1</span>;
+    t_a[i_2] = f_a[i_1] + f_a[i_2]*csn[trig_ind] + f_a[i_3]*sne[trig_ind];
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">   Get the real part of the Fourier transform ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> get_fft_R(<span class="Type">int</span>          size,
+                       FTYPE da_arr_in[],
+                       FTYPE da_arr_out[])
+
+{   <span class="Type">int</span> i;
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;size; ++i)
+        da_arr_out[i] = da_arr_in[i] + da_arr_in[size-i-<span class="Constant">1</span>];
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">   Get the imaginary part of the Fourier transform ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> get_fft_IM(<span class="Type">int</span>          size,
+                        FTYPE da_arr_in[],
+                        FTYPE da_arr_out[])
+
+{   <span class="Type">int</span> i;
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;size; ++i)
+        da_arr_out[i] = da_arr_in[i] - da_arr_in[size-i-<span class="Constant">1</span>];
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">   Get the power spectrum ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> get_pwr_S(<span class="Type">int</span>          size,
+                       FTYPE da_arr_in[],
+                       FTYPE da_arr_out[])
+
+{   <span class="Type">int</span> i;
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;size; ++i)
+        da_arr_out[i] = (sqr(da_arr_in[i]) + sqr(da_arr_in[size-i-<span class="Constant">1</span>])) / <span class="Constant">2</span>;
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Function to test whether input data is in fact a power of two ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE _BOOLEAN pwr_of_2(<span class="Type">int</span> size)
+
+{   <span class="Type">int</span> i;
+
+    <span class="Statement">while</span>(size%<span class="Constant">2</span> == <span class="Constant">0</span>)
+         size = size &gt;&gt; <span class="Constant">1</span>;
+
+    <span class="Statement">if</span>(size != <span class="Constant">1</span>)
+       <span class="Statement">return</span>(FALSE);
+    <span class="Statement">else</span>
+       <span class="Statement">return</span>(TRUE);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">   Main program for the fast Hartley transform. Translated from ISO Pascal</span>
+<span class="Comment">   to C 14th April 1988.</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> fht(<span class="Type">int</span> sign, <span class="Type">int</span> size, FTYPE da_arr[])
+
+{   <span class="Type">int</span> pwr;
+
+    FTYPE *da_temp_1  = (FTYPE *)<span class="Constant">NULL</span>,
+          *da_temp_2  = (FTYPE *)<span class="Constant">NULL</span>,
+                *f_a  = (FTYPE *)<span class="Constant">NULL</span>,
+                *t_a  = (FTYPE *)<span class="Constant">NULL</span>;
+
+    da_temp_1 = (FTYPE *)pups_calloc(size,<span class="Statement">sizeof</span>(FTYPE));
+    da_temp_2 = (FTYPE *)pups_calloc(size,<span class="Statement">sizeof</span>(FTYPE));
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">  First equivalence 'from data' array pointer to the input data array, </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> da_arr                                                                </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+     f_a = &amp;da_temp_1[<span class="Constant">0</span>];
+     t_a = &amp;da_temp_2[<span class="Constant">0</span>];
+
+     <span class="Statement">if</span>(pwr_of_2(size) == TRUE)
+     {  power = <span class="Constant">1</span>;
+        pwr   = get_pwr(size);
+        trig_table(size);
+
+        <span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> Permute indexes </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">-----------------</span><span class="Comment">*/</span>
+
+        <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;size; ++i)
+            f_a[i] = da_arr[permute(i,pwr)];
+
+        <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> Start of the Hartley butterfly transform </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">------------------------------------------</span><span class="Comment">*/</span>
+
+        <span class="Statement">for</span>(i=<span class="Constant">1</span>; i&lt;pwr+<span class="Constant">1</span>; ++i)
+        {  j = <span class="Constant">0</span>;
+           section = <span class="Constant">0</span>;
+           trg_inc = (<span class="Type">int</span>)(size / (power &lt;&lt; <span class="Constant">1</span>));
+           <span class="Statement">do</span> {  trg_ind = <span class="Constant">0</span>;
+                 s_start = section*power;
+                 s_end   = (section + <span class="Constant">1</span>)*power;
+
+                 <span class="Statement">for</span>(k=<span class="Constant">0</span>; k&lt;power; ++k)
+                 {   butterfly(trg_ind,
+                               size,
+                               j,
+                               j + power,
+                               modify(power,s_start,s_end,j + power,size),
+                                                                      f_a,
+                                                                      t_a);
+                     trg_ind += trg_inc;
+                     ++j;
+                  }
+
+                  j += power;
+                  section += <span class="Constant">2</span>;
+              }   <span class="Statement">while</span>(j &lt; size);
+           power = power &lt;&lt; <span class="Constant">1</span>;
+
+
+           <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment"> Swap dual in place pointers </span><span class="Comment">*/</span>
+           <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+
+           swap_pointers(f_a,t_a);
+        }
+
+        <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------</span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> End of Hartley butterfly. The results are scaled in necessary, and then </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">  placed in back into the array data                                     </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+        <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;size; ++i)
+           <span class="Statement">if</span>(sign == <span class="Constant">1</span>)
+               da_arr[i] = f_a[i] / size;
+            <span class="Statement">else</span>
+               da_arr[i] = f_a[i];
+    }
+    <span class="Statement">else</span>
+       pups_error(<span class="Constant">&quot;[fht] number of points is not a power of two&quot;</span>);
+
+    (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)f_a);
+    (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)t_a);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    This routine is used to apply a band-stop filter ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> band_pass(<span class="Type">int</span>           size,   <span class="Comment">// Data size</span>
+                       FTYPE      f_start,   <span class="Comment">// Start of band pass</span>
+                       FTYPE       f_stop,   <span class="Comment">// End of band pass</span>
+                       FTYPE        t_inc,   <span class="Comment">// Time dopups_main increment</span>
+                       FTYPE  *trans_func)   <span class="Comment">// Transfer function </span>
+{   <span class="Type">int</span> i,
+        nf1,
+        nf2;
+
+    FTYPE band;
+
+    band = <span class="Constant">0.5</span> / t_inc;
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Zero width filters are a little silly </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(f_start == f_stop)
+       pups_error(<span class="Constant">&quot;[band_pass] zero width filter&quot;</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set up band pass filter limits </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+
+    nf1 = (<span class="Type">int</span>)(f_start * (FTYPE)(size &gt;&gt; <span class="Constant">1</span>) / band + <span class="Constant">0.5</span>) - <span class="Constant">1</span>;
+    <span class="Statement">if</span>(nf1 &lt; <span class="Constant">0</span>)
+       nf1 = <span class="Constant">0</span>;
+
+    nf2 = (<span class="Type">int</span>)(f_stop  * (FTYPE)(size &gt;&gt; <span class="Constant">1</span>) / band + <span class="Constant">0.5</span>) - <span class="Constant">1</span>;
+    <span class="Statement">if</span>(nf2 &gt; size)
+       nf2 = size &gt;&gt; <span class="Constant">1</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> No point in continuing if the data isn't likely to get filtered </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(nf1 == <span class="Constant">0</span> &amp;&amp; nf2 == size &gt;&gt; <span class="Constant">1</span>)
+       pups_error(<span class="Constant">&quot;[band_pass] filter width is size of dataset&quot;</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Build the transfer function </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;size; ++i)
+    {   <span class="Statement">if</span>(i &gt;= nf1 &amp;&amp; i &lt;= nf2)
+        {  trans_func[i]        = <span class="Constant">0.0</span>;
+           trans_func[size - i] = <span class="Constant">0.0</span>;
+        }
+        <span class="Statement">else</span>
+        {  trans_func[i]            = <span class="Constant">1.0</span>;
+           trans_func[size - i - <span class="Constant">1</span>] = <span class="Constant">1.0</span>;
+        }
+    }
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to generate power spectral density function from FFT data ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> get_FFT_pwr_S(<span class="Type">int</span>              size, <span class="Comment">// Data size</span>
+                           FTYPE  pwr_spectrum[], <span class="Comment">// Power spectrum</span>
+                           FTYPE        r_data[], <span class="Comment">// Real part of FFT</span>
+                           FTYPE        i_data[]) <span class="Comment">// Imaginary part of FFT</span>
+
+{   <span class="Type">int</span> i;
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;size &gt;&gt; <span class="Constant">1</span>; ++i)
+       pwr_spectrum[i] = r_data[i]*r_data[i] + <span class="Constant">2.0</span>*r_data[i]*i_data[i] +
+                                                    i_data[i]*i_data[i];
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to resample the data - for HIPS data, will have to supply a</span>
+<span class="Comment">    line of data to be resampled ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> resample(<span class="Type">int</span>      old_size,
+                      <span class="Type">int</span>      new_size,
+                      FTYPE   in_data[],
+                      FTYPE  out_data[])
+
+{   <span class="Type">int</span> i;
+
+    FTYPE *in_x      = (FTYPE *)<span class="Constant">NULL</span>,
+          *in_data_2 = (FTYPE *)<span class="Constant">NULL</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Set up cubic spline </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+    in_x      = (FTYPE *)pups_calloc(old_size, <span class="Statement">sizeof</span>(FTYPE));
+    in_data_2 = (FTYPE *)pups_calloc(old_size, <span class="Statement">sizeof</span>(FTYPE));
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;old_size; ++i)
+        in_x[i] = (FTYPE)i*(FTYPE)new_size/(FTYPE)old_size;
+
+    spline(in_x,
+           in_data,
+           old_size,
+           NATURAL,
+           NATURAL,
+           in_data_2);
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Spline data, and put it into the resampling array ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;new_size; ++i)
+        out_data[i] = splint(in_x,
+                             in_data,
+                             in_data_2,
+                             old_size,
+                             (FTYPE)i);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to replace a function by its complex Fourier Transform ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> Fourier(<span class="Type">int</span>         flags,  <span class="Comment">// Initialisation flags </span>
+                     <span class="Type">int</span>         isign,  <span class="Comment">// Transform direction</span>
+                     <span class="Type">int</span>         isize,  <span class="Comment">// Data size</span>
+                     FTYPE  r_da_arr[],  <span class="Comment">// Real part of data</span>
+                     FTYPE  i_da_arr[])  <span class="Comment">// Imaginary part of data</span>
+
+{   <span class="Type">int</span> i,
+        j,
+        k,
+        m,
+        n,
+        mb,
+        ja,
+        jb,
+        jja,
+        jjb,
+        mmax,
+        itemp,
+        istep,
+        i_temp;
+
+
+    FTYPE scale,
+          r_temp,
+          f_temp,
+          theta,
+          r_theta,
+          i_theta;
+
+
+    _IMMORTAL <span class="Type">int</span> ifirst     = <span class="Constant">0</span>,
+                  started    = FALSE,
+                  *b_index   = (<span class="Type">int</span> *)<span class="Constant">NULL</span>;
+
+    _IMMORTAL FTYPE *i_array = (FTYPE *)<span class="Constant">NULL</span>,
+                    *r_array = (FTYPE *)<span class="Constant">NULL</span>,
+                    *r_omega = (FTYPE *)<span class="Constant">NULL</span>,
+                    *i_omega = (FTYPE *)<span class="Constant">NULL</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Free resources if asked to do so </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(flags &amp; RESET)
+    {  b_index = (<span class="Type">int</span> *)  pups_free((<span class="Type">void</span> *)b_index);
+       i_array = (FTYPE *)pups_free((<span class="Type">void</span> *)i_array);
+       r_array = (FTYPE *)pups_free((<span class="Type">void</span> *)r_array);
+       i_omega = (FTYPE *)pups_free((<span class="Type">void</span> *)i_omega);
+       r_omega = (FTYPE *)pups_free((<span class="Type">void</span> *)r_omega);
+
+       <span class="Statement">return</span>;
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> If size is not a power of two, flag error and exit </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(pwr_of_2(size) == FALSE)
+       pups_error(<span class="Constant">&quot;[Fourier] not a power of two&quot;</span>);
+
+
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> This section of the routine is only executed the first time the </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> routine is entered. This sets up the indexes for the butterfly  </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> transform                                                       </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(started == FALSE || flags &amp; RESTART)
+    {  b_index = (<span class="Type">int</span> *)  pups_calloc(isize,<span class="Statement">sizeof</span>(<span class="Type">int</span>));
+       i_array = (FTYPE *)pups_calloc(isize,<span class="Statement">sizeof</span>(FTYPE));
+       r_array = (FTYPE *)pups_calloc(isize,<span class="Statement">sizeof</span>(FTYPE));
+       r_omega = (FTYPE *)pups_calloc(isize,<span class="Statement">sizeof</span>(FTYPE));
+       i_omega = (FTYPE *)pups_calloc(isize,<span class="Statement">sizeof</span>(FTYPE));
+
+       <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;isize; ++i)
+           b_index[i] = i;
+
+       <span class="Statement">for</span>(j=<span class="Constant">0</span>; j&lt;isize; ++j)
+       {  jb = <span class="Constant">0</span>;
+          ja = j - <span class="Constant">1</span>;
+          m  = isize &gt;&gt; <span class="Constant">1</span>;
+          n  = <span class="Constant">1</span>;
+
+          <span class="Statement">do</span> {   <span class="Statement">if</span>(j &gt;= m)
+                 {  ja = ja - m;
+                    jb = jb + n;
+                 }
+
+                 m = m &gt; <span class="Constant">1</span>;
+                 n = n &lt; <span class="Constant">1</span>;
+             } <span class="Statement">while</span>(ja != <span class="Constant">0</span>);
+
+          <span class="Statement">if</span>(j - <span class="Constant">1</span> &lt; jb)
+          {  itemp           = b_index[j];
+             b_index[j]      = b_index[jb + <span class="Constant">1</span>];
+             b_index[jb + <span class="Constant">1</span>] = itemp;
+          }
+       }
+       started = TRUE;
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> This is the start of the FFT butterfly transform </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------------------------</span><span class="Comment">*/</span>
+
+    mb    = <span class="Constant">0</span>;
+    mmax  = <span class="Constant">1</span>;
+
+    <span class="Statement">do</span> {   istep = mmax &lt;&lt; <span class="Constant">1</span>;
+
+           <span class="Statement">for</span>(m=<span class="Constant">0</span>; m&lt;mmax; ++m)
+           {   ++mb;
+
+               <span class="Statement">if</span>(ifirst != isign)
+               {  theta   = PI * (FTYPE)(isign * (m - <span class="Constant">1</span>)) / (FTYPE)mmax;
+                  r_theta = <span class="Constant">0.0</span>;
+                  i_theta = theta;
+
+                  r_omega[m] = COS(theta);
+                  i_omega[m] = SIN(theta);
+               }
+
+               <span class="Statement">for</span>(jja = m; jja &lt; isize; jja += istep)
+               {  jjb = jja + mmax;
+                  ja  = b_index[jja];
+                  jb  = b_index[jjb];
+
+                  r_temp = r_array[jb]*r_omega[mb] + i_array[jb]*i_omega[mb];
+                  i_temp = r_array[jb]*i_omega[mb] + i_array[jb]*r_omega[mb];
+
+                  r_array[jb] = r_array[ja] - r_temp;
+                  i_array[jb] = i_array[ja] - i_temp;
+
+                  r_array[ja] = r_array[ja] + r_temp;
+                  i_array[ja] = i_array[ja] + i_temp;
+              }
+           }
+       } <span class="Statement">while</span>(mmax &lt; isize);
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> End of Butterfly - scale and reorder results </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+
+    scale = <span class="Constant">1.0</span> / sqrt(isize);
+    <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;isize; ++i)
+    {   k = b_index[i];
+        <span class="Statement">if</span>(k &gt;= i)
+        {  r_temp     = r_array[k]*scale;
+           i_temp     = i_array[k]*scale;
+           r_array[k] = r_array[i]*scale;
+           i_array[k] = i_array[i]*scale;
+           r_array[i] = r_temp;
+           i_array[i] = i_temp;
+        }
+    }
+
+    <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> End of scaling and re-ordering </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------------------</span><span class="Comment">*/</span>
+
+    ifirst = <span class="Constant">1</span>;
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to swap a pair of pointers ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> swap_pointers(FTYPE *p_1, FTYPE *p_2)
+
+{   FTYPE *tmp_ptr = (FTYPE *)<span class="Constant">NULL</span>;
+
+    tmp_ptr = p_1;
+    p_1     = p_2;
+    p_2     = tmp_ptr;
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------</span>
+<span class="Comment">    Given a real vector of data[1 ... n], and given m this routine returns</span>
+<span class="Comment">    the m linear prediction coefficients as d[1 ... m] and also returns the</span>
+<span class="Comment">    mean square discrepancy as xms ...</span>
+<span class="Comment">------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+_PUBLIC <span class="Type">void</span> memcof(FTYPE data[], <span class="Type">int</span> n, <span class="Type">int</span> m, FTYPE *xms, FTYPE d[], <span class="Type">int</span> rpt_cnt)
+
+{   <span class="Type">int</span> i,
+        j,
+        k,
+        v_index,
+        n_eff;
+
+    FTYPE p      = <span class="Constant">0.0</span>,
+          *wk1   = (FTYPE *)<span class="Constant">NULL</span>,
+          *wk2   = (FTYPE *)<span class="Constant">NULL</span>,
+          *wkm   = (FTYPE *)<span class="Constant">NULL</span>;
+
+    wk1   = (FTYPE *)pups_calloc(n,  <span class="Statement">sizeof</span>(FTYPE));
+    wk2   = (FTYPE *)pups_calloc(n,  <span class="Statement">sizeof</span>(FTYPE));
+    wkm   = (FTYPE *)pups_calloc(m+<span class="Constant">1</span>,<span class="Statement">sizeof</span>(FTYPE));
+    n_eff = n*rpt_cnt;
+
+    <span class="Statement">for</span>(j=<span class="Constant">1</span>; j&lt;=n_eff; j++)
+    {  v_index = j%n;
+       <span class="Statement">if</span>(v_index == <span class="Constant">0</span>)
+          v_index = <span class="Constant">1</span>;
+
+       p += sqr(data[v_index]);
+    }
+
+    *xms = p / n_eff;
+
+    wk1[<span class="Constant">1</span>]   = data[<span class="Constant">1</span>];
+    wk2[n-<span class="Constant">1</span>] = data[n];
+
+    <span class="Statement">for</span>(j=<span class="Constant">2</span>; j&lt;=n-<span class="Constant">1</span>; ++j)
+    {  wk1[j]   = data[j];
+       wk2[j-<span class="Constant">1</span>] = data[j];
+    }
+
+    <span class="Statement">for</span>(k=<span class="Constant">1</span>; k&lt;=m; ++k)
+    {  FTYPE num   = <span class="Constant">0.0</span>;
+       FTYPE denom = <span class="Constant">0.0</span>;
+
+       <span class="Statement">for</span>(j=<span class="Constant">1</span>; j&lt;=(n_eff-k); ++j)
+       {   v_index = j%n;
+           <span class="Statement">if</span>(v_index == <span class="Constant">0</span>)
+              v_index = <span class="Constant">1</span>;
+
+          num   += wk1[v_index]*wk2[v_index];
+          denom += sqr(wk1[v_index]) + sqr(wk2[v_index]);
+       }
+
+       d[k] =  <span class="Constant">2.0</span>*num/denom;
+       *xms += (<span class="Constant">1.0</span> - sqr(d[k]));
+
+       <span class="Statement">for</span>(i=<span class="Constant">1</span>; i&lt;=(k-<span class="Constant">1</span>); ++i)
+          d[i] = wkm[i] - d[k]*wkm[k-i];
+
+       <span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> This algorithm is recursive, building up the answer for larger values of </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> m until the desired value is reached. At this point the algorithm could  </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> return the vector d and scalar xms for a set of LP coefficients with k   </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> (rather than m) terms                                                    </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> -------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(k == m)
+       {  (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)wk1);
+          (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)wk2);
+          (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)wkm);
+
+          <span class="Statement">return</span>;
+       }
+
+       <span class="Statement">for</span>(i=<span class="Constant">1</span>; i&lt;=k; ++i)
+          wkm[i] = d[i];
+
+       <span class="Statement">for</span>(j=<span class="Constant">1</span>; j&lt;=(n_eff-k-<span class="Constant">1</span>); ++j)
+       {   v_index = j%(n-<span class="Constant">1</span>);
+           <span class="Statement">if</span>(v_index == <span class="Constant">0</span>)
+              v_index = <span class="Constant">1</span>;
+
+          wk1[v_index] -= wkm[k]*wk2[v_index];
+          wk2[v_index] = wk2[v_index+<span class="Constant">1</span>] - wkm[k]*wk1[v_index+<span class="Constant">1</span>];
+       }
+   }
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------------------------</span>
+<span class="Comment">    Routine to compute the power spectrum using the maximum entropy [all poles]</span>
+<span class="Comment">    method. Given d[1 ... m], m and xms returned by memcof, this function</span>
+<span class="Comment">    returns the power spectrum estimate, p(f) as a function of fdt ...</span>
+<span class="Comment">-------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC FTYPE evlmem(FTYPE fdt, FTYPE d[], <span class="Type">int</span> m, FTYPE xms)
+
+{   <span class="Type">int</span> i;
+
+    FTYPE sumr = <span class="Constant">1.0</span>,
+          sumi = <span class="Constant">0.0</span>,
+          wr   = <span class="Constant">1.0</span>,
+          wi   = <span class="Constant">0.0</span>,
+          wpr,
+          wpi,
+          wtemp,
+          theta;
+
+
+    theta = <span class="Constant">2</span>*PI*fdt;
+
+    wpr = cos(theta);
+    wpi = sin(theta);
+
+    <span class="Statement">for</span>(i=<span class="Constant">1</span>; i&lt;=m; ++i)
+    {  wr   = (wtemp = wr)*wpr - wi*wpi;
+       wi   = wi*wpr + wtemp*wpi;
+       sumr -= d[i]*wr;
+       sumi -= d[i]*wi;
+    }
+
+    <span class="Statement">return</span>(xms / (sumr*sumr + sumi*sumi));
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Definition of wavefilt_type </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-----------------------------</span><span class="Comment">*/</span>
+
+<span class="Type">typedef</span> <span class="Type">struct</span> {    <span class="Type">int</span> ncof,
+                        ioff,
+                        joff;
+
+                    FTYPE *cc,
+                          *cr;
+               } wfilt_type;
+
+_PRIVATE wfilt_type wfilt;
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------ </span>
+<span class="Comment">   Initialising routine for generalised wavelet function generator, pwt. Implements</span>
+<span class="Comment">   Debauchies wavelet filters with 4, 12 and 20 coefficients (selected by bvalue n).</span>
+<span class="Comment">   This routine is called once, prior to calling pwt ...</span>
+<span class="Comment">------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+
+_PUBLIC <span class="Type">int</span> pwtset(<span class="Type">int</span> n)
+
+{   <span class="Type">int</span> k;
+
+    FTYPE sig = (-<span class="Constant">1.0</span>);
+
+    _IMMORTAL FTYPE c4[<span class="Constant">5</span>]   = { <span class="Constant">0.0</span>,                                                                               <span class="Comment">/*</span><span class="Comment">--------</span><span class="Comment">*/</span>
+                                <span class="Constant">0.4829629131445341</span>, <span class="Constant">0.8365163037378079</span>, <span class="Constant">0.2241438680420134</span>, -<span class="Constant">0.1294095225512604</span> }; <span class="Comment">/*</span><span class="Comment"> Daub4  </span><span class="Comment">*/</span>
+                                                                                                                   <span class="Comment">/*</span><span class="Comment">--------</span><span class="Comment">*/</span>
+
+
+    _IMMORTAL FTYPE c12[<span class="Constant">13</span>] = { <span class="Constant">0.0</span>,                                                                               <span class="Comment">/*</span><span class="Comment">--------</span><span class="Comment">*/</span>
+                                <span class="Constant">0.111540743350</span>,  <span class="Constant">0.494623890398</span>,  <span class="Constant">0.751133908021</span>,                                  <span class="Comment">/*</span><span class="Comment"> Daub12 </span><span class="Comment">*/</span>
+                                <span class="Constant">0.315250351709</span>, -<span class="Constant">0.226264693965</span>, -<span class="Constant">0.129766867567</span>,                                  <span class="Comment">/*</span><span class="Comment">--------</span><span class="Comment">*/</span>
+                                <span class="Constant">0.097501605587</span>,  <span class="Constant">0.027522865530</span>, -<span class="Constant">0.031582039318</span>,
+                                <span class="Constant">0.000553842201</span>,  <span class="Constant">0.004777257511</span>, -<span class="Constant">0.001077301085</span>};
+
+
+    _IMMORTAL FTYPE c20[<span class="Constant">21</span>] = {  <span class="Constant">0.0</span>,                                                                              <span class="Comment">/*</span><span class="Comment">--------</span><span class="Comment">*/</span>
+                                 <span class="Constant">0.026670057901</span>,   <span class="Constant">0.188176800078</span>,  <span class="Constant">0.527201188932</span>,                                <span class="Comment">/*</span><span class="Comment"> Daub20 </span><span class="Comment">*/</span>
+                                 <span class="Constant">0.688459039454</span>,   <span class="Constant">0.281172343661</span>, -<span class="Constant">0.249846424327</span>,                                <span class="Comment">/*</span><span class="Comment">--------</span><span class="Comment">*/</span>
+                                -<span class="Constant">0.195946274377</span>,   <span class="Constant">0.127369340336</span>,  <span class="Constant">0.093057364604</span>,
+                                -<span class="Constant">0.071394147166</span>,  -<span class="Constant">0.029457536822</span>,  <span class="Constant">0.033212674059</span>,
+                                 <span class="Constant">0.003606553567</span>,  -<span class="Constant">0.010733175483</span>, -<span class="Constant">0.000116466855</span>,
+                                 <span class="Constant">0.000093588670</span>,  -<span class="Constant">0.000013264203</span>                 };
+
+
+    _IMMORTAL FTYPE c4r [<span class="Constant">5</span>],
+                    c12r[<span class="Constant">13</span>],
+                    c20r[<span class="Constant">21</span>];
+
+    wfilt.ncof = n;
+    <span class="Statement">if</span>(n == <span class="Constant">4</span>)
+    {  wfilt.cc = c4;
+       wfilt.cr = c4r;
+    }
+    <span class="Statement">else</span> <span class="Statement">if</span>(n == <span class="Constant">12</span>)
+    {  wfilt.cc = c12;
+       wfilt.cr = c12r;
+    }
+    <span class="Statement">else</span> <span class="Statement">if</span>(n == <span class="Constant">20</span>)
+    {  wfilt.cc = c20;
+       wfilt.cr = c20r;
+    }
+    <span class="Statement">else</span>
+       <span class="Statement">return</span>(-<span class="Constant">1</span>);
+
+    <span class="Statement">for</span>(k=<span class="Constant">1</span>; k&lt;=n; k++)
+    {  wfilt.cr[wfilt.ncof + <span class="Constant">1</span> -k]  = sig*wfilt.cc[k];
+       sig                          = -sig;
+    }
+
+    wfilt.ioff = wfilt.joff = -(n &gt;&gt; <span class="Constant">1</span>);
+
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------------</span>
+<span class="Comment">    Partial wavelet transform, applies arbitary wavelet filter to data vector a[]</span>
+<span class="Comment">    (isign = 1) or its inverse transform (isign = -1) ...</span>
+<span class="Comment">----------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> pwt(FTYPE a[], <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span> n, <span class="Type">int</span> isign)
+
+{   FTYPE ai,
+          ai1,
+          *wksp = (FTYPE *)<span class="Constant">NULL</span>;
+
+    <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span> i,
+                      ii,
+                      j,
+                      jf,
+                      jr,
+                      k,
+                      n1,
+                      ni,
+                      nj,
+                      nh,
+                      nmod;
+    <span class="Statement">if</span>(n &lt; <span class="Constant">4</span>)
+      <span class="Statement">return</span>(-<span class="Constant">1</span>);
+
+    wksp = pups_calloc(n + <span class="Constant">1</span>,<span class="Statement">sizeof</span>(FTYPE));
+    nmod = wfilt.ncof*n;
+    n1   = n - <span class="Constant">1</span>;
+    nh   = n &gt;&gt; <span class="Constant">1</span>;
+
+    <span class="Statement">for</span>(j=<span class="Constant">1</span>; j&lt;=n; j++)
+       wksp[j] = <span class="Constant">0.0</span>;
+
+    <span class="Statement">if</span>(isign &gt;= <span class="Constant">0</span>)
+    {  <span class="Statement">for</span>(ii=<span class="Constant">1</span>,i=<span class="Constant">1</span>; i&lt;=n; i += <span class="Constant">2</span>,ii++)
+       {  ni = i + nmod + wfilt.ioff;
+          nj = i + nmod + wfilt.joff;
+
+          <span class="Statement">for</span>(k=<span class="Constant">1</span>; k&lt;=wfilt.ncof; k++)
+          {  jf           = n1 &amp; (ni + k);
+             jr           = n1 &amp; (nj + k);
+             wksp[ii]    += wfilt.cc[k]*a[jf+<span class="Constant">1</span>];
+             wksp[ii+nh] += wfilt.cr[k]*a[jr+<span class="Constant">1</span>];
+          }
+       }
+    }
+    <span class="Statement">else</span>
+    {  <span class="Statement">for</span>(ii=<span class="Constant">1</span>,i=<span class="Constant">1</span>; i &lt;= n; i += <span class="Constant">2</span>,ii++)
+       {  ai  = a[ii];
+          ai1 = a[ii+nh];
+          ni  = i + nmod + wfilt.ioff;
+          nj  = i + nmod + wfilt.joff;
+
+          <span class="Statement">for</span>(k=<span class="Constant">1</span>; k &lt;= wfilt.ncof; k++)
+          {  jf        = (n1 &amp; (ni + k)) + <span class="Constant">1</span>;
+             jr        = (n1 &amp; (nj + k)) + <span class="Constant">1</span>;
+             wksp[jf] += wfilt.cc[k]*ai;
+             wksp[jr] += wfilt.cr[k]*ai1;
+          }
+       }
+    }
+
+    <span class="Statement">for</span>(j=<span class="Constant">1</span>; j &lt;= n; j++)
+       a[j] = wksp[j];
+
+    (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)wksp);
+
+    <span class="Statement">return</span>(<span class="Constant">0</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------</span>
+<span class="Comment">    One dimensional discrete wavelet transform. This routine implements the pyramid</span>
+<span class="Comment">    algorithm replacing an input vector a[1..n] by its wavelet transform (for isign</span>
+<span class="Comment">    = 1) or performing the inverse operation (for isign = -1). Note that as in the</span>
+<span class="Comment">    Cooley Tukey FFT algorithm n MUST be an integer power of 2. The routine wstep</span>
+<span class="Comment">    whose name is supplied to the calling routine, is the underlying wavelet filter</span>
+<span class="Comment">    used by this routine ...</span>
+<span class="Comment">------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> wt1(FTYPE              a[],
+                 <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>  n,
+                 <span class="Type">int</span>                isign,
+                 <span class="Type">void</span>               (*wstep)(FTYPE [], <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>, <span class="Type">int</span>))
+
+{   <span class="Type">unsigned</span> <span class="Type">long</span> nn;
+
+    <span class="Statement">if</span>(n &lt; <span class="Constant">4</span>)
+       <span class="Statement">return</span>;
+
+    <span class="Statement">if</span>(isign &gt;= <span class="Constant">0</span>)
+    {
+
+       <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Forward wavelet transform - note that we start at the largest hierarchy and </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> work towards the smallest                                                   </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-----------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">for</span>(nn=n; nn&gt;=<span class="Constant">4</span>; nn&gt;&gt;=<span class="Constant">1</span>)
+          (*wstep)(a,nn,isign);
+    }
+    <span class="Statement">else</span>
+    {
+
+       <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Inverse wavelet transform </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">for</span>(nn=<span class="Constant">4</span>; nn&lt;=n; nn&lt;&lt;=<span class="Constant">1</span>)
+          (*wstep)(a,nn,isign);
+
+    }
+}
+
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Coefficients for Debauchies 4-coefficient wavelet transform </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">-------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define C0  </span><span class="Constant">0.4829629131445431</span>
+<span class="PreProc">#define C1  </span><span class="Constant">0.8365163037378079</span>
+<span class="PreProc">#define C2  </span><span class="Constant">0.2241438680420134</span>
+<span class="PreProc">#define C3 -</span><span class="Constant">0.1294095225512604</span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------------------------------------------------------------------</span>
+<span class="Comment">    Applies Debauchies 4-coefficent wavelet filter to a data vector a[1..n] (for</span>
+<span class="Comment">    isign = 1) or applies its transpose (for isign = -1). Used by hiearchical</span>
+<span class="Comment">    routine wt1 ...</span>
+<span class="Comment">------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> daub4(FTYPE a[], <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span> n, <span class="Type">int</span> isign)
+
+{   FTYPE a_max = <span class="Constant">0.0</span>,
+          *wksp = (FTYPE *)<span class="Constant">NULL</span>;
+
+    <span class="Type">unsigned</span> <span class="Type">long</span> nh,
+                  nh1,
+                  i,
+                  j;
+
+    <span class="Statement">if</span>(n &lt; <span class="Constant">4</span>)
+      <span class="Statement">return</span>;
+
+    wksp = (FTYPE *)pups_calloc(n+<span class="Constant">1</span>,<span class="Statement">sizeof</span>(FTYPE));
+    nh1 = (nh = n &gt;&gt; <span class="Constant">1</span>) + <span class="Constant">1</span>;
+
+    <span class="Statement">if</span>(isign &gt;= <span class="Constant">0</span>)
+    {
+
+        <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> Apply forward filter </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">----------------------</span><span class="Comment">*/</span>
+
+        <span class="Statement">for</span>(i=<span class="Constant">1</span>,j=<span class="Constant">1</span>; j&lt;=n-<span class="Constant">3</span>; j+=<span class="Constant">2</span>,i++)
+        {  wksp[i]      = C0*a[j] + C1*a[j+<span class="Constant">1</span>] + C2*a[j+<span class="Constant">2</span>] + C3*a[j+<span class="Constant">3</span>];
+           wksp[i + nh] = C3*a[j] - C2*a[j+<span class="Constant">1</span>] + C1*a[j+<span class="Constant">2</span>] - C0*a[j+<span class="Constant">3</span>];
+        }
+
+        wksp[i]      = C0*a[n-<span class="Constant">1</span>] + C1*a[n] + C2*a[<span class="Constant">1</span>] + C3*a[<span class="Constant">2</span>];
+        wksp[i + nh] = C3*a[n-<span class="Constant">1</span>] - C2*a[n] + C1*a[<span class="Constant">1</span>] - C0*a[<span class="Constant">2</span>];
+    }
+    <span class="Statement">else</span>
+    {
+
+       <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Apply inverse [transpose] filter </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+       wksp[<span class="Constant">1</span>] = C2*a[nh] + C1*a[n] + C0*a[<span class="Constant">1</span>] + C3*a[nh1];
+       wksp[<span class="Constant">2</span>] = C3*a[nh] - C0*a[n] + C1*a[<span class="Constant">1</span>] - C2*a[nh1];
+
+       <span class="Statement">for</span>(i=<span class="Constant">1</span>,j=<span class="Constant">3</span>; i&lt;nh; ++i)
+       {  wksp[j++] = C2*a[i] + C1*a[i+nh] + C0*a[i+<span class="Constant">1</span>] + C3*a[i+nh1];
+          wksp[j++] = C3*a[i] - C0*a[i+nh] + C1*a[i+<span class="Constant">1</span>] - C2*a[i+nh1];
+       }
+    }
+
+    <span class="Statement">for</span>(i=<span class="Constant">1</span>; i&lt;=n; i++)
+    {  a[i] = wksp[i];
+
+       <span class="Statement">if</span>(a_max &lt; wksp[i])
+          a_max =  wksp[i];
+    }
+
+    (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)wksp);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------------------------------------------------------------------</span>
+<span class="Comment">    N dimensional wavelet transform ...</span>
+<span class="Comment">----------------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">void</span> wtn(FTYPE                                             a[],
+                 <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>                                nn[],
+                 <span class="Type">int</span>                                              ndim,
+                 <span class="Type">int</span>                                             isign,
+                 <span class="Type">void</span>       (*wstep)(FTYPE [], <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span>, <span class="Type">int</span>))
+
+{   <span class="Type">unsigned</span> <span class="Type">long</span> <span class="Type">int</span> i1,
+                      i2,
+                      i3,
+                      k,
+                      n,
+                      nnew,
+                      nprev = <span class="Constant">1</span>,
+                      nt,
+                      ntot  = <span class="Constant">1</span>;
+
+    <span class="Type">int</span>    idim;
+    FTYPE  *wksp = (FTYPE *)<span class="Constant">NULL</span>;
+
+    <span class="Statement">for</span>(idim=<span class="Constant">1</span>; idim&lt;=ndim; idim++)
+       ntot *= nn[idim];
+
+    wksp = (FTYPE *)pups_calloc(ntot+<span class="Constant">1</span>,<span class="Statement">sizeof</span>(FTYPE));
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Main loop over dimensions </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">for</span>(idim=<span class="Constant">1</span>; idim&lt;=ndim; idim++)
+    {  n = nn[idim];
+       nnew = n*nprev;
+
+       <span class="Statement">if</span>(n &gt; <span class="Constant">4</span>)
+       {  <span class="Statement">for</span>(i2=<span class="Constant">0</span>; i2&lt;ntot; i2 += nnew)
+          {  <span class="Statement">for</span>(i1=<span class="Constant">1</span>; i1&lt;=nprev; i1++)
+             {  <span class="Statement">for</span>(i3=i1+i2,k=<span class="Constant">1</span>; k&lt;=n; k++,i3+=nprev)
+                   wksp[k] = a[i3];
+
+                <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+                <span class="Comment">/*</span><span class="Comment"> Copy relevant dimension into workspace </span><span class="Comment">*/</span>
+                <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+                <span class="Statement">if</span>(isign &gt;= <span class="Constant">0</span>)
+                {
+
+                   <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+                   <span class="Comment">/*</span><span class="Comment"> Forward transform </span><span class="Comment">*/</span>
+                   <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+                   <span class="Statement">for</span>(nt=n; nt&gt;=<span class="Constant">4</span>; nt &gt;&gt;= <span class="Constant">1</span>)
+                      (*wstep)(wksp,nt,isign);
+                }
+                <span class="Statement">else</span>
+                {
+
+                   <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+                   <span class="Comment">/*</span><span class="Comment"> Inverse transform </span><span class="Comment">*/</span>
+                   <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+                   <span class="Statement">for</span>(nt=<span class="Constant">4</span>; nt&lt;=n; nt &lt;&lt;= <span class="Constant">1</span>)
+                      (*wstep)(wksp,nt,isign);
+                }
+
+
+                <span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+                <span class="Comment">/*</span><span class="Comment"> Copy transformed data back </span><span class="Comment">*/</span>
+                <span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+                <span class="Statement">for</span>(i3=i1+i2,k=<span class="Constant">1</span>; k&lt;=n; k++,i3+=nprev)
+                   a[i3] = wksp[k];
+             }
+          }
+       }
+
+       nprev = nnew;
+   }
+
+   (<span class="Type">void</span>)pups_free((<span class="Type">void</span> *)wksp);
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

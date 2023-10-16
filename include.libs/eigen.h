@@ -1,5 +1,5 @@
 /*-------------------------------------------------------------------------------------
-    Purpose: Numerical recipes matrix routines to support PCA classifiers
+    Purpose: Numerical recipes matrix routines to support PCA classification
 
     Author:  M.A. O'Neill
              Tumbling Dice Ltd
@@ -8,8 +8,8 @@
              NE3 4RT
              United Kingdom
 
-    Dated:   30th August 2018       
     Version: 2.00 
+    Dated:   4th January 2022
     E-mail:  mao@tumblingdice.co.uk
 -------------------------------------------------------------------------------------*/
 

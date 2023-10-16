@@ -1,7 +1,7 @@
-.TH LEAF 1 "10th January 2010" "PUPSP3 tools" "PUPSP3 tools"
+.TH LEAF 1 "7th December 2020" "PUPSP3 tools" "PUPSP3 tools"
 
 .SH NAME
-LEAF \- extract leaf or twig from branch directory path 
+LEAF \- extract leaf or apical twig (plus leaf) from directory pathname
 .br
 
 .SH SYNOPSIS
@@ -17,16 +17,16 @@ LEAF \- extract leaf or twig from branch directory path
 .I twig length
 ]!
 .I pathname
-![>& <log file>]
+[2> <log file>]
 .br
 
 .SH DESCRIPTION
 .I leaf(1)
-extracts a leaf (or sub twig) from a pathname (branch). By defaulti,
+extracts a leaf (or apical twig including the leaf) from a pathname (branch). By defaulti,
 .I leaf(1)
 extracts the
 .B leaf
-(file name) from the end of the pathname branch. Larger twigs are specified
+(file name) from the end of the pathname branch. Larger (apical) twigs are specified
 using the tlength parameter.
 .br
 
@@ -57,6 +57,18 @@ specifies the size of the
 .B twig
 to be extracted from the pathname branch. Defaults to 1 (the filename leaf is
 extracted from the pathname).
+
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
+.br
 
 .SH ENVIRONMENT VARIABLES
 None.

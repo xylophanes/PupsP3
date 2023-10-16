@@ -8,14 +8,15 @@
              NE3 4RT
              United Kingdom
 
-    Version: 2.00 
-    Dated:   30th August 2019 
+    Version: 2.01 
+    Dated:   24th May 2022
     E-mail:  mao@tumblingdice.co.uk
 ----------------------------------------------------------------------------------------------*/
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <bsd/string.h>
 #include <unistd.h>
 #include <xtypes.h>
 
@@ -24,7 +25,7 @@
 /* Version of psrptool */
 /*---------------------*/
 
-#define PSRPTOOL_VERSION    "2.00"
+#define PSRPTOOL_VERSION    "2.01"
 
 
 /*-------------*/
@@ -39,103 +40,6 @@
 /*-------------------*/
 
 #define DEFAULT_FONT_SIZE   7
-
-
-
-
-#ifdef BSD_FUNCTION_SUPPORT
-/*--------------------------------------------------------------------------------------------
-    Strlcpy and stlcat function based on OpenBSD functions ...
---------------------------------------------------------------------------------------------*/
-/*------------------*/
-/* Open BSD Strlcat */
-/*------------------*/
-_PRIVATE size_t strlcat(char *dst, const char *src, size_t dsize)
-{
-	const char *odst = dst;
-	const char *osrc = src;
-	size_t      n    = dsize;
-	size_t      dlen;
-
-
-        /*------------------------------------------------------------------*/
-	/* Find the end of dst and adjust bytes left but don't go past end. */
-        /*------------------------------------------------------------------*/
-
-	while (n-- != 0 && *dst != '\0')
-		dst++;
-	dlen = dst - odst;
-	n = dsize - dlen;
-
-	if (n-- == 0)
-		return(dlen + strlen(src));
-	while (*src != '\0') {
-		if (n != 0) {
-			*dst++ = *src;
-			n--;
-		}
-		src++;
-	}
-	*dst = '\0';
-
-
-        /*----------------------------*/
-        /* count does not include NUL */
-        /*----------------------------*/
-
-	return(dlen + (src - osrc));
-}
-
-
-
-
-/*------------------*/
-/* Open BSD strlcpy */
-/*------------------*/
-
-_PRIVATE size_t strlcpy(char *dst, const char *src, size_t dsize)
-{
-	const char   *osrc = src;
-	size_t nleft       = dsize;
-
-
-        /*---------------------------------*/
-	/* Copy as many bytes as will fit. */
-        /*---------------------------------*/
-
-	if (nleft != 0) {
-		while (--nleft != 0) {
-			if ((*dst++ = *src++) == '\0')
-				break;
-		}
-	}
-
-
-        /*-----------------------------------------------------------*/
-	/* Not enough room in dst, add NUL and traverse rest of src. */
-        /*-----------------------------------------------------------*/
-
-	if (nleft == 0) {
-		if (dsize != 0)
-
-                        /*-------------------*/
-                        /* NUL-terminate dst */
-                        /*-------------------*/
-
-			*dst = '\0';
-		while (*src++)
-			;
-	}
-
-
-        /*----------------------------*/
-        /* count does not include NUL */
-        /*----------------------------*/
-
-	return(src - osrc - 1);
-}
-#endif /* BSD_FUNCTION_SUPPORT */
-
 
 
 
@@ -163,7 +67,7 @@ _PUBLIC int main(int argc, char *argv[])
     /*---------------------------------------------------------*/
 
     if(argc == 2 && (strcmp(argv[1],"-usage") == 0 || strcmp(argv[1],"-help") == 0))
-    {  (void)fprintf(stderr,"\npsrptool version %s, (C) 2003-2019 Tumbling Dice (built %s %s)\n",PSRPTOOL_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\npsrptool version %s, (C) 2003-2022 Tumbling Dice (built %s %s)\n",PSRPTOOL_VERSION,__TIME__,__DATE__);
        (void)fprintf(stderr,"\nUsage: psrptool [-help | -usage] [psrp client argument list] [-fsize <font size:%d>] [-sdongle <soft dongle file name | default>]\n\n",
                                                                                                                                                     DEFAULT_FONT_SIZE);
 
@@ -172,7 +76,7 @@ _PUBLIC int main(int argc, char *argv[])
        (void)fprintf(stderr,"See the GPL and LGPL licences at www.gnu.org for further details\n");
        (void)fprintf(stderr,"PSRPTOOL comes with ABSOLUTELY NO WARRANTY\n\n");
                
-       exit(-1);
+       exit(255);
     }
     
 
@@ -190,7 +94,7 @@ _PUBLIC int main(int argc, char *argv[])
           {  (void)fprintf(stderr,"\npsrptool: illegal command tail syntax\n\n");
              (void)fflush(stderr);
 
-             exit(-1);
+             exit(255);
           }
           (void)snprintf(host_name,SSIZE,argv[i+1]);
        }          
@@ -208,7 +112,7 @@ _PUBLIC int main(int argc, char *argv[])
           {  (void)fprintf(stderr,"\npsrptool: illegal command tail syntax\n\n");
              (void)fflush(stderr);
 
-             exit(-1);
+             exit(255);
           }
           (void)snprintf(client_name,SSIZE,"%s@%s",argv[i+1],host_name);
           ++i;
@@ -219,7 +123,7 @@ _PUBLIC int main(int argc, char *argv[])
           {  (void)fprintf(stderr,"\npsrptool: cannot get home directory (from environment)\n\n");
              (void)fflush(stderr);
 
-             exit(-1);
+             exit(255);
           }
 
           (void)strlcpy(hdir,getenv("HOME"),SSIZE);
@@ -244,14 +148,14 @@ _PUBLIC int main(int argc, char *argv[])
              (void)fflush(stderr);
 
 
-             exit(-1);
+             exit(255);
           }
           else
           {  if(sscanf(argv[i+1],"%d",&fsize) != 1 || fsize < 6 || fsize > 16)
              {  (void)fprintf(stderr,"\npsrptool: ridiculous font size specification (%d)\n",fsize);
                 (void)fflush(stderr);
 
-                exit(-1);
+                exit(255);
              }
 
              ++i;

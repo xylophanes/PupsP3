@@ -1,0 +1,493 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<title>/usr/local/src/pupsp3-5.4.9.src.git/pupscore.src/cpuload.c.html</title>
+<meta name="Generator" content="Vim/7.4">
+<meta name="plugin-version" content="vim7.4_v1">
+<meta name="syntax" content="c">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,prevent_copy=">
+<meta name="colorscheme" content="none">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #0000c0; }
+.Constant { color: #c00000; }
+.Special { color: #c000c0; }
+.Statement { color: #af5f00; }
+.PreProc { color: #c000c0; }
+.Type { color: #008000; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">/*</span><span class="Comment">--------------------------------------------------------------------------------</span>
+<span class="Comment">    Purpose: Compute CPU loading using mpstat untility</span>
+
+<span class="Comment">    Author:  Mark A. O'Neill</span>
+<span class="Comment">             Tumbling Dice Ltd</span>
+<span class="Comment">             Gosforth</span>
+<span class="Comment">             Newcastle</span>
+<span class="Comment">             NE3 4RT</span>
+<span class="Comment">             Tyne and Wear</span>
+
+<span class="Comment">    Version: 1.02</span>
+<span class="Comment">    Dated:   24th May 2022</span>
+<span class="Comment">    E-mail:  mao@tumblingdice.co.uk</span>
+<span class="Comment">---------------------------------------------------------------------------------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;stdio.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;bsd/string.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stdlib.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;unistd.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/types.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;sys/stat.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;signal.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;fcntl.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;xtypes.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;dirent.h&gt;</span>
+
+
+<span class="Comment">/*</span><span class="Comment">---------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Defines </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">---------</span><span class="Comment">*/</span>
+
+<span class="PreProc">#define CPULOAD_VERSION  </span><span class="Constant">&quot;1.02&quot;</span>
+<span class="PreProc">#define SSIZE            </span><span class="Constant">2048</span>
+<span class="PreProc">#define WINDOW_SIZE      </span><span class="Constant">32</span><span class="PreProc"> </span>
+
+
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Global variables </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+<span class="Type">FILE</span>  *pstream             = (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>;
+<span class="Type">FILE</span>  *stream              = (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>;
+<span class="Type">char</span>  linkName[SSIZE]      = <span class="Constant">&quot;&quot;</span>;
+<span class="Type">float</span> loading[WINDOW_SIZE] = { <span class="Constant">0.0</span> };
+
+
+<span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Signal handler </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+
+<span class="Type">static</span> <span class="Type">int</span> sigHandler(<span class="Type">int</span> signum)
+
+{    <span class="Type">struct</span> stat buf;
+
+     <span class="Statement">if</span>(pstream != (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>)
+        (<span class="Type">void</span>)fclose(pstream);
+
+
+     <span class="Statement">if</span>(stream != (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>)
+        (<span class="Type">void</span>)fclose(stream);
+
+
+     <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> Are we the last usage instance? </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+
+     (<span class="Type">void</span>)stat(<span class="Constant">&quot;/tmp/cpuloading&quot;</span>,&amp;buf);
+
+
+     <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> Remove usage case </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment">-------------------</span><span class="Comment">*/</span>
+
+     <span class="Statement">if</span>(buf.st_nlink &gt; <span class="Constant">2</span>)
+        (<span class="Type">void</span>)unlink(linkName);
+
+
+     <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> Last usage case                           </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment"> Switch off the lights and close the door! </span><span class="Comment">*/</span>
+     <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+     <span class="Statement">else</span>
+     {  (<span class="Type">void</span>)unlink(<span class="Constant">&quot;/tmp/cpuloading&quot;</span>);
+        (<span class="Type">void</span>)unlink(<span class="Constant">&quot;/tmp/.cpuloading&quot;</span>);
+
+        (<span class="Type">void</span>)unlink(<span class="Constant">&quot;/tmp/cpuload.pid&quot;</span>);
+        (<span class="Type">void</span>)unlink(<span class="Constant">&quot;/tmp/.cpuload.pid&quot;</span>);
+     }
+
+     (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    cpuload: finished (</span><span class="Special">%d</span><span class="Constant"> remaining usage cases)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,buf.st_nlink - <span class="Constant">2</span>);
+     (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+     exit(<span class="Constant">1</span>);
+}
+
+
+
+
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Window average CPU loading </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">----------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">float</span> window_average_loading(<span class="Type">unsigned</span> <span class="Type">int</span> cnt, <span class="Type">float</span> next_loading)
+
+{   <span class="Type">unsigned</span> <span class="Type">int</span> i;
+    <span class="Type">float</span>        sum = <span class="Constant">0.0</span>;
+
+    <span class="Statement">if</span>(cnt &lt; WINDOW_SIZE)
+    {  loading[cnt] = next_loading;
+
+       <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;cnt+<span class="Constant">1</span>; ++i)
+          sum += loading[i];
+
+       <span class="Statement">if</span>(sum &gt; <span class="Constant">0.0</span>)
+          sum /= (<span class="Type">float</span>)(cnt + <span class="Constant">1</span>);
+    }
+
+    <span class="Statement">else</span>
+    {  loading[cnt % WINDOW_SIZE] = next_loading;
+
+       <span class="Statement">for</span>(i=<span class="Constant">0</span>; i&lt;WINDOW_SIZE; ++i)
+          sum += loading[i];
+       sum /= (<span class="Type">float</span>)WINDOW_SIZE;
+    }
+
+    <span class="Statement">return</span>(sum);
+}
+
+
+<span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Remove stale links and </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> repair critical files  </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+_PRIVATE <span class="Type">void</span> file_homeostat()
+
+{   <span class="Type">int</span>           pid;
+    <span class="Type">DIR</span>           *dirp      = (<span class="Type">DIR</span> *)<span class="Constant">NULL</span>;
+    <span class="Type">struct</span> dirent *next_item = (<span class="Type">struct</span> dirent *)<span class="Constant">NULL</span>;
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Critical files </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> CPU loading </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+    <span class="Statement">if</span>(access(<span class="Constant">&quot;/tmp/cpuloading&quot;</span>,F_OK) == (-<span class="Constant">1</span>))
+    {  (<span class="Type">void</span>)link(<span class="Constant">&quot;/tmp/.cpuloading&quot;</span>,<span class="Constant">&quot;/tmp/cpuloading&quot;</span>);
+
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;file /tmp/cpuloading lost (recreating)</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> CPU loading shadow </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">else</span> <span class="Statement">if</span>(access(<span class="Constant">&quot;/tmp/.cpuloading&quot;</span>,F_OK) == (-<span class="Constant">1</span>))
+    {  (<span class="Type">void</span>)link(<span class="Constant">&quot;/tmp/cpuloading&quot;</span>,<span class="Constant">&quot;/tmp/.cpuloading&quot;</span>);
+
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;file /tmp/cpuloading shadow lost (recreating)</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-----</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> PID </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-----</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(access(<span class="Constant">&quot;/tmp/cpuload.pid&quot;</span>,F_OK) == (-<span class="Constant">1</span>))
+    {  (<span class="Type">void</span>)link(<span class="Constant">&quot;/tmp/.cpuload..pid&quot;</span>,<span class="Constant">&quot;/tmp/cpuload.pid&quot;</span>);
+
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;file /tmp/cpuload.pid lost (recreating)</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> PID shadow </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">else</span> <span class="Statement">if</span>(access(<span class="Constant">&quot;/tmp/.cpuload.pid&quot;</span>,F_OK) == (-<span class="Constant">1</span>))
+    {  (<span class="Type">void</span>)link(<span class="Constant">&quot;/tmp/cpuload..pid&quot;</span>,<span class="Constant">&quot;/tmp/.cpuload.pid&quot;</span>);
+
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;file /tmp/cpuload.pid shadow lost (recreating)</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Stale links </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------</span><span class="Comment">*/</span>
+
+    dirp = opendir(<span class="Constant">&quot;/tmp&quot;</span>);
+    <span class="Statement">while</span>((next_item = readdir(dirp)) != (<span class="Type">struct</span> dirent *)<span class="Constant">NULL</span>)
+    {
+       <span class="Statement">if</span>(sscanf(next_item-&gt;d_name,<span class="Constant">&quot;cpuloading.</span><span class="Special">%d</span><span class="Constant">.link&quot;</span>,&amp;pid) == <span class="Constant">1</span>)
+       {  <span class="Type">char</span> procpid[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+          (<span class="Type">void</span>)snprintf(procpid,SSIZE,<span class="Constant">&quot;/proc/</span><span class="Special">%d</span><span class="Constant">&quot;</span>,pid);
+          <span class="Statement">if</span>(access(procpid,F_OK) == (-<span class="Constant">1</span>))
+          {  <span class="Type">char</span> tmpstr[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+             (<span class="Type">void</span>)snprintf(tmpstr,SSIZE,<span class="Constant">&quot;/tmp/</span><span class="Special">%s</span><span class="Constant">&quot;</span>,next_item-&gt;d_name);
+             (<span class="Type">void</span>)unlink(tmpstr);
+
+             (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    cpuload: stale link (</span><span class="Special">%s</span><span class="Constant">) removed</span><span class="Special">\n</span><span class="Constant">&quot;</span>,tmpstr);
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+          }
+       }
+    }
+    (<span class="Type">void</span>)closedir(dirp);
+}
+
+
+
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment"> Main entry point </span><span class="Comment">*/</span>
+<span class="Comment">/*</span><span class="Comment">------------------</span><span class="Comment">*/</span>
+
+_PUBLIC <span class="Type">int</span> main(<span class="Type">int</span> argc, <span class="Type">char</span> *argv[])
+
+{   <span class="Type">long</span>  <span class="Type">int</span> cnt              = <span class="Constant">0</span>;
+
+    <span class="Type">char</span>  strdum[SSIZE]        = <span class="Constant">&quot;&quot;</span>,
+          mpstat_cmd[SSIZE]    = <span class="Constant">&quot;&quot;</span>;
+
+    <span class="Type">float</span> next_loading,
+          average_loading;
+
+
+    <span class="Comment">/*</span><span class="Comment">------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Help </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(argc == <span class="Constant">2</span>                                           &amp;&amp;
+       (strncmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;-help&quot;</span>, strlen(argv[<span class="Constant">1</span>])) == <span class="Constant">0</span>     ||
+        strncmp(argv[<span class="Constant">1</span>],<span class="Constant">&quot;-usage&quot;</span>,strlen(argv[<span class="Constant">1</span>])) == <span class="Constant">0</span>     ))
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">cpuload version </span><span class="Special">%s</span><span class="Constant">, (C) Tumbling Dice 2000-2022 (built </span><span class="Special">%s</span><span class="Constant"> </span><span class="Special">%s</span><span class="Constant">)</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>,CPULOAD_VERSION,<span class="Constant">__TIME__</span>,<span class="Constant">__DATE__</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;CPULOAD is free software, covered by the GNU General Public License, and you are</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;welcome to change it and/or distribute copies of it under certain conditions.</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;See the GPL and LGPL licences at www.gnu.org for further details</span><span class="Special">\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;CPULOAD comes with ABSOLUTELY NO WARRANTY</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">usage: cpuload [2&gt; log/status file]</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       exit(<span class="Constant">255</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Unparsed command line parameters </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">else</span> <span class="Statement">if</span>(argc &gt; <span class="Constant">1</span>)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    cpuload ERROR: unparsed command line paramters</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       exit(<span class="Constant">255</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Install signal handler </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)signal(<span class="Constant">SIGTERM</span>,(<span class="Type">void</span> *)&amp;sigHandler);
+    (<span class="Type">void</span>)signal(<span class="Constant">SIGHUP</span>, (<span class="Type">void</span> *)&amp;sigHandler);
+    (<span class="Type">void</span>)signal(<span class="Constant">SIGINT</span>, (<span class="Type">void</span> *)&amp;sigHandler);
+    (<span class="Type">void</span>)signal(<span class="Constant">SIGQUIT</span>,(<span class="Type">void</span> *)&amp;sigHandler);
+
+
+    <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Check for running cpuload instance </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> First usage instance creates loading file </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>(access(<span class="Constant">&quot;/tmp/cpuloading&quot;</span>,F_OK) == (-<span class="Constant">1</span>))
+    {
+
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> /tmp/cpuloading is a devil of a file!! </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">----------------------------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">if</span>(close(creat(<span class="Constant">&quot;/tmp/cpuloading&quot;</span>,<span class="PreProc">0</span><span class="Constant">666</span>)) == (-<span class="Constant">1</span>))
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    cpuload ERROR: failed to create /tmp/cpuloading</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+          exit(<span class="Constant">255</span>);
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Simple file homeostat </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+
+       <span class="Statement">else</span>
+          (<span class="Type">void</span>)link(<span class="Constant">&quot;/tmp/cpuloading&quot;</span>,<span class="Constant">&quot;/tmp/.cpuloading&quot;</span>);
+
+
+       <span class="Comment">/*</span><span class="Comment">------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Record PID </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">------------</span><span class="Comment">*/</span>
+
+       (<span class="Type">void</span>)close(creat(<span class="Constant">&quot;/tmp/cpuload.pid&quot;</span>,<span class="PreProc">0</span><span class="Constant">666</span>));
+       (<span class="Type">void</span>)link(<span class="Constant">&quot;/tmp/cpuload.pid&quot;</span>,<span class="Constant">&quot;/tmp/.cpuload.pid&quot;</span>);
+
+       stream = fopen(<span class="Constant">&quot;/tmp/cpuload.pid&quot;</span>,<span class="Constant">&quot;w&quot;</span>);
+       (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,getpid());
+       (<span class="Type">void</span>)fflush(stream);
+       (<span class="Type">void</span>)fclose(stream);
+       stream = (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>;
+
+       <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Remove any dead links </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-----------------------</span><span class="Comment">*/</span>
+
+       (<span class="Type">void</span>)system(<span class="Constant">&quot;rm -f /tmp/cpuloading.*.link&quot;</span>);
+
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    cpuload: process </span><span class="Special">%d</span><span class="Constant"> monitoring cpu loading</span><span class="Special">\n</span><span class="Constant">&quot;</span>,getpid());
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Tell cpuload we wish to add a usage instance </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">else</span>
+    {  <span class="Type">int</span>  pid;
+
+       <span class="Type">char</span> procpid[SSIZE]  = <span class="Constant">&quot;&quot;</span>;
+
+       _BOOLEAN first = TRUE;
+
+
+       (<span class="Type">void</span>)snprintf(linkName,SSIZE,<span class="Constant">&quot;/tmp/cpuloading.</span><span class="Special">%d</span><span class="Constant">.link&quot;</span>,getpid());
+       <span class="Statement">if</span>(link(<span class="Constant">&quot;/tmp/cpuloading&quot;</span>,linkName) == (-<span class="Constant">1</span>))
+       {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    cpuload ERROR: failed to make (hard) link to /tmp/cpuloading</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+          (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+          exit(<span class="Constant">255</span>);
+       }
+
+
+       <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Has cpuload fallen over? </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">--------------------------</span><span class="Comment">*/</span>
+
+       stream = fopen(<span class="Constant">&quot;/tmp/cpuload.pid&quot;</span>,<span class="Constant">&quot;r&quot;</span>);
+       (<span class="Type">void</span>)fscanf(stream,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,&amp;pid);
+       (<span class="Type">void</span>)fclose(stream);
+       stream = (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>;
+
+
+       <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Exit (there is a running cpuload process) </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">-------------------------------------------</span><span class="Comment">*/</span>
+
+       (<span class="Type">void</span>)snprintf(procpid,SSIZE,<span class="Constant">&quot;/proc/</span><span class="Special">%d</span><span class="Constant">&quot;</span>,pid);
+       <span class="Statement">while</span>(access(procpid,F_OK) != (-<span class="Constant">1</span>))
+       {  <span class="Statement">if</span>(first == TRUE)
+          {  first = FALSE;
+
+             (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    cpuload: process </span><span class="Special">%d</span><span class="Constant"> is live (process </span><span class="Special">%d</span><span class="Constant"> going dormant)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,pid,getpid());
+             (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+          }
+
+          (<span class="Type">void</span>)sleep(<span class="Constant">1</span>);
+       }
+
+       (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;    cpuload: process </span><span class="Special">%d</span><span class="Constant"> has been terminated (process </span><span class="Special">%d</span><span class="Constant"> taking over as cpu load daemon)</span><span class="Special">\n</span><span class="Constant">&quot;</span>,pid,getpid());
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+
+       <span class="Comment">/*</span><span class="Comment">------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Record PID </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">------------</span><span class="Comment">*/</span>
+
+       stream = fopen(<span class="Constant">&quot;/tmp/cpuload.pid&quot;</span>,<span class="Constant">&quot;w&quot;</span>);
+       (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">%d</span><span class="Special">\n</span><span class="Constant">&quot;</span>,getpid());
+       (<span class="Type">void</span>)fflush(stream);
+       (<span class="Type">void</span>)fclose(stream);
+       stream = (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>;
+
+
+       <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment"> Remove (self) link </span><span class="Comment">*/</span>
+       <span class="Comment">/*</span><span class="Comment">--------------------</span><span class="Comment">*/</span>
+
+       (<span class="Type">void</span>)snprintf(linkName,SSIZE,<span class="Constant">&quot;/tmp/cpuloading.</span><span class="Special">%d</span><span class="Constant">.link&quot;</span>,getpid());
+       (<span class="Type">void</span>)unlink(linkName);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Collect loading statistics once </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> per second                      </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------------------</span><span class="Comment">*/</span>
+
+    (<span class="Type">void</span>)strlcpy(mpstat_cmd,<span class="Constant">&quot;bash -c </span><span class="Special">\&quot;</span><span class="Constant">mpstat 1</span><span class="Special">\&quot;</span><span class="Constant">&quot;</span>,SSIZE);
+    <span class="Statement">if</span>((pstream = popen(mpstat_cmd,<span class="Constant">&quot;r&quot;</span>)) == (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    cpuload ERROR: could not start mpstat command</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       exit(<span class="Constant">255</span>);
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Update loading (in /tmp/cpuload) </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">----------------------------------</span><span class="Comment">*/</span>
+
+    <span class="Statement">if</span>((stream = fopen(<span class="Constant">&quot;/tmp/cpuloading&quot;</span>,<span class="Constant">&quot;w&quot;</span>)) == (<span class="Type">FILE</span> *)<span class="Constant">NULL</span>)
+    {  (<span class="Type">void</span>)fprintf(<span class="Constant">stderr</span>,<span class="Constant">&quot;</span><span class="Special">\n</span><span class="Constant">    cpuload ERROR: could not open /tmp/cpuload</span><span class="Special">\n\n</span><span class="Constant">&quot;</span>);
+       (<span class="Type">void</span>)fflush(<span class="Constant">stderr</span>);
+
+       exit(<span class="Constant">255</span>);
+    }
+
+    <span class="Statement">while</span>(TRUE)
+    {   <span class="Type">char</span> line[SSIZE] = <span class="Constant">&quot;&quot;</span>;
+
+        (<span class="Type">void</span>)fgets(line,SSIZE,pstream);
+
+        <span class="Statement">if</span>(sscanf(line,<span class="Constant">&quot;</span><span class="Special">%s%s%f</span><span class="Constant">&quot;</span>,strdum,strdum,&amp;next_loading) == <span class="Constant">3</span>)
+        {  average_loading = window_average_loading(cnt,next_loading);
+           ++cnt;
+
+           (<span class="Type">void</span>)fprintf(stream,<span class="Constant">&quot;</span><span class="Special">%5.2f</span><span class="Special">\n</span><span class="Constant">&quot;</span>,average_loading);
+           (<span class="Type">void</span>)fflush(stream);
+           (<span class="Type">void</span>)rewind(stream);
+        }
+
+
+        <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> Reap any dead links       </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment"> and repair critical files </span><span class="Comment">*/</span>
+        <span class="Comment">/*</span><span class="Comment">---------------------------</span><span class="Comment">*/</span>
+
+        file_homeostat();
+    }
+
+
+    <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment"> Should not get here </span><span class="Comment">*/</span>
+    <span class="Comment">/*</span><span class="Comment">---------------------</span><span class="Comment">*/</span>
+
+    exit(<span class="Constant">0</span>);
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

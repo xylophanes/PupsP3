@@ -1,0 +1,17 @@
+#!/bin/tcsh
+#
+#------------------------------------------------------------------------------
+#  Install PUPSP3 libraries and service functions
+#  (C) M.A. O'Neill, Tumbling Dice Ltd, 2000-2022
+#
+#  $1 is build type
+#  $2 is logfile
+#  $3 is set to default (if security mode enable and we want default settings)
+#  $4 is set to debug (to build debuggable system e.g -g)
+#------------------------------------------------------------------------------
+
+pushd pupscore.src			>& /dev/null
+./install_pupsP3.csh $1 $2 $3 $4 
+popd					>& /dev/null
+
+exit 0

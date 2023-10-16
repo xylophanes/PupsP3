@@ -10,7 +10,7 @@
              United Kingdom
 
     Version: 2.00 
-    Dated:   30th August 2019 
+    Dated:   4th January 2022
     Email:   mao@tumblingdice.co.uk
 ------------------------------------------------------------------------------*/
 
@@ -59,7 +59,7 @@ _PRIVATE void xtee_slot(int level)
 {   (void)fprintf(stderr,"int app xtee %s: [ANSI C]\n",XTEE_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 1999-2019 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 1999-2022 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
        (void)fprintf(stderr,"Extended tee filter (built %s %s)\n\n",__TIME__,__DATE__);
     }
@@ -173,7 +173,7 @@ _PRIVATE int psrp_process_status(int argc, char *argv[])
     checkpoint files) ...
 -------------------------------------------------------------------------------*/
 
-#define VTAG  3276
+#define VTAG  3686
 
 extern int appl_vtag = VTAG;
 
@@ -207,7 +207,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
                   XTEE_VERSION,
                   "M.A. O'Neill",
                   "xtee",
-                  "2019",
+                  "2022",
                   argv);
 
 
