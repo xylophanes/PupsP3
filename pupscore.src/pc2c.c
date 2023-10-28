@@ -10,7 +10,7 @@
              United Kingdom
 
     Version: 2.01 
-    Dated:   24th May 2022
+    Dated:   24th May 2023
     E-mail:  mao@tumblingdice.co.uk
 -------------------------------------------------------------------------------------------*/
 
@@ -208,7 +208,7 @@ _PUBLIC int main(int argc, char *argv[])
     char arglist[32][SSIZE] = { "" };
 
     (void)fprintf(stderr,"\nPUPS parallel C  to C translation tool version %s\n",PC2C_VERSION);
-    (void)fprintf(stderr,"(C) Tumbling Dice, 2006-2022 (built %s %s)\n\n",__TIME__,__DATE__);
+    (void)fprintf(stderr,"(C) Tumbling Dice, 2006-2023 (built %s %s)\n\n",__TIME__,__DATE__);
 
     if(isatty(0) == 1 || isatty(1) == 1)
     {  (void)fprintf(stderr,"Usage: pc2c < <input PUPS parallel C file> > <output C file>\n\n");

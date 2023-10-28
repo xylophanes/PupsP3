@@ -14,7 +14,7 @@
                United Kingdom
 
     Version:  2.02 
-    Dated:    7th January 2022
+    Dated:    7th January 2023
     E-mail:   mao@tumblingdice.co.uk
 ------------------------------------------------------------------------------*/
 
@@ -48,7 +48,7 @@ _PRIVATE void hiplib_slot(int level)
 {   (void)fprintf(stderr,"lib hiplib %s: [ANSI C]\n",HIPLIB_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 1987-2022 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 1987-2023 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
        (void)fprintf(stderr,"PUPS/P3 HIPS support library (built %s %s)\n\n",__TIME__,__DATE__);
     }

@@ -9,7 +9,7 @@
              United Kingdom
 
     Version: 2.00 
-    Dated:   4th January 2022
+    Dated:   4th January 2023
     E-Mail:  mao@tumblingdice.co.uk
 -----------------------------------------------------------------------------*/
 
@@ -351,7 +351,7 @@ _PUBLIC void slot_usage(const int level)
 
 {   int i;
 
-    (void)fprintf(stderr,"    slot manager %s, (C) Tumbling Dice, 1999-2022 (built %s %s)\n",SLOTMAN_VERSION,__TIME__,__DATE__);
+    (void)fprintf(stderr,"    slot manager %s, (C) Tumbling Dice, 1999-2023 (built %s %s)\n",SLOTMAN_VERSION,__TIME__,__DATE__);
     (void)fflush(stderr);
 
     (void)fprintf(stderr,"\n");
@@ -380,7 +380,7 @@ _PUBLIC void usage(void)
 
 {   int i;
 
-    (void)fprintf(stderr,"Slot manager %s (C) Tumbling Dice, 1999-2022 (built %s %s), usage:\n\n",SLOTMAN_VERSION,__TIME__,__DATE__);
+    (void)fprintf(stderr,"Slot manager %s (C) Tumbling Dice, 1999-2023 (built %s %s), usage:\n\n",SLOTMAN_VERSION,__TIME__,__DATE__);
     (void)fflush(stderr);
 
 

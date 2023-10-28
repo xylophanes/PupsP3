@@ -8,8 +8,8 @@
              NE3 4RT
              United Kingdom
 
-    Version: 5.06 
-    Dated:   6th October 2023 
+    Version: 5.08 
+    Dated:   26th October 2023 
     E-mail:  mao@tumblingdice.co.uk
 ------------------------------------------------------------------------------*/
 
@@ -165,7 +165,7 @@ _PRIVATE void psrplib_slot(int level)
 {   (void)fprintf(stderr,"lib psrplib %s: [ANSI C]\n",PSRPLIB_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 1995-2022 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 1995-2023 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
        (void)fprintf(stderr,"PUPS/P3 multiuser threadsafe PSRP [SUPUPS] library (built %s %s)\n\n",__TIME__,__DATE__);
     }
@@ -304,6 +304,8 @@ _PROTOTYPE _PRIVATE int psrp_builtin_show_malloc_stats(const int, const char *[]
 _PROTOTYPE _PRIVATE int psrp_builtin_ssave(const int, const char *[]);
 #endif /* CRIU_SUPPORT */
 
+// Enable/disable software watchdog
+_PROTOTYPE _PRIVATE int psrp_builtin_softdog(const int, const char *[]);
 
 // Process exits if its effective parent is terminated
 _PROTOTYPE _PRIVATE int psrp_builtin_set_pexit(const int, const char *[]);
@@ -3658,6 +3660,14 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     #endif /* CRIU_SUPPORT */
 
 
+    /*----------------------------------*/
+    /* Enable/disable software watchdog */
+    /*----------------------------------*/
+
+    else if(psrp_builtin_softdog(r_argc,(char **)r_argv) == PSRP_OK)
+       goto object_dispatched;
+
+
     /*--------------------------------------------------*/  
     /* Set PSRP server stdio detach on background state */
     /*--------------------------------------------------*/  
@@ -4661,7 +4671,7 @@ _PUBLIC int psrp_save_dispatch_table(const char *autoload_file_name)
 
     (void)fprintf(autoload_stream,"#-------------------------------------------------------------------\n");
     (void)fprintf(autoload_stream,"#    PSRP dispatch table resource file version 1.0                  \n");
-    (void)fprintf(autoload_stream,"#    (C) M.A. O'Neill, Tumbling Dice, Gosforth, 2022                \n");
+    (void)fprintf(autoload_stream,"#    (C) M.A. O'Neill, Tumbling Dice, Gosforth, 2023                \n");
     (void)fprintf(autoload_stream,"#-------------------------------------------------------------------\n");
     (void)fprintf(autoload_stream,"\n\n");
 
@@ -5812,16 +5822,7 @@ _PRIVATE int psrp_builtin_terminate_process(const int argc, const char *argv[])
     /* Set up command tail decoder for this object */
     /*---------------------------------------------*/
 
-    if(psrp_std_init(argc,argv) == FALSE)
-       return(PSRP_OK);
-
-
-    /*------------------------------------------------------*/ 
-    /* Check that there is no junk left on the command line */
-    /*------------------------------------------------------*/ 
-
-    if(psrp_t_arg_errs(argc,argd,argv) == FALSE)
-       return(PSRP_OK);
+    //(void)pups_malarm(0);
 
 
     /*--------------------------------------*/
@@ -5837,8 +5838,10 @@ _PRIVATE int psrp_builtin_terminate_process(const int argc, const char *argv[])
     /* Commit suicide explicitly to invoke handler - just in case we are a session leader */
     /*------------------------------------------------------------------------------------*/
 
-    (void)raise(SIGTERM);
+    if (appl_pg_leader == TRUE)
+       (void)killpg(appl_pid,SIGTERM);
 
+    pups_sleep(1);
     pups_exit(255);
 }
 
@@ -6246,8 +6249,8 @@ _PRIVATE int psrp_builtin_help(const int argc, const char *argv[])
     /* Display on line help for builtin commands */
     /*-------------------------------------------*/  
 
-    (void)fprintf(psrp_out,"\n\n    PSRP request handler version 2.16 (protocol %5.2F)\n",PSRP_PROTOCOL_VERSION);
-    (void)fprintf(psrp_out,"    (C) M.A. O'Neill, Tumbling Dice, 1995-2022\n\n");
+    (void)fprintf(psrp_out,"\n\n    PSRP request handler version 2.17 (protocol %5.2F)\n",PSRP_PROTOCOL_VERSION);
+    (void)fprintf(psrp_out,"    (C) M.A. O'Neill, Tumbling Dice, 1995-2023\n\n");
     (void)fprintf(psrp_out,"    Builtin commands\n");
     (void)fprintf(psrp_out,"    ================\n\n");
     (void)fflush(psrp_out);
@@ -6268,28 +6271,31 @@ _PRIVATE int psrp_builtin_help(const int argc, const char *argv[])
     (void)fprintf(psrp_out,"    rusage                           :   show current resource usage status\n"); 
     (void)fprintf(psrp_out,"    rset                             :   set resource usage limits\n"); 
     (void)fprintf(psrp_out,"    pstat                            :   display /proc filesystem status entry\n");
-    (void)fprintf(psrp_out,"    terminate | kill                 :   terminate (this) PSRP server process\n");
+    (void)fprintf(psrp_out,"    terminate | kill                 :   terminate (this) PSRP server process\n\n\n");
+
     (void)fprintf(psrp_out,"    P3 server virtual timer control/status functions\n");
     (void)fprintf(psrp_out,"    ================================================\n\n");
     (void)fprintf(psrp_out,"    quantum        [<time> | default]:   set PSRP (vitimer) quantum\n");
     (void)fprintf(psrp_out,"    vitstat                          :   display status of PUPS virtual interval timers\n\n");
-    (void)fprintf(psrp_out,"    vitab          [<n> | shrink]    :   display [or set to <n> or Procrustes shrink] number of virtal timer table slots\n\n");
+    (void)fprintf(psrp_out,"    vitab          [<n> | shrink]    :   display [or set to <n> or Procrustes shrink] number of virtal timer table slots\n\n\n");
+
     (void)fprintf(psrp_out,"    P3 server child control/status functions\n");
     (void)fprintf(psrp_out,"    =========================================\n\n");
     (void)fprintf(psrp_out,"    cstat                            :   display active children`\n");
-    (void)fprintf(psrp_out,"    htab          [<n> | shrink]    :   display [or set to <n> or Procrustes shrink] number of child table slots\n\n");
+    (void)fprintf(psrp_out,"    htab          [<n> | shrink]     :   display [or set to <n> or Procrustes shrink] number of child table slots\n\n\n");
+
     (void)fprintf(psrp_out,"    P3 server command alias control/status functions\n");
     (void)fprintf(psrp_out,"    ================================================\n\n");
     (void)fprintf(psrp_out,"    showaliases    <n>               :   show aliases of PSRP object <n>                  \n");
     (void)fprintf(psrp_out,"    alias          <n> <a>           :   alias <n> to <a>\n");
-    (void)fprintf(psrp_out,"    unalias        <a>               :   remove alias <a>\n\n");
+    (void)fprintf(psrp_out,"    unalias        <a>               :   remove alias <a>\n\n\n");
+
     (void)fprintf(psrp_out,"    P3 server entry/exit routine control/status functions\n");
     (void)fprintf(psrp_out,"    =====================================================\n\n");
     (void)fprintf(psrp_out,"    atentrance                       :   display list of (PUPS) application entrance functions\n");
     (void)fprintf(psrp_out,"    atexit                           :   display list of (PUPS) application exit functions\n");
-    (void)fprintf(psrp_out,"    atabort                          :   display list of (PUPS) application abort functions\n");
+    (void)fprintf(psrp_out,"    atabort                          :   display list of (PUPS) application abort functions\n\n\n");
     (void)fflush(psrp_out);
-
 
     #ifdef SSH_SUPPORT
     (void)fprintf(psrp_out,"    P3 server ssh control functions\n");
@@ -6319,76 +6325,80 @@ _PRIVATE int psrp_builtin_help(const int argc, const char *argv[])
     #ifdef CRIU_SUPPORT
     (void)fprintf(psrp_out,"    P3 server (Criu) state save control/status functions\n");
     (void)fprintf(psrp_out,"    ====================================================\n\n");
-    (void)fprintf(psrp_out,"    ssave                           |  :   Report state saving status\n");
-    (void)fprintf(psrp_out,"                   [-t <poll time>]    :   Save state every <poll time> seconds (default 60 seconds)\n");
-    (void)fprintf(psrp_out,"                   [-enable       ] |  :   Enable state saving\n");
-    (void)fprintf(psrp_out,"                   [-disable      ] |  :   Disable state saving\n");
-    (void)fprintf(psrp_out,"                   [-cd <criu dir>] |  :   Set Criu directory (default /tmp)\n\n\n");
+    (void)fprintf(psrp_out,"    ssave                       |   :   Report state saving status\n");
+    (void)fprintf(psrp_out,"             [sspoll <seconds>]     :   Save state every <poll time> seconds (default 60 seconds)\n");
+    (void)fprintf(psrp_out,"                [enable       ] |   :   Enable state saving\n");
+    (void)fprintf(psrp_out,"                [disable      ] |   :   Disable state saving\n");
+    (void)fprintf(psrp_out,"                [cd <criu dir>]     :   Set Criu directory (default /tmp)\n\n\n");
     (void)fflush(psrp_out);
     #endif /* CRIU_SUPPORT */
+
+
+    (void)fprintf(psrp_out,"    P3 sofware watchdog functions\n");
+    (void)fprintf(psrp_out,"    =============================\n\n");
+    (void)fprintf(psrp_out,"    softdog                         :   Report software watchdog status\n");
+    (void)fprintf(psrp_out,"           [timoeout <seconds>]     :   Save state every <poll time> seconds (default 60 seconds)\n");
+    (void)fprintf(psrp_out,"                [enable       ] |   :   Enable software watchdog\n");
+    (void)fprintf(psrp_out,"                [disable      ]     :   Disable software watchdog\n\n\n");
 
 
     #ifdef BUBBLE_MEMORY_SUPPORT
     (void)fprintf(psrp_out,"    P3 server bubble memory control/status functions\n");
     (void)fprintf(psrp_out,"    ================================================\n\n");
-    (void)fprintf(psrp_out,"    mstat                              :   show memory allocation statistics\n");
-    (void)fprintf(psrp_out,"    mset           <threshold>         :   set memory bubble utilisation threshold %% (-usage for more detailed help)\n\n\n");
+    (void)fprintf(psrp_out,"    mstat                            :   show memory allocation statistics\n");
+    (void)fprintf(psrp_out,"    mset           <threshold>       :   set memory bubble utilisation threshold %% (-usage for more detailed help)\n\n\n");
     (void)fflush(psrp_out);
     #endif /* BUBBLE_MEMORY_SUPPPORT */
 
     (void)fprintf(psrp_out,"    P3 server (attached) file control/status functions\n");
     (void)fprintf(psrp_out,"    ==================================================\n\n");
-    (void)fprintf(psrp_out,"    lflstat                            :   show concurrently held link file locks\n");
-    (void)fprintf(psrp_out,"    flstat                             :   show currently held flockfile locks\n");
-    (void)fprintf(psrp_out,"    fstat                              :   display open file descriptors\n");
-    (void)fprintf(psrp_out,"    ftab           [<n> | shrink]      :   display [or set to <n> or Procrustes shrink] number of file table slots\n\n\n");
+    (void)fprintf(psrp_out,"    lflstat                          :   show concurrently held link file locks\n");
+    (void)fprintf(psrp_out,"    flstat                           :   show currently held flockfile locks\n");
+    (void)fprintf(psrp_out,"    fstat                            :   display open file descriptors\n");
+    (void)fprintf(psrp_out,"    ftab           [<n> | shrink]    :   display [or set to <n> or Procrustes shrink] number of file table slots\n\n\n");
     (void)fflush(psrp_out);
 
     (void)fprintf(psrp_out,"    P3 server (attached) signal control/status functions\n");
     (void)fprintf(psrp_out,"    ====================================================\n\n");
-    (void)fprintf(psrp_out,"    sigstat                            :   display non default signal handlers\n");
-    (void)fprintf(psrp_out,"    sigstat        <sig list>          :   display detailed data for selected signal handlers\n");
-    (void)fprintf(psrp_out,"    maskstat                           :   display signal mask and pending signals\n\n\n");
+    (void)fprintf(psrp_out,"    sigstat                          :   display non default signal handlers\n");
+    (void)fprintf(psrp_out,"    sigstat        <sig list>        :   display detailed data for selected signal handlers\n");
+    (void)fprintf(psrp_out,"    maskstat                         :   display signal mask and pending signals\n\n\n");
     (void)fflush(psrp_out);
 
     (void)fprintf(psrp_out,"    P3 server (attached) fast cache status\n");
     (void)fprintf(psrp_out,"    ======================================\n\n");
-    (void)fprintf(psrp_out,"    cachestat                          :   display (fast) caches mapped into process address space\n\n\n");
+    (void)fprintf(psrp_out,"    cachestat                        :   display (fast) caches mapped into process address space\n\n\n");
     (void)fflush(psrp_out);
 
     (void)fprintf(psrp_out,"    P3 server process cron scheduler control/status functions\n");
     (void)fprintf(psrp_out,"    =========================================================\n\n");
-    (void)fprintf(psrp_out,"    schedule       <f> <t> [<func>]    :   schedule function <func> between times <f> and <t> using cron homeostat\n");
-    (void)fprintf(psrp_out,"                                    :   if <func> is omitted sleep between times <f> and <t>\n");
-    (void)fprintf(psrp_out,"    unschedule    <index>              :   unschedule a previously scheduled crontab slot\n");
-    (void)fprintf(psrp_out,"    crontstat                          :   display crontab\n\n\n");
+    (void)fprintf(psrp_out,"    schedule       <f> <t> [<func>]  :   schedule function <func> between times <f> and <t> using cron homeostat\n");
+    (void)fprintf(psrp_out,"                                     :   if <func> is omitted sleep between times <f> and <t>\n");
+    (void)fprintf(psrp_out,"    unschedule    <index>            :   unschedule a previously scheduled crontab slot\n");
+    (void)fprintf(psrp_out,"    crontstat                        :   display crontab\n\n\n");
     (void)fflush(psrp_out);
    
     (void)fprintf(psrp_out,"    P3 server process general hoeostatis control/status functions\n");
     (void)fprintf(psrp_out,"    =============================================================\n\n");
-    (void)fprintf(psrp_out,"    sicstat                            :   display open slaved interaction client channels\n");
-    (void)fprintf(psrp_out,"    rooted                             :   set process to rooted mode (system context cannot migrate)\n");
-    (void)fprintf(psrp_out,"    unrooted                           :   set process to unrooted mode (system context can migrate)\n");
-    (void)fprintf(psrp_out,"    parent         <name | PID>        :   set name/PID of effective parent process\n");
-    (void)fprintf(psrp_out,"    pexit                              :   process  exits if effective parent terminated\n");
-    (void)fprintf(psrp_out,"    unpexit                            :   process does not exit if effective parent terminated\n");
-    (void)fprintf(psrp_out,"    live           <f1> <f2> ...       :   protects list of (open) files against damage or deletion\n");
-    (void)fprintf(psrp_out,"    dead           <f1> <f2> ...       :   unprotects list of (open) files\n");
-    (void)fflush(psrp_out);
+    (void)fprintf(psrp_out,"    sicstat                          :   display open slaved interaction client channels\n");
+    (void)fprintf(psrp_out,"    rooted                           :   set process to rooted mode (system context cannot migrate)\n");
+    (void)fprintf(psrp_out,"    unrooted                         :   set process to unrooted mode (system context can migrate)\n");
+    (void)fprintf(psrp_out,"    parent         <name | PID>      :   set name/PID of effective parent process\n");
+    (void)fprintf(psrp_out,"    pexit                            :   process  exits if effective parent terminated\n");
+    (void)fprintf(psrp_out,"    unpexit                          :   process does not exit if effective parent terminated\n");
+    (void)fprintf(psrp_out,"    live           <f1> <f2> ...     :   protects list of (open) files against damage or deletion\n");
+    (void)fprintf(psrp_out,"    dead           <f1> <f2> ...     :   unprotects list of (open) files\n");
+    (void)fprintf(psrp_out,"    new            <f|>s> <n> <h>    :   create new instance <n> of server, n=instance, f=fork, s=segment, h=hostname\n");
+    (void)fprintf(psrp_out,"    overlay        <command>         :   Overlay server process with <command> (server resumes when command exits)\n");
+    (void)fprintf(psrp_out,"    overfork       <command>         :   Overfork server process with <command>\n");
+    (void)fprintf(psrp_out,"    autosave       [on | off]        :   switch automatic saving of dipatch table (at exit) on or off\n");
+    (void)fprintf(psrp_out,"    autosave                         :   display status of automatic dispatch table saving (at exit)\n");
+    (void)fprintf(psrp_out,"    save           <n>               :   save dispatch table (to PSRP ressource file <n>)\n");
+    (void)fprintf(psrp_out,"    load           <n>               :   load PSRP resource file <n> (appending objects to current dispatch table)\n");
+    (void)fprintf(psrp_out,"    reset                            :   reset dispatch table (returning it to its default state)\n");
 
-    (void)fprintf(psrp_out,"    new            <f|>s> <n> <h>      :   create new instance <n> of server, n=instance, f=fork, s=segment, h=hostname\n");
-    (void)fprintf(psrp_out,"    overlay        <command>           :   Overlay server process with <command> (server resumes when command exits)\n");
-    (void)fprintf(psrp_out,"    overfork       <command>           :   Overfork server process with <command>\n");
-    (void)fflush(psrp_out);
-
-    (void)fprintf(psrp_out,"    autosave       [on | off]          :   switch automatic saving of dipatch table (at exit) on or off\n");
-    (void)fprintf(psrp_out,"    autosave                           :   display status of automatic dispatch table saving (at exit)\n");
-    (void)fprintf(psrp_out,"    save           <n>                 :   save dispatch table (to PSRP ressource file <n>)\n");
-    (void)fprintf(psrp_out,"    load           <n>                 :   load PSRP resource file <n> (appending objects to current dispatch table)\n");
-    (void)fprintf(psrp_out,"    reset                              :   reset dispatch table (returning it to its default state)\n");
-
-    if(psrp_bind_status & PSRP_DYNAMIC_DATABAG)
-       (void)fprintf(psrp_out,"    bag         <n> <f>   [LIVE|DEAD]  :   bind dynamic databag in <f> to PSRP handler <n>\n");
+    if (psrp_bind_status & PSRP_DYNAMIC_DATABAG)
+       (void)fprintf(psrp_out,"    bag       <n> <f>   [LIVE|DEAD]  :   bind dynamic databag in <f> to PSRP handler <n>\n");
     (void)fprintf(psrp_out,"\n\n");
     (void)fflush(psrp_out);
     
@@ -6397,18 +6407,18 @@ _PRIVATE int psrp_builtin_help(const int argc, const char *argv[])
     (void)fprintf(psrp_out,"    P3 server process DLL (dynamically linked object) control/status functions\n");
     (void)fprintf(psrp_out,"    ==========================================================================\n\n");
 
-    if(psrp_bind_status & PSRP_DYNAMIC_FUNCTION)
-    {  (void)fprintf(psrp_out,"    dll         <name> <object DLL>    :   bind dynamic function in <object DLL> to PSRP handler with <name>\n");
-       (void)fprintf(psrp_out,"    ostat                              :   display orifices which are bound to application\n");
-       (void)fprintf(psrp_out,"    ortab       [<n>]                  :   display [or set to <n>] number of orifice [DLL] table slots\n\n\n");
+    if (psrp_bind_status & PSRP_DYNAMIC_FUNCTION)
+    {  (void)fprintf(psrp_out,"    dll         <name> <object DLL>  :   bind dynamic function in <object DLL> to PSRP handler with <name>\n");
+       (void)fprintf(psrp_out,"    ostat                            :   display orifices which are bound to application\n");
+       (void)fprintf(psrp_out,"    ortab       [<n>]                :   display [or set to <n>] number of orifice [DLL] table slots\n\n\n");
     }
 
-    if(psrp_bind_status & PSRP_DYNAMIC_FUNCTION || psrp_bind_status & PSRP_DYNAMIC_DATABAG || psrp_bind_status & PSRP_PERSISTENT_HEAP)
-    {  (void)fprintf(psrp_out,"    detach      <item-list>            :   detach PSRP objects function in <item-list>\n");
-       (void)fprintf(psrp_out,"                                       :   if item list contains \"all\" reset dispatch table\n");
+    if (psrp_bind_status & PSRP_DYNAMIC_FUNCTION || psrp_bind_status & PSRP_DYNAMIC_DATABAG || psrp_bind_status & PSRP_PERSISTENT_HEAP)
+    {  (void)fprintf(psrp_out,"    detach      <item-list>          :   detach PSRP objects function in <item-list>\n");
+       (void)fprintf(psrp_out,"                                     :   if item list contains \"all\" reset dispatch table\n");
     }
 
-    (void)fprintf(psrp_out,"    dllstat     <name>                 :   show orifices exported by DLL <name>\n\n\n");
+    (void)fprintf(psrp_out,"    dllstat     <name>               :   show orifices exported by DLL <name>\n\n\n");
     (void)fflush(psrp_out);
     #endif /* DLL_SUPPORT */
 
@@ -6416,11 +6426,11 @@ _PRIVATE int psrp_builtin_help(const int argc, const char *argv[])
     #ifdef PTHREAD_SUPPORT
     (void)fprintf(psrp_out,"    P3 server process thread control/status functions\n");
     (void)fprintf(psrp_out,"    =================================================\n\n");
-    (void)fprintf(psrp_out,"    tstat          [<nid>]             :   show running threads, or optionally info for thread <nid>\n");
-    (void)fprintf(psrp_out,"    tstart         [<n> [ <a>]         :   run (static or dynamic payload function) [name <a>] on thread <n>\n");
-    (void)fprintf(psrp_out,"    tpause         [<n> | <all>]       :   pause thread <n> or all threads if <all> specifed\n");
-    (void)fprintf(psrp_out,"    tcont          [<n> | <all>]       :   restart thread <n> or all threads if <all> specifed\n");
-    (void)fprintf(psrp_out,"    tkill          [<n> | <all>]       :   kill thread <n> or all threads if <all> specifed\n\n\n");
+    (void)fprintf(psrp_out,"    tstat          [<nid>]           :   show running threads, or optionally info for thread <nid>\n");
+    (void)fprintf(psrp_out,"    tstart         [<n> [ <a>]       :   run (static or dynamic payload function) [name <a>] on thread <n>\n");
+    (void)fprintf(psrp_out,"    tpause         [<n> | <all>]     :   pause thread <n> or all threads if <all> specifed\n");
+    (void)fprintf(psrp_out,"    tcont          [<n> | <all>]     :   restart thread <n> or all threads if <all> specifed\n");
+    (void)fprintf(psrp_out,"    tkill          [<n> | <all>]     :   kill thread <n> or all threads if <all> specifed\n\n\n");
     #endif /* PTHREAD_SUPPORT */
  
     (void)fprintf(psrp_out,"    P3 server process heap control/status functions\n");
@@ -6430,15 +6440,14 @@ _PRIVATE int psrp_builtin_help(const int argc, const char *argv[])
 
     #ifdef PERSISTENT_HEAP_SUPPORT
     if(psrp_bind_status & PSRP_PERSISTENT_HEAP)
-    {  (void)fprintf(psrp_out,"    heap     <n> <f>  [LIVE|DEAD       :   map persistent heap in <f> to PSRP handler <n>\n");
-       (void)fprintf(psrp_out,"    hstat    [<h | id> [<o | id>]      :   display pesistent heap details\n");
-       (void)fprintf(psrp_out,"    htab     [<n> | shrink]            :   display [or set to <n>] or Procrustes shrink number of persistent heap table slots\n");
+    {  (void)fprintf(psrp_out,"    heap     <n> <f>  [LIVE|DEAD      :   map persistent heap in <f> to PSRP handler <n>\n");
+       (void)fprintf(psrp_out,"    hstat    [<h | id> [<o | id>]     :   display pesistent heap details\n");
+       (void)fprintf(psrp_out,"    htab     [<n> | shrink]           :   display [or set to <n>] or Procrustes shrink number of persistent heap table slots\n");
     }
     #endif /* PERSISTENT_HEAP_SUPPORT */
 
-    (void)fprintf(psrp_out,"    hostat      <o1> <o2> ... <on>i    :   Show statistics for tracked heap object <tracked object>\n");
-    (void)fprintf(psrp_out,"    hostat                             :   Show statistics for all tracked heap objects\n");
-    (void)fprintf(psrp_out,"\n");
+    (void)fprintf(psrp_out,"    hostat      <o1> <o2> ... <on>i  :   Show statistics for tracked heap object <tracked object>\n");
+    (void)fprintf(psrp_out,"    hostat                           :   Show statistics for all tracked heap objects\n\n\n");
     (void)fflush(psrp_out);
 
     return(PSRP_OK);
@@ -13247,7 +13256,7 @@ _PRIVATE void psrp_create_trailfile(char *trail_file_name,
 
     (void)fprintf(stream,"#--------------------------------------------------------------------\n");
     (void)fprintf(stream,"#    PSRP migration trail file version 1.02\n");
-    (void)fprintf(stream,"#    (C) M.A. O'Neill, Tumbling Dice 2022\n");
+    (void)fprintf(stream,"#    (C) M.A. O'Neill, Tumbling Dice 2023\n");
     (void)fprintf(stream,"#---------------------------------------------------------------------\n\n");
     (void)fflush(stream);
     (void)fprintf(stream,"%s %s %s\n\n",pen,host,host_port);
@@ -13446,9 +13455,11 @@ _PRIVATE int psrp_builtin_show_malloc_stats(const int argc, const char *argv[])
 _PRIVATE int psrp_builtin_ssave(const int argc, const char *argv[])
 
 {   int i,
-        itmp;
+        itmp,
+        deconded = 0;
 
-    char tmpstr[SSIZE] = "";
+    unsigned char tmpstr[SSIZE] = "";
+
 
     if(strcmp("ssave",argv[0]) != 0)
         return(PSRP_DISPATCH_ERROR);
@@ -13479,7 +13490,6 @@ _PRIVATE int psrp_builtin_ssave(const int argc, const char *argv[])
     /* Parse command tail */
     /*--------------------*/
 
-    (void)pups_clear_cmd_tail();
     for(i=0; i<argc; ++i)
     {
 
@@ -13487,12 +13497,48 @@ _PRIVATE int psrp_builtin_ssave(const int argc, const char *argv[])
        /* Display usage */
        /*---------------*/
 
-       if(pups_locate(&init,"usage",&argc,argv,0) != NOT_FOUND)
-       {  (void)fprintf(psrp_out,"\nusage: ssave [-t <poll_time:%d>]\n",appl_poll_time);
-          (void)fprintf(psrp_out,"             [-enable | -disable | -cd <criu directory:/tmp>]\n\n");
+       if (pups_locate(&init,"usage",&argc,argv,0) != NOT_FOUND)
+       {  (void)fprintf(psrp_out,"\nusage: ssave [sspoll <criu state save pool time seconds:%d>]\n",appl_poll_time);
+          (void)fprintf(psrp_out,"               [enable | disable]\n");
+          (void)fprintf(psrp_out,"               [cd <criu directory:/tmp>]\n\n");
           (void)fflush(psrp_out);
 
           return(PSRP_OK);
+       }
+
+
+       /*----------------------------*/
+       /* Set user defined poll time */
+       /*----------------------------*/
+
+       if (strcmp(argv[i],"sspoll") == 0)
+       {
+
+          /*-------*/
+          /* Error */
+          /*-------*/
+
+          if (i == argc - 1 || sscanf(argv[i+1],"%d",&itmp) != 1 || itmp <= 0)
+          {  (void)fprintf(psrp_out,"\nexpecting criu state save poll time in seconds (integer >= 0)\n\n");
+             (void)fflush(psrp_out);
+
+             return(PSRP_ERROR);
+          }
+
+
+          /*--------------*/
+          /* Poll time Ok */
+          /*--------------*/
+
+          else
+          {  appl_poll_time = itmp;
+
+             (void)fprintf(psrp_out,"criu state save poll time: %d seconds\n", appl_poll_time);
+             (void)fflush(psrp_out);
+          }
+
+          ++i;
+          decoded += 2;
        }
 
 
@@ -13500,9 +13546,9 @@ _PRIVATE int psrp_builtin_ssave(const int argc, const char *argv[])
        /* Enable state saving */
        /*---------------------*/
 
-       if(pups_locate(&init,"enable",&argc,argv,0) != NOT_FOUND)
+       if (strcmp(argcv[i],"enable") == 0)
        {  if(appl_ssave == TRUE)
-          {  (void)fprintf(psrp_out,"\nstate saving already enabled\n\n");
+          {  (void)fprintf(psrp_out,"\ncriu state saving already enabled\n\n");
              (void)fflush(psrp_out);
 
              return(PSRP_OK);
@@ -13510,10 +13556,10 @@ _PRIVATE int psrp_builtin_ssave(const int argc, const char *argv[])
           else
              appl_ssave = TRUE;
 
-          (void)fprintf(psrp_out,"\nstate saving enabled (poll time: %d seconds, criu directory: \"%s\")\n",
-                                                                                             appl_poll_time,
-                                                                                              appl_criu_dir);
+          (void)fprintf(psrp_out,"criu state saving enabled)\n");
           (void)fflush(psrp_out);
+
+          ++decoded;
        }
 
 
@@ -13521,9 +13567,9 @@ _PRIVATE int psrp_builtin_ssave(const int argc, const char *argv[])
        /* Disable state saving */
        /*----------------------*/
 
-       if(pups_locate(&init,"disable",&argc,argv,0) != NOT_FOUND)
+       else if (strcmp(argcv[i],"disable") == 0)
        {  if(appl_ssave == FALSE)
-          {  (void)fprintf(psrp_out,"\nstate saving already disabled\n\n");
+          {  (void)fprintf(psrp_out,"\ncriu state saving already disabled\n\n");
              (void)fflush(psrp_out);
 
              return(PSRP_OK);
@@ -13531,38 +13577,10 @@ _PRIVATE int psrp_builtin_ssave(const int argc, const char *argv[])
           else
              appl_ssave = FALSE;
 
-          (void)fprintf(psrp_out,"\nstate saving disabled\n\n");
+          (void)fprintf(psrp_out,"criu state saving disabled\n");
           (void)fflush(psrp_out);
-       }
 
-
-       /*-------------------------------------------------*/
-       /* Enable state saving with user defined poll time */
-       /*-------------------------------------------------*/
-
-       else if((ptr = pups_locate(&init,"t",&argc,argv,0)) != NOT_FOUND)
-       {  
-          if((itmp = pups_i_dec(&ptr,argc,args)) == (int)INVALID_ARG)
-          {  (void)fprintf(psrp_out,"\nexpecting poll time in seconds (integer >= 0)\n\n");
-             (void)fflush(psrp_out);
-
-             return(PSRP_OK);
-          }
-          else if(itmp > 0)
-          {  appl_ssave     = TRUE;
-             appl_poll_time = itmp;
-
-             (void)fprintf(psrp_out,"\nstate saving enabled (poll time: %d seconds, criu directory: \"%s\")\n",
-                                                                                                appl_poll_time,
-                                                                                                 appl_criu_dir);
-             (void)fflush(psrp_out);
-          }
-          else if(itmp <= 0)
-          {  appl_ssave = FALSE;
-
-             (void)fprintf(psrp_out,"\nstate saving disabled\n\n");
-             (void)fflush(psrp_out);
-          }
+          ++decoded;
        }
 
 
@@ -13570,20 +13588,55 @@ _PRIVATE int psrp_builtin_ssave(const int argc, const char *argv[])
        /* Set Criu directory - used to store checkpoints */
        /*------------------------------------------------*/
 
-       if((ptr = pups_locate(&init,"cd",&argc,argv,0)) != NOT_FOUND)
-       {  if(strccpy(tmpstr,pups_str_dec(ptr,argc,args)) == (char *)INVALID_ARG)
-          {  (void)fprintf(psrp_out,"\nexpecting name of criu directory\n\n");
+       if(strcmp(argv[i]."cd") == 0)
+       {
+
+          /*-------*/
+          /* Error */
+          /*-------*/
+
+          if (i == argc - 1 || access(argv[i], R_Ok | W_OK | X_OK) != 0)
+          {  (void)fprintf(psrp_out,"\nexpecting name of criu state save directory\n\n");
              (void)fflush(psrp_out);
 
-             return(PSRP_OK);
+             return(PSRP_ERROR);
           }
 
-          if(access(tmpstr,F_OK) == (-1))
-          {  (void)snprintf(errstr,SSIZE,"[psrp_builtin_ssave] criu directory \"%s\" not found");
-             pups_error(errstr);
-          }
+
+          /*-------------*/
+          /* File exists */
+          /*-------------*/
+
           else
-             (void)strlcpy(appl_criu_dir,tmpstr,SSIZE);
+          {  struct stat buf;
+
+
+             /*-----------*/
+             /* Directory */
+             /*-----------*/
+
+             (void)stat(argv[i],&stat_buf);
+             if (S_ISDIR(argv[i],buf.st_mode)
+                (void)strlcpy(appl_criu_dir,tmpstr,SSIZE);
+
+
+             /*-------*/
+             /* Error */
+             /*-------*/
+
+             else
+             {  (void)fprintf(psrp_out,"\n\"%s\" is not a directory\n\n",argv[i]);
+                (void)fflush(psrp_out);
+
+                return(PSRP_ERROR);
+             }
+
+             (void)fprintf(psrp_out,"criu state save directory: \"%s\"\n", appl_poll_time, appl_criu_dir);
+             (void)fflush(psrp_out);
+          }
+
+          ++i;
+          decoded += 2;
        }
     }
 
@@ -13592,13 +13645,155 @@ _PRIVATE int psrp_builtin_ssave(const int argc, const char *argv[])
     /* If any arguments remain unparsed - complain and stop */
     /*------------------------------------------------------*/
 
-    pups_t_arg_errs(argd,argv);
+    if (decoded < argc - 1)
+    {  (void)fprintf(stderr,"\n    command line arguments unparsed (got %d, expected %d)\n\n",decoded,argc - 1);
+       (void)fflush(sderr);
+
+       return(PSRP_ERROR);
+    }
 
     return(PSRP_OK);
 }
-
 #endif /* CRIU_SUPPORT */
 
+
+
+
+/*----------------------------------*/
+/* Enable/disable software watchdog */
+/*----------------------------------*/
+
+_PRIVATE int psrp_builtin_softdog(const int argc, const char *argv[])
+
+{   int i,
+        itmp,
+        decoded = 0;
+
+    unsigned char tmpstr[SSIZE] = "";
+
+    if(strcmp("softdog",argv[0]) != 0)
+        return(PSRP_DISPATCH_ERROR);
+
+
+    /*------------------------------------------------*/
+    /* No arguments - report software watchdog status */
+    /*------------------------------------------------*/
+
+    if(argc == 1)
+    {  pups_show_softdogstatus(psrp_out);
+       return(PSRP_OK);
+    }
+
+
+    /*--------------------*/
+    /* Parse command tail */
+    /*--------------------*/
+
+    for(i=0; i<argc; ++i)
+    {
+
+       /*---------------*/
+       /* Display usage */
+       /*---------------*/
+
+       if(strcmp(argv[i],"usage") == 0)
+       {  (void)fprintf(psrp_out,"\nusage: softdog [timeout <watchdog timeout seconds>]\n");
+          (void)fprintf(psrp_out,"                 [enable]\n");
+          (void)fprintf(psrp_out,"                 [disable]\n\n");
+          (void)fflush(psrp_out);
+
+          return(PSRP_OK);
+       }
+
+
+       /*----------------------------*/
+       /* Set user defined poll time */
+       /*----------------------------*/
+
+       if (strcmp(argv[i],"timeout") == 0)
+       {
+
+          /*-------*/
+          /* Error */
+          /*-------*/
+
+          if (i == argc - 1 || sscanf(argv[i+1],"%d",&itmp) != 1 || itmp <= 0)
+          {  (void)fprintf(psrp_out,"\nexpecting software watchdog timeout in seconds (integer >= 0)\n\n");
+             (void)fflush(psrp_out);
+
+             return(PSRP_ERROR);
+          }
+
+
+          /*--------------*/
+          /* Poll time Ok */
+          /*--------------*/
+
+          else
+             appl_softdog_timeout = itmp;
+
+          (void)fprintf(psrp_out," software watchdog timeout: %d seconds)\n", appl_softdog_timeout);
+          (void)fflush(psrp_out);
+
+          ++i;
+          decoded += 2;
+       }
+
+
+       /*--------------------------*/
+       /* Enable software watchdog */
+       /*--------------------------*/
+
+       if(strcmp(argv[i],"enable") == 0)
+       {  if(appl_softdog_enabled == TRUE)
+          {  (void)fprintf(psrp_out,"\nsoftware watchdog already enabled\n\n");
+             (void)fflush(psrp_out);
+
+             return(PSRP_ERROR);
+          }
+
+          (void)fprintf(psrp_out,"software watchdog enabled\n");
+          (void)fflush(psrp_out);
+
+	  (void)pups_start_softdog(appl_softdog_timeout);
+          ++decoded;
+       }
+
+
+       /*---------------------------*/
+       /* Disable software watchdog */
+       /*---------------------------*/
+
+       if(strcmp(argv[i],"disable") == 0)
+       {  if(appl_softdog_enabled == FALSE)
+          {  (void)fprintf(psrp_out,"\nsoftware watchdiog already disabled\n\n");
+             (void)fflush(psrp_out);
+
+             return(PSRP_ERROR);
+          }
+       
+          (void)fprintf(psrp_out,"software watchdog disabled\n");
+          (void)fflush(psrp_out);
+
+	  (void)pups_stop_softdog();
+          ++decoded; 
+       }
+    }
+
+
+    /*------------------------------------------------------*/
+    /* If any arguments remain unparsed - complain and stop */
+    /*------------------------------------------------------*/
+
+    if (decoded < argc - 1)
+    {  (void)fprintf(stderr,"\n    command line arguments unparsed (got %d, expected %d)\n\n",decoded,argc - 1);
+       (void)fflush(stderr);
+
+       return(PSRP_ERROR);
+    }
+
+    return(PSRP_OK);
+}
 
 
 
@@ -13614,7 +13809,7 @@ _PRIVATE int psrp_builtin_set_vitimer_quantum(const int argc, const char *argv[]
        return(PSRP_DISPATCH_ERROR);
 
     if(argc >2 || (ptr = pups_locate(&init,"usage",&argc,args,0)) != NOT_FOUND)
-    {  (void)fprintf(psrp_out,"\nusage: qunatum [-usage] | <quantum | default>\n\n");
+    {  (void)fprintf(psrp_out,"\nusage: quantum [-usage] | <quantum | default>\n\n");
        (void)fflush(psrp_out);
 
        return(PSRP_OK);
@@ -13638,16 +13833,18 @@ _PRIVATE int psrp_builtin_set_vitimer_quantum(const int argc, const char *argv[]
        vitimer_quantum = itmp;
        (void)pups_malarm(vitimer_quantum);
 
-       (void)fprintf(psrp_out,"\nPSRP (vitimer) quantum is now %d %%\n\n",vitimer_quantum);
+       (void)fprintf(psrp_out,"\nPSRP (vitimer) quantum is now %d milliseconds\n\n",vitimer_quantum);
        (void)fflush(psrp_out);
     }
+
     else if(strcmp(argv[1],"default") == 0)
     {  vitimer_quantum = VITIMER_QUANTUM;
        (void)pups_malarm(vitimer_quantum);
 
-       (void)fprintf(psrp_out,"\nPSRP (vitimer) quantum is now %d %% (default)\n\n",vitimer_quantum);
+       (void)fprintf(psrp_out,"\nPSRP (vitimer) quantum is now %d millisecond (default)\n\n",vitimer_quantum);
        (void)fflush(psrp_out);
     }
+
     else
     {  (void)fprintf(psrp_out,"\nexpecting PSRP (vitimer) quantum parameter\n\n");
        (void)fflush(psrp_out);

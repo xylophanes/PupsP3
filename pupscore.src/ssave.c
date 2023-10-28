@@ -9,7 +9,7 @@
               United Kingdom
 
      Version: 2.01 
-     Dated:   24th May 2022
+     Dated:   24th May 2023
      E-mail:  mao@tumblingdice.co.uk
 -----------------------------------------------------------------------------*/
 
@@ -146,7 +146,7 @@ _PUBLIC int main(int argc, char *argv[])
 
     if(argc == 1)
     {  (void)fprintf(stderr,"\n   ssave version %s (built %s %s)\n",SSAVE_VERSION,__TIME__,__DATE__);
-       (void)fprintf(stderr,"   (C) Tumbling Dice, 2016-2022\n\n");
+       (void)fprintf(stderr,"   (C) Tumbling Dice, 2016-2023\n\n");
        (void)fprintf(stderr,"   Usage: ssave [-usage | -help] |\n");
        (void)fprintf(stderr,"                [-t <poll time:%d>]\n",DEFAULT_POLL_TIME);
        (void)fprintf(stderr,"                [-cd <criu directory:/tmp>]\n");
@@ -166,7 +166,7 @@ _PUBLIC int main(int argc, char *argv[])
 
        if(strcmp(argv[i],"-usage") == 0 || strcmp(argv[i],"-help") == 0)
        {  (void)fprintf(stderr,"\n   ssave version %s (built %s %s)\n",SSAVE_VERSION,__TIME__,__DATE__);
-          (void)fprintf(stderr,"   (C) Tumbling Dice, 2016-2022\n\n");
+          (void)fprintf(stderr,"   (C) Tumbling Dice, 2016-2023\n\n");
           (void)fprintf(stderr,"   Usage: ssave [-usage | -help] |\n");
           (void)fprintf(stderr,"                [-t <poll time:%d>]\n",DEFAULT_POLL_TIME);
           (void)fprintf(stderr,"                [-cd <criu directory:/tmp>\n");

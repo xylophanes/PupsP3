@@ -10,7 +10,7 @@
              United Kingdom
 
     Version: 1.05
-    Dated:   4th January 2022
+    Dated:   4th January 2023
     E-mail:  mao@tumblingdice.co.uk
 -----------------------------------------------------------------------------*/
 
@@ -38,7 +38,7 @@ int main(int argc, char *argv[])
     FILE *stream   = (FILE *)NULL;
 
     if(argc > 1)
-    {  (void)fprintf(stderr,"\nvstamp version %s, (C) Tumbling Dice 2000-2022 (built %s %s)\n\n",VSTAMP_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nvstamp version %s, (C) Tumbling Dice 2000-2023 (built %s %s)\n\n",VSTAMP_VERSION,__TIME__,__DATE__);
        (void)fprintf(stderr,"VSTAMP is free software, covered by the GNU General Public License, and you are\n");
        (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
        (void)fprintf(stderr,"See the GPL and LGPL licences at www.gnu.org for further details\n");
@@ -57,7 +57,7 @@ int main(int argc, char *argv[])
 
     (void)fprintf(stream,"/*---------------------------------------------------*/\n");
     (void)fprintf(stream,"/* Time stamp file generated automatically by vstamp */\n");
-    (void)fprintf(stream,"/* (C) M.A. O'Neill, Tumbling Dice, 2022             */\n");
+    (void)fprintf(stream,"/* (C) M.A. O'Neill, Tumbling Dice, 2023             */\n");
     (void)fprintf(stream,"/* Do not edit                                       */\n");
     (void)fprintf(stream,"/*---------------------------------------------------*/\n");
     (void)fprintf(stream,"\n\n#ifdef TSTAMP_H\n#define TSTAMP_H\n\n");

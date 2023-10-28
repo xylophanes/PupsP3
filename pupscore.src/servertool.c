@@ -8,7 +8,7 @@
             OX11 8QY
 
     Version: 2.01 
-    Dated:   24th May 2022
+    Dated:   24th May 2023
     E-mail:  mao@tumblingdice.co.uk
 ----------------------------------------------------------------------------------------------*/
 
@@ -55,7 +55,7 @@ _PUBLIC int main(int argc, char *argv[])
     /*---------------------------------------------------------*/
 
     if(argc == 1 || (argc == 2 && (strcmp(argv[1],"-usage") == 0 || strcmp(argv[1],"-help") == 0)))
-    {  (void)fprintf(stderr,"\nservertool version %s, (C) Tumbling Dice 2003-2022 (built %s %s)\n\n",SERVERTOOL_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nservertool version %s, (C) Tumbling Dice 2003-2023 (built %s %s)\n\n",SERVERTOOL_VERSION,__TIME__,__DATE__);
        (void)fprintf(stderr,"\nUsage: psrptool [-help | -usage] | !server!  [PSRP server  argument list]\n\n");                                              
 
        (void)fprintf(stderr,"SERVERTOOL is free software, covered by the GNU General Public License, and you are\n");

@@ -9,7 +9,7 @@
               United Kingdom
 
      Version: 2.00 
-     Dated:   4th January 2022
+     Dated:   4th January 2023
      E-mail:  mao@tumblingdice.co.uk
 -------------------------------------------------------------------*/
 
@@ -39,7 +39,7 @@ int main(int argc, char *argv[])
     char downcased[SSIZE] = "";
 
     if(argc != 2)
-    {  (void)fprintf(stderr,"\ndowncase version %s, (C) Tumbling Dice 2002-2022 (built %s %s)\n\n",DOWNCASE_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\ndowncase version %s, (C) Tumbling Dice 2002-2023 (built %s %s)\n\n",DOWNCASE_VERSION,__TIME__,__DATE__);
        (void)fprintf(stderr,"DOWNCASE is free software, covered by the GNU General Public License, and you are\n");
        (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
        (void)fprintf(stderr,"See the GPL and LGPL licences at www.gnu.org for further details\n");

@@ -173,7 +173,7 @@ _PUBLIC int main(int argc, char *argv[])
     }
 
     if(do_verbose == TRUE)
-    {  (void)fprintf(stderr,"\n    stripper (comment stripper)  version %s, (C) Tumbling Dice, 2022\n\n",STRIPPER_VERSION);
+    {  (void)fprintf(stderr,"\n    stripper (comment stripper)  version %s, (C) Tumbling Dice, 2023\n\n",STRIPPER_VERSION);
        (void)fflush(stderr);
     }
 

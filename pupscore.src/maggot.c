@@ -70,7 +70,7 @@ _PRIVATE void maggot_slot(int level)
 {   (void)fprintf(stderr,"int app (PSRP) maggot %s: [ANSI C]\n",MAGGOT_VERSION);
  
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 1999-2022 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 1999-2023 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
        (void)fprintf(stderr,"The digital maggot (PUPS stale resource and garbage collection) (built %s)\n\n",__TIME__,__DATE__);
     }
@@ -211,7 +211,7 @@ _PRIVATE char        key_list[MAX_S_DIRS][SSIZE];          /* List of user searc
     checkpoint files) ...
 -------------------------------------------------------------------------------------------------------*/
 
-#define VTAG  3795
+#define VTAG  3878
 
 extern int appl_vtag = VTAG;
 

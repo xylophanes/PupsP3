@@ -11,7 +11,7 @@
               United Kingdom
 
     Version: 2.00 
-    Dated:   4th January 2022
+    Dated:   4th January 2023
     Email:   mao@tumblingdice.co.uk
 -----------------------------------------------------------------------------------*/
 
@@ -221,7 +221,7 @@ _PRIVATE void pheap_slot(int level)
 {   (void)fprintf(stderr,"lib hseaplib %s: [ANSI C]\n",PHEAP_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 2003-2022 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 2003-2023 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
        (void)fprintf(stderr,"PUPS/P3 persistent heap support library (built %s %s)\n\n",__TIME__,__DATE__);
     }
@@ -3291,7 +3291,7 @@ _PUBLIC int msm_save_heapstate(const char *ssave_dir)
      or (US mail) as Mike Haertel c/o Free Software Foundation.
 
      Shared heap modifications by Mark O'Neill (mao@tumblingdice.co.uk)
-     (C) 1998-2022 M.A. O'Neill, Tumbling Dice
+     (C) 1998-2023 M.A. O'Neill, Tumbling Dice
 ---------------------------------------------------------------------------*/
 
 #ifndef GLIBC
@@ -3346,7 +3346,7 @@ _PUBLIC __ptr_t phvalloc (const unsigned int hdes, const __malloc_size_t size, c
    or (US mail) as Mike Haertel c/o Free Software Foundation.
 
    Persistent heap modifications by Mark O'Neill (mao@tumblingdice.co.uk) 
-   (C) 1998-2022 M.A. O'Neill, Tumbling Dice
+   (C) 1998-2023 M.A. O'Neill, Tumbling Dice
 -----------------------------------------------------------------------------*/
 
 #include <stdio.h>
@@ -4157,7 +4157,7 @@ _PUBLIC __ptr_t phmalloc (const unsigned int hdes, __malloc_size_t  size, const 
     or (US mail) as Mike Haertel c/o Free Software Foundation.
 
     Persistent heap modifications by Mark O'Neill (mao@tumblingdice.co.uk)
-    (C) 1998-2022 M.A. O'Neill, Tumbling Dice
+    (C) 1998-2023 M.A. O'Neill, Tumbling Dice
 -------------------------------------------------------------------------------------------------------*/
 
 #include <stdio.h>
@@ -4532,7 +4532,7 @@ void *phfree (const unsigned int hdes, const __ptr_t ptr)
     Cambridge, MA 02139, USA.
 
     Shared heap code by Mark O'Neill (mao@tumblingdice.co.uk)
-    (C) 1998-2022 M.A. O'Neill, Tumbling Dice
+    (C) 1998-2023 M.A. O'Neill, Tumbling Dice
 --------------------------------------------------------------------------*/
 
 #ifndef	_PHMALLOC_INTERNAL
@@ -4580,7 +4580,7 @@ _PUBLIC void phcfree (int hdes,  __ptr_t ptr)
     or (US mail) as Mike Haertel c/o Free Software Foundation.
 
     Persistent heap modifications by Mark O'Neill (mao@tumblingdice.co.uk)
-    (C) 1998-2022 M.A. O'Neill, Tumbling Dice
+    (C) 1998-2023 M.A. O'Neill, Tumbling Dice
 -------------------------------------------------------------------------*/
 
 #ifndef	_PHMALLOC_INTERNAL
@@ -5016,7 +5016,7 @@ _PUBLIC __ptr_t phrealloc (const unsigned int hdes, const __ptr_t ptr, __malloc_
    or (US mail) as Mike Haertel c/o Free Software Foundation.
 
    Shared heap modifications by Mark O'Neill (mao@tumblingdice.co.uk)
-   (C) 1998-2022 M.A. O'Neill, Tumbling Dice
+   (C) 1998-2023 M.A. O'Neill, Tumbling Dice
 --------------------------------------------------------------------------*/
 
 #include <errno.h>
@@ -5088,7 +5088,7 @@ _PUBLIC __ptr_t phcalloc (const unsigned int hdes, const __malloc_size_t nmemb, 
     the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
 
     Persistent heap modifications by Mark O'Neill (mao@tumblingdice.co.uk)
-    (C) 1998-2022 M.A. O'Neill, Tumbling Dice
+    (C) 1998-2023 M.A. O'Neill, Tumbling Dice
 ----------------------------------------------------------------------------*/
 
 #include <pheap.h>
@@ -5152,7 +5152,7 @@ _PUBLIC __ptr_t __default_phmorecore (int hdes,  int increment)
     Cambridge, MA 02139, USA.  
 
     Persistent heap modification by Mark O'Neill (mao@tumblingdice.co.uk)
-    (C) 1998-2022 M.A. O'Neill, Tumbling Dice
+    (C) 1998-2023 M.A. O'Neill, Tumbling Dice
 ----------------------------------------------------------------------------*/
 
 #ifndef	_PHMALLOC_INTERNAL

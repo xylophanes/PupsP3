@@ -10,7 +10,7 @@
               United Kingdom
 
      Version: 2.02 
-     Dated:   4th May 2022
+     Dated:   4th May 2023
      E-mail:  mao@tumblingdice.co.uk
 ---------------------------------------------------------------------------------------*/
 
@@ -150,7 +150,7 @@ _PUBLIC int main(int argc, char *argv[])
        }
     }
     else if(argc == 2 && (strcmp(argv[1],"-usage") == 0 || strcmp(argv[1],"-help") == 0))
-    {  (void)fprintf(stderr,"\nPUPS/P3 application generator version %s, (C) Tumbling Dice, 2002-2022 (built %s %s)\n",APPGEN_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nPUPS/P3 application generator version %s, (C) Tumbling Dice, 2002-2023 (built %s %s)\n",APPGEN_VERSION,__TIME__,__DATE__);
        (void)fprintf(stderr,"Usage: application [skeleton application file]\n\n");
        (void)fflush(stderr);
        (void)fprintf(stderr,"APPLICATION is free software, covered by the GNU General Public License, and you are\n");
@@ -167,7 +167,7 @@ _PUBLIC int main(int argc, char *argv[])
        (void)strlcpy(skelpapp,argv[2],SSIZE);
     }
     else
-    {  (void)fprintf(stderr,"\nPUPS/P3 application generator version %s, (C) Tumbling Dice, 2002-2022 (built %s %s)\n",APPGEN_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nPUPS/P3 application generator version %s, (C) Tumbling Dice, 2002-2023 (built %s %s)\n",APPGEN_VERSION,__TIME__,__DATE__);
        (void)fprintf(stderr,"Usage: application [skeleton application file]\n\n");
        (void)fflush(stderr);
        (void)fprintf(stderr,"APPLICATION is free software, covered by the GNU General Public License, and you are\n");

@@ -8,8 +8,8 @@
              NE3 4RT
              United Kingdom
 
-    Version: 7.17
-    Dated:   3rd November 2022
+    Version: 7.20
+    Dated:   26th October 2023
     E-Mail:  mao@tumblingdice.co.uk
 ------------------------------------------------------------------------------*/
 
@@ -52,7 +52,7 @@
 /* Version */
 /***********/
 
-#define UTILIB_VERSION              "7.17"
+#define UTILIB_VERSION              "7.20"
 
 
 /*-------------*/
@@ -73,6 +73,23 @@
 #ifdef SECURE
 #include <sed_securicor.h>
 #endif /* SECURE */
+
+
+/*------------------------*/
+/* Default Criu poll time */
+/* (between state saves)  */
+/*------------------------*/
+
+
+#define DEFAULT_CRIU_POLL_TIME      60
+
+
+/*-----------------------------------*/
+/* Default software watchdog timeout */
+/*-----------------------------------*/
+
+#define DEFAULT_SOFTDOG_TIMEOUT     60
+
 
 
 /*----------------------------------------------------------*/
@@ -139,7 +156,7 @@
 /* Quantum for PUPS virtual interval timers (in microseconds) */
 /*------------------------------------------------------------*/
 
-#define VITIMER_QUANTUM    100000
+#define VITIMER_QUANTUM    1000
 
 
 /*------------------------------------------------*/
@@ -575,7 +592,7 @@ _EXPORT  sigjmp_buf pups_restart_buf;     // Abort restart buffer
 _EXPORT _BOOLEAN    fs_write_blocked;     // TRUE if filesystem is full
 
 #ifdef CRIU_SUPPORT
-_EXPORT _BOOLEAN appl_ssave;              // TRUE if (criu) state saving enabled
+_EXPORT _BOOLEAN appl_criu_ssave;         // TRUE if (criu) state saving enabled
 #endif /* CRIU_SUPPORT */
 
 _EXPORT int sargc,                        // Number of arguments in command tail
@@ -602,7 +619,7 @@ _EXPORT int sargc,                        // Number of arguments in command tail
             appl_remote_pid,              // Remote PID to relay signals to
 
 #ifdef CRIU_SUPPORT
-            appl_ssaves,                  // Number of times state has been saved
+            appl_criu_ssaves,             // Number of times state has been saved
             appl_poll_time,               // Pol time for (Criu) state saving
 #endif /* CRIU_SUPPORT */
 
@@ -615,7 +632,10 @@ _EXPORT int sargc,                        // Number of arguments in command tail
             appl_root_thread,             // Root (initial) thread for process
 #endif /* PTHREAD_SUPPORT */
 
-            appl_nice_lvl;                // Process niceness
+            appl_nice_lvl,                // Process niceness
+            appl_softdog_timeout,         // Software watchdog timeout
+            appl_softdog_pid;             // Software watchdog process PID
+
 
 
 _EXPORT _BOOLEAN appl_verbose,            // TRUE if verbose mode selected
@@ -630,7 +650,7 @@ _EXPORT _BOOLEAN appl_verbose,            // TRUE if verbose mode selected
 
                  test_mode,               // TRUE if test mode
                  init,                    // TRUE if first option
-                 pg_leader,               // TRUE if process group leader
+                 appl_pg_leader,          // TRUE if process group leader
                  appl_nodetach,           // Don't detach stdio in background
                  appl_fgnd,               // TRUE if process in foreground process group
                  appl_snames_crypted,     // TRUE if shadow filenames crypted
@@ -642,6 +662,7 @@ _EXPORT _BOOLEAN appl_verbose,            // TRUE if verbose mode selected
                  appl_psrp_save,          // If TRUE save dispatch table at exit
                  appl_have_pen,           // TRUE if binname != exec name
                  appl_default_chname,     // TRUE if PSRP channel name default
+		 appl_softdog_enabled,    // TRUE if software watchdog enabled
                  argd[];                  // Argument decode status flags
 
 _EXPORT char *version,                    // Version of program
@@ -683,7 +704,7 @@ _EXPORT char *version,                    // Version of program
              appl_argfifo[];              // Argument FIFO (for memory resident process)
 
 #ifdef CRIU_SUPPORT
-_EXPORT char appl_ssave_dir[];            // Criu checkpoint directory for state saving
+_EXPORT char appl_criu_ssave_dir[];       // Criu checkpoint directory for state saving
 _EXPORT char appl_criu_dir[];             // Criu directory (holds migratable files and checkpoints) 
 #endif /* CRIU_SUPPORT */
 
@@ -1677,7 +1698,6 @@ _PROTOTYPE _EXPORT size_t strlcat(char *, const char *, size_t dsize);
 _PROTOTYPE _EXPORT size_t strlcpy(char *, const char *, size_t dsize);
 #endif /* BSD_FUNCTION_SUPPORT */
 
-
 // Can we run command? */
 _PROTOTYPE _EXPORT _BOOLEAN pups_can_run_command(const char *);
 
@@ -1686,6 +1706,15 @@ _PROTOTYPE _EXPORT void pups_enable_resident(void);
 
 // Get size of directory in bytes
 _PROTOTYPE _EXPORT off_t pups_dsize(const char *);
+
+// Show software watchdog status
+_PROTOTYPE _EXPORT int pups_show_softdogstatus(const FILE *);
+
+// Start software watchdog
+_PROTOTYPE _EXPORT int pups_start_softdog(const unsigned int);
+
+// Stop software watchdog
+_PROTOTYPE _EXPORT int pups_stop_softdog(void);
 
 
 #ifdef _CPLUSPLUS

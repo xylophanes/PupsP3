@@ -1,4 +1,4 @@
-.TH LYOSOME 1 "19th August 2010" "PUPSP3 commands" "PUPSP3 commands"
+.TH LYOSOME 1 "24th October 2023" "PUPSP3 commands" "PUPSP3 commands"
 
 .SH NAME
 LYOSOME \- PUPS lightweight file protector/destructor utility.
@@ -19,7 +19,7 @@ LYOSOME \- PUPS lightweight file protector/destructor utility.
 ][
 .B -always
 ][
-.B -d
+.B -daemon
 .I process name
 ]
 .I !<name of file to protect/destruct>!i
@@ -49,8 +49,8 @@ will then exit.
 
 .SH OPTIONS
 
-.B !<file to protect! 
-specifies the name of the file which is to be protected
+.B !<file sytem object to monitor>! 
+specifies the name of the file system object which is to be monitored
 .br
 
 .B -verbose
@@ -59,7 +59,7 @@ tells
 to log error and status information to standard error.
 .br
 
-.B -d
+.B -daemon
 .I process name
 tells
 .I lyosome(1)
@@ -67,7 +67,7 @@ to enter
 .B daemon
 mode. In daemon mode
 .I lysome(1)
-forks into the background and runs in its own session (see
+forks into the background using the specified process name  and runs in its own session (see
 .I setsid(1)
 ). By default stanadard I/O is closed when running daemon mode.
 .br
@@ -84,14 +84,23 @@ are mutually exclusive options.
 .B -always
 tells
 .I lyosome(1)
-to protect principal until terminated.
+to protect principal until it is terminated.
 .B -always
 and
 .B -lifetime
 are mutually exclusive options.
 .br 
  
-.B SIGNALS
+.SH SIGNALS
+
+.B SIGINT
+.B SIHUP
+.B SIGQUIT
+.B SIGTERM
+tells
+.I lyosome(1)
+to terminate gracefully.
+.br
 
 .B SIGUSR1
 Tells
@@ -104,7 +113,7 @@ flag is specified).
 .B SIGUSR2
 Tells
 .I lysome(1)
-to reset the lifetime of its principal(s).
+to reset the lifetime of monitored file system object(s).
 .br
 
 .SH EXIT STATUS
@@ -132,6 +141,6 @@ M.A. O'Neill.
 .br
 
 .SH SEE ALSO
-maggot(1)
+maggot(1), kepher(1), phagocyte(1), softdog(1), setsid(2), fork(2)
 .br
 

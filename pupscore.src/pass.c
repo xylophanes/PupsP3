@@ -9,8 +9,8 @@
              NE3 4RT
              United Kingdom
 
-    Version: 2.00 
-    Dated:   4th January 2022
+    Version: 2.02 
+    Dated:   26th October 2023
     E-mail:  mao@@tumblingdice.co.uk
 -------------------------------------------------------------------------------------------------------*/
 
@@ -41,7 +41,7 @@
 /* Version of pass */
 /*-----------------*/
 
-#define PASS_VERSION    "2.00"
+#define PASS_VERSION    "2.02"
 
 
 #ifdef BUBBLE_MEMORY_SUPPORT
@@ -87,7 +87,7 @@ _PRIVATE void pass_slot(int level)
 {   (void)fprintf(stderr,"int dynamic app (PSRP) pass %s: [ANSI C, PUPS MTD D]\n",PASS_VERSION);
  
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 2005-2022 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 2005-2023 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
        (void)fprintf(stderr,"PUPS/PSRP service server-client (built %s %s)\n\n",__TIME__,__DATE__);
     }
@@ -246,7 +246,7 @@ _PRIVATE char     *tsname[SSIZE]   = { (char *) NULL };  /* List of sdir input f
     checkpoint files) ...
 -------------------------------------------------------------------------------------------------------*/
 
-#define VTAG  4587
+#define VTAG  4670
 
 extern int appl_vtag = VTAG;
 
@@ -274,13 +274,13 @@ _PUBLIC int pups_main(int argc, char *argv[])
     /*------------------------------------------*/
 
 
-    pg_leader = TRUE;
+    appl_pg_leader = TRUE;
     pups_std_init(TRUE,
                   &argc,
                   PASS_VERSION,
                   "M.A. O'Neill",
                   "(PSRP) pass",
-                  "2022",
+                  "2023",
                   argv);
 
 

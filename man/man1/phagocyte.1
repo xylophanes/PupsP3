@@ -1,0 +1,139 @@
+.TH PHAGOCYTE 1 "23rd October 2023" "PUPSP3 commands" "PUPSP3 commands"
+
+.SH NAME
+PHAGOCYTE \- PUPS lightweight process monitor/killer.
+
+.br
+
+.SH SYNOPSIS
+.B phagocyte
+[
+.B -usage
+|
+.B -help
+] | [
+-verbose
+][
+.B -daemon
+.I daemon process name
+][
+.B -monitor
+.I partial process name
+][
+.B -period
+.I target process monitoring period in seconds
+][
+.I -mincpu
+.I minimum cpu utilisation percent
+][
+.B -maxcpu
+.I maximum cpu usage percent
+]
+.br
+
+.SH DESCRIPTION
+.I phagocyte(1)
+is a lightweight utility which monitors a nominated process (or group of processes) identified
+by
+.I partial process name.
+If the percentage cpu usage of the process lies outside the range
+.I minium cpu utilisation percent
+to
+.I maximum cpu utilisatio percent
+the process is deemed to be behaving abnormally and it is terminated by being sent a
+.B SIGKILL
+signal. Phagocyte is inspired the biological phagocyte cell which is a type of cell with the
+ability to eliminate pathogens and malfunctioning cells in a multicelluar organism.
+.br
+
+.SH OPTIONS
+
+.B -verbose
+tells
+.I phagocyte(1)
+to log error and status information to standard error.
+.br
+
+.B -daemon
+.I daemon nprocess name
+tells
+.I phagocyte(1)
+to enter
+.B daemon
+mode. In daemon mode
+.I phagocyte(1)
+forks into the background using the specified process name  and runs in its own session (see
+.I setsid(1)
+). By default stanadard I/O is closed when running daemon mode.
+.br
+
+.B -period
+.I file lifetime in seconds 
+specifies the monitoring period in seconds after which cpu statistics for the specified
+.I partial process name
+are gathered via a slaved instnace of the
+.I ps(1)
+command.
+.br 
+
+.B -mincpu
+specifies the
+.I minimum cpu usage percentage
+which is expected for a process which is functioing correctly. This
+is a floating point value which must lie between 0.0 and 100.0
+.br 
+ 
+.B -maxcpu
+specifies the
+.I maximum cpu usage percentage
+which is expected for a process which is functioing correctly. This
+is a floating point value which must lie between
+.I minimum cpu usage percentage
+and 100.0
+.br 
+ 
+.SH SIGNALS
+.br
+.B SIGINT
+.B SIHUP
+.B SIGQUIT
+.B SIGTERM
+tells
+.I phagocyte(1)
+to terminate gracefully.
+.br
+
+.B SIGUSR1
+Tells
+.I phagocyte(1)
+to print status information to standard error.
+.br
+
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
+.br
+
+.SH ENVIRONMENT VARIABLES
+None.
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br
+
+.SH SEE ALSO
+maggot(1), kepher(1), lyosome(1), ps(1), setsid(2), fork(2)
+.br
+

@@ -9,7 +9,7 @@
              United Kingdom
 
     Version: 2.00 
-    Dated:   26th January 2022
+    Dated:   26th January 2023
     E-mail:  mao@tumblingdice.co.uk
 -------------------------------------------------------------------------------------------------------*/
 
@@ -81,7 +81,7 @@ _PRIVATE void protect_slot(int level)
 {   (void)fprintf(stderr,"int [PUPS/PSRP] application protect %s: [ANSI C, PUPS/PSRP]\n",PROTECT_VERSION);
  
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 2005-2022 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 2005-2023 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
        (void)fprintf(stderr,"File and directory protector (built %s %s)\n\n",__TIME__,__DATE__);
     }
@@ -207,7 +207,7 @@ _PRIVATE int child_pid;                              /* PID of child bud process
     checkpoint files) ...
 -------------------------------------------------------------------------------------------------------*/
 
-#define VTAG  3749
+#define VTAG  3831
 extern int appl_vtag = VTAG;
 
 
@@ -344,7 +344,7 @@ refork:
                   PROTECT_VERSION,
                   "M.A. O'Neill",
                   "protect",
-                  "2022",
+                  "2023",
                   argv);
 
 

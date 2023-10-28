@@ -1,0 +1,6 @@
+On 64 bit architectures (x86_64 and aarch64) need to add line:
+
+/usr/lib64
+
+to /etc/ld.so.conf
+

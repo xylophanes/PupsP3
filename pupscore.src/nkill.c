@@ -9,7 +9,7 @@
               United Kingdom
 
      Version: 5.01 
-     Dated:   24th May 2022
+     Dated:   24th May 2023
      E-mail:  mao@tumblingdice.co.uk
 -------------------------------------------------------------------------------*/
 
@@ -193,7 +193,7 @@ _PUBLIC int main(int argc, char *argv[])
     /*-------------------------------------------------------*/
 
     if(argc < 2 || strcmp(argv[1],"-usage") == 0 || strcmp(argv[1],"-help") == 0)
-    {  (void)fprintf(stderr,"\nnkill version %s, (C) 1999-2022 Tumbling Dice (built %s)\n",NKILL_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nnkill version %s, (C) 1999-2023 Tumbling Dice (built %s)\n",NKILL_VERSION,__TIME__,__DATE__);
        (void)fprintf(stderr,"\nUsage: nkill [+/-all] [+/-verbose] [+binname | +status] [-slaved:FALSE] [-psrp] !signum | signame! <process-list>\n");
        (void)fprintf(stderr,"\nProcess list entries have the following forms:\n\n");
        (void)fprintf(stderr,"numeric-pid              :    Process identifier on local host\n");

@@ -9,7 +9,7 @@
               United Kingdom
 
     Version: 2.00 
-    Dated:   4th January 2022
+    Dated:   4th January 2023
     E-mail:  mao@tumblingdice.co.uk
 -------------------------------------------------------------------------------------------------------*/
 
@@ -64,7 +64,7 @@ _PRIVATE void larraytest_slot(int level)
 {   (void)fprintf(stderr,"int app (PSRP) larraytest %s: [ANSI C, PUPS MTD D]\n",LARRAYTEST_VERSION);
  
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 2013-2022 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 2013-2023 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. ONeill\n");
        (void)fprintf(stderr,"Unassigned PSRP dynamic process (PUPS format) (built %s)\n\n",__DATE__);
     }
@@ -167,7 +167,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
                   TEST_VERSION,
                   "M.A. O'Neill",
                   "(PSRP) larraytest",
-                  "2022",
+                  "2023",
                   argv);
 
 

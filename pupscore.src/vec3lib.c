@@ -12,7 +12,7 @@
              United Kingdom
 
     Version: 2.11
-    Dated:   4th January 2022
+    Dated:   4th January 2023
     E-mail:  mao@tumblingdice.co.uk 
 ------------------------------------------------------------------------------*/
 
@@ -39,7 +39,7 @@ _PRIVATE void veclib_slot(int level)
 {   (void)fprintf(stderr,"lib vec3lib %s: [ANSI C]\n",VEC3_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 1985-2022 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 1985-2023 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
        (void)fprintf(stderr,"PUPS/P3 vector support library (built %s %s)\n\n",__TIME__,__DATE__);
     }

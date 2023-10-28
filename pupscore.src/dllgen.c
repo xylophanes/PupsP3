@@ -9,7 +9,7 @@
               United Kingdom
 
      Version: 2.01
-     Dated:   24th May 2022
+     Dated:   24th May 2023
      E-mail:  mao@tumblingdice.co.uk
 ---------------------------------------------------------------------------------------*/
 
@@ -143,7 +143,7 @@ _PUBLIC int main(int argc, char *argv[])
     _BOOLEAN dll_init             = FALSE;
 
     if(argc == 1 || argc > 4 || argc == 2 && (strcmp(argv[1],"-usage") == 0 || strcmp(argv[1],"-help") == 0))
-    {  (void)fprintf(stderr,"\nPUPS/P3 DLL generator version %s, (C) Tumbling Dice, 2002-2022 (built %s %s)\n",DLLGEN_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nPUPS/P3 DLL generator version %s, (C) Tumbling Dice, 2002-2023 (built %s %s)\n",DLLGEN_VERSION,__TIME__,__DATE__);
        (void)fprintf(stderr,"Usage: dllgen [skeleton DLL file | skeleton DLL function file]\n\n");
        (void)fflush(stderr);
        (void)fprintf(stderr,"DLLGEN is free software, covered by the GNU General Public License, and you are\n");
@@ -189,7 +189,7 @@ _PUBLIC int main(int argc, char *argv[])
        }
     }
     else
-    {  (void)fprintf(stderr,"\nPUPS/P3 DLL generator version %s, (C) Tumbling Dice, 2002-2022 (built %s %s)\n",DLLGEN_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nPUPS/P3 DLL generator version %s, (C) Tumbling Dice, 2002-2023 (built %s %s)\n",DLLGEN_VERSION,__TIME__,__DATE__);
        (void)fprintf(stderr,"Usage: dllgen [skeleton DLL file | skeleton DLL function file]\n\n");
        (void)fflush(stderr);
        (void)fprintf(stderr,"DLLGEN is free software, covered by the GNU General Public License, and you are\n");
@@ -215,7 +215,7 @@ _PUBLIC int main(int argc, char *argv[])
        exit(255);
     }
 
-    (void)fprintf(stderr,"\nPUPS/P3 DLL template generator version %s (C) M.A. O'Neill, Tumbling Dice, 2002-2022\n\n",DLLGEN_VERSION);
+    (void)fprintf(stderr,"\nPUPS/P3 DLL template generator version %s (C) M.A. O'Neill, Tumbling Dice, 2002-2023\n\n",DLLGEN_VERSION);
     (void)fflush(stderr); 
 
     (void)read_line(dll_name,"dllgen (DLL name)> ");

@@ -21,7 +21,7 @@
    or (US mail) as Mike Haertel c/o Free Software Foundation.
 
    Shared heap modifications by Mark O'Neill, Tumbling DIce  <mao@tumblingdice.co.uk>
-   (C) M.A. O'Neill. Tumbling Dice 2005-2022
+   (C) M.A. O'Neill. Tumbling Dice 2005-2023
 --------------------------------------------------------------------------------------*/
 
 #ifndef _PHMALLOC_H

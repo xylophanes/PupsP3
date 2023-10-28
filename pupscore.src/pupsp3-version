@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo ""
-echo "    PUPSP3 version 5.5.1"
+echo "    PUPSP3 version 5.5.3"
 echo "    (C) M.A. O'Neill, Tumbling Dice, 2023"
 echo ""
 

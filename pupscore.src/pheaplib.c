@@ -11,7 +11,7 @@
               United Kingdom
 
     Version: 2.00 
-    Dated:   4th January 2022
+    Dated:   4th January 2023
     Email:   mao@tumblingdice.co.uk
 -----------------------------------------------------------------------------------*/
 
@@ -221,7 +221,7 @@ _PRIVATE void pheap_slot(int level)
 {   (void)fprintf(stderr,"lib hseaplib %s: [ANSI C]\n",PHEAP_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 2003-2022 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 2003-2023 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
        (void)fprintf(stderr,"PUPS/P3 persistent heap support library (built %s %s)\n\n",__TIME__,__DATE__);
     }

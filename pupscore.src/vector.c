@@ -9,7 +9,7 @@
              United Kingdom
 
     Version: 2.00 
-    Dated:   4th January 2022
+    Dated:   4th January 2023
     E-mail:  mao@tumblingdice.co.uk
 -------------------------------------------------------------------------------------------------------*/
 
@@ -50,7 +50,7 @@ _PRIVATE void vector_slot(int level)
 {   (void)fprintf(stderr,"int app vector %s: [ANSI C]\n",VECTOR_VERSION);
  
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 2002-2022 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 2002-2023 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. ONeill\n");
        (void)fprintf(stderr,"PSRP remote server vector (built %s %s)\n\n",__TIME__,__DATE__);
     }
@@ -157,7 +157,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
                   VECTOR_VERSION,
                   "M.A. O'Neill",
                   "(PSRP) vector",
-                  "2022",
+                  "2023",
                   argv);
 
 

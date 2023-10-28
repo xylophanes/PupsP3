@@ -1,0 +1,3 @@
+_PUBLIC void pups_show_softdogtatus(const FILE *stream)
+_PUBLIC int pups_start_softdog(unsinged int timeout)
+_PUBLIC int pups_stop_softdog(void)

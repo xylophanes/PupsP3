@@ -9,7 +9,7 @@
              United Kingdom
 
     Version: 2.00 
-    Dated:   4th January 2022
+    Dated:   4th January 2023
     E-mail:  mao@tumblingdice.co.uk
 -----------------------------------------------------------------------------*/
 
@@ -52,7 +52,7 @@ _PRIVATE void larray_slot(int level)
 {   (void)fprintf(stderr,"lib larraylib %s: [ANSI C]\n",LARRAY_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 2013-2022 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 2013-2023 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
        (void)fprintf(stderr,"PUPS/P3 sparse matrix support library (built %s %s)\n\n",__TIME__,__DATE__);
     }
@@ -1190,7 +1190,7 @@ _PUBLIC int lvector_save_to_file(char *filename, vlist_type *vector)
 
     (void)fprintf(stream,"\n#--------------------------------------------------------------------------\n");
     (void)fprintf(stream,"#    List vector (ASCII format 1.00)\n");
-    (void)fprintf(stream,"#    (C) M.A. O'Neill, Tumbling Dice 2022\n");
+    (void)fprintf(stream,"#    (C) M.A. O'Neill, Tumbling Dice 2023\n");
     (void)fprintf(stream,"#--------------------------------------------------------------------------\n\n");
     (void)fflush(stream);
 
@@ -1806,7 +1806,7 @@ _PUBLIC int lmatrix_save_to_file(char *filename, mlist_type *matrix)
 
     (void)fprintf(stream,"\n#--------------------------------------------------------------------------\n");
     (void)fprintf(stream,"#    List matrix (ASCII format 1.00)\n");
-    (void)fprintf(stream,"#    (C) M.A. O'Neill, Tumbling Dice 2022\n");
+    (void)fprintf(stream,"#    (C) M.A. O'Neill, Tumbling Dice 2023\n");
     (void)fprintf(stream,"#--------------------------------------------------------------------------\n\n");
     (void)fflush(stream);
 

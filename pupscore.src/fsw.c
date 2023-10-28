@@ -77,7 +77,7 @@ _PRIVATE void fsw_slot(int level)
 {   (void)fprintf(stderr,"int app fsw %s: [ANSI C]\n",FSW_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 2005-2022 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 2005-2023 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
        (void)fprintf(stderr,"File system status filter (built %s %s)\n\n",__TIME__,__DATE__);
     }
@@ -198,7 +198,7 @@ _PRIVATE int psrp_process_status(int argc, char *argv[])
     checkpoint files) ...
 -------------------------------------------------------------------------------*/
 
-#define VTAG  3749
+#define VTAG  3831
 
 extern int appl_vtag = VTAG;
 

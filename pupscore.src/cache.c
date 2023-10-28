@@ -9,7 +9,7 @@
              United Kingdom
 
     Version: 3.00 
-    Dated:   7th January 2022 
+    Dated:   7th January 2023 
     E-mail:  mao@tumblingdice.co.uk
 -------------------------------------------------------------------------------------------------------*/
 
@@ -128,7 +128,7 @@ _PRIVATE void cache_slot(int level)
 {   (void)fprintf(stderr,"int app (PSRP) cache %s: [ANSI C, PUPS MTD D]\n",CACHE_VERSION);
  
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 2022 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 2023 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. ONeill\n");
        (void)fprintf(stderr,"(fast) cache test (built %s %s)\n\n",__TIME__,__DATE__);
     }
@@ -316,7 +316,7 @@ int i;
                   CACHE_VERSION,
                   "M.A. O'Neill",
                   "cache",
-                  "2022",
+                  "2023",
                   argv);
 
 

@@ -20,8 +20,7 @@ link-loader interface supported by POSIX. In addition to functions, PUPS/P3 also
 objects to running PUPS/P3 enabled applications.
 
 These include:
-<br>
-<br>
+
 1. Dynamic (i.e hot pluggable) functions.
 2. Databags (simple contiguous data objects organised as a stream of bytes).
 3. Persistent (menory mapped) heaps.
@@ -47,6 +46,7 @@ to the root directory of the PUPS/P3 source distribution: dist.p3.src/pupscore.s
 the build is successful (see build log) and the user is not root, by default, the binaries for the PUPS/P3 service functions, libraries,
 
 For a non-root installation, header files and man pages are located in:
+
 * ~/bin (PUPS/P3 utility commands)
 * ~/lib (static and shared PUPS/P3 libraries)
 * ~/include/p3 (PUPS/P3 header files)
@@ -156,6 +156,7 @@ was generated interactively above could be redirected to a file (assuming the PS
 psrp -c "open embryo; ascii" > foo
 <br>
 <br>
+
 ### PUPS/P3 libraries
 
 Currently there are 12 core PUPS/P3 libraries:
@@ -200,7 +201,9 @@ address spaces of multiple process.
 12. dllib: supports dynamically pluggable (C) functions with strong typing.
 <br>
 <br>
+
 ### PUPS/P3 build tools
+
 There are a number of build tools which can be used to automate the generation of PUPS/P3 applications. These include:
 here are a number of build tools which can be used to automate the generation of PUPS/P3 applications. These include:
 
@@ -227,7 +230,9 @@ mulituser environment.
 11. application: generates application template from skeleton template files.
 <br>
 <br>
+
 ### PUPS/P3 Scripts
+
 The PUPS/P3 distribution includes a number of shell scripts which facilitate building the PUPS/P3 environment. These include:
 
 1. configure: generates a Makefile from a PUPS/P3 Makefile template. Essentially this is a wrapper script for pupsconf.
@@ -250,6 +255,7 @@ put binaries and libraries in appropriate places.
 9. restart.sh: restart (PUPS/P3) process which has been checkpointed via criu.
 <br>
 <br>
+
 ### Service Functions
 
 The PUPS/P3 service functions are a set of tools which facilitate building of user applications in the PUPS/P3 environment. Many of the
@@ -320,6 +326,7 @@ interactively using password authentication. This allows PSRP server processes t
 data traffic between PSRP servers on networked hosts thereby enhancing system security.
 <br>
 <br>
+
 ### The PUPS/P3 Project Directory
 
 The PUPS/P3 project is the source tree within which an implementor devel- ops PUPS/P3 applications. In order to create a PUPS/P3
@@ -345,6 +352,7 @@ application builder will prompt (interactively) for the following:
 The resulting application template and associated makefile may then be used as a basis for the application which is being implemented.
 <br>
 <br>
+
 ### PSRP client command summary
 
 The PSRP client, psrp has its own language, PML (PSRP Macro Language) and a large number of builtin commands. PML and its associated
@@ -469,6 +477,7 @@ the required server is running on the local <host>. The PSRP server may be speci
 55. "a1 a2": glob argument "a1 a2" to a1a2
 <br>
 <br>
+
 ### PSRP Server Builtin Commands
 
 In addition to the set of static and dynamic dispatch functions which are built into a PSRP server application by the implementor, any
@@ -689,6 +698,7 @@ copies of these examples and use them as a basis for their own applications.
 <br>
 
 ### Schematic of PUPS/P3 Ecosystem
+
 <br>
 <br>
 
@@ -701,6 +711,7 @@ garbage disposal processes.
 <br>
 
 ### History
+
 <br>
 <br>
 
@@ -722,6 +733,7 @@ philosophy draws on the goals of the influential Multiplexed Information and Com
 
 O'Neill M.A and Hilgetag C-C, 2001: The Portable UNIX Programming System (PUPS) and Cantor: A computational environment for the
 dynamical representation and analysis of complex neurobiological data. Proc Phil. Roy. Soc. Lond B 356(1412):1259-1276
+<br>
 <br>
 O'Neill M.A, Burns A.P.C. and Hilgetag C-C, 2003: The PUPS-MOSIX Environment: A Homeostatic Environment for Neuro- and Bio-Informatic
 Applications. In Neuroscience Databases: A practical guide Kotter R. (Ed.), Blackwell ISBN 140207 1655
@@ -764,3 +776,5 @@ If I have left anyone out, I humbly apologise.
 * Jahwr Bammi (formerly at Case Western Reserve University, Cleveland, USA).
 
 * Amnon Barak (Hebrew Univeristy of Jurusalem).
+
+* Mike Cook (formerly at Laser-Scan, Cambridge, UK)

@@ -9,7 +9,7 @@
              United Kingdom
 
     Version: 5.00 
-    Dated:   4th January 2022
+    Dated:   4th January 2023
     E-Mail:  mao@tumblingdice.co.uk
 ------------------------------------------------------------------------------*/
 
@@ -71,7 +71,7 @@ _PRIVATE void netlib_slot(int level)
 {   (void)fprintf(stderr,"lib netlib %s: [ANSI C]\n",NETLIB_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 1995-2022 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 1995-2023 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
        (void)fprintf(stderr,"PUPS/P3 network support library (built %s %s)\n\n",__TIME__,__DATE__);
     }

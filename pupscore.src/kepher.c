@@ -9,7 +9,7 @@
               United Kingdom
 
      Version: 3.01
-     Dated:   24th May 2022
+     Dated:   24th May 2023
      E-mail:  mao@tumblingdice.co.uk
 ---------------------------------------------------------------------------------------*/
 
@@ -589,7 +589,7 @@ _PUBLIC int main(int argc, char *argv[])
           (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
           (void)fprintf(stderr,"See the GPL and LGPL licences at www.gnu.org for further details\n");
           (void)fprintf(stderr,"KEPHER comes with ABSOLUTELY NO WARRANTY\n\n");
-          (void)fprintf(stderr,"\nkepher lightweight garbage collector version %s, (C) Tumbling Dice, 2010-2022 (built %s %s)\n",KEPHER_VERSION,__TIME__,__DATE__);
+          (void)fprintf(stderr,"\nkepher lightweight garbage collector version %s, (C) Tumbling Dice, 2010-2023 (built %s %s)\n",KEPHER_VERSION,__TIME__,__DATE__);
           (void)fprintf(stderr,"Usage: kepher [-help | -usage] | [-verbose:FALSE]\n");
           (void)fprintf(stderr,"              [-mpid <monitor pid | monitor pname>]\n"); 
           (void)fprintf(stderr,"              [-mdir <directory to clean:/tmp>]\n");
@@ -693,7 +693,7 @@ _PUBLIC int main(int argc, char *argv[])
     }
 
     if(do_verbose == TRUE)
-    {  (void)fprintf(stderr,"\n    kepher lightweight garbage collector (version %s)\n    (C) M.A. O'Neill, Tumbling Dice, 2010-2022\n",
+    {  (void)fprintf(stderr,"\n    kepher lightweight garbage collector (version %s)\n    (C) M.A. O'Neill, Tumbling Dice, 2010-2023\n",
                                                                                                                          KEPHER_VERSION);
        (void)fprintf(stderr,"\n    Process %d on host \"%s\" monitoring \"%s\" for stale .tmp, .fifo, .run, .lock and .lid files\n",
                                                                                                              getpid(),hostname,mdir);

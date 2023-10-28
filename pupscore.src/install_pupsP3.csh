@@ -581,7 +581,7 @@ if($status != 0) then
         exit 255
 endif
 
-gcc -I../include.libs -DFLOAT -w -Wfatal-errors -O3 -o isfloat isfloat.c  							>>& $logFile
+gcc -I../include.libs -D$ftype -w -Wfatal-errors -O3 -o isfloat isfloat.c  							>>& $logFile
 if($status != 0) then
         echo ""                                                                                 				>>& $logFile
         echo "    ERROR  install_pupsp3: operation failed [gcc isfloat]"                                             		>>& $logFile
@@ -617,7 +617,7 @@ if($status != 0) then
         exit 255
 endif
 
-gcc -I../include.libs -DFLOAT -w -Wfatal-errors -O3 -o fadd fadd.c                              				>>& $logFile
+gcc -I../include.libs -D$ftype -w -Wfatal-errors -O3 -o fadd fadd.c                              				>>& $logFile
 if($status != 0) then
         echo ""                                                                                 				>>& $logFile
         echo "    ERROR  install_pupsp3:  operation failed [gcc fadd]"                                 				>>& $logFile
@@ -635,7 +635,7 @@ if($status != 0) then
         exit 255
 endif
 
-gcc -I../include.libs -DFLOAT -w -Wfatal-errors -O3 -o fsub fsub.c                              				>>& $logFile
+gcc -I../include.libs -D$ftype -w -Wfatal-errors -O3 -o fsub fsub.c                              				>>& $logFile
 if($status != 0) then
         echo ""                                                                                 				>>& $logFile
         echo "    ERROR install_pupsp3: operation failed gcc fsub]"                                                   		>>& $logFile
@@ -653,7 +653,7 @@ if($status != 0) then
         exit 255 
 endif
 
-gcc -I../include.libs -DFLOAT -w -Wfatal-errors -O3 -o fmul fmul.c                              				>>& $logFile
+gcc -I../include.libs -D$ftype -w -Wfatal-errors -O3 -o fmul fmul.c                              				>>& $logFile
 if($status != 0) then
         echo ""                                                                                 				>>& $logFile
         echo "    ERROR install_pupsp3: operation failed [gcc fmul]"                                                   		>>& $logFile
@@ -671,7 +671,7 @@ if($status != 0) then
         exit 255
 endif
 
-gcc -I../include.libs -DFLOAT -w -Wfatal-errors -O3 -o fdiv fdiv.c                              				>>& $logFile
+gcc -I../include.libs -D$ftype -w -Wfatal-errors -O3 -o fdiv fdiv.c                              				>>& $logFile
 if($status != 0) then
         echo ""                                                                                 				>>& $logFile
         echo "    ERROR install_pupsp3: operation failed [gcc fdiv]"                                                  		>>& $logFile
@@ -680,7 +680,7 @@ if($status != 0) then
         exit 255
 endif
 
-gcc -I../include.libs -DFLOAT -w -Wfatal-errors -O3 -o fint fint.c -lm                          				>>& $logFile
+gcc -I../include.libs -D$ftype -w -Wfatal-errors -O3 -o fint fint.c -lm                          				>>& $logFile
 if($status != 0) then
         echo ""                                                                                 				>>& $logFile
         echo "    ERROR install_pupsp3: operation failed [gcc fint]"                                                   		>>& $logFile
@@ -689,7 +689,7 @@ if($status != 0) then
         exit 255
 endif
 
-gcc -I../include.libs -DFLOAT -w -Wfatal-errors -O3 -o intf intf.c                              				>>& $logFile
+gcc -I../include.libs -D$ftype -w -Wfatal-errors -O3 -o intf intf.c                              				>>& $logFile
 if($status != 0) then
         echo ""                                                                                 				>>& $logFile
         echo "    ERROR install_pupsp3: operation failed [gcc intf]"                                                  		>>& $logFile
@@ -1433,6 +1433,32 @@ if($buildtype == cluster) then
     strip lyosome														>&  /dev/null
 
     echo ""															>>& $logFile
+    echo "    ... Building P3 lightweight process homeostat [phagocyte] (removes damaged processes)"				>>& $logFile
+    echo ""															>>& $logFile
+    gcc -w -Wfatal-errors -D$utarget -D$arch -D$ftype -O3 -I../include.libs -o phagocyte phagocyte.c -lbsd			>>& $logFile
+    if($status != 0) then
+        echo ""                                                                                                                 >>& $logFile
+        echo "    ERROR install_pupsP3: operation failed [gcc phagocyte]"                                                       >>& $logFile
+        echo ""                                                                                                                 >>& $logFile
+
+        exit 255
+    endif
+    strip phagocyte														>&  /dev/null
+
+    echo ""															>>& $logFile
+    echo "    ... Building P3 software watchdog (removes damaged processes)"							>>& $logFile
+    echo ""															>>& $logFile
+    gcc -w -Wfatal-errors -D$utarget -D$arch -O3 -I../include.libs -o softdog softdog.c -lbsd					>>& $logFile
+    if($status != 0) then
+        echo ""                                                                                                                 >>& $logFile
+        echo "    ERROR install_pupsP3: operation failed [gcc phagocyte]"                                                       >>& $logFile
+        echo ""                                                                                                                 >>& $logFile
+
+        exit 255
+    endif
+    strip softdog														>&  /dev/null
+
+    echo ""															>>& $logFile
     echo "    ... Building P3 lightweight garbage collector [kepher] (removes stale temporary files)"				>>& $logFile
     echo ""															>>& $logFile
     gcc -w -Wfatal-errors -D$utarget -D$arch -O3 -I../include.libs -o kepher kepher.c -lbsd					>>& $logFile
@@ -1669,7 +1695,7 @@ if($buildtype == cluster) then
     endif
     strip gethostip														>&  /dev/null
 
-    \mv gethostip hupter nkill htype farm cpuload lol gob arse mktty mkfile lyosome kepher leaf branch psrptool servertool p3f stripper     \
+    \mv gethostip hupter nkill htype farm cpuload lol gob arse mktty mkfile lyosome phagocyte softdog kepher leaf branch psrptool servertool p3f stripper     \
 															$BINDIR	>&  /dev/null
 
     if($status != 0) then
@@ -2665,6 +2691,23 @@ if($debug == TRUE) then
 	mkfile ../lib.$arch.linux.cluster/debug											>&  /dev/null
 else
 	\rm ../lib.$arch.linux.cluster/debug											>&  /dev/null
+endif
+
+if(`whoami` == root) then
+	if($MACHTYPE == x86_64 || $MACHTYPE == aarch64) then
+
+		echo "    ----------------------------------------------------------------------------------"			>>& $logFile
+		echo "    make sure that /usr/lib64 is added to /etc/ld.so.conf"						>>& $logFile
+		echo "    ----------------------------------------------------------------------------------"			>>& $logFile
+		echo ""														>>& $logFile
+
+		sleep 2
+
+		if(`tty` != "not a tty") then
+			vi /etc/ld.so.conf
+			ldconfig												>& /dev/null
+		endif
+	endif
 endif
 
 echo ""																>>& $logFile

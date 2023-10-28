@@ -9,7 +9,7 @@
               United Kingdom
 
      Version: 2.01
-     Dated:   24th May 2022
+     Dated:   24th May 2023
      E-mail:  mao@tumblingdice.co.uk
 ---------------------------------------------------------------------------------------*/
 
@@ -144,7 +144,7 @@ _PUBLIC int main(int argc, char *argv[])
     _BOOLEAN lib_init             = FALSE;
 
     if(argc == 1 || argc == 2 && (strcmp(argv[1],"-usage") == 0 || strcmp(argv[1],"-help") == 0))
-    {  (void)fprintf(stderr,"\nPUPS/P3 Library function generator version %s (C) Tumbling Dice, 2002-2022 (built %s %s)\n",LIBGEN_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nPUPS/P3 Library function generator version %s (C) Tumbling Dice, 2002-2023 (built %s %s)\n",LIBGEN_VERSION,__TIME__,__DATE__);
        (void)fprintf(stderr,"Usage: libgen [skeleton LIB file | skeleton LIB function file]\n\n");
        (void)fflush(stderr);
        (void)fprintf(stderr,"LIBGEN is free software, covered by the GNU General Public License, and you are\n");
@@ -192,7 +192,7 @@ _PUBLIC int main(int argc, char *argv[])
        }
     }
     else
-    {  (void)fprintf(stderr,"\nPUPS/P3 LIB generator version %s, (C) Tumbling Dice, 2022 (built %s %s)1\n",LIBGEN_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nPUPS/P3 LIB generator version %s, (C) Tumbling Dice, 2023 (built %s %s)1\n",LIBGEN_VERSION,__TIME__,__DATE__);
        (void)fprintf(stderr,"Usage: libgen [skeleton library file]  [skeleton library function file]\n\n");
        (void)fflush(stderr);
        (void)fprintf(stderr,"LIBGEN is free software, covered by the GNU General Public License, and you are\n");
@@ -218,7 +218,7 @@ _PUBLIC int main(int argc, char *argv[])
        exit(255);
     }
 
-    (void)fprintf(stderr,"\nPUPS/P3 LIB template generator version %s (C) M.A. O'Neill, Tumbling Dice, 2022\n\n",LIBGEN_VERSION);
+    (void)fprintf(stderr,"\nPUPS/P3 LIB template generator version %s (C) M.A. O'Neill, Tumbling Dice, 2023\n\n",LIBGEN_VERSION);
     (void)fflush(stderr); 
 
     (void)read_line(lib_name,"libgen (LIB name)> ");

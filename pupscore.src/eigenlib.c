@@ -9,7 +9,7 @@
              United Kingdom
 
     Version: 1.05
-    Dated:   4th Janiary 2022
+    Dated:   4th Janiary 2023
     E-mail:  mao@tumblingdice.co.uk
 
     Some routines here are derived from those given in Press et al (Numerical
@@ -64,7 +64,7 @@ _PRIVATE void eigenlib_slot(int level)
 {   (void)fprintf(stderr,"lib eigenlib %s: [ANSI C]\n",EIGEN_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 1985-2022 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 1985-2023 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
        (void)fprintf(stderr,"PUPS/P3 eigenvector analysis library (built %s %s)\n\n",__TIME__,__DATE__);
     }

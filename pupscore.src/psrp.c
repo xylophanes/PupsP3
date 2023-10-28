@@ -8,8 +8,8 @@
              NE3 4RT
              United Kingdom
 
-    Version: 21.02 
-    Dated:   7th October 2023 
+    Version: 21.04 
+    Dated:   26th October 2023 
     E-mail:  mao@tumblingdice.co.uk
 -----------------------------------------------------------------------------------------------*/
 
@@ -95,7 +95,7 @@
 /* Version */
 /*---------*/
 
-#define PSRP_VERSION          "21.02"
+#define PSRP_VERSION          "21.04"
 
 
 /*---------------------------------------------*/
@@ -151,7 +151,7 @@ _PRIVATE void psrp_slot(int level)
 {   (void)fprintf(stdout,"int app psrp %s: [ANSI C]\n",PSRP_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stdout,"(C) 1994-2022 Tumbling Dice\n");
+    {  (void)fprintf(stdout,"(C) 1994-2023 Tumbling Dice\n");
        (void)fprintf(stdout,"Author: M.A. O'Neill\n");
        (void)fprintf(stdout,"PSRP (protocol %5.2F) communication shell (built %s %s)\n",PSRP_PROTOCOL_VERSION,__TIME__,__DATE__);
        (void)fflush(stdout);
@@ -545,7 +545,7 @@ _PROTOTYPE _PRIVATE void psrp_yield_channel(void);
 /* Software I.D. tag */
 /*-------------------*/
 
-#define VTAG  7497
+#define VTAG  7587
 extern int appl_vtag = VTAG;
 
 
@@ -604,7 +604,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
                   PSRP_VERSION,
                   "M.A. O'Neill",
                   "psrp",
-                  "2022",
+                  "2023",
                   argv);
 
 
@@ -634,7 +634,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
 
     if(pups_locate(&init,"startmsg",&argc,args,0) != NOT_FOUND)
     {  (void)fprintf(stderr,"\n    PSRP client version %s, [build %6d]\n",PSRP_VERSION,appl_vtag);
-       (void)fprintf(stderr,"    (C) M.A. O'Neill, Tumbling Dice 2022\n\n");
+       (void)fprintf(stderr,"    (C) M.A. O'Neill, Tumbling Dice 2023\n\n");
        (void)fflush(stderr);
     }
 
@@ -2980,7 +2980,7 @@ _PRIVATE _BOOLEAN psrp_process_command(char *request_line)
                   (void)fprintf(stdout,"    [with slaved commands                 ]\n");
                   #endif /* SLAVED_COMMANDS */
 
-                  (void)fprintf(stdout,"\nCopyright (C), Tumbling Dice, 1994-2022 (built %s %s)\n\n",__TIME__,__DATE__);
+                  (void)fprintf(stdout,"\nCopyright (C), Tumbling Dice, 1994-2023 (built %s %s)\n\n",__TIME__,__DATE__);
                   (void)fprintf(stdout,"PSRP is free software, covered by the GNU General Public License, and you are\n");
                   (void)fprintf(stdout,"welcome to change it and/or distribute copies of it under certain conditions.\n");
                   (void)fprintf(stdout,"See the GPL and LGPL licences at www.gnu.org for further details\n");
@@ -3849,6 +3849,7 @@ busy_retry:
                                                                                 psrp_server,server_pid,psrp_host);
                           (void)fflush(stdout);
                        }
+
                        else if(ret == PUPS_STOPPED && psrp_hard_link == FALSE)
                        {  (void)fprintf(stdout,"\ntarget PSRP server process %s (%d@%s) has been stopped\n\n",
                                                                              psrp_server,server_pid,psrp_host);
@@ -3971,11 +3972,13 @@ busy_retry:
                      /* Get response from PSRP server process */
                      /*---------------------------------------*/
 
-                     (void)efgets(reply,SSIZE,client_in);
+                     if (strcmp(request,"terminate") != 0) 
+                     {  (void)efgets(reply,SSIZE,client_in);
 
-                     if(do_repeat[r_cnt] == TRUE && strin(reply,"Illegal") == TRUE)
-                     {  do_repeat[r_cnt] = FALSE;
-                        (void)strlcpy(psrp_c_code,"sillerr",SSIZE);
+                        if(do_repeat[r_cnt] == TRUE && strin(reply,"Illegal") == TRUE)
+                        {  do_repeat[r_cnt] = FALSE;
+                           (void)strlcpy(psrp_c_code,"sillerr",SSIZE);
+                        }
                      }
 
 
@@ -3984,7 +3987,8 @@ busy_retry:
                      /* and return to prompt mode                    */
                      /*----------------------------------------------*/
 
-                     if(strncmp(reply,"CST",3) == 0)
+                     //if(strncmp(reply,"CST",3) == 0)
+                     if (strcmp(request,"terminate") == 0)
                      {  (void)pups_clearvitimer("server_alive_handler");
                         if(pel_appl_verbose == TRUE)
                         {  (void)fprintf(stdout,"connection closed (server termination by active client)\n\n");
@@ -4075,6 +4079,7 @@ busy_retry:
                      {  (void)printf("EOT\n");
                         (void)fflush(stdout);
                      }
+
                  }  while(strncmp(reply,"EOT",3) != 0);
 
 
@@ -4118,18 +4123,21 @@ busy_retry:
 
                  psrp_waitfor_endop("EOP psrp");
 
+
+                 /*---------------*/
+                 /* Clear channel */
+                 /*---------------*/
+
                  (void)empty_fifo(fileno(client_in));
                  (void)empty_fifo(fileno(client_out));
 
                  processing_command = FALSE;
 
 
-                 /*--------------------------------------------------------------------------------*/
-                 /* We have finished the current transaction - yield the channel so that           */
-                 /* other attached clients can submit their PSRP requests. SIGINT is blocked       */
-                 /* at this time, as we can only service it when the server is actually processing */
-                 /* a PSRP request                                                                 */
-                 /*--------------------------------------------------------------------------------*/
+                 /*-------------------------------*/
+                 /* Enable other attached clients */
+                 /* to submit requests            */
+                 /*-------------------------------*/
 
                  psrp_yield_channel();
 

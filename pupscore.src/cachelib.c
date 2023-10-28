@@ -82,7 +82,7 @@ _PRIVATE void cache_slot(int level)
 {   (void)fprintf(stderr,"lib cachelib %s: [ANSI C]\n",CACHELIB_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(c) 2001-2022 Tumbling Dice, Gosforth\n");
+    {  (void)fprintf(stderr,"(c) 2001-2023 Tumbling Dice, Gosforth\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
        (void)fprintf(stderr,"PUPS/P3 fast caching library (built %s %s)\n",__TIME__,__DATE__);
        (void)fflush(stderr);

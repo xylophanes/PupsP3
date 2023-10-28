@@ -9,7 +9,7 @@
              United Kingdom
 
     Version: 2.01 
-    Dated:   24th May 2022
+    Dated:   24th May 2023
     E-mail:  mao@tumblingdice.co.uk
 ----------------------------------------------------------------------------------------------*/
 
@@ -67,7 +67,7 @@ _PUBLIC int main(int argc, char *argv[])
     /*---------------------------------------------------------*/
 
     if(argc == 2 && (strcmp(argv[1],"-usage") == 0 || strcmp(argv[1],"-help") == 0))
-    {  (void)fprintf(stderr,"\npsrptool version %s, (C) 2003-2022 Tumbling Dice (built %s %s)\n",PSRPTOOL_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\npsrptool version %s, (C) 2003-2023 Tumbling Dice (built %s %s)\n",PSRPTOOL_VERSION,__TIME__,__DATE__);
        (void)fprintf(stderr,"\nUsage: psrptool [-help | -usage] [psrp client argument list] [-fsize <font size:%d>] [-sdongle <soft dongle file name | default>]\n\n",
                                                                                                                                                     DEFAULT_FONT_SIZE);
 

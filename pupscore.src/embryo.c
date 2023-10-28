@@ -9,8 +9,8 @@
              NE3 4RT
              United Kingdom
 
-    Version: 3.00 
-    Dated:   4th January 2022
+    Version: 3.02 
+    Dated:   26th October 2023
     E-mail:  mao@tumblingdice.co.uk
 ----------------------------------------------------------------------------------*/
 
@@ -66,7 +66,7 @@
 /* Version of this application */
 /*******************************/
 
-#define EMBRYO_VERSION    "3.00"
+#define EMBRYO_VERSION    "3.02"
 
 #ifdef BUBBLE_MEMORY_SUPPORT
 #include <bubble.h>
@@ -354,7 +354,7 @@ _PRIVATE void embryo_slot(int level)
 {   (void)fprintf(stderr,"int app (PSRP) embryo %s: [ANSI C, PUPS MTD D]\n",EMBRYO_VERSION);
  
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 1996-2022 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 1996-2023 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. ONeill\n");
        (void)fprintf(stderr,"Unassigned PSRP dynamic process (built %s %s)\n\n",__TIME__,__DATE__);
     }
@@ -458,7 +458,7 @@ _BOOLEAN looper = TRUE;
 /* Software I.D. tag  */
 /*--------------------*/
 
-#define VTAG  7494
+#define VTAG  7577
 
 extern int appl_vtag = VTAG;
 
@@ -535,7 +535,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
                   EMBRYO_VERSION,
                   "M.A. O'Neill",
                   "(PSRP) embryo",
-                  "2022",
+                  "2023",
                   argv);
 
 
@@ -916,11 +916,10 @@ _PUBLIC int pups_main(int argc, char *argv[])
 
        (void)fprintf(stderr,"\n**********\n\n");
        (void)fflush(stderr);
+
+       (void)pups_sleep(5);
     }
-
-    (void)pups_sleep(5);
-
-#endif /* PERSISTENT_HEAP_SUPPORT */
+    #endif /* PERSISTENT_HEAP_SUPPORT */
 
 
     /*--------------------------------------------------------------*/

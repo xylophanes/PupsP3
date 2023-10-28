@@ -8,8 +8,8 @@
              NE3 4RT
              United Kingdom
 
-    Version: 7.19
-    Dated:   5th September 2023 
+    Version: 7.20
+    Dated:   26th October 2023 
     E-Mail:  mao@tumblingdice.co.uk
 ----------------------------------------------------------------------------*/
 
@@ -189,11 +189,11 @@ _PUBLIC int  ptr,                                                             //
              appl_pid,                                                        // Process id
              appl_ppid,                                                       // Parent process
              appl_uid,                                                        // Process UID
-             appl_gid;                                                        // Process GID
+             appl_gid,                                                        // Process GID
 
 #ifdef CRIU_SUPPORT
-             appl_ssaves                  = 0,                                // Number of times state has been saved
-             appl_poll_time               = 60,                               // Poll time for (Criu) state saving
+             appl_criu_ssaves             = 0,                                // Number of times state has been saved
+             appl_criu_poll_time          = DEFAULT_CRIU_POLL_TIME,           // Poll time for (Criu) state saving
 #endif /* CRIU_SUPPORT */
 
 
@@ -202,14 +202,17 @@ _PUBLIC int  ptr,                                                             //
 #endif /* _OPENMP */
 
 #ifdef PTHREAD_SUPPORT
-             appl_root_tid                = (-1);                             // LWP of root thread
+             appl_root_tid                = (-1),                             // LWP of root thread
              appl_root_thread,                                                // Root (initial) thread for process 
 #endif /* PTHREAD_SUPPORT */
 
              appl_tty                     = (-1),                             // Applications controlling terminal
              appl_remote_pid,                                                 // Remote PID to relay signals to 
              appl_timestamp,                                                  // Application compilation time stamp
-             appl_nice_lvl                = 10;                               // Process niceness
+             appl_nice_lvl                = 10,                               // Process niceness
+             appl_softdog_timeout         = DEFAULT_SOFTDOG_TIMEOUT,          // Software watchdog timeout
+	     appl_softdog_pid             = (-1);                             // Software watchdog process PID
+
 
 _PUBLIC  int pupsighold_cnt[MAX_SIGS]     = { [0 ... MAX_SIGS-1] = 1 };       // Counter for signal states
 
@@ -222,17 +225,17 @@ _PUBLIC _BOOLEAN
          appl_nodetach                    = FALSE,                            // Don't detach stdio in background
          test_mode                        = FALSE,                            // Set test mode
          init                             = TRUE,                             // Initialise tail decoder system
-         pg_leader                        = FALSE,                            // Application is process group leader
+         appl_pg_leader                   = FALSE,                            // Application is process group leader
          appl_wait                        = FALSE,                            // TRUE if process stopped
          appl_fgnd                        = TRUE,                             // TRUE if in foreground pgrp
          appl_snames_crypted              = FALSE,                            // If TRUE encrypt shadow files
-         //pups_exit_entered                = FALSE,                            // TRUE if in pups_exit()
+	 appl_softdog_enabled             = FALSE,                            // TRUE if software watchdog enabled
          argd[255];                                                           // Argument decode status flags
 
 #ifdef CRIU_SUPPORT
-         appl_ssave                       = FALSE;                            // TRUE if (Criu) state saving enabled
+         appl_criu_ssave                  = FALSE;                            // TRUE if (Criu) state saving enabled
 
-_PUBLIC char appl_ssave_dir[SSIZE]        = "";                               // Criu checkpoint directory for state saving
+_PUBLIC char appl_criu_ssave_dir[SSIZE]   = "";                               // Criu checkpoint directory for state saving
 _PUBLIC char appl_criu_dir[SSIZE]         = "/tmp";                           // Criu directory (holds migratable files and checkpoint directories)
 #endif /* CRIU_SUPPORT */
 
@@ -424,7 +427,7 @@ _PRIVATE void utilib_slot(int level)
 {   (void)fprintf(stderr,"int lib utilib %s: [ANSI C]\n",UTILIB_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 1985-2022 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 1985-2023 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
        (void)fprintf(stderr,"PUPS/P3 general purpose utilities library (built %s %s)\n\n",__TIME__,__DATE__);
     }
@@ -489,9 +492,10 @@ _PRIVATE void utilib_usage()
 #endif /* SSH_SUPPORT */
 
 #ifdef CRIU_SUPPORT
-    (void)fprintf(stderr,"[-ssave [-t <poll time:%d>] [-cd <criu directory:/tmp]]\n",appl_poll_time);
+    (void)fprintf(stderr,"[-ssave [-sspoll <criu state save poll time seconds:%d>] [-cd <criu directory:/tmp]]\n",appl_poll_time);
 #endif /* CRIU_SUPPORT */
 
+    (void)fprintf(stderr,"[-softdog [-softdog <watchdog timeout seconds:%d>]\n",appl_softdog_timeout);
     (void)fprintf(stderr,"[-stdio_dead]\n");
     (void)fprintf(stderr,"[-pam <PUPS authentication module name>]\n");
     (void)fprintf(stderr,"[-shadows_crypted:FALSE]\n");
@@ -6870,6 +6874,25 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
                                                    /*-----------------------*/
 
 
+    #ifdef CRIU_SUPPORT
+    /*------*/
+    /* Criu */
+    /*------*/
+
+    appl_criu_ssaves     = 0;
+    appl_criu_poll_time  = DEFAULT_CRIU_POLL_TIME;
+
+    #endif /* Criu support */
+
+
+    /*---------*/
+    /* Softdog */
+    /*---------*/
+
+    appl_softdog_timeout = DEFAULT_SOFTDOG_TIMEOUT;
+    appl_softdog_pid     = (-1);
+    appl_softdog_enabled = FALSE;
+
 
     /*----------------------------------*/
     /* Only the root thread can process */
@@ -7931,7 +7954,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
         /* Get poll time (between state saves) */
         /*-------------------------------------*/
 
-        if((ptr = pups_locate(&init,"t",argc,args,0)) != NOT_FOUND)
+        if((ptr = pups_locate(&init,"sppoll",argc,args,0)) != NOT_FOUND)
         {  int itmp;
 
 
@@ -7940,11 +7963,11 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
             /*-------------------------------------*/
 
             if((itmp = pups_i_dec(&ptr,argc,args)) == (int)INVALID_ARG)
-                  pups_error("[pups_std_init] expecting (ssave) poll time in seconds (integer >= 0)");
+                  pups_error("[pups_std_init] expecting criu (ssave) poll time in seconds (integer >= 0)");
             else if(itmp > 0)
                appl_poll_time = itmp;
             else
-               pups_error("[pups_std_init] expecting (ssave) poll time in seconds (integer >= 0)");
+               pups_error("[pups_std_init] expecting criu (ssave) poll time in seconds (integer >= 0)");
         }
 
 
@@ -7952,11 +7975,11 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
         /* Get name of (Criu) directory (holds migratable files and checkpoints) */
         /*-----------------------------------------------------------------------*/
 
-        if((ptr = pups_locate(&init,"t",argc,args,0)) != NOT_FOUND)
+        if((ptr = pups_locate(&init,"cd",argc,args,0)) != NOT_FOUND)
         {  char tmpstr[SSIZE] = "";
 
             if(strccpy(tmpstr,pups_str_dec(&ptr,argc,args)) == (char *)INVALID_ARG)
-               pups_error("[pups_std_init] expecting Criu directory name");
+               pups_error("[pups_std_init] expecting criu directory name");
             else
                (void)strlcpy(appl_criu_dir,tmpstr,SSIZE); 
         }
@@ -7965,7 +7988,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
 
         if(appl_verbose == TRUE)
         {  (void)strdate(date);
-           (void)fprintf(stderr,"%s %s (%d@%s:%s): Criu state saving enabled (poll time: %d, Criu directory: \"%s\")\n",
+           (void)fprintf(stderr,"%s %s (%d@%s:%s): criu state saving enabled (poll time: %d, Criu directory: \"%s\")\n",
                                               date,appl_name,appl_pid,appl_host,appl_owner,appl_poll_time,appl_criu_dir);
            (void)fflush(stderr);
         }
@@ -7978,6 +8001,45 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
 
     (void)pups_sighandle(SIGCHECK,"ssave_handler",(void *)ssave_handler,(sigset_t *)NULL);
     #endif /* CRIU_SUPPORT
+
+
+    /*-------------------------*/
+    /* Start software watchdog */
+    /*-------------------------*/
+
+    if((ptr = pups_locate(&init,"softdog",argc,args,0)) != NOT_FOUND)
+    {   
+
+        /*----------------------*/
+        /* Get watchdog timeout */
+        /*----------------------*/
+
+        if((ptr = pups_locate(&init,"timeout",argc,args,0)) != NOT_FOUND)
+        {  int itmp;
+
+
+            /*-------------------------------------*/
+            /* Get poll time (between state saves) */
+            /*-------------------------------------*/
+
+            if((itmp = pups_i_dec(&ptr,argc,args)) == (int)INVALID_ARG)
+                  pups_error("[pups_std_init] expecting criu (ssave) poll time in seconds (integer >= 0)");
+            else if(itmp > 0)
+               appl_softdog_timeout = itmp;
+            else
+               pups_error("[pups_std_init] expecting wtchdog timeout in seconds (integer >= 0)");
+        }
+
+        (void)pups_start_softdog(appl_softdog_timeout);
+
+        if(appl_verbose == TRUE)
+        {  (void)strdate(date);
+           (void)fprintf(stderr,"%s %s (%d@%s:%s): software watchdog enabled (pid: %d  timout: %d)\n",
+                         date,appl_name,appl_pid,appl_host,appl_owner,appl_softdog_pid,appl_softdog_timeout);
+           (void)fflush(stderr);
+        }
+    }
+
 
 
     /*------------------------------------*/
@@ -8286,7 +8348,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
 
        if(appl_proprietary) 
        {  (void)fprintf(stderr,"\n%s (C) Tumbling Dice\n",up_appl_name);
-          (void)fprintf(stderr,"All rights reserved 2022\n\n");
+          (void)fprintf(stderr,"All rights reserved 2023\n\n");
        }
        else
        {  (void)fprintf(stderr,"\n%s is free software, covered by the GNU General Public License, and you are\n",up_appl_name);
@@ -8609,7 +8671,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
                           date,appl_name,appl_pid,appl_host,appl_owner);
              (void)fflush(stderr);
           }
-          pg_leader = TRUE;
+          appl_pg_leader = TRUE;
        }
     }
     else if(pups_locate(&init,"session_leader",argc,args,0) != NOT_FOUND)
@@ -8627,7 +8689,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
                                     date,appl_name,appl_pid,appl_host,appl_owner);
              (void)fflush(stderr);
           }
-          pg_leader = TRUE;
+          appl_pg_leader = TRUE;
        }
     }
     else
@@ -12221,6 +12283,19 @@ _PUBLIC int pups_exit(const int exit_code)
     #endif /* PTHREAD_SUPPORT */
 
 
+    /*----------------------------------------*/
+    /* If we are being monitored by a softdog */
+    /* instance termimnate it                 */
+    /*----------------------------------------*/
+
+    if (appl_softdog_enabled == TRUE)
+    {  (void)kill(appl_softdog_pid,SIGTERM);
+
+       (void)fprintf(stderr,"\n%s %s (%d@%s:%s): softdog terminated\n\n",date,appl_name,appl_pid,appl_host,appl_owner);
+       (void)fflush(stderr);
+    }
+
+
     /*---------------------------------------*/
     /* CLear alarm for virtual timer systems */
     /* and block signals                     */
@@ -14378,8 +14453,6 @@ _PUBLIC int pups_vt_handler(const int signum)
     void       (*handler)(void *, char *args) = NULL;
     vttab_type tinfo;
 
-// CHANGE
-//return 0;
 
     /*----------------------------------*/
     /* Only the root thread can process */
@@ -14558,10 +14631,6 @@ _PUBLIC int pups_setvitimer(const char   *tname,        /* Timer payload name   
        interval     <  0                   ||
        handler      == (const void *)NULL   )
     {  pups_set_errno(EINVAL);
-
-fprintf(stderr,"BAIL 1\n");
-fflush(stderr);
-
        return(-1);
     }
 
@@ -14572,15 +14641,22 @@ fflush(stderr);
 
     if(no_vt_services == TRUE)
     {  pups_set_errno(EACCES);
-
-fprintf(stderr,"BAIL 2\n");
-fflush(stderr);
-
        return(-1);
     }
 
     if(priority < 0)
        pups_error("[setvitimer] invalid priority");
+
+
+
+    /*-------------------------------------------*/
+    /* Ignore timer signals while reseting timer */
+    /*-------------------------------------------*/
+
+    (void)pups_malarm(0);
+    (void)sigemptyset(&set);
+    (void)sigaddset(&set,SIGALRM);
+    (void)pups_sigprocmask(SIG_BLOCK,&set,(sigset_t *)NULL);
 
 
     /*--------------------------------------------*/
@@ -14590,11 +14666,10 @@ fflush(stderr);
 
     for(i=0; i<appl_max_vtimers; ++i)
     {   if(vttab[i].name != (char *)NULL && strcmp(vttab[i].name,tname) == 0)
-        {  pups_set_errno(EEXIST);
+        {  (void)pups_sigprocmask(SIG_UNBLOCK,&set,(sigset_t *)NULL);
+           (void)pups_malarm(vitimer_quantum);
 
-fprintf(stderr,"BAIL 3  %s:%s\n",vttab[i].name,tname);
-fflush(stderr);
-
+           pups_set_errno(EEXIST);
            return(-1);
         }
 
@@ -14604,37 +14679,29 @@ fflush(stderr);
         }
     }
 
+    (void)pups_sigprocmask(SIG_UNBLOCK,&set,(sigset_t *)NULL);
+    (void)pups_malarm(vitimer_quantum);
+
     pups_set_errno(ENOSPC);
     return(-1);
 
 free_timer:
 
     if(mode != VT_ONESHOT && mode != VT_CONTINUOUS)
-    {  pups_set_errno(EINVAL);
+    {  (void)pups_sigprocmask(SIG_UNBLOCK,&set,(sigset_t *)NULL);
+       (void)pups_malarm(vitimer_quantum);
 
-fprintf(stderr,"BAIL 4\n");
-fflush(stderr);
-
+       pups_set_errno(EINVAL);
        return(-1);
     }
 
     if(interval <= 0)
-    {  pups_set_errno(ERANGE);
+    {  (void)pups_sigprocmask(SIG_UNBLOCK,&set,(sigset_t *)NULL);
+       (void)pups_malarm(vitimer_quantum);
 
-fprintf(stderr,"BAIL 5\n");
-fflush(stderr);
-
+       pups_set_errno(ERANGE);
        return(-1);
     }
-
-
-    /*-------------------------------------------*/
-    /* Ignore timer signals while reseting timer */
-    /*-------------------------------------------*/
-
-    (void)sigemptyset(&set);
-    (void)sigaddset(&set,SIGALRM);
-    (void)pups_sigprocmask(SIG_BLOCK,&set,(sigset_t *)NULL);
 
 
     /*------------------------------------------------*/
@@ -14664,11 +14731,10 @@ fflush(stderr);
     if(interval > 0 && mode == VT_CONTINUOUS)
        vttab[t_index].prescaler   = interval;
     else if(mode != VT_CONTINUOUS)
-    {  pups_set_errno(EINVAL);
+    {  (void)pups_sigprocmask(SIG_UNBLOCK,&set,(sigset_t *)NULL);
+       (void)pups_malarm(vitimer_quantum);
 
-fprintf(stderr,"BAIL 6\n");
-fflush(stderr);
-
+       pups_set_errno(EINVAL);
        return(-1);
     }
 
@@ -14694,13 +14760,6 @@ fflush(stderr);
     (void)qsort((void *)vttab,appl_max_vtimers,sizeof(vttab_type),(void *)sort_priority);
 
 
-    /*-----------------------------------------------------*/
-    /* Re-enable interrupts from underlying hardware timer */
-    /*-----------------------------------------------------*/
-
-    (void)pups_sigprocmask(SIG_UNBLOCK,&set,(sigset_t *)NULL);
-    (void)pups_malarm(vitimer_quantum);
-
     if(appl_verbose == TRUE)
     {  (void)strdate(date);
        if(mode == VT_CONTINUOUS)
@@ -14713,7 +14772,7 @@ fflush(stderr);
                                                                                                                             t_index,
                                                                                                                               tname,
                                                                                                                            priority,
-                                                                                                            (FTYPE)interval / 100.0);
+                                                                                                           (FTYPE)interval / 1000.0);
        else
           (void)fprintf(stderr,"%s %s (%d@%s:%s): PUPS virtual timer %d (%s) one shot timer, priority %d (interval %5.2F secs)\n",
                                                                                                                              date,
@@ -14724,10 +14783,18 @@ fflush(stderr);
                                                                                                                           t_index,
                                                                                                                             tname,
                                                                                                                          priority,
-                                                                                                           (FTYPE)interval /100.0);
+                                                                                                          (FTYPE)interval /1000.0);
 
        (void)fflush(stderr);
     }
+
+
+    /*-----------------------------------------------------*/
+    /* Re-enable interrupts from underlying hardware timer */
+    /*-----------------------------------------------------*/
+
+    (void)pups_sigprocmask(SIG_UNBLOCK,&set,(sigset_t *)NULL);
+    (void)pups_malarm(vitimer_quantum);
 
     pups_set_errno(OK);
     return(t_index);
@@ -14760,6 +14827,7 @@ _PUBLIC int pups_clearvitimer(const char *tname)
        return(-1);
     }
 
+    (void)pups_malarm(0);
     (void)sigemptyset(&set);
     (void)sigaddset(&set,SIGALRM);
     (void)pups_sigprocmask(SIG_BLOCK,&set,(sigset_t *)NULL);
@@ -14787,7 +14855,13 @@ _PUBLIC int pups_clearvitimer(const char *tname)
           --active_v_timers;
 
           if(vt_no_reset == FALSE)
-          {  if(active_v_timers > 0)
+          {  
+
+             /*---------------*/
+             /* Active timers */
+             /*---------------*/
+
+             if(active_v_timers > 0)
              { 
 
                /*------------------------------------------------------------*/
@@ -14795,16 +14869,23 @@ _PUBLIC int pups_clearvitimer(const char *tname)
                /* clearing timers in case it expired in the critical section */
                /*------------------------------------------------------------*/
 
-               (void)pups_sigprocmask(SIG_UNBLOCK,&set,(sigset_t *)NULL);
                (void)pups_malarm(vitimer_quantum);
+               (void)pups_malarm(vitimer_quantum);
+               (void)pups_sigprocmask(SIG_UNBLOCK,&set,(sigset_t *)NULL);
              }
+
+
+             /*------------------*/
+             /* No active timers */
+             /*------------------*/
+
              else
              {  (void)pups_malarm(0);
                 (void)pups_sighandle(SIGALRM,"default",SIG_DFL, (sigset_t *)NULL);
                 (void)pups_sigprocmask(SIG_UNBLOCK,&set,(sigset_t *)NULL);
              }
           }
-
+     
           pups_set_errno(OK);
           return(0);
        }
@@ -14856,7 +14937,7 @@ _PUBLIC void pups_show_vitimers(const FILE *stream)
                                "    %04d: \"%-48s\" priority %02d, continuous mode, interval time %7.4F secs, prescaler %04d, (handler at %016lx virtual)\n",i,
                                                                                                                                                  vttab[i].name,
                                                                                                                                              vttab[i].priority,
-                                                                                                                         (FTYPE)vttab[i].interval_time / 100.0,
+                                                                                                                        (FTYPE)vttab[i].interval_time / 1000.0,
                                                                                                                                             vttab[i].prescaler,
                                                                                                                            (unsigned long int)vttab[i].handler);
               else
@@ -14864,7 +14945,7 @@ _PUBLIC void pups_show_vitimers(const FILE *stream)
                               "    %04d: \"%-48s\" priority %02d, oneshot mode, interval time %7.4F secs, prescaler %04d, (handler at %016lx virtual)\n",i,
                                                                                                                                              vttab[i].name,
                                                                                                                                          vttab[i].priority,
-			                                                                                             (FTYPE)vttab[i].interval_time / 100.0,
+			                                                                                            (FTYPE)vttab[i].interval_time / 1000.0,
                                                                                                                                         vttab[i].prescaler,
                                                                                                                        (unsigned long int)vttab[i].handler);
               (void)fflush(stream);
@@ -18008,7 +18089,7 @@ _PRIVATE int ssave_handler(int signum)
 
 
      #ifdef UTILIB_DEBUG
-     (void)fprintf(stderr,"SIGCHECK: SAVING STATE AND EXITING (checkpoint %d)\n",appl_ssaves);
+     (void)fprintf(stderr,"SIGCHECK: SAVING STATE AND EXITING (checkpoint %d)\n",appl_criu_ssaves);
      (void)fflush(stderr);
      #endif /* UTILIB_DEBUG */
 
@@ -18017,9 +18098,9 @@ _PRIVATE int ssave_handler(int signum)
      /* Create checkpointing directory if it doesn't exist */
      /*----------------------------------------------------*/
 
-     (void)snprintf(appl_ssave_dir,SSIZE,"/tmp/pups.%s.%d.ssave",appl_name,appl_pid);
-     if(access(appl_ssave_dir,F_OK) == (-1))
-     {  if(mkdir(appl_ssave_dir,0700) == (-1))
+     (void)snprintf(appl_criu_ssave_dir,SSIZE,"/tmp/pups.%s.%d.ssave",appl_name,appl_pid);
+     if(access(appl_criu_ssave_dir,F_OK) == (-1))
+     {  if(mkdir(appl_criu_ssave_dir,0700) == (-1))
 
 
            /*----------------------------------------------*/
@@ -18041,7 +18122,7 @@ _PRIVATE int ssave_handler(int signum)
      /* Kill server after saving state */
      /*--------------------------------*/
 
-     (void)snprintf(criu_cmd,SSIZE,"criu --log-file /dev/null --shell-job --link-remap dump -D %s -t %d &",appl_ssave_dir,appl_pid);
+     (void)snprintf(criu_cmd,SSIZE,"criu --log-file /dev/null --shell-job --link-remap dump -D %s -t %d &",appl_criu_ssave_dir,appl_pid);
 
 
      /*------------------------------------*/
@@ -18057,7 +18138,7 @@ _PRIVATE int ssave_handler(int signum)
      /* can see if it is stale             */
      /*------------------------------------*/
 
-     (void)snprintf(ssave_buildpath,SSIZE,"%s/build",appl_ssave_dir);
+     (void)snprintf(ssave_buildpath,SSIZE,"%s/build",appl_criu_ssave_dir);
      if(access(ssave_buildpath,F_OK) == (-1))
         (void)close(creat(ssave_buildpath,0600));
 
@@ -18086,11 +18167,11 @@ _PRIVATE int ssave_handler(int signum)
      (void)nanosleep(&delay,(struct timespec *)NULL);
 
      #ifdef UTILIB_DEBUG
-     (void)fprintf(stderr,"RESTART (checkpoint: %d)\n",appl_ssaves);
+     (void)fprintf(stderr,"RESTART (checkpoint: %d)\n",appl_criu_ssaves);
      (void)fflush(stderr);
      #endif /* UTILIB_DEBUG */
 
-     ++appl_ssaves;
+     ++appl_criu_ssaves;
 
 
      /*-------------------*/
@@ -18331,7 +18412,24 @@ _PUBLIC int pups_usleep(const unsigned long int useconds)
     rem.tv_sec  = 0;
     rem.tv_nsec = 0;
 
-    (void)nanosleep(&req,&rem);
+    while (TRUE)
+    {
+
+         /*---------------------------*/
+         /* Sleep for specfied period */
+         /*---------------------------*/
+
+         if (nanosleep(&req,&rem) == 0)
+            break;
+
+
+         /*-------------*/      
+         /* Interrupted */
+         /*-------------*/
+ 
+         else
+            req = rem;
+    }
 
     pups_set_errno(OK);
     return(0);
@@ -21492,7 +21590,7 @@ _PUBLIC int pups_ssave_enable(void)
     /* Create directory in /tmp for state saving */
     /*-------------------------------------------*/
 
-    (void)snprintf(appl_ssave_dir,SSIZE,"%s/pups.%s.%d.ssave",appl_criu_dir,appl_name,appl_pid);
+    (void)snprintf(appl_criu_ssave_dir,SSIZE,"%s/pups.%s.%d.ssave",appl_criu_dir,appl_name,appl_pid);
 
 
     /*---------------------------------------------*/
@@ -21501,9 +21599,9 @@ _PUBLIC int pups_ssave_enable(void)
     /*---------------------------------------------*/
 
  
-    if(access(appl_ssave_dir,F_OK) == (-1))
+    if(access(appl_criu_ssave_dir,F_OK) == (-1))
     {
-       if(mkdir(appl_ssave_dir,0700) == (-1))
+       if(mkdir(appl_criu_ssave_dir,0700) == (-1))
 
 
           /*----------------------------------------------*/
@@ -21575,11 +21673,11 @@ _PUBLIC int pups_ssave_disable(void)
     /* and all its contents                      */
     /*-------------------------------------------*/
 
-    (void)snprintf(rm_cmd,SSIZE,"rm -rf %s",appl_ssave_dir);
+    (void)snprintf(rm_cmd,SSIZE,"rm -rf %s",appl_criu_ssave_dir);
     (void)system(rm_cmd);
 
-    appl_ssave  = FALSE;
-    appl_ssaves = 0;
+    appl_criu)ssave  = FALSE;
+    appl_criu_ssaves = 0;
 
     if(appl_verbose == TRUE)
     {  (void)strdate(date);
@@ -21640,7 +21738,7 @@ _PRIVATE int ssave_homeostat(void *t_info, char *args)
 
 
        #ifdef UTILIB_DEBUG
-       (void)fprintf(stderr,"ELAPSED TIME: %ld SAVING STATE (%d)\n",elapsed_time,appl_ssaves);
+       (void)fprintf(stderr,"ELAPSED TIME: %ld SAVING STATE (%d)\n",elapsed_time,appl_criu_ssaves);
        (void)fflush(stderr);
        #endif /* UTILIB_DEBUG */
 
@@ -21658,7 +21756,7 @@ _PRIVATE int ssave_homeostat(void *t_info, char *args)
        /*--------------------------------*/
 
        if(args != (char *)NULL && strcmp(args,"kill") == 0)
-          (void)snprintf(criu_cmd,SSIZE,"criu --log-file /dev/null --shell-job --link-remap dump -D %s -t %d &",appl_ssave_dir,appl_pid);
+          (void)snprintf(criu_cmd,SSIZE,"criu --log-file /dev/null --shell-job --link-remap dump -D %s -t %d &",appl_criu_ssave_dir,appl_pid);
 
 
        /*-----------------------------------------*/
@@ -21666,7 +21764,7 @@ _PRIVATE int ssave_homeostat(void *t_info, char *args)
        /*-----------------------------------------*/
 
        else
-          (void)snprintf(criu_cmd,SSIZE,"criu --log-file /dev/null --leave-running --shell-job --link-remap dump -D %s -t %d &",appl_ssave_dir,appl_pid);
+          (void)snprintf(criu_cmd,SSIZE,"criu --log-file /dev/null --leave-running --shell-job --link-remap dump -D %s -t %d &",appl_criu_ssave_dir,appl_pid);
 
        (void)system(criu_cmd);
 
@@ -21683,7 +21781,7 @@ _PRIVATE int ssave_homeostat(void *t_info, char *args)
        (void)nanosleep(&delay,(struct timespec *)NULL);
 
        #ifdef UTILIB_DEBUG
-       (void)fprintf(stderr,"RESTART (checkpoint: %d)\n",appl_ssaves);
+       (void)fprintf(stderr,"RESTART (checkpoint: %d)\n",appl_criu_ssaves);
        (void)fflush(stderr);
        #endif /* UTILIB_DEBUG */
 
@@ -21693,7 +21791,7 @@ _PRIVATE int ssave_homeostat(void *t_info, char *args)
        /*---------------------------------------*/
 
        base_time = time((time_t *)NULL);
-       ++appl_ssaves; 
+       ++appl_criu_ssaves; 
 
 
        /*-------------------*/
@@ -21995,3 +22093,182 @@ _PUBLIC off_t pups_dsize(const char *directory_name)
 
     return(directory_size);
 }
+
+
+
+
+/*--------------------------*/
+/* Software watchdog status */
+/*--------------------------*/
+
+_PUBLIC int pups_show_softdogstatus(const FILE *stream)
+
+{
+
+    /*-----------------------------*/
+    /* Software watchdog is active */
+    /*-----------------------------*/
+
+    if (appl_softdog_enabled == TRUE)
+    {  (void)fprintf(stream,"\n    softdog: software watchdog is enabled (pid: %d timeout: %d seconds)\n\n",appl_softdog_pid,appl_softdog_timeout);
+       (void)fflush(stream);
+    }
+
+
+    /*---------------------------------*/
+    /* Software watchdog is not active */
+    /*---------------------------------*/
+
+    else
+    {  (void)fprintf(stream,"\n    softdog: software watchdog is disabled (timeout: %d seconds)\n\n",appl_softdog_timeout);
+       (void)fflush(stream);
+    }
+
+    pups_set_errno(OK);
+    return(0);
+}
+
+
+
+/*--------------------------------------*/
+/* Perioidically kick software watchdog */
+/*--------------------------------------*/
+
+_PRIVATE int softdog_homeostat(void *t_info, char *args)
+
+{
+
+    /*------------------------*/
+    /* Kick software watchdog */
+    /*------------------------*/
+
+    if (kill(appl_softdog_pid,SIGCONT) != 0)
+    {  
+	    
+       /*-------------------------------------*/	
+       /* Software watchdog lost - restart it */
+       /*-------------------------------------*/
+
+       (void)pups_start_softdog(appl_softdog_timeout);
+
+       if(appl_verbose == TRUE)
+       {  (void)strdate(date);
+          (void)fprintf(stderr,"%s %s (%d@%s:%s): software watchdog lost -- restarting\n",
+                                             date,appl_name,appl_pid,appl_host,appl_owner);
+          (void)fflush(stderr);
+       }
+    }
+
+    return(0);
+}
+
+
+
+/*-------------------------*/
+/* Start software watchdog */
+/*-------------------------*/
+
+_PUBLIC int pups_start_softdog(const unsigned int timeout)
+
+{    int           t_index            = (-1);
+
+
+     /*-------*/
+     /* Child */
+     /*-------*/
+     /*---------------------------------*/
+     /* Cancel timers so child does not */
+     /* get signalled                   */
+     /*---------------------------------*/
+
+     (void)pups_malarm(0);
+     if ((appl_softdog_pid = pups_fork(FALSE,FALSE)) == 0)
+     {  unsigned char applpidstr[SSIZE]  = "",
+                      timeoutstr[SSIZE]  = "";
+
+
+	/*---------------------------------*/
+	/* Exec software watchdog as child */
+	/*---------------------------------*/
+
+        (void)snprintf(applpidstr,SSIZE,"%d",appl_pid);
+        (void)snprintf(timeoutstr,SSIZE,"%d",timeout);
+        (void)execlp("softdog","softdog","-monitorpid",applpidstr,"-timeout",timeoutstr,(char *)NULL);
+
+
+	/*------------------------*/
+	/* We should not get here */
+	/*------------------------*/
+
+	_exit(255);
+     }
+
+
+     /*--------*/
+     /* Parent */
+     /*--------*/
+
+     else
+
+
+        /*------------------------------------------------*/
+        /* Set polling time software watchdog (in seconds) */
+        /*------------------------------------------------*/
+
+        t_index = pups_setvitimer("softdog_homeostat",
+                                  1,VT_CONTINUOUS,500,
+                                  (void *)NULL,
+                                  (void *)softdog_homeostat);
+
+
+
+     if(appl_verbose == TRUE)
+     {  (void)strdate(date);
+        (void)fprintf(stderr,"%s %s (%d@%s:%s): softdog homeostat enabled (polling via vtimer %d (payload function: softdog_homeostat)\n",
+                                                                                     date,appl_name,appl_pid,appl_host,appl_owner,t_index);
+        (void)fflush(stderr);
+     }
+   
+     appl_softdog_enabled = TRUE;
+
+     pups_set_errno(OK);
+     return(0);
+}
+
+
+
+/*------------------------*/
+/* Stop software watchdog */
+/*------------------------*/
+
+_PUBLIC int pups_stop_softdog(void)
+
+{   int ret = (-1);
+
+
+    /*-----------------------------*/
+    /* Terminate software watchdog */
+    /*-----------------------------*/
+
+    pups_set_errno(OK);
+    ret = kill(appl_softdog_pid,SIGTERM);
+
+
+    /*------------------*/
+    /* Remove homeostat */
+    /*------------------*/
+
+    (void)pups_clearvitimer("softdog_homeostat");
+    appl_softdog_enabled = FALSE;
+    appl_softdog_pid     = (-1);
+
+    if(appl_verbose == TRUE)
+    {  (void)strdate(date);
+       (void)fprintf(stderr,"%s %s (%d@%s:%s): softdog homeostat disabled\n",date,appl_name,appl_pid,appl_host,appl_owner);
+       (void)fflush(stderr);
+    }
+   
+    pups_set_errno(OK);
+    return(0);
+}
+

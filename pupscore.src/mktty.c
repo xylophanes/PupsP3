@@ -59,7 +59,7 @@ _PUBLIC int main(int argc, char *argv[])
     {  if(strcmp(argv[1],"-verbose") == 0)
           verbose = TRUE;
        else
-       {  (void)fprintf(stderr,"\nmktty version %s, (C) Tumbling Dice 2004-2022 (built %s)\n\n",MKTTY_VERSION,__TIME__,__DATE__);
+       {  (void)fprintf(stderr,"\nmktty version %s, (C) Tumbling Dice 2004-2023 (built %s)\n\n",MKTTY_VERSION,__TIME__,__DATE__);
           (void)fprintf(stderr,"MKTTY is free software, covered by the GNU General Public License, and you are\n");
           (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
           (void)fprintf(stderr,"See the GPL and LGPL licences at www.gnu.org for further details\n");
@@ -73,7 +73,7 @@ _PUBLIC int main(int argc, char *argv[])
     }
 
     else if(argc > 2)
-    {  (void)fprintf(stderr,"\nmktty version %s, (C) Tumbling Dice 2004-2022 (built %s %s)\n\n",MKTTY_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nmktty version %s, (C) Tumbling Dice 2004-2023 (built %s %s)\n\n",MKTTY_VERSION,__TIME__,__DATE__);
        (void)fprintf(stderr,"MKTTY is free software, covered by the GNU General Public License, and you are\n");
        (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
        (void)fprintf(stderr,"See the GPL and LGPL licences at www.gnu.org for further details\n");

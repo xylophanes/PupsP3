@@ -9,7 +9,7 @@
             United Kingdom
 
    Version: 2.00 
-   Dated:   4th January 2022
+   Dated:   4th January 2023
    E-mail:  mao@tumblingdice.co.uk
 ----------------------------------------------------------------------------*/
 
@@ -58,7 +58,7 @@ _PUBLIC int main(int argc, char *argv[])
     _BOOLEAN one_way         = TRUE;
 
     if(argc > 1 && (strcmp(argv[1],"-usage") == 0 || strcmp(argv[1],"-help") == 0))
-    {  (void)fprintf(stderr,"\necrypt version %s, (C) Tumbling Dice 2003-2022 (built %s %s)\n\n",ECRYPT_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\necrypt version %s, (C) Tumbling Dice 2003-2023 (built %s %s)\n\n",ECRYPT_VERSION,__TIME__,__DATE__);
        (void)fprintf(stderr,"ECRYPT is free software, covered by the GNU General Public License, and you are\n");
        (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
        (void)fprintf(stderr,"See the GPL and LGPL licences at www.gnu.org for further details\n");

@@ -8,8 +8,8 @@
              NE3 4RT
              United Kingdom
 
-    Version: 5.05
-    Dated:   12th July 2023 
+    Version: 5.08
+    Dated:   25th October 2023 
     E-mail:  mao@tumblingdice.co.uk
 -------------------------------------------------------------------------*/
 
@@ -38,7 +38,7 @@
 /* Version */
 /***********/
 
-#define PSRPLIB_VERSION    "5.05"
+#define PSRPLIB_VERSION    "5.08"
 
 
 /*-------------*/

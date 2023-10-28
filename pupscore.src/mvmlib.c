@@ -9,7 +9,7 @@
               United Kingdom
 
     Version: 2.02 
-    Dated:   4th January 2022
+    Dated:   4th January 2023
     E-mail:  mao@tumblingdice.co..uk
 ------------------------------------------------------------------------------*/
 
@@ -38,7 +38,7 @@ _PRIVATE void mvm_slot(int level)
 {   (void)fprintf(stderr,"lib mvmlib %s: [ANSI C]\n",MVMLIB_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(c) 1995-2022 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(c) 1995-2023 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
        (void)fprintf(stderr,"Meta virtual paged object library (built %s %s)\n",__TIME__,__DATE__);
        (void)fflush(stderr);

@@ -1,0 +1,132 @@
+.TH SOFTDOG 1 "25th October 2023" "PUPSP3 commands" "PUPSP3 commands"
+
+.SH NAME
+SOFTDOG \- PUPS process/process-group software watchdog 
+
+.br
+
+.SH SYNOPSIS
+.B softdog
+[
+.B -usage
+|
+.B -help
+] | [
+-verbose
+]!
+.B -monitorpgrp
+.I process group identifier
+! | !
+.B -monitor
+.I process identifier
+![
+.B -timeout
+.I watchdog timeout seconds
+]
+.br
+
+.SH DESCRIPTION
+.I softdog(1)
+is a software watchdog which will terminate the specified process group or process unless it
+receives a
+.I SIGCONT
+signal before it times out. It is used to terminate a malfunctioning process by sending it a
+.I SIGKILL
+signal. Typically
+.B PUPS/P3
+servers which are locked up in a tight loop and/or uncommunicative. If a process group is specified
+.I softdog(1)
+will kill all processes in the process group by sending them a
+.I SIGKILL
+signal if it does not a
+.I SIGCONT
+signal before it times out.
+If the monitored process groupd or process is killed
+.I softdog(1)
+then exits.
+.br
+
+.SH OPTIONS
+
+.B -verbose
+tells
+.I softdog(1)
+to log error and status information to standard error.
+.br
+
+.B -monitorprgp
+.I process group identifier
+tells
+.I sofdog(1)
+to send a
+.I SIGKILL
+signal to the specified process group when it times out. This option and
+.B -monitorpid
+are mutually exclusive.
+.br
+
+.B -monitorpid
+.I process identifier
+tells
+.I sofdog(1)
+to send a
+.I SIGKILL
+signal to the specified process when it times out. This option and
+.B -monitorpgrp
+are mutually exclusive.
+
+.B -timeout
+.I watchdog timeout in seconds 
+specifies the  watchdog timeout in seconds. If
+.I softdog does not receive a
+.I SIGCONT
+signal, a
+.I SIGKILL
+signal is sent to the monitored process group or process.
+.br
+
+.SH SIGNALS
+.br
+.B SIGINT
+.B SIHUP
+.B SIGQUIT
+.B SIGTERM
+tells
+.I softdog(1)
+to terminate gracefully.
+.br
+
+.B SIGCONT
+tells
+.I softdog(1)
+to reset the watchdog timeout period.
+.br
+
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B -usage
+or
+.B -help
+.br
+0: no error
+.br
+
+.SH ENVIRONMENT VARIABLES
+None.
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br
+
+.SH SEE ALSO
+maggot(1), kepher(1), lyosome(1)
+.br
+
