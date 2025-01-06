@@ -8,8 +8,8 @@
               NE3 4RT
               United Kingdom
 
-     Version: 3.00 
-     Dated:   24th October 2023
+     Version: 3.03 
+     Dated:   10th December 2024
      E-mail:  mao@tumblingdice.co.uk
 -------------------------------------------*/
 
@@ -24,6 +24,7 @@
 #include <errno.h>
 #include <signal.h>
 #include <time.h>
+#include <stdint.h>
 
 
 #define _XOPEN_SOURCE
@@ -37,7 +38,7 @@
 /* Vesion of lyosome */
 /*-------------------*/
 
-#define  LYOSOME_VERSION    "3.00"
+#define  LYOSOME_VERSION    "3.03"
 #define  FOREVER            (-9999.0)
 
 
@@ -48,9 +49,20 @@
 #define SSIZE               2048 
 
 
-/*-------------------------------------------------*/
-/* Variables which are private to this application */
-/*-------------------------------------------------*/
+/*----------------------*/
+/* Argument vector size */
+/*----------------------*/
+
+#define ARGC                255
+
+
+
+/*------------------*/
+/* Global variables */
+/*------------------*/
+
+_PRIVATE char          boldOn [8]             = "\e[1m",    // Make character bold
+                       boldOff[8]             = "\e[m" ;    // Make character non-bold
 
 _PRIVATE unsigned char principal[SSIZE]       = "";
 _PRIVATE unsigned char principal_link[SSIZE]  = "";
@@ -58,13 +70,13 @@ _PRIVATE unsigned char hostname[SSIZE]        = "";
 _PRIVATE unsigned char pname[SSIZE]           = "";
 _PRIVATE unsigned char new_pname[SSIZE]       = "";
 _PRIVATE unsigned char ppath[SSIZE]           = "";
-_PRIVATE unsigned int  pname_pos              = 0;
-_PRIVATE _BOOLEAN principal_is_directory      = FALSE;
-_PRIVATE _BOOLEAN do_daemon                   = FALSE;
-_PRIVATE _BOOLEAN do_protect                  = FALSE;
-_PRIVATE _BOOLEAN do_verbose                  = FALSE;
-_PRIVATE time_t   start_time                  = 0;
-_PRIVATE time_t   lifetime                    = 60;
+_PRIVATE uint32_t      pname_pos              = 0;
+_PRIVATE _BOOLEAN      principal_is_directory = FALSE;
+_PRIVATE _BOOLEAN      do_daemon              = FALSE;
+_PRIVATE _BOOLEAN      do_protect             = FALSE;
+_PRIVATE _BOOLEAN      do_verbose             = FALSE;
+_PRIVATE time_t        start_time             = 0;
+_PRIVATE time_t        lifetime               = 60;
 
 
 
@@ -90,7 +102,7 @@ _PRIVATE void exit_handler(void)
        (void)unlink(principal);
     }
 
-    (void)fprintf(stderr,"\n%s (%d@%s): lifetime of principal [%s] expired -- deleted\n\n",pname,getpid(),hostname,principal);
+    (void)fprintf(stderr,"\n%s (%d@%s): %sWARNING%s lifetime of principal [%s] expired -- deleted\n\n",pname,getpid(),hostname,boldOn,boldOff,principal);
     (void)fflush(stderr);
 
     exit(0);
@@ -102,7 +114,7 @@ _PRIVATE void exit_handler(void)
 /* Handler for SIGTERM */
 /*---------------------*/
 
-_PRIVATE int term_handler(int signum)
+_PRIVATE int32_t term_handler(const int32_t signum)
 
 {   (void)unlink(principal_link);
 
@@ -135,10 +147,10 @@ _PRIVATE int term_handler(int signum)
 /* (Lifetime) reset handler */
 /*--------------------------*/
 
-_PRIVATE int rejuvenation_handler(int signum)
+_PRIVATE int32_t rejuvenation_handler(const int32_t signum)
 {
     if (lifetime != FOREVER)
-    {  start_time = time(NULL);
+    {  start_time = time((time_t *)NULL);
 
        if (do_verbose == TRUE)
        {  (void)fprintf(stderr,"\n%s (%d@%s): lifetime (of principal \"%s\") reset (%d seconds)\n\n",pname,getpid(),hostname,principal,lifetime);
@@ -163,14 +175,14 @@ _PRIVATE int rejuvenation_handler(int signum)
 /* Status handler */
 /*----------------*/
 
-_PRIVATE int status_handler(int signum)
+_PRIVATE int32_t status_handler(const int32_t signum)
 
 {   time_t        lifetime_left  = 0;
     unsigned char ftype[SSIZE]   = "";
 
-    lifetime_left = lifetime - (time((time_t)NULL) - start_time); 
+    lifetime_left = lifetime - (time((time_t *)NULL) - start_time); 
 
-    (void)fprintf(stderr,"\nlyosome lightweight file destructor version %s, (C) Tumbling Dice, 2004-2023 (built %s %s)\n",LYOSOME_VERSION,__TIME__,__DATE__);
+    (void)fprintf(stderr,"\nlyosome lightweight file destructor version %s, (C) Tumbling Dice, 2004-2024 (gcc %s: built %s %s)\n",LYOSOME_VERSION,__VERSION__,__TIME__,__DATE__);
 
     if (do_verbose == TRUE)
        (void)fprintf(stderr,"    verbose mode                  : on\n");
@@ -196,7 +208,7 @@ _PRIVATE int status_handler(int signum)
 
     (void)fflush(stderr);
 
-    return;
+    return(0);
 }
 
 
@@ -208,7 +220,7 @@ _PRIVATE int status_handler(int signum)
 
 _PRIVATE _BOOLEAN strleaf(const unsigned char *pathname, unsigned char *leaf)
 
-{   int i;
+{   size_t i;
 
     for (i=strlen(pathname); i>= 0; --i)
     {  if (pathname[i] == '/')
@@ -230,7 +242,7 @@ _PRIVATE _BOOLEAN strleaf(const unsigned char *pathname, unsigned char *leaf)
 /* Make sure path is absolute */
 /*----------------------------*/
 
-_PRIVATE int absolute_path(const unsigned char *pathname, unsigned char *absolute_pathname)
+_PRIVATE  int32_t absolute_path(const unsigned char *pathname, unsigned char *absolute_pathname)
 
 {   unsigned char leaf[SSIZE]         = "",
                   current_path[SSIZE] = "";
@@ -260,13 +272,13 @@ _PRIVATE int absolute_path(const unsigned char *pathname, unsigned char *absolut
 
 
 
-/*--------------------------------------*/
-/* Main entry point to this application */
-/*--------------------------------------*/
+/*------------------*/
+/* Main entry point */
+/*------------------*/
 
-_PUBLIC int main(int argc, char *argv[])
+_PUBLIC  int32_t main(int argc, char *argv[])
 
-{   unsigned int  i,
+{   uint32_t      i,
                   decoded        = 0,
                   p_index        = 1;
 
@@ -287,7 +299,7 @@ _PUBLIC int main(int argc, char *argv[])
     /* Get process name (stripping out branch from path */
     /*--------------------------------------------------*/
 
-    (void)strncpy(ppath,argv[0],SSIZE);
+    (void)strlcpy(ppath,argv[0],SSIZE);
     (void)absolute_path(ppath,tmpstr);
     (void)strlcpy(ppath,tmpstr,SSIZE);
     (void)strleaf(ppath,pname);
@@ -298,7 +310,7 @@ _PUBLIC int main(int argc, char *argv[])
     /*--------------------*/
 
     if (argc == 1 || strcmp(argv[1],"-usage") == 0 || strcmp(argv[1],"-help") == 0)
-    {  (void)fprintf(stderr,"\nlyosome lightweight file destructor version %s, (C) Tumbling Dice, 2004-2023 (built %s %s)\n\n",LYOSOME_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nlyosome lightweight file destructor version %s, (C) Tumbling Dice, 2004-2024 (gcc %s: built %s %s)\n\n",LYOSOME_VERSION,__VERSION__,__TIME__,__DATE__);
 
        (void)fprintf(stderr,"LYOSOME is free software, covered by the GNU General Public License, and you are\n");
        (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
@@ -341,7 +353,7 @@ _PUBLIC int main(int argc, char *argv[])
 
              if (strcmp(pname,new_pname) == 0)
              {  if (do_verbose == TRUE)
-                {  (void)fprintf(stderr,"\n%s (%d@%s): new and old process names cannot be the same\n\n",pname,getpid(),hostname);
+                {  (void)fprintf(stderr,"\n%s (%d@%s): %sERROR%s new and old process names cannot be the same\n\n",pname,getpid(),hostname,boldOn,boldOff);
                    (void)fflush(stderr);
                 }
 
@@ -365,7 +377,7 @@ _PUBLIC int main(int argc, char *argv[])
        if (strcmp(argv[i],"-lifetime") == 0)
        {  if (i == argc - 2 || argv[i+1][0] == '-' || sscanf(argv[i+1],"%d",&lifetime) != 1 || lifetime < 0) 
           {  if (do_verbose == TRUE)
-             {  (void)fprintf(stderr,"\n%s (%d@%s): lifetime must be a positive integer value\n\n",pname,getpid(),hostname);
+             {  (void)fprintf(stderr,"\n%s (%d@%s): %sERROR%s lifetime must be a positive  int32_teger value\n\n",pname,getpid(),hostname,boldOn,boldOff);
                 (void)fflush(stderr);
              }
 
@@ -406,7 +418,7 @@ _PUBLIC int main(int argc, char *argv[])
      
     if (decoded < argc - 2)
     {  if (do_verbose == TRUE)
-       {  (void)fprintf(stderr,"\n%s (%d@%s): command tail items unparsed\n\n",pname,getpid(),hostname);
+       {  (void)fprintf(stderr,"\n%s (%d@%s): %sERROR%s command tail items unparsed\n\n",pname,getpid(),hostname,boldOn,boldOff);
           (void)fflush(stderr);
        }
 
@@ -423,7 +435,7 @@ _PUBLIC int main(int argc, char *argv[])
     (void)strlcpy(principal,argv[p_index],SSIZE);
     if (access(principal,F_OK | R_OK | W_OK) == (-1))
     {  if (do_verbose == TRUE)
-       {  (void)fprintf(stderr,"\n%s (%d@%s): cannot find principal to monitor [%s]\n\n",pname,getpid(),hostname,principal);
+       {  (void)fprintf(stderr,"\n%s (%d@%s): %sERROR%s cannot find principal to monitor [%s]\n\n",pname,getpid(),hostname,boldOn,boldOff,principal);
           (void)fflush(stderr);
        }
 
@@ -469,7 +481,7 @@ _PUBLIC int main(int argc, char *argv[])
        {  do_protect = FALSE;
 
           if (do_verbose == TRUE)
-          {  (void)fprintf(stderr,"\n%s (%d@%s): cannot protect directories (yet)\n",pname,getpid(),hostname);
+          {  (void)fprintf(stderr,"\n%s (%d@%s): %sERROR%s cannot protect directories (yet)\n",pname,getpid(),hostname,boldOn,boldOff);
              (void)fflush(stderr);
           }
        }
@@ -481,26 +493,26 @@ _PUBLIC int main(int argc, char *argv[])
     /*--------------*/
 
     else if (do_protect == TRUE)
-    {
+    {  size_t j;
 
        /*--------------------------------------------------------------*/
        /* If we have an absolute path make protective link on its leaf */
        /*--------------------------------------------------------------*/
 
-       for (i=strlen(principal); i>=0; --i)
+       for (j=strlen(principal); j>=0; --j)
        {
 
           /*----------------------------------*/
           /* Is filename actually a pathname? */ 
           /*----------------------------------*/
 
-          if (principal[i] == '/')
-          {  unsigned char leaf[SSIZE]   = "",
+          if (principal[j] == '/')
+          {  unsigned char leaf  [SSIZE] = "",
                            branch[SSIZE] = "";
 
-             (void)strlcpy(leaf,&principal[i+1],SSIZE);
+             (void)strlcpy(leaf,&principal[j+1],SSIZE);
              (void)strlcpy(branch,principal,SSIZE);
-             branch[i+1] = '\0';
+             branch[j+1] = '\0';
 
              (void)snprintf(principal_link,SSIZE,"%s.%s",branch,leaf);
              goto dot_inserted;
@@ -523,7 +535,7 @@ dot_inserted:
 
        if (link(principal,principal_link) == (-1))
        {  if (do_verbose == TRUE)
-          {  (void)fprintf(stderr,"\nERROR %s (%d@%s): could not make protective link to regular file [%s] -- aborting\n\n",pname,getpid(),hostname,principal);
+          {  (void)fprintf(stderr,"\n%sERROR%s %s (%d@%s): could not make protective link to regular file [%s] -- aborting\n\n",boldOn,boldOff,pname,getpid(),hostname,principal);
              (void)fflush(stderr);
           }
 
@@ -550,8 +562,8 @@ dot_inserted:
 
     if (do_daemon == TRUE)
     {  unsigned char tmpPathName[SSIZE]  = "";
-       unsigned int  nargc               = 1;
-       unsigned char **nargv             = (unsigned char **)NULL;
+       uint32_t nargc         = 1;
+       char     *nargv[ARGC]  = { (char *)NULL };
 
        if (strcmp(new_pname,"") == 0)
           (void)snprintf(tmpPathName,SSIZE,"/tmp/lyosome"); 
@@ -560,21 +572,7 @@ dot_inserted:
 
        if (symlink(ppath,tmpPathName) == (-1))
        {  if (do_verbose == TRUE)
-          {  (void)fprintf(stderr,"%s (%d@%s): failed to link (lyosome) binary\n",pname,getpid(),hostname);
-             (void)fflush(stderr);
-          }
-
-          exit(255);
-       }
-
-
-       /*-----------------*/
-       /* Argument vector */
-       /*-----------------*/
-
-       if ((nargv = (unsigned char **)calloc(64,sizeof(unsigned char *))) == (unsigned char *)NULL)
-       {  if (do_verbose == TRUE)
-          {  (void)fprintf(stderr,"\n%s (%d@%s): failed to allocate memory for first argument vector\n\n",pname,getpid(),hostname);
+          {  (void)fprintf(stderr,"%s (%d@%s): %sERROR%s failed to link (lyosome) binary\n",pname,getpid(),hostname,boldOn,boldOff);
              (void)fflush(stderr);
           }
 
@@ -591,7 +589,7 @@ dot_inserted:
 
        if ((nargv[0] = (unsigned char *)malloc(SSIZE*sizeof(unsigned char))) == (unsigned char *)NULL)
        {  if (do_verbose == TRUE)
-          {  (void)fprintf(stderr,"\n%s (%d@%s): failed to allocate memory for first argument vector\n\n",pname,getpid(),hostname);
+          {  (void)fprintf(stderr,"\n%s (%d@%s): %sERROR%s failed to allocate memory for first argument vector\n\n",pname,getpid(),hostname,boldOn,boldOff);
              (void)fflush(stderr);
           }
 
@@ -627,7 +625,7 @@ dot_inserted:
 
              else
              {  if (do_verbose == TRUE)
-                {  (void)fprintf(stderr,"\n%s (%d@%s): failed to allocate memory for next argument vector\n\n",pname,getpid(),hostname);
+                {  (void)fprintf(stderr,"\n%s (%d@%s): %sERROR%s failed to allocate memory for next argument vector\n\n",pname,getpid(),hostname,boldOn,boldOff);
                    (void)fflush(stderr);
                 }
 
@@ -696,22 +694,24 @@ dot_inserted:
     /*----------------------------------*/
 
     if (lifetime != FOREVER)
-       start_time = time((time_t)NULL);
+       start_time = time((time_t *)NULL);
 
     while (TRUE)
     {   if (do_protect == TRUE)
         {  if (access(principal,F_OK | R_OK | W_OK) == (-1))
            {  (void)link(principal_link,principal);
               if (do_verbose == TRUE)
-              {  (void)fprintf(stderr,"%s (%d@%s): unexpected attempt to delete monitored file system object [%s] -- relinking\n",pname,getpid(),hostname,principal);
+              {  (void)fprintf(stderr,"%s (%d@%s): %sWARNING%s unexpected attempt to delete monitored file system object [%s] -- relinking\n",pname,getpid(),hostname,boldOn,boldOff,principal);
                  (void)fflush(stderr);
               }
            }
+
            else if (access(principal_link,F_OK | R_OK | W_OK) == (-1))
               (void)link(principal,principal_link);
+
            else if (access(principal,F_OK | R_OK | W_OK) == (-1) && access(principal_link,F_OK | R_OK | W_OK) == (-1))
            {  if (do_verbose == TRUE)
-              {  (void)fprintf(stderr,"\n%s (%d@%s): lost monitored file system object [%s] -- aborting\n\n",pname,getpid(),hostname,principal);
+              {  (void)fprintf(stderr,"\n%s (%d@%s): %sWARNING%s lost monitored file system object [%s] -- aborting\n\n",pname,getpid(),hostname,boldOn,boldOff,principal);
                  (void)fflush(stderr);
               }
 
@@ -746,7 +746,7 @@ dot_inserted:
         /*----------------------------------------*/
 
         if (lifetime != FOREVER)
-        {  if (time((time_t)NULL) - start_time >= lifetime)
+        {  if (time((time_t *)NULL) - start_time >= lifetime)
               exit_handler();
         }
     }

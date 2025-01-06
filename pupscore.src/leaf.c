@@ -1,5 +1,5 @@
-/*-----------------------------------------------------------------------------
-     Purpose: Extracts sub "twig" from pathname branch. 
+/*----------------------------------------------------
+     Purpose: Extracts sub "twig" from pathname branch 
 
      Author:  M.A. O'Neill
               Tumbling Dice Ltd
@@ -8,10 +8,10 @@
               NE3 4RT
               United Kingdom
 
-     Version: 2.01 
-     Dated:   24th May 2023
+     Version: 2.02 
+     Dated:   10th December 2024
      e-mail:  mao@tumblingdice.co.uk
------------------------------------------------------------------------------*/
+----------------------------------------------------*/
 
 
 #include <stdio.h>
@@ -20,13 +20,17 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <xtypes.h>
+#include <stdint.h>
 
 
+/*---------*/
+/* Defines */
+/*---------*/
 /*-----------------*/
 /* Version of leaf */
 /*-----------------*/
 
-#define LEAF_VERSION    "2.01"
+#define LEAF_VERSION    "2.02"
 
 
 /*-------------*/
@@ -38,29 +42,36 @@
 
 
 
-/*---------------------------------*/
-/* Main entry point of application */
-/*---------------------------------*/
+/*------------------*/
+/* Main entry point */
+/*------------------*/
 
-_PUBLIC int main(int argc, char *argv[])
+_PUBLIC  int32_t main(int32_t argc, char *argv[])
 
-{   int i,
-        decoded    = 0,
-        start      = 1,
-        twigLength = 1,
-        cnt        = 0,
-        cnt_pos    = 0;
+{  uint32_t i,
+            decoded   = 0;
 
-    _BOOLEAN do_verbose = FALSE;
+   size_t   j,
+            start         = 1,
+            twigLength    = 1,
+            cnt           = 0,
+            cnt_pos       = 0;
 
-    char hostname[SSIZE] = "",
-         pathname[SSIZE] = "",
-         twig[SSIZE]     = "";
+    _BOOLEAN do_verbose   = FALSE;
+
+    char hostname[SSIZE]  = "",
+         pathname[SSIZE]  = "",
+         twig[SSIZE]      = "";
+
+
+    /*--------------------*/
+    /* Parse command line */
+    /*--------------------*/
 
     (void)gethostname(hostname,SSIZE);
     for(i=0; i<argc; ++i)
     {  if(argc == 1 || argc > 3 || strcmp(argv[i],"-usage") == 0 || strcmp(argv[i],"-help") == 0)
-       {  (void)fprintf(stderr,"\nleaf version %s, (C) Tumbling Dice 2010-2023 (built %s %s)\n\n",LEAF_VERSION,__TIME__,__DATE__);
+       {  (void)fprintf(stderr,"\nleaf version %s, (C) Tumbling Dice 2010-2024 (gcc %s: built %s %s)\n\n",LEAF_VERSION,__VERSION__,__TIME__,__DATE__);
           (void)fprintf(stderr,"LEAF is free software, covered by the GNU General Public License, and you are\n");
           (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
           (void)fprintf(stderr,"See the GPL and LGPL licences at www.gnu.org for further details\n");
@@ -78,7 +89,7 @@ _PUBLIC int main(int argc, char *argv[])
        else if(strcmp(argv[i],"-tlength") == 0)
        {  if(i == argc - 2 || argv[i+1][0] == '-')
           {  if(do_verbose == TRUE)
-             {  (void)fprintf(stderr,"\nleaf (%d@%s): expecting twig length (cardinal integer >= 0)\n\n",getpid(),hostname);
+             {  (void)fprintf(stderr,"\nleaf (%d@%s): expecting twig length (cardinal  int32_teger >= 0)\n\n",getpid(),hostname);
                 (void)fflush(stderr);
              }
              exit(255);
@@ -86,7 +97,7 @@ _PUBLIC int main(int argc, char *argv[])
 
           if(sscanf(argv[i+1],"%d",&twigLength) != 1 || twigLength < 1)
           {  if(do_verbose == TRUE)
-             {  (void)fprintf(stderr,"\nleaf (%d@%s): twig length must be cardinal integer (>= 0)\n\n",getpid(),hostname);
+             {  (void)fprintf(stderr,"\nleaf (%d@%s): twig length must be cardinal  int32_teger (>= 0)\n\n",getpid(),hostname);
                 (void)fflush(stderr);
              }
              exit(255);
@@ -107,10 +118,10 @@ _PUBLIC int main(int argc, char *argv[])
     }
 
     (void)strlcpy(pathname,argv[start],SSIZE);
-    for(i=strlen(pathname); i>=0;  --i)
-    {  if(pathname[i] == '/')
+    for(j=strlen(pathname); j>=0;  --j)
+    {  if(pathname[j] == '/')
        {  ++cnt;
-          cnt_pos = i;
+          cnt_pos = j;
        }
 
        if(cnt == twigLength)

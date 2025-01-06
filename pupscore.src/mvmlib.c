@@ -1,5 +1,5 @@
-/*------------------------------------------------------------------------------
-    Purpose: Meta virtual page demand dynamic object support library.
+/*------------------------------------------------------------------
+    Purpose: Meta virtual page demand dynamic object support library
 
     Author:  M.A. O'Neill
               Tumbling Dice Ltd
@@ -9,9 +9,9 @@
               United Kingdom
 
     Version: 2.02 
-    Dated:   4th January 2023
+    Dated:   10th December 2024
     E-mail:  mao@tumblingdice.co..uk
-------------------------------------------------------------------------------*/
+------------------------------------------------------------------*/
 
 #include <me.h>
 #include <utils.h>
@@ -25,7 +25,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
-
+#include <bsd/bsd.h>
 
 /*----------------------------------------------*/
 /* Get application information for slot manager */
@@ -34,13 +34,13 @@
 /* Slot information function */
 /*---------------------------*/
 
-_PRIVATE void mvm_slot(int level)
+_PRIVATE void mvm_slot(int32_t level)
 {   (void)fprintf(stderr,"lib mvmlib %s: [ANSI C]\n",MVMLIB_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(c) 1995-2023 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(c) 1995-2024 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
-       (void)fprintf(stderr,"Meta virtual paged object library (built %s %s)\n",__TIME__,__DATE__);
+       (void)fprintf(stderr,"Meta virtual paged object library (gcc %s: built %s %s)\n",__VERSION__,__TIME__,__DATE__);
        (void)fflush(stderr);
     }
 
@@ -59,8 +59,6 @@ _EXTERN void (* SLOT ) = mvm_slot;
 #endif /* SLOT */
 
 
-
-
 /*--------------------------------------------*/
 /* Variables which are private to this module */
 /*--------------------------------------------*/
@@ -68,48 +66,44 @@ _EXTERN void (* SLOT ) = mvm_slot;
 _PRIVATE mvm_type *mvmtab[MVM_TABLE_SIZE] = { (mvm_type *)NULL };
 
 
-
-
-
-/*------------------------------------------------------------------------------
-    Functions which are private to this module ...
-------------------------------------------------------------------------------*/
+/*-------------------*/
+/* Private functions */
+/*-------------------*/
 
 // Lock list updater
-_PROTOTYPE _PRIVATE int mvm_update_lock_map(int, mvm_type *);
+_PROTOTYPE _PRIVATE int32_t mvm_update_lock_map(const uint32_t, mvm_type *);
 
 // Create a usage keyed index table for a meta virtual memory structure
-_PROTOTYPE _PRIVATE int mvm_index_phys_pages(mvm_type *);
+_PROTOTYPE _PRIVATE int32_t mvm_index_phys_pages(mvm_type *);
 
 // Read a page from backing store
-_PROTOTYPE _PRIVATE int mvm_read_page_from_backing_store(mvm_type *, int);
+_PROTOTYPE _PRIVATE int32_t mvm_read_page_from_backing_store(mvm_type *, uint32_t);
 
 // Read a page from backing store
-_PROTOTYPE _PRIVATE int mvm_write_page_to_backing_store(mvm_type *, int);
+_PROTOTYPE _PRIVATE int32_t mvm_write_page_to_backing_store(mvm_type *,  uint32_t);
 
 
 
 
-/*------------------------------------------------------------------------------
-    Get a line from image file on disk - this is a modeified version 
-    of the algorithm used in the Alvey MMI-137 version of the cached
-    stereomatcher code ...
-------------------------------------------------------------------------------*/
+/*------------------------------------*/
+/* Get a line from image file on disk */
+/*------------------------------------*/
 
 
-_PUBLIC int mvm_page(int      v_page,   // Page to cache
-	             mvm_type   *mvm)   // Meta virtual memory mapper
+_PUBLIC int32_t mvm_page(uint32_t  v_page,   // Page to cache
+                         mvm_type    *mvm)   // Meta virtual memory mapper
 		   
-{   int i,
-        phys_page;
+{   uint32_t i,
+             phys_page;
 
-    unsigned long int bytes_read,
-                      v_page_offset;
+    uint64_t bytes_read,
+             v_page_offset;
 
     if(v_page < 0 || mvm == (mvm_type *)NULL)
     {  pups_set_errno(EINVAL);
        return(-1);
     }
+
 
     /*------------------------------------------------------------------*/
     /* Do we already have the line we need "paged" into the image cache */
@@ -121,7 +115,7 @@ _PUBLIC int mvm_page(int      v_page,   // Page to cache
        mvm_update_lock_map(phys_page,mvm);
 
        pups_set_errno(OK);
-       return;
+       return(0);
     }
 
 
@@ -235,14 +229,13 @@ allocate_more_resources:
 
     if(phys_page == 0)
     {  mvm->page_status = (page_status_type *)pups_malloc(sizeof(page_status_type));
-       mvm->usage_map   = (int *)             pups_malloc(sizeof(int));
+       mvm->usage_map   = (int32_t *)         pups_malloc(sizeof(int32_t));
     }
     else
     {  mvm->page_status = (page_status_type *)pups_realloc((void *)mvm->page_status,
                                                        (phys_page + 1)*sizeof(page_status_type));
 
-       mvm->usage_map   = (int *)             pups_realloc((void *)mvm->usage_map,
-                                                       (phys_page + 1)*sizeof(int));
+       mvm->usage_map   = (int32_t *)         pups_realloc((void *)mvm->usage_map, (phys_page + 1)*sizeof(int32_t));
     }
 
     #ifdef DEBUG
@@ -304,14 +297,14 @@ page_in:
 
 
 
-/*--------------------------------------------------------------------------------
-    Routine to age the pages in the mapper structure and sort them into to
-    age order starting with the least used [youngest] page ...
---------------------------------------------------------------------------------*/
+/*------------------------------------------------------------------------*/
+/* Routine to age the pages in the mapper structure and sort them into to */
+/* age order starting with the least used [youngest] page                 */
+/*------------------------------------------------------------------------*/
 
-_PUBLIC int mvm_age_and_order(mvm_type *mvm)
+_PUBLIC int32_t mvm_age_and_order(mvm_type *mvm)
 
-{   int i;
+{   uint32_t i;
 
     if(mvm == (mvm_type *)NULL)
     {  pups_set_errno(EINVAL);
@@ -319,10 +312,10 @@ _PUBLIC int mvm_age_and_order(mvm_type *mvm)
     }
 
 
-    /*--------------------------------------------------------------------------------
-    /* Make sure that we do not try to age and order on subsequent calls to the
-    /* pager until we have called mvm_init again ...
-    /*--------------------------------------------------------------------------------*/
+    /*--------------------------------------------------------------------------*/
+    /* Make sure that we do not try to age and order on subsequent calls to the */
+    /* pager until we have called mvm_init again                                */
+    /*--------------------------------------------------------------------------*/
 
     mvm->aged_and_ordered = TRUE;
 
@@ -358,22 +351,22 @@ _PUBLIC int mvm_age_and_order(mvm_type *mvm)
 
 
 
-/*--------------------------------------------------------------------------------
-    Initialise an image cache ...
---------------------------------------------------------------------------------*/
+/*-------------------------*/
+/* Initialise an mvm cache */
+/*-------------------------*/
 
-_PUBLIC void **mvm_init(char             *name,  // Name of virtual memory 
-                        _BOOLEAN   initialised,  // TRUE if swap initialised
-                        int          r_w_state,  // Read write access state
-                        int       sched_policy,  // Scheduling policy
-                        int       v_page_slots,  // Pages in virtual memory
-                        int     max_page_slots,  // Pages in physical memory
-                        int                 fd,  // Backing store descriptor
-                        long       v_page_size,  // Page size in virtual memory
-                        mvm_type          *mvm)  // Virtual memory structure
+_PUBLIC void **mvm_init(const char      *name         ,  // Name of virtual memory 
+                        const _BOOLEAN  initialised   ,  // TRUE if swap initialised
+                        const int32_t   r_w_state     ,  // Read write access state
+                        const int32_t   sched_policy  ,  // Scheduling policy
+                        const uint32_t  v_page_slots  ,  // Pages in virtual memory
+                        const uint32_t  max_page_slots,  // Pages in physical memory
+                        const des_t     fd            ,  // Backing store descriptor
+                        const size_t    v_page_size   ,  // Page size in virtual memory
+                        mvm_type        *mvm          )  // Virtual memory structure
 
-{   int  i;
-    char errstr[SSIZE] = "";
+{   uint32_t i;
+    char     errstr[SSIZE] = "";
 
     if(mvm            ==  (mvm_type *)NULL    ||
        name           ==  (char *)NULL        ||
@@ -409,7 +402,7 @@ _PUBLIC void **mvm_init(char             *name,  // Name of virtual memory
 
     mvm->next_lock = 0;
     mvm->max_lock  = MVM_QUANTUM;
-    mvm->lock_map  = (int *)pups_malloc(MVM_QUANTUM*sizeof(int));
+    mvm->lock_map  = (int32_t *)pups_malloc(MVM_QUANTUM*sizeof(int32_t));
 
 
     /*-----------------------*/
@@ -435,7 +428,7 @@ _PUBLIC void **mvm_init(char             *name,  // Name of virtual memory
         return((void **)NULL);
     }
 
-    if((mvm->v_page_map = (int *)pups_malloc(mvm->v_page_slots*sizeof(int))) == (int *)NULL)
+    if((mvm->v_page_map = (int32_t *)pups_malloc(mvm->v_page_slots*sizeof(int32_t))) == (int32_t *)NULL)
     {   pups_set_errno(ENOMEM);
         return((void **)NULL);
     }
@@ -458,7 +451,7 @@ _PUBLIC void **mvm_init(char             *name,  // Name of virtual memory
     }
 
     (void)snprintf(errstr,SSIZE,"mvm_init: too many metata virtual memory objects (max per process %d)\n",MVM_TABLE_SIZE);
-    error(errstr); 
+    pups_error(errstr); 
 
     pups_exit(255);
 }
@@ -466,13 +459,13 @@ _PUBLIC void **mvm_init(char             *name,  // Name of virtual memory
 
 
     
-/*---------------------------------------------------------------------------------
-    Destroy meta virtual memory structure ...
----------------------------------------------------------------------------------*/
+/*---------------------------------------*/
+/* Destroy meta virtual memory structure */
+/*---------------------------------------*/
 
-_PUBLIC int mvm_destroy(mvm_type *mvm)
+_PUBLIC int32_t mvm_destroy(mvm_type *mvm)
 
-{   int i;
+{   uint32_t i;
 
     if(mvm == (mvm_type *)NULL)
     {  pups_set_errno(EINVAL);
@@ -515,13 +508,13 @@ _PUBLIC int mvm_destroy(mvm_type *mvm)
 
 
 
-/*---------------------------------------------------------------------------------
-    Reset image cache usage list pointer ...
----------------------------------------------------------------------------------*/
+/*--------------------------------------*/
+/* Reset image cache usage list pointer */
+/*--------------------------------------*/
 
-_PUBLIC int mvm_reset_pager(mvm_type *mvm)
+_PUBLIC int32_t mvm_reset_pager(mvm_type *mvm)
 
-{   int i;
+{   uint32_t i;
 
     if(mvm == (mvm_type *)NULL)
     {  pups_set_errno(EINVAL);
@@ -545,13 +538,13 @@ _PUBLIC int mvm_reset_pager(mvm_type *mvm)
 
 
 
-/*---------------------------------------------------------------------------------
-    Update the lock map of current meta virtual object ...
----------------------------------------------------------------------------------*/
+/*----------------------------------------------------*/
+/* Update the lock map of current meta virtual object */
+/*----------------------------------------------------*/
 
-_PRIVATE int mvm_update_lock_map(int phys_page, mvm_type *mvm)
+_PRIVATE int32_t mvm_update_lock_map(const uint32_t phys_page, mvm_type *mvm)
 
-{   int i;
+{   uint32_t i;
 
     if(phys_page < 0 || mvm == (mvm_type *)NULL)
        return(-1);
@@ -574,7 +567,7 @@ _PRIVATE int mvm_update_lock_map(int phys_page, mvm_type *mvm)
 
     if(mvm->next_lock == mvm->max_lock)
     {  mvm->max_lock += MVM_QUANTUM;
-       if((mvm->lock_map = (int *)pups_realloc((void *)mvm->lock_map,mvm->max_lock*sizeof(int))) == (int *)NULL)
+       if((mvm->lock_map = (int32_t *)pups_realloc((void *)mvm->lock_map,mvm->max_lock*sizeof(int32_t))) == (int32_t *)NULL)
            return(-1);
     }
 
@@ -588,18 +581,18 @@ _PRIVATE int mvm_update_lock_map(int phys_page, mvm_type *mvm)
 
 
 
-/*---------------------------------------------------------------------------------
-    Build index table of current page usage levels ...
----------------------------------------------------------------------------------*/
+/*------------------------------------------------*/
+/* Build index table of current page usage levels */
+/*------------------------------------------------*/
 
-_PRIVATE int mvm_index_phys_pages(mvm_type *mvm)
+_PRIVATE int32_t mvm_index_phys_pages(mvm_type *mvm)
 
-{   int i,
-        j,
-        l,
-        ir,
-        indxt,
-        q;
+{   int32_t i,
+            j,
+            l,
+            ir,
+            indxt,
+            q;
 
     if(mvm == (mvm_type *)NULL)
        return(-1);
@@ -619,7 +612,7 @@ _PRIVATE int mvm_index_phys_pages(mvm_type *mvm)
 
           if(--ir == 1)
           {  mvm->usage_map[1] = indxt;
-             return;
+             return(0);
           }
        }
 
@@ -646,16 +639,16 @@ _PRIVATE int mvm_index_phys_pages(mvm_type *mvm)
 
 
 
-/*---------------------------------------------------------------------------------
-    Write a page of memory to backing store - note that this page is locked
-    when this is done to avoid race condtions (if we have multiple readers
-    and or writers) ...
----------------------------------------------------------------------------------*/
+/*-------------------------------------------------------------------------*/
+/* Write a page of memory to backing store - note that this page is locked */
+/* when this is done to avoid race condtions (if we have multiple readers  */
+/* and or writers)                                                         */
+/*-------------------------------------------------------------------------*/
 
-_PRIVATE int mvm_read_page_from_backing_store(mvm_type *mvm, int v_page)
+_PRIVATE int32_t mvm_read_page_from_backing_store(mvm_type *mvm, const uint32_t v_page)
 
-{   unsigned long int v_page_offset,
-                      bytes_read; 
+{   size_t v_page_offset,
+           bytes_read; 
 
     struct flock page_flock;
 
@@ -703,14 +696,14 @@ _PRIVATE int mvm_read_page_from_backing_store(mvm_type *mvm, int v_page)
 
 
 
-/*---------------------------------------------------------------------------------
-    Write a page of memory to backing store ...
----------------------------------------------------------------------------------*/
+/*-----------------------------------------*/
+/* Write a page of memory to backing store */
+/*-----------------------------------------*/
  
-_PRIVATE int mvm_write_page_to_backing_store(mvm_type *mvm, int v_page) 
+_PRIVATE int32_t mvm_write_page_to_backing_store(mvm_type *mvm, const uint32_t v_page) 
  
-{   unsigned long int v_page_offset,
-                      bytes_written; 
+{   size_t v_page_offset,
+           bytes_written; 
 
     struct flock page_flock;
 
@@ -755,18 +748,18 @@ _PRIVATE int mvm_write_page_to_backing_store(mvm_type *mvm, int v_page)
 
 
 
-/*---------------------------------------------------------------------------------
-    Create an MVM swap file and return a handle to it ...
----------------------------------------------------------------------------------*/
+/*---------------------------------------------------*/
+/* Create an MVM swap file and return a handle to it */
+/*---------------------------------------------------*/
  
-_PUBLIC int mvm_create_named_swapfile(char *swap_file_name,
-                                      int            pages,
-                                      long       page_size)
+_PUBLIC int32_t mvm_create_named_swapfile(const char      *swap_file_name,
+                                          const uint32_t            pages,
+                                          const size_t          page_size)
  
-{   int   i,
-          swap_handle = (-1);
+{   uint32_t  i;
+     int32_t  swap_handle     = (-1);
 
-    _BYTE *buf        = (_BYTE *)NULL;
+    _BYTE *buf                = (_BYTE *)NULL;
     struct flock page_flock;
 
     if(swap_file_name == (char *)NULL || pages < 0 || page_size < 0L)
@@ -864,17 +857,17 @@ _PUBLIC int mvm_create_named_swapfile(char *swap_file_name,
 
 
 
-/*----------------------------------------------------------------------------------
-    Create an MVM swapfile using an open file handle ...
-----------------------------------------------------------------------------------*/
+/*--------------------------------------------------*/
+/* Create an MVM swapfile using an open file handle */
+/*--------------------------------------------------*/
 
-_PUBLIC int mvm_create_swapfile(int swap_handle,
-                                int       pages,
-                                long  page_size)
+_PUBLIC  int32_t mvm_create_swapfile(const  int32_t  swap_handle,
+                                     const uint32_t  pages,
+                                     const size_t    page_size)
 
 
-{   unsigned long int offset;
-    struct flock      page_flock;
+{   size_t       offset;
+    struct flock page_flock;
 
     if(swap_handle < 0 || pages < 0 || page_size < 0L)
     {  pups_set_errno(EINVAL);
@@ -941,11 +934,11 @@ _PUBLIC int mvm_create_swapfile(int swap_handle,
 
 
 
-/*----------------------------------------------------------------------------------
-    Delete MVM swapfile ...
-----------------------------------------------------------------------------------*/
+/*---------------------*/
+/* Delete MVM swapfile */
+/*---------------------*/
  
-_PUBLIC int mvm_delete_swapfile(int swap_file_handle, char *swap_file_name)
+_PUBLIC int32_t mvm_delete_swapfile(const int32_t swap_file_handle, const char *swap_file_name)
  
 {   struct flock page_flock;
 
@@ -990,11 +983,11 @@ _PUBLIC int mvm_delete_swapfile(int swap_file_handle, char *swap_file_name)
 
 
 
-/*----------------------------------------------------------------------------------
-    Mark MVM swapfile initialised ...
-----------------------------------------------------------------------------------*/
+/*-------------------------------*/
+/* Mark MVM swapfile initialised */
+/*-------------------------------*/
 
-_PUBLIC int mvm_initialised(mvm_type *mvm)
+_PUBLIC int32_t mvm_initialised(mvm_type *mvm)
 
 {   if(mvm == (mvm_type *)NULL)
     {  pups_set_errno(OK);
@@ -1011,11 +1004,11 @@ _PUBLIC int mvm_initialised(mvm_type *mvm)
 
 
 
-/*----------------------------------------------------------------------------------
-    Set maximum (resident) cache for MVM object ...
-----------------------------------------------------------------------------------*/
+/*---------------------------------------------*/
+/* Set maximum (resident) cache for MVM object */
+/*---------------------------------------------*/
 
-_PUBLIC void mvm_change_cache_size(int max_page_slots, mvm_type *mvm)
+_PUBLIC void mvm_change_cache_size(const uint32_t max_page_slots, mvm_type *mvm)
 
 {   if(mvm == (mvm_type *)NULL)
     {  pups_set_errno(EINVAL);
@@ -1029,11 +1022,11 @@ _PUBLIC void mvm_change_cache_size(int max_page_slots, mvm_type *mvm)
 
 
 
-/*----------------------------------------------------------------------------------
-    Show MVM object statitics ...
-----------------------------------------------------------------------------------*/
+/*----------------------------*/
+/* Show MVM object statistics */
+/*----------------------------*/
 
-_PUBLIC mvm_stat(FILE *stream, mvm_type *mvm)
+_PUBLIC void mvm_stat(const FILE *stream, const mvm_type *mvm)
 
 {   struct flock page_flock;
 
@@ -1088,20 +1081,19 @@ _PUBLIC mvm_stat(FILE *stream, mvm_type *mvm)
     (void)fflush(stream);
 
     pups_set_errno(OK);
-    return;
 }
 
 
 
 
-/*----------------------------------------------------------------------------------
-    Show MVM objects attached to current application ...
-----------------------------------------------------------------------------------*/
+/*--------------------------------------------------*/
+/* Show MVM objects attached to current application */
+/*--------------------------------------------------*/
 
-_PUBLIC void mvm_show_mvm_objects(FILE *stream)
+_PUBLIC void mvm_show_mvm_objects(const FILE *stream)
 
-{   int i,
-        cnt = 0;
+{   uint32_t i,
+             cnt = 0;
 
     if(stream == (FILE *)NULL)
     {  pups_set_errno(EINVAL);

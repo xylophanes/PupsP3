@@ -1,4 +1,4 @@
-/*------------------------------------------------------------------------------
+/*-------------------------------------------------------------------------
     Double 'in place' Fast Hartley transform routine. This routine is based
     upon the Pascal version of the Fast Hartley routine described in "Byte"
     April 1988 edition.
@@ -10,10 +10,10 @@
              NE3 4RT
              United Kingdom
 
-   Version: 2.02
-   Dated:   4th January 2023
+   Version: 3.00
+   Dated:   10th Decemeber 2024
    E-mail:  mao@tumblingdice.co.uk
-------------------------------------------------------------------------------*/
+-------------------------------------------------------------------------*/
 
 #include <me.h>
 #include <nfo.h>
@@ -26,22 +26,20 @@
 #include <utils.h>
 
 
-/*------------------------------------------------------------------------------
-    Slot and usage functions - used by slot manager ...
-------------------------------------------------------------------------------*/
-
-
+/*-------------------------------------------------*/
+/* Slot and usage functions - used by slot manager */
+/*-------------------------------------------------*/
 /*---------------------*/
 /* Slot usage function */
 /*---------------------*/
 
-_PRIVATE void fhtlib_slot(int level)
+_PRIVATE void fhtlib_slot(int32_t level)
 {   (void)fprintf(stderr,"lib fhtlib %s: [ANSI C]\n",FHT_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 1985-2023 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 1987-2024 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
-       (void)fprintf(stderr,"PUPS/P3 fast Fourier/Hartley transform library (built %s %s)\n\n",__TIME__,__DATE__);
+       (void)fprintf(stderr,"PUPS/P3 fast Fourier/Hartley transform library (gcc %s: built %s %s)\n\n",__VERSION__,__TIME__,__DATE__);
     }
     else
        (void)fprintf(stderr,"\n");
@@ -51,9 +49,9 @@ _PRIVATE void fhtlib_slot(int level)
 
 
 
-/*------------------------------------------------------------------------------
-    Segment identification for fhtlib library ...
-------------------------------------------------------------------------------*/
+/*-------------------------------------------*/
+/* Segment identification for fhtlib library */
+/*-------------------------------------------*/
 
 #ifdef SLOT
 #include <slotman.h>
@@ -61,28 +59,28 @@ _EXTERN void (* SLOT )() __attribute__ ((aligned(16))) = fhtlib_slot;
 #endif /* SLOT */
 
 
-/*------------------------------------------------------------------------------
-    Prototypes private to this application ...
-------------------------------------------------------------------------------*/
+/*----------------------------------------*/
+/* Prototypes private to this application */
+/*----------------------------------------*/
 
 // Find power of two represented by input number
-_PROTOTYPE _PRIVATE int get_pwr(int);
+_PROTOTYPE _PRIVATE int32_t get_pwr(int32_t);
 
 // Index permutation routine
-_PROTOTYPE _PRIVATE int permute(int, int);
+_PROTOTYPE _PRIVATE int32_t permute(int32_t,  int32_t);
 
 // Generate trig tables
-_PROTOTYPE _PRIVATE void trig_table(int);
+_PROTOTYPE _PRIVATE void trig_table(int32_t);
 
 // Modify retrograde indexes
-_PROTOTYPE _PRIVATE int modify(int, int, int, int, int);
+_PROTOTYPE _PRIVATE int32_t modify(int32_t,  int32_t,  int32_t,  int32_t,  int32_t);
 
 // Butterfly transform an index pair
-_PROTOTYPE _PRIVATE void butterfly(int,       \
-                                   int,       \
-                                   int,       \
-                                   int,       \
-                                   int,       \
+_PROTOTYPE _PRIVATE void butterfly(int32_t,   \
+                                   int32_t,   \
+                                   int32_t,   \
+                                   int32_t,   \
+                                   int32_t,   \
                                    FTYPE [],  \
                                    FTYPE []);
 
@@ -95,20 +93,6 @@ _PROTOTYPE _PRIVATE void swap_pointers(FTYPE *, FTYPE *);
 /*  procedures                                              */
 /*----------------------------------------------------------*/
 
-_PRIVATE int i,
-             j,
-             k,
-             trg_ind,
-             trg_inc,
-             power,
-             t_a,
-             f_a,
-             size,
-             section,
-             s_start,
-             s_end,
-             st;
-
 _PRIVATE FTYPE start,
                step,
                *sne   = (FTYPE *)NULL,
@@ -117,13 +101,13 @@ _PRIVATE FTYPE start,
 
 
 
-/*------------------------------------------------------------------------------
-            Find power of two represented by input number.
-------------------------------------------------------------------------------*/
+/*-----------------------------------------------*/
+/* Find power of two represented by input number */
+/*-----------------------------------------------*/
 
-_PRIVATE int get_pwr(int arg)
+_PRIVATE int32_t get_pwr(int32_t arg)
 
-{   int i = 0;
+{    int32_t i = 0;
 
     while(arg != 1)
     {  arg = arg >> 1;
@@ -135,17 +119,17 @@ _PRIVATE int get_pwr(int arg)
 
 
 
-/*------------------------------------------------------------------------------
-   Permutation routine. This routine re-orders the data before the butterly 
-   transform routine is called ...
-------------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------------*/
+/* Permutation routine. This routine re-orders the data before the butterly */
+/* transform routine is called                                              */
+/*--------------------------------------------------------------------------*/
 
-_PRIVATE int permute(int b_index, int pwr)
+_PRIVATE int32_t permute(int32_t b_index, int32_t pwr)
 
-{   int i,
-        r,
-        s,
-        j = 0;
+{    int32_t i,
+             r,
+             s,
+             j = 0;
 
    for(i=0; i<pwr; ++i)
    {  s       = b_index >> 1;
@@ -157,15 +141,15 @@ _PRIVATE int permute(int b_index, int pwr)
 
 
 
-/*------------------------------------------------------------------------------
-   Calculate the trignometric functions required by the FHT and store values.
-   For a N point transform, the trignometric functions will be calculated  at
-   intervals of Nths of a turn ...
-------------------------------------------------------------------------------*/
+/*----------------------------------------------------------------------------*/
+/* Calculate the trignometric functions required by the FHT and store values. */
+/* For a N point transform, the trignometric functions will be calculated  at */
+/*  int32_tervals of Nths of a turn                                                */
+/*----------------------------------------------------------------------------*/
 
-_PRIVATE void trig_table(int size)
+_PRIVATE void trig_table(int32_t size)
 
-{   int i;
+{   uint32_t i;
 
     FTYPE omega,
           angle = 0.0;
@@ -184,18 +168,18 @@ _PRIVATE void trig_table(int size)
 
 
 
-/*------------------------------------------------------------------------------
-   Calculate the address of the retrograde index for the sine term for the
-   dual place alogrithm, if it is required ...
-------------------------------------------------------------------------------*/
+/*-------------------------------------------------------------------------*/
+/* Calculate the address of the retrograde index for the sine term for the */
+/* dual place alogrithm, if it is required                                 */
+/*-------------------------------------------------------------------------*/
 
-_PRIVATE int modify(int    power,
-                    int  s_start,
-                    int    s_end,
-                    int  b_index,
-                    int     size)
+_PRIVATE int32_t modify(int32_t    power,
+                        int32_t  s_start,
+                        int32_t    s_end,
+                        int32_t  b_index,
+                        int32_t     size)
 
-{   int ret;
+{    int32_t ret;
 
     if(s_end == b_index /* || power < 3 */)
        ret = b_index;
@@ -206,17 +190,17 @@ _PRIVATE int modify(int    power,
 
 
 
-/*------------------------------------------------------------------------------
-   Butterfly transform an index pair ...
-------------------------------------------------------------------------------*/
+/*-----------------------------------*/
+/* Butterfly transform an index pair */
+/*-----------------------------------*/
 
-_PRIVATE void butterfly(int trig_ind,
-                        int     size,
-                        int      i_1,
-                        int      i_2,
-                        int      i_3,
-                        FTYPE  f_a[],
-                        FTYPE  t_a[])
+_PRIVATE void butterfly(int32_t trig_ind,
+                        int32_t size,
+                        int32_t i_1,
+                        int32_t i_2,
+                        int32_t i_3,
+                        FTYPE   f_a[],
+                        FTYPE   t_a[])
 
 {   t_a[i_1] = f_a[i_1] + f_a[i_2]*csn[trig_ind] + f_a[i_3]*sne[trig_ind];
     trig_ind += size >> 1;
@@ -226,15 +210,15 @@ _PRIVATE void butterfly(int trig_ind,
 
 
 
-/*------------------------------------------------------------------------------
-   Get the real part of the Fourier transform ...
-------------------------------------------------------------------------------*/
+/*--------------------------------------------*/
+/* Get the real part of the Fourier transform */
+/*--------------------------------------------*/
 
-_PUBLIC void get_fft_R(int          size,
+_PUBLIC void get_fft_R(uint32_t     size,
                        FTYPE da_arr_in[],
                        FTYPE da_arr_out[])
 
-{   int i;
+{   uint32_t i;
 
     for(i=0; i<size; ++i)
         da_arr_out[i] = da_arr_in[i] + da_arr_in[size-i-1];
@@ -243,15 +227,15 @@ _PUBLIC void get_fft_R(int          size,
 
 
 
-/*------------------------------------------------------------------------------
-   Get the imaginary part of the Fourier transform ...
-------------------------------------------------------------------------------*/
+/*-------------------------------------------------*/
+/* Get the imaginary part of the Fourier transform */
+/*-------------------------------------------------*/
 
-_PUBLIC void get_fft_IM(int          size,
+_PUBLIC void get_fft_IM(uint         size,
                         FTYPE da_arr_in[],
                         FTYPE da_arr_out[])
 
-{   int i;
+{   uint32_t i;
 
     for(i=0; i<size; ++i)
         da_arr_out[i] = da_arr_in[i] - da_arr_in[size-i-1];
@@ -260,15 +244,15 @@ _PUBLIC void get_fft_IM(int          size,
 
 
 
-/*------------------------------------------------------------------------------
-   Get the power spectrum ...
-------------------------------------------------------------------------------*/
+/*------------------------*/
+/* Get the power spectrum */
+/*------------------------*/
 
-_PUBLIC void get_pwr_S(int          size,
+_PUBLIC void get_pwr_S(uint         size,
                        FTYPE da_arr_in[],
                        FTYPE da_arr_out[])
 
-{   int i;
+{   uint32_t i;
 
     for(i=0; i<size; ++i)
         da_arr_out[i] = (sqr(da_arr_in[i]) + sqr(da_arr_in[size-i-1])) / 2;
@@ -277,13 +261,13 @@ _PUBLIC void get_pwr_S(int          size,
 
 
 
-/*------------------------------------------------------------------------------
-    Function to test whether input data is in fact a power of two ...
-------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------*/
+/* Function to test whether input data is in fact a power of two */
+/*---------------------------------------------------------------*/
 
-_PRIVATE _BOOLEAN pwr_of_2(int size)
+_PRIVATE _BOOLEAN pwr_of_2(uint size)
 
-{   int i;
+{   uint32_t    i;
 
     while(size%2 == 0)
          size = size >> 1;
@@ -302,9 +286,19 @@ _PRIVATE _BOOLEAN pwr_of_2(int size)
    to C 14th April 1988.
 ------------------------------------------------------------------------------*/
 
-_PUBLIC void fht(int sign, int size, FTYPE da_arr[])
+_PUBLIC void fht(int32_t sign,  int32_t size, FTYPE da_arr[])
 
-{   int pwr;
+{   int32_t pwr,
+            i,
+            j,
+            k,
+            trg_ind,
+            trg_inc,
+            power,
+            section,
+            s_start,
+            s_end,
+            st;
 
     FTYPE *da_temp_1  = (FTYPE *)NULL,
           *da_temp_2  = (FTYPE *)NULL, 
@@ -313,6 +307,7 @@ _PUBLIC void fht(int sign, int size, FTYPE da_arr[])
 
     da_temp_1 = (FTYPE *)pups_calloc(size,sizeof(FTYPE));
     da_temp_2 = (FTYPE *)pups_calloc(size,sizeof(FTYPE));
+
 
     /*-----------------------------------------------------------------------*/
     /*  First equivalence 'from data' array pointer to the input data array, */
@@ -327,12 +322,14 @@ _PUBLIC void fht(int sign, int size, FTYPE da_arr[])
         pwr   = get_pwr(size);
         trig_table(size);
 
+
         /*-----------------*/
         /* Permute indexes */
         /*-----------------*/
 
         for(i=0; i<size; ++i)
             f_a[i] = da_arr[permute(i,pwr)];
+
 
         /*------------------------------------------*/
         /* Start of the Hartley butterfly transform */
@@ -371,9 +368,10 @@ _PUBLIC void fht(int sign, int size, FTYPE da_arr[])
            swap_pointers(f_a,t_a);
         }
 
+
         /*-------------------------------------------------------------------------*/
         /* End of Hartley butterfly. The results are scaled in necessary, and then */
-        /*  placed in back into the array data                                     */
+        /*  placed in back  int32_to the array data                                     */
         /*-------------------------------------------------------------------------*/
 
         for(i=0; i<size; ++i)
@@ -392,22 +390,23 @@ _PUBLIC void fht(int sign, int size, FTYPE da_arr[])
 
 
 
-/*------------------------------------------------------------------------------
-    This routine is used to apply a band-stop filter ...
-------------------------------------------------------------------------------*/
+/*--------------------------------------------------*/
+/* This routine is used to apply a band-stop filter */
+/*--------------------------------------------------*/
 
-_PUBLIC void band_pass(int           size,   // Data size
+_PUBLIC void band_pass(uint32_t      size,   // Data size
                        FTYPE      f_start,   // Start of band pass
                        FTYPE       f_stop,   // End of band pass
                        FTYPE        t_inc,   // Time dopups_main increment
                        FTYPE  *trans_func)   // Transfer function 
-{   int i,
-        nf1,
-        nf2;
+{    int32_t i,
+             nf1,
+             nf2;
 
     FTYPE band;
 
     band = 0.5 / t_inc;
+
 
     /*---------------------------------------*/
     /* Zero width filters are a little silly */
@@ -457,16 +456,16 @@ _PUBLIC void band_pass(int           size,   // Data size
 
 
 
-/*------------------------------------------------------------------------------
-    Routine to generate power spectral density function from FFT data ...
-------------------------------------------------------------------------------*/
+/*-------------------------------------------------------------------*/
+/* Routine to generate power spectral density function from FFT data */
+/*-------------------------------------------------------------------*/
 
-_PUBLIC void get_FFT_pwr_S(int              size, // Data size
+_PUBLIC void get_FFT_pwr_S(uint32_t         size, // Data size
                            FTYPE  pwr_spectrum[], // Power spectrum
                            FTYPE        r_data[], // Real part of FFT
                            FTYPE        i_data[]) // Imaginary part of FFT
 
-{   int i;
+{   uint32_t i;
 
     for(i=0; i<size >> 1; ++i)
        pwr_spectrum[i] = r_data[i]*r_data[i] + 2.0*r_data[i]*i_data[i] +
@@ -476,17 +475,17 @@ _PUBLIC void get_FFT_pwr_S(int              size, // Data size
 
 
 
-/*------------------------------------------------------------------------------
-    Routine to resample the data - for HIPS data, will have to supply a
-    line of data to be resampled ...
-------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------*/
+/* Routine to resample the data - for HIPS data, will have to supply a */
+/* line of data to be resampled                                        */
+/*---------------------------------------------------------------------*/
 
-_PUBLIC void resample(int      old_size,
-                      int      new_size,
-                      FTYPE   in_data[],
-                      FTYPE  out_data[])
+_PUBLIC void resample(uint32_t  old_size,
+                      uint32_t  new_size,
+                      FTYPE     in_data[],
+                      FTYPE     out_data[])
 
-{   int i;
+{   uint32_t    i;
 
     FTYPE *in_x      = (FTYPE *)NULL,
           *in_data_2 = (FTYPE *)NULL;
@@ -509,9 +508,10 @@ _PUBLIC void resample(int      old_size,
            NATURAL,
            in_data_2);
 
-/*------------------------------------------------------------------------------
-    Spline data, and put it into the resampling array ...
-------------------------------------------------------------------------------*/
+
+    /*---------------------------------------------------*/
+    /* Spline data, and put it  int32_to the resampling array */
+    /*---------------------------------------------------*/
 
     for(i=0; i<new_size; ++i)
         out_data[i] = splint(in_x,
@@ -524,30 +524,30 @@ _PUBLIC void resample(int      old_size,
 
 
       
-/*------------------------------------------------------------------------------
-    Routine to replace a function by its complex Fourier Transform ...
-------------------------------------------------------------------------------*/
+/*----------------------------------------------------------------*/
+/* Routine to replace a function by its complex Fourier Transform */
+/*----------------------------------------------------------------*/
 
-_PUBLIC void Fourier(int         flags,  // Initialisation flags 
-                     int         isign,  // Transform direction
-                     int         isize,  // Data size
+_PUBLIC void Fourier(int32_t     flags,  // Initialisation flags 
+                     int32_t     isign,  // Transform direction
+                     int32_t     isize,  // Data size
                      FTYPE  r_da_arr[],  // Real part of data
                      FTYPE  i_da_arr[])  // Imaginary part of data
 
-{   int i,
-        j,
-        k,
-        m,
-        n,
-        mb,
-        ja,
-        jb,
-        jja,
-        jjb,
-        mmax,
-        itemp,
-        istep,
-        i_temp;
+{    int32_t i,
+             j,
+             k,
+             m,
+             n,
+             mb,
+             ja,
+             jb,
+             jja,
+             jjb,
+             mmax,
+             itemp,
+             istep,
+             i_temp;
 
 
     FTYPE scale,
@@ -558,7 +558,7 @@ _PUBLIC void Fourier(int         flags,  // Initialisation flags
           i_theta;
 
    
-    _IMMORTAL int ifirst     = 0,
+    _IMMORTAL  int32_t ifirst     = 0,
                   started    = FALSE,
                   *b_index   = (int *)NULL;
 
@@ -587,7 +587,7 @@ _PUBLIC void Fourier(int         flags,  // Initialisation flags
     /* If size is not a power of two, flag error and exit */
     /*----------------------------------------------------*/
 
-    if(pwr_of_2(size) == FALSE)
+    if(pwr_of_2(isize) == FALSE)
        pups_error("[Fourier] not a power of two");
 
 
@@ -698,9 +698,9 @@ _PUBLIC void Fourier(int         flags,  // Initialisation flags
 
 
 
-/*------------------------------------------------------------------------------
-    Routine to swap a pair of pointers ...
-------------------------------------------------------------------------------*/
+/*------------------------------------*/
+/* Routine to swap a pair of pointers */
+/*------------------------------------*/
 
 _PRIVATE void swap_pointers(FTYPE *p_1, FTYPE *p_2)
 
@@ -715,20 +715,20 @@ _PRIVATE void swap_pointers(FTYPE *p_1, FTYPE *p_2)
 
 
 
-/*------------------------------------------------------------------------------
-    Given a real vector of data[1 ... n], and given m this routine returns
-    the m linear prediction coefficients as d[1 ... m] and also returns the
-    mean square discrepancy as xms ...
-------------------------------------------------------------------------------*/
+/*-------------------------------------------------------------------------*/
+/* Given a real vector of data[1 ... n], and given m this routine returns  */
+/* the m linear prediction coefficients as d[1 ... m] and also returns the */
+/*  mean square discrepancy as xms                                         */
+/*-------------------------------------------------------------------------*/
 
  
-_PUBLIC void memcof(FTYPE data[], int n, int m, FTYPE *xms, FTYPE d[], int rpt_cnt)
+_PUBLIC void memcof(FTYPE data[], int32_t n, int32_t m, FTYPE *xms, FTYPE d[], int32_t rpt_cnt)
 
-{   int i,
-        j,
-        k,
-        v_index,
-        n_eff;
+{    int32_t i,
+             j,
+             k,
+             v_index,
+             n_eff;
 
     FTYPE p      = 0.0,
           *wk1   = (FTYPE *)NULL,
@@ -809,15 +809,15 @@ _PUBLIC void memcof(FTYPE data[], int n, int m, FTYPE *xms, FTYPE d[], int rpt_c
 
 
 
-/*-------------------------------------------------------------------------------
-    Routine to compute the power spectrum using the maximum entropy [all poles]
-    method. Given d[1 ... m], m and xms returned by memcof, this function
-    returns the power spectrum estimate, p(f) as a function of fdt ...
--------------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------------------*/
+/* Routine to compute the power spectrum using the maximum entropy [all poles] */
+/* method. Given d[1 ... m], m and xms returned by memcof, this function       */
+/* returns the power spectrum estimate, p(f) as a function of fdt              */
+/*-----------------------------------------------------------------------------*/
 
-_PUBLIC FTYPE evlmem(FTYPE fdt, FTYPE d[], int m, FTYPE xms)
+_PUBLIC FTYPE evlmem(FTYPE fdt, FTYPE d[], int32_t m, FTYPE xms)
 
-{   int i;
+{   uint32_t i;
 
     FTYPE sumr = 1.0,
           sumi = 0.0,
@@ -851,8 +851,8 @@ _PUBLIC FTYPE evlmem(FTYPE fdt, FTYPE d[], int m, FTYPE xms)
 /* Definition of wavefilt_type */
 /*-----------------------------*/
 
-typedef struct {    int ncof,
-                        ioff,
+typedef struct {    int32_t ncof,
+                            ioff,
                         joff;
 
                     FTYPE *cc,
@@ -862,16 +862,16 @@ typedef struct {    int ncof,
 _PRIVATE wfilt_type wfilt;
 
 
-/*------------------------------------------------------------------------------------ 
-   Initialising routine for generalised wavelet function generator, pwt. Implements
-   Debauchies wavelet filters with 4, 12 and 20 coefficients (selected by bvalue n).
-   This routine is called once, prior to calling pwt ...
-------------------------------------------------------------------------------------*/
+/*----------------------------------------------------------------------------------*/
+/* Initialising routine for generalised wavelet function generator, pwt. Implements */
+/* Debauchies wavelet filters with 4, 12 and 20 coefficients (selected by bvalue n) */
+/* This routine is called once, prior to calling pwt                                */
+/*----------------------------------------------------------------------------------*/
 
 
-_PUBLIC int pwtset(int n)
+_PUBLIC  int32_t pwtset(int n)
 
-{   int k;
+{   uint32_t k;
 
     FTYPE sig = (-1.0);
 
@@ -928,28 +928,29 @@ _PUBLIC int pwtset(int n)
 
 
 
-/*----------------------------------------------------------------------------------
-    Partial wavelet transform, applies arbitary wavelet filter to data vector a[]
-    (isign = 1) or its inverse transform (isign = -1) ...
-----------------------------------------------------------------------------------*/
+/*-------------------------------------------------------------------------------*/
+/* Partial wavelet transform, applies arbitary wavelet filter to data vector a[] */
+/* (isign = 1) or its inverse transform (isign = -1)                             */
+/*-------------------------------------------------------------------------------*/
 
-_PUBLIC int pwt(FTYPE a[], unsigned long int n, int isign)
+_PUBLIC  int32_t pwt(FTYPE a[], uint64_t n, int32_t isign)
 
 {   FTYPE ai,
           ai1,
           *wksp = (FTYPE *)NULL;
 
-    unsigned long int i,
-                      ii,
-                      j,
-                      jf,
-                      jr,
-                      k,
-                      n1,
-                      ni,
-                      nj,
-                      nh,
-                      nmod;
+    uint64_t i,
+             ii,
+             j,
+             jf,
+             jr,
+             k,
+             n1,
+             ni,
+             nj,
+             nh,
+             nmod;
+
     if(n < 4)
       return(-1);
 
@@ -1001,21 +1002,21 @@ _PUBLIC int pwt(FTYPE a[], unsigned long int n, int isign)
 
 
 
-/*------------------------------------------------------------------------------------
-    One dimensional discrete wavelet transform. This routine implements the pyramid
-    algorithm replacing an input vector a[1..n] by its wavelet transform (for isign
-    = 1) or performing the inverse operation (for isign = -1). Note that as in the
-    Cooley Tukey FFT algorithm n MUST be an integer power of 2. The routine wstep
-    whose name is supplied to the calling routine, is the underlying wavelet filter
-    used by this routine ...
-------------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------------------*/
+/* One dimensional discrete wavelet transform. This routine implements the pyramid */
+/* algorithm replacing an input vector a[1..n] by its wavelet transform (for isign */
+/*  = 1) or performing the inverse operation (for isign = -1). Note that as in the */
+/* Cooley Tukey FFT algorithm n MUST be an integer power of 2. The routine wstep   */
+/* whose name is supplied to the calling routine, is the underlying wavelet filter */
+/* used by this routine                                                            */
+/*---------------------------------------------------------------------------------*/
 
-_PUBLIC void wt1(FTYPE              a[],
-                 unsigned long int  n,
-                 int                isign,
-                 void               (*wstep)(FTYPE [], unsigned long int, int))
+_PUBLIC void wt1(FTYPE     a[],
+                 uint64_t  n,
+                 int32_t   isign,
+                 void      (*wstep)(FTYPE [], uint64_t, int32_t))
 
-{   unsigned long nn;
+{   uint64_t nn;
 
     if(n < 4)
        return;
@@ -1058,21 +1059,21 @@ _PUBLIC void wt1(FTYPE              a[],
 #define C3 -0.1294095225512604
 
 
-/*------------------------------------------------------------------------------------
-    Applies Debauchies 4-coefficent wavelet filter to a data vector a[1..n] (for
-    isign = 1) or applies its transpose (for isign = -1). Used by hiearchical
-    routine wt1 ...
-------------------------------------------------------------------------------------*/
+/*------------------------------------------------------------------------------*/
+/* Applies Debauchies 4-coefficent wavelet filter to a data vector a[1..n] (for */
+/* isign = 1) or applies its transpose (for isign = -1). Used by hiearchical    */
+/* routine wt1                                                                  */
+/*------------------------------------------------------------------------------*/
 
-_PUBLIC void daub4(FTYPE a[], unsigned long int n, int isign)
+_PUBLIC void daub4(FTYPE a[], uint64_t n, int32_t isign)
 
 {   FTYPE a_max = 0.0,
           *wksp = (FTYPE *)NULL;
 
-    unsigned long nh,
-                  nh1,
-                  i,
-                  j;
+    uint64_t nh,
+             nh1,
+             i,
+             j;
 
     if(n < 4)
       return;
@@ -1095,6 +1096,7 @@ _PUBLIC void daub4(FTYPE a[], unsigned long int n, int isign)
         wksp[i]      = C0*a[n-1] + C1*a[n] + C2*a[1] + C3*a[2];
         wksp[i + nh] = C3*a[n-1] - C2*a[n] + C1*a[1] - C0*a[2];
     }
+
     else
     {
 
@@ -1124,28 +1126,28 @@ _PUBLIC void daub4(FTYPE a[], unsigned long int n, int isign)
 
 
 
-/*----------------------------------------------------------------------------------------
-    N dimensional wavelet transform ...
-----------------------------------------------------------------------------------------*/
+/*---------------------------------*/
+/* N dimensional wavelet transform */
+/*---------------------------------*/
 
-_PUBLIC void wtn(FTYPE                                             a[],
-                 unsigned long int                                nn[],
-                 int                                              ndim,
-                 int                                             isign,
-                 void       (*wstep)(FTYPE [], unsigned long int, int))
+_PUBLIC void wtn(FTYPE     a[],
+                 uint64_t  nn[],
+                 int32_t   ndim,
+                 int32_t   isign,
+                 void      (*wstep)(FTYPE [], uint64_t, int32_t))
 
-{   unsigned long int i1,
-                      i2,
-                      i3,
-                      k,
-                      n,
-                      nnew,
-                      nprev = 1,
-                      nt,
-                      ntot  = 1;
+{   uint64_t i1,
+             i2,
+             i3,
+             k,
+             n,
+             nnew,
+             nprev = 1,
+             nt,
+             ntot  = 1;
 
-    int    idim;
-    FTYPE  *wksp = (FTYPE *)NULL;
+    int32_t  idim;
+    FTYPE    *wksp = (FTYPE *)NULL;
 
     for(idim=1; idim<=ndim; idim++)
        ntot *= nn[idim];
@@ -1167,8 +1169,9 @@ _PUBLIC void wtn(FTYPE                                             a[],
              {  for(i3=i1+i2,k=1; k<=n; k++,i3+=nprev)
                    wksp[k] = a[i3];
 
+
                 /*----------------------------------------*/
-                /* Copy relevant dimension into workspace */
+                /* Copy relevant dimension  int32_to workspace */
                 /*----------------------------------------*/
 
                 if(isign >= 0)
@@ -1181,6 +1184,7 @@ _PUBLIC void wtn(FTYPE                                             a[],
                    for(nt=n; nt>=4; nt >>= 1)
                       (*wstep)(wksp,nt,isign);
                 }
+
                 else
                 {
 

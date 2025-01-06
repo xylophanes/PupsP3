@@ -1,15 +1,15 @@
-/*-----------------------------------------------------------
+/*----------------------------------------
     Purpose: Per process software watchdog 
 
     Author:  Mark A. O'Neill
              Tumbling Dice
              Gosforth
-             Tyne and Wear
+             NE3 4RT 
 
-    Version: 1.00 
-    Date:    25th October 
+    Version: 1.02 
+    Date:    11th December 2024 
     Email:   mao@tumblingdice.co.uk
------------------------------------------------------------*/
+---------------------------------------*/
 
 #include <stdio.h>
 #include <string.h>
@@ -22,6 +22,7 @@
 #include <errno.h>
 #include <signal.h>
 #include <time.h>
+#include <stdint.h>
 
 
 #define _XOPEN_SOURCE
@@ -32,7 +33,7 @@
 /* Defines */
 /*---------*/
 
-#define SOFTDOG_VERSION         "1.00" 
+#define SOFTDOG_VERSION         "1.02" 
 #define DEFAULT_SOFTDOG_TIMEOUT  60 
 
 
@@ -50,24 +51,24 @@
 _PRIVATE struct sigaction sighandle;
 
 
-/*-------------------------------------------*/
-/* Variables which are global to this module */
-/*-------------------------------------------*/
+/*-------------------*/
+/* Private Variables */
+/*-------------------*/
 
-                                                                    /*------------------------------------*/
-_PRIVATE _BOOLEAN      do_verbose       = FALSE;                    /* Log status to stderr if TRUE       */
-_PRIVATE unsigned int  monitor_pgrp     = (-1);                     /* Pgrp of monitored process group    */
-_PRIVATE unsigned int  monitor_pid      = (-1);                     /* Pid of monitored process           */
-_PRIVATE unsigned int  softdog_timeout  = DEFAULT_SOFTDOG_TIMEOUT;  /* Softfog timeout (seconds)          */
-_PRIVATE unsigned char hostname[SSIZE]  = "";                       /* Host running this softdog instance */
-                                                                    /*------------------------------------*/
+                                                                   /*------------------------------------*/
+_PRIVATE _BOOLEAN     do_verbose       = FALSE;                    /* Log status to stderr if TRUE       */
+_PRIVATE uint32_t     monitor_pgrp     = (-1);                     /* Pgrp of monitored process group    */
+_PRIVATE uint32_t     monitor_pid      = (-1);                     /* Pid of monitored process           */
+_PRIVATE uint32_t     softdog_timeout  = DEFAULT_SOFTDOG_TIMEOUT;  /* Softfog timeout (seconds)          */
+_PRIVATE unsigned char hostname[SSIZE] = "";                       /* Host running this softdog instance */
+                                                                   /*------------------------------------*/
 
 
 /*----------------*/
 /* Signal handler */
 /*----------------*/
 
-_PRIVATE int sighandler(const int signum)
+_PRIVATE int32_t sighandler(const int32_t signum)
 
 {   sigset_t pending_set;
 
@@ -92,6 +93,7 @@ _PRIVATE int sighandler(const int signum)
 		          /*---------------*/
 
 		          (void)alarm(0);
+
 
 			  /*-------------------------*/
                           /* Close hardware watchdog */
@@ -229,13 +231,13 @@ _PRIVATE int sighandler(const int signum)
 /* Main entry point */
 /*------------------*/
 
-_PUBLIC int main(int argc, char *argv[])
+_PUBLIC int32_t main(int32_t argc, char *argv[])
 
 {   sigset_t full_set,
              empty_set;
 
-    unsigned int i,
-		 decoded = 0;
+    uint32_t i,
+             decoded = 0;
 
 
     /*----------*/
@@ -246,11 +248,11 @@ _PUBLIC int main(int argc, char *argv[])
 
 
     /*--------------------*/
-    /* Parse command tail */
+    /* Parse command line */
     /*--------------------*/
 
     if (argc == 1 || strcmp(argv[1],"-usage") == 0 || strcmp(argv[1],"-help") == 0)
-    {  (void)fprintf(stderr,"\nsoftdog (version %s, built %s %s)\n\n",SOFTDOG_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nsoftdog version %s (gcc %s: built %s %s)\n\n",SOFTDOG_VERSION,__VERSION__,__TIME__,__DATE__);
 
        (void)fprintf(stderr,"SOFTDOG is free software, covered by the GNU General Public License, and you are\n");
        (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
@@ -356,7 +358,7 @@ _PUBLIC int main(int argc, char *argv[])
     /*--------*/
 
     if (do_verbose == TRUE)
-    {  (void)fprintf(stderr,"\nsoftdog (version %s, built %s %s)\n\n",SOFTDOG_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nsoftdog version %s (gcc %s: built %s %s)\n\n",SOFTDOG_VERSION,__VERSION__,__TIME__,__DATE__);
        (void)fflush(stderr);
     }
 

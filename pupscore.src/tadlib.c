@@ -1,4 +1,4 @@
-/*----------------------------------------------------------------------------
+/*------------------------------------------------------
     Purpose: thread and DLL support for PUPS environment
 
     Author:  M.A. O'Neill
@@ -8,17 +8,30 @@
              NE3 4RT
              United Kingdom
 
-    Version: 2.00 
-    Dated:   4th January 2023
+    Version: 2.02 
+    Dated:   10th December 2024
     E-mail:  mao@tumblingdice.co.uk
-----------------------------------------------------------------------------*/
+------------------------------------------------------*/
 /*-------------------------------------------------------------*/
 /* If we have OpenMP support then we also have pthread support */
 /* (OpenMP is built on pthreads for Linux distributions).      */
 /*-------------------------------------------------------------*/
 
 #if defined(_OPENMP) && !defined(PTHREAD_SUPPORT)
-#define PTHREAD_SUPPORT
+    #define PTHREAD_SUPPORT
+#else
+
+    #ifndef PTHREAD_SUPPORT
+    #include <me.h>
+
+    /*------------------------------------------------------------*/
+    /* We are always the root thread if threads are not supported */
+    /*------------------------------------------------------------*/
+
+    _PUBLIC _BOOLEAN pupsthread_is_root_thread(void)
+    {   return(TRUE);
+    }
+    #endif /* PTHREAD_SUPPORT */
 #endif /* PTHREAD_SUPPORT */
 
 #ifdef PTHREAD_SUPPORT 
@@ -32,6 +45,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include <syscall.h>
+#include <bsd/bsd.h>
 
 
 /*----------------------------------------------------------------*/
@@ -64,20 +78,20 @@
 
 
 
-/*----------------------------------------------------------------------------
-    Get application information for slot manager ...
-----------------------------------------------------------------------------*/
+/*----------------------------------------------*/
+/* Get application information for slot manager */
+/*----------------------------------------------*/
 /*---------------------------*/
 /* Slot information function */
 /*---------------------------*/
 
-_PRIVATE _ROOT_THREAD void tadlib_slot(int level)
+_PRIVATE _ROOT_THREAD void tadlib_slot(int32_t level)
 {   (void)fprintf(stderr,"lib threadlib %s: [ANSI C]\n",TADLIB_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 2002-2023 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 2002-2024 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
-       (void)fprintf(stderr,"PUPS/P3 thread and DLL support library (built %s %s)\n",__TIME__,__DATE__);
+       (void)fprintf(stderr,"PUPS/P3 thread and DLL support library (gcc %s: built %s %s)\n",__VERSION__,__TIME__,__DATE__);
        (void)fflush(stderr);
     }
 
@@ -106,8 +120,8 @@ _EXTERN void (* SLOT )() __attribute__ ((aligned(16))) = tadlib_slot;
 /*----------------------------------------------------------------------*/
                                                                                  /*------------------------------*/
 _PUBLIC  pthread_mutex_t ttab_mutex    = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP; /* Mutex for thread ttab access */
-_PRIVATE int             ttab_index    = (-1);                                   /* Current index into ttab      */
-_PUBLIC  int             n_threads     = 0;                                      /* Number of running threads    */
+_PRIVATE int32_t         ttab_index    = (-1);                                   /* Current index into ttab      */
+_PUBLIC  int32_t         n_threads     = 0;                                      /* Number of running threads    */
 _PUBLIC  ttab_type       ttab[MAX_THREADS];                                      /* Thread table                 */
                                                                                  /*------------------------------*/
 
@@ -115,14 +129,12 @@ _PUBLIC  ttab_type       ttab[MAX_THREADS];                                     
 /*---------------------------------------------*/
 /* Functions which are private to this modules */
 /*---------------------------------------------*/
-
-
 /*-------------------------------------------------------*/
 /* Thread laucher - initialise thread as PUPS thread and */
 /* call its payload function                             */
 /*-------------------------------------------------------*/
 
-_PROTOTYPE _PRIVATE _THREADSAFE int pupsthread_launch(void *);
+_PROTOTYPE _PRIVATE _THREADSAFE  int32_t pupsthread_launch(void *);
 
 // Initialise thread table
 _PROTOTYPE _PRIVATE void pupsthread_init_ttab(void);
@@ -133,32 +145,33 @@ _PROTOTYPE _PRIVATE void pupsthread_init_ttab(void);
 /* Variables which are private to this moudle */
 /*--------------------------------------------*/
 
-_PRIVATE pthread_key_t   pupsthread_error_key                        = (-1);
+_PRIVATE pthread_key_t   pupsthread_error_key = (-1);
 
 
 
 
-/*----------------------------------------------------------------------------
-    Set per thread error number ...
-----------------------------------------------------------------------------*/
+/*-----------------------------*/
+/* Set per thread error number */
+/*-----------------------------*/
 
-_PUBLIC _THREADSAFE void pupsthread_set_errno(const unsigned int thread_errno)
+_PUBLIC _THREADSAFE void pupsthread_set_errno(const uint32_t thread_errno)
 
 {   (void)pthread_setspecific(pupsthread_error_key, (const void *)&thread_errno);
 }
 
 
 
-/*----------------------------------------------------------------------------
-    Handler for SIGTHREAD (asychronous thread termination) ...
-----------------------------------------------------------------------------*/
+/*--------------------------------------------------------*/
+/* Handler for SIGTHREAD (asychronous thread termination) */
+/*--------------------------------------------------------*/
 
-_PRIVATE _THREADSAFE int att_handler(int signum)
+_PRIVATE _THREADSAFE  int32_t att_handler(const int32_t signum)
 
-{ 
+{   char signame[SSIZE]  = "";  // Name of signal received
 
     #ifdef TADLIB_DEBUG
-    (void)fprintf(stderr,"THREAD TERMINATED\n");
+    (void) pups_signotosigname(signum);
+    (void)fprintf(stderr,"THREAD TERMINATED (signal %s)\n",signame);
     (void)fflush(stderr);
     #endif /* TADLIB_DEBUG */
 
@@ -167,20 +180,22 @@ _PRIVATE _THREADSAFE int att_handler(int signum)
 
 
 
-/*----------------------------------------------------------------------------
-    Handler for SIGTHREADSTOP and SIGTHREADRESTART (stop and restarts
-    threads) ...
-----------------------------------------------------------------------------*/
+/*-------------------------------------------------------------------*/
+/* Handler for SIGTHREADSTOP and SIGTHREADRESTART (stop and restarts */
+/* threads)                                                          */
+/*-------------------------------------------------------------------*/
 
 
-_PRIVATE _THREADSAFE int att_pausecont_handler(int signum)
+_PRIVATE _THREADSAFE int32_t att_pausecont_handler(const int32_t signum)
 
-{   int ret_signum;    // Return signal from sigwait()
-    sigset_t sigmask;  // Set of signals that sigwait() is waiting for
+{   int32_t  ret_signum;           // Return signal from sigwait()
+    sigset_t sigmask;              // Set of signals that sigwait() is waiting for
+    char     signame[SSIZE] = "";  // Name of singal received 
 
 
     #ifdef TADLIB_DEBUG
-    (void)fprintf(stderr,"STARTSTOP HANDLER\n");
+    (void) pups_signotosigname(signum);
+    (void)fprintf(stderr,"STARTSTOP HANDLER (signal %s)\n",signame);
     (void)fflush(stderr);
     #endif /* TADLIB_DEBUG */
 
@@ -192,10 +207,10 @@ _PRIVATE _THREADSAFE int att_pausecont_handler(int signum)
     if(signum == SIGTHREADRESTART)
     {
 
-      #ifdef TADLIB_DEBUG
-      (void)fprintf(stderr,"SPURIOUS SIGTHREADRESTART\n");
-      (void)fflush(stderr);
-      #endif /* TADLIB_DEBUG */
+       #ifdef TADLIB_DEBUG
+       (void)fprintf(stderr,"SPURIOUS SIGTHREADRESTART\n");
+       (void)fflush(stderr);
+       #endif /* TADLIB_DEBUG */
 
        return(0);
     }
@@ -205,12 +220,11 @@ _PRIVATE _THREADSAFE int att_pausecont_handler(int signum)
     /*----------------------------------*/
 
     (void)sigemptyset(&sigmask);
-
     (void)sigaddset  (&sigmask,SIGTHREAD);
     (void)sigaddset  (&sigmask,SIGTHREADRESTART);
 
     #ifdef TADLIB_DEBUG
-    (void)fprintf(stderr,"THREAD STOP\n");
+    (void)fprintf(stderr,"THREAD STOP (waiting for SIGTHREAD or SIGTHREADRESTART)\n");
     (void)fflush(stderr);
     #endif /* TADLIB_DEBUG */
 
@@ -220,7 +234,6 @@ _PRIVATE _THREADSAFE int att_pausecont_handler(int signum)
     /*-----------------------------------------*/
 
     (void)sigwait(&sigmask,&ret_signum);
-
 
     #ifdef TADLIB_DEBUG
     if(ret_signum == SIGTHREAD)
@@ -237,7 +250,6 @@ _PRIVATE _THREADSAFE int att_pausecont_handler(int signum)
 
     if(ret_signum == SIGTHREAD)
     { 
-
        #ifdef TADLIB_DEBUG
        (void)fprintf(stderr,"THREAD TERMINATED\n");
        (void)fflush(stderr);
@@ -257,13 +269,13 @@ _PRIVATE _THREADSAFE int att_pausecont_handler(int signum)
 
 
 
-/*----------------------------------------------------------------------------
-    Get per thread error number ...
-----------------------------------------------------------------------------*/
+/*-----------------------------*/
+/* Get per thread error number */
+/*-----------------------------*/
 
-_PUBLIC _THREADSAFE int pupsthread_get_errno(void)
+_PUBLIC _THREADSAFE int32_t pupsthread_get_errno(void)
 
-{   int *ret = (int *)NULL;
+{    int32_t *ret = (int32_t *)NULL;
 
     ret = (int *)pthread_getspecific(pupsthread_error_key);
     return((*ret));
@@ -272,14 +284,20 @@ _PUBLIC _THREADSAFE int pupsthread_get_errno(void)
 
 
 
-/*-----------------------------------------------------------------------------
-    Is this the root thread (e.g. not a POSIX thread or part of an OMP
-    gang) ...
------------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------*/
+/* Is this the root thread (e.g. not a POSIX thread or part of an OMP */
+/* gang)                                                              */
+/*--------------------------------------------------------------------*/
+
+_PRIVATE pthread_mutex_t is_root_thread_mutex;
+_PRIVATE _BOOLEAN        in_pupsthread_is_roothread = FALSE;
 
 _PUBLIC _THREADSAFE _BOOLEAN pupsthread_is_root_thread(void)
 
-{   if(appl_root_tid == (-1) || appl_root_tid == syscall(SYS_gettid))
+{   if(pthread_mutex_trylock(&is_root_thread_mutex) != 0)
+       return(TRUE);
+
+    if(appl_root_tid == pthread_self())
     {  pups_set_errno(OK);
        return(TRUE);
     }
@@ -291,13 +309,13 @@ _PUBLIC _THREADSAFE _BOOLEAN pupsthread_is_root_thread(void)
 
 
 
-/*----------------------------------------------------------------------------
-   Translate function name to tid ...
-----------------------------------------------------------------------------*/
+/*--------------------------------*/
+/* Translate function name to tid */
+/*--------------------------------*/
 
 _PUBLIC pthread_t pupsthread_tfuncname2tid(const char *tfuncname)
 
-{   int       i;
+{   uint32_t  i;
     pthread_t tid;
 
 
@@ -335,13 +353,13 @@ _PUBLIC pthread_t pupsthread_tfuncname2tid(const char *tfuncname)
 
 
 
-/*-------------------------------------------------------------------------------
-    Translate tid to function name ...
---------------------------------------------------------------------------------*/
+/*--------------------------------*/
+/* Translate tid to function name */
+/*--------------------------------*/
 
-_PUBLIC int pupsthread_tid2tfuncname(const pthread_t tid, char *tfuncname)
+_PUBLIC int32_t pupsthread_tid2tfuncname(const pthread_t tid, char *tfuncname)
 
-{   int  i;
+{   uint32_t i;
 
 
     /*--------------*/
@@ -378,13 +396,13 @@ _PUBLIC int pupsthread_tid2tfuncname(const pthread_t tid, char *tfuncname)
 
 
 
-/*-----------------------------------------------------------------------------
-    Translate function name to ttab index (nid) ...
------------------------------------------------------------------------------*/
+/*---------------------------------------------*/
+/* Translate function name to ttab index (nid) */
+/*---------------------------------------------*/
 
-_PUBLIC int pupsthread_tfuncname2nid(const char *tfuncname)
+_PUBLIC int32_t pupsthread_tfuncname2nid(const char *tfuncname)
 
-{   int i;
+{   uint32_t i;
 
 
     /*--------------*/
@@ -420,15 +438,13 @@ _PUBLIC int pupsthread_tfuncname2nid(const char *tfuncname)
 
 
 
-/*-----------------------------------------------------------------------------
-   Translate ttab index (nid) to function name ...
------------------------------------------------------------------------------*/
+/*---------------------------------------------*/
+/* Translate ttab index (nid) to function name */
+/*---------------------------------------------*/
 
-_PUBLIC int pupsthread_nid2tfuncname(const unsigned int nid, char *tfuncname)
+_PUBLIC int32_t pupsthread_nid2tfuncname(const uint32_t nid, char *tfuncname)
 
-{   int i;
-
-
+{
     /*--------------*/
     /* Sanity check */
     /*--------------*/
@@ -437,6 +453,7 @@ _PUBLIC int pupsthread_nid2tfuncname(const unsigned int nid, char *tfuncname)
     {  pups_set_errno(EINVAL);
        return(-1);
     }
+
 
     /*------------------------------------------------------*/
     /* Make sure we don't clash with (exiting) thread which */
@@ -454,13 +471,13 @@ _PUBLIC int pupsthread_nid2tfuncname(const unsigned int nid, char *tfuncname)
 
 
 
-/*-----------------------------------------------------------------------------
-    Translate tid to ttab index (nid) ...
------------------------------------------------------------------------------*/
+/*-----------------------------------*/
+/* Translate tid to ttab index (nid) */
+/*-----------------------------------*/
 
-_PUBLIC int pupsthread_tid2nid(const pthread_t tid)
+_PUBLIC int32_t pupsthread_tid2nid(const pthread_t tid)
 
-{   int i;
+{   uint32_t i;
 
 
     /*--------------*/
@@ -496,14 +513,13 @@ _PUBLIC int pupsthread_tid2nid(const pthread_t tid)
 
 
 
-/*-----------------------------------------------------------------------------
-   Translate ttab index (nid) to tid ...
------------------------------------------------------------------------------*/
+/*-----------------------------------*/
+/* Translate ttab index (nid) to tid */
+/*-----------------------------------*/
 
-_PUBLIC pthread_t pupsthread_nid2tid(const unsigned int nid)
+_PUBLIC pthread_t pupsthread_nid2tid(const uint32_t nid)
 
-{   int       i;
-    pthread_t tid = (pthread_t)NULL;
+{   pthread_t  tid = (pthread_t)NULL;
 
 
     /*--------------*/
@@ -532,13 +548,13 @@ _PUBLIC pthread_t pupsthread_nid2tid(const unsigned int nid)
 
 
 
-/*-----------------------------------------------------------------------------
-    Translate (LWP) tpid to ttab index (nid) ...
------------------------------------------------------------------------------*/
+/*------------------------------------------*/
+/* Translate (LWP) tpid to ttab index (nid) */
+/*------------------------------------------*/
 
-_PUBLIC int pupsthread_tpid2nid(const unsigned int tpid)
+_PUBLIC int32_t pupsthread_tpid2nid(const pid_t tpid)
 
-{   int i;
+{   uint32_t i;
 
 
     /*------------------------------------------------------*/
@@ -564,14 +580,13 @@ _PUBLIC int pupsthread_tpid2nid(const unsigned int tpid)
 
 
 
-/*-----------------------------------------------------------------------------
-    Translate ttab index (nid) to (LWP) tpid ...
------------------------------------------------------------------------------*/
+/*------------------------------------------*/
+/* Translate ttab index (nid) to (LWP) tpid */
+/*------------------------------------------*/
 
-_PUBLIC int pupsthread_nid2tpid(const unsigned int nid)
+_PUBLIC int32_t pupsthread_nid2tpid(const uint32_t nid)
 
-{   int i,
-        tpid;
+{   pid_t tpid;
 
 
     /*--------------*/
@@ -600,13 +615,13 @@ _PUBLIC int pupsthread_nid2tpid(const unsigned int nid)
 
 
 
-/*--------------------------------------------------------------------------------
-    Get index to next free slot in thread table ...
---------------------------------------------------------------------------------*/
+/*---------------------------------------------*/
+/* Get index to next free slot in thread table */
+/*---------------------------------------------*/
 
-_PRIVATE int pupsthread_get_slot(void)
+_PRIVATE int32_t pupsthread_get_slot(void)
 
-{   int i;
+{   uint32_t i;
 
 
     /*------------------------------------------------------*/
@@ -633,13 +648,13 @@ _PRIVATE int pupsthread_get_slot(void)
 
 
 
-/*---------------------------------------------------------------------------------
-    Find thread table entry given tid ...
----------------------------------------------------------------------------------*/
+/*-----------------------------------*/
+/* Find thread table entry given tid */
+/*-----------------------------------*/
 
-_PRIVATE int pupsthread_find_slot(pthread_t tid)
+_PRIVATE int32_t pupsthread_find_slot(pthread_t tid)
 
-{  int i;
+{   uint32_t i;
 
 
     /*--------------*/
@@ -673,11 +688,11 @@ _PRIVATE int pupsthread_find_slot(pthread_t tid)
 
 
 
-/*---------------------------------------------------------------------------------
-    Clear a thread table entry ...
----------------------------------------------------------------------------------*/
+/*----------------------------*/
+/* Clear a thread table entry */
+/*----------------------------*/
 
-_PRIVATE int pupsthread_clear_slot(unsigned int t_index)
+_PRIVATE int32_t pupsthread_clear_slot(uint32_t t_index)
 
 {   char tio_name[SSIZE] = ""; 
 
@@ -696,6 +711,7 @@ _PRIVATE int pupsthread_clear_slot(unsigned int t_index)
     ttab[t_index].tpid       = (-1);
     ttab[t_index].tfunc      = (void *)NULL;
     ttab[t_index].targs      = (void *)NULL;
+
     (void)strlcpy(ttab[t_index].tfuncname,"none",SSIZE);
     (void)strlcpy(ttab[t_index].state,    "",SSIZE);
 
@@ -708,11 +724,11 @@ _PRIVATE int pupsthread_clear_slot(unsigned int t_index)
 
 
  
-/*--------------------------------------------------------------------------------------
-    Show ttab entry for active thread ...
---------------------------------------------------------------------------------------*/
+/*-----------------------------------*/
+/* Show ttab entry for active thread */
+/*-----------------------------------*/
 
-_PUBLIC int pupsthread_show_threadinfo(const FILE *stream, const unsigned int nid)
+_PUBLIC int32_t pupsthread_show_threadinfo(const FILE *stream, const uint32_t nid)
 
 {    
 
@@ -770,9 +786,9 @@ _PUBLIC int pupsthread_show_threadinfo(const FILE *stream, const unsigned int ni
 
     (void)fprintf(stream,"    tpid [LWP]      :  %04d\n",                         ttab[nid].tpid);
     (void)fprintf(stream,"    tid             :  %016lx\n",                       (unsigned long)ttab[nid].tid);
-    (void)fprintf(stream,"    payload function:  \"%-32s\" (at %016lx virtual)\n",ttab[nid].tfuncname,(unsigned long int)ttab[nid].tid);
-    (void)fprintf(stream,"    argument pointer:  %016lx\n",                       (unsigned long int)ttab[nid].targs);
-    (void)fprintf(stream,"    state           :  %-16s\n\n",                       ttab[nid].state);
+    (void)fprintf(stream,"    payload function:  \"%-32s\" (at %016lx virtual)\n",ttab[nid].tfuncname,(uint64_t         )ttab[nid].tid);
+    (void)fprintf(stream,"    argument pointer:  %016lx\n",                       (uint64_t         )ttab[nid].targs);
+    (void)fprintf(stream,"    state           :  %-16s\n\n",                      ttab[nid].state);
     
     (void)pthread_mutex_unlock(&ttab_mutex);
 
@@ -783,14 +799,14 @@ _PUBLIC int pupsthread_show_threadinfo(const FILE *stream, const unsigned int ni
 
 
 
-/*--------------------------------------------------------------------------------------
-    Show ttab entries for PSRP servers active threads ...
---------------------------------------------------------------------------------------*/
+/*---------------------------------------------------*/
+/* Show ttab entries for PSRP servers active threads */
+/*---------------------------------------------------*/
 
 _PUBLIC void pupsthread_show_ttab(const FILE *stream)
 
-{   int i,
-        threads = 0;
+{   uint32_t i,
+             threads = 0;
 
 
     /*--------------*/
@@ -799,7 +815,7 @@ _PUBLIC void pupsthread_show_ttab(const FILE *stream)
 
     if(stream == (FILE *)NULL)
     {  pups_set_errno(EINVAL);
-       return(-1);
+       return;
     }
 
 
@@ -825,8 +841,8 @@ _PUBLIC void pupsthread_show_ttab(const FILE *stream)
 
     for(i=0; i<MAX_THREADS; ++i)
     {  if(ttab[i].tid != (pthread_t)NULL)
-       {  int  d_index;
-          char psrp_object_info[SSIZE] = "";
+       {  int32_t  d_index;
+          char     psrp_object_info[SSIZE] = "";
 
           if((d_index = lookup_psrp_object_by_handle(ttab[i].tfunc)) != (-1))
           {  char typestr[246] = "";
@@ -843,9 +859,9 @@ _PUBLIC void pupsthread_show_ttab(const FILE *stream)
           (void)fprintf(stream,"    %04d: tname: \"%-32s\" (payload \"%-32s\", tid %016lx (LWP %04d) at %016lx virtual) state: %-16s\n",i,
                                                                                                                         ttab[i].tfuncname,
                                                                                                                          psrp_object_info,
-                                                                                                           (unsigned long int)ttab[i].tid,
+                                                                                                                    (uint64_t)ttab[i].tid,
                                                                                                                              ttab[i].tpid,
-                                                                                                         (unsigned long int)ttab[i].tfunc,
+                                                                                                                  (uint64_t)ttab[i].tfunc,
                                                                                                                             ttab[i].state);
           (void)fflush(stream);
 
@@ -868,13 +884,13 @@ _PUBLIC void pupsthread_show_ttab(const FILE *stream)
 
 
 
-/*--------------------------------------------------------------------------------
-    Initialise thread table (note this function IS threadsafe as it gets run
-    only once by the root thread before any other threads are created) ...
---------------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------------*/
+/* Initialise thread table (note this function IS threadsafe as it gets run */
+/* only once by the root thread before any other threads are created)       */
+/*--------------------------------------------------------------------------*/
 
 _PRIVATE void pupsthread_init_ttab(void)
-{   int i;
+{   uint32_t i;
 
     n_threads = 0;
     for(i=0; i<MAX_THREADS; ++i)
@@ -890,10 +906,10 @@ _PRIVATE void pupsthread_init_ttab(void)
 
 
 
-/*----------------------------------------------------------------------------
-    Thread initialisation routine called by main in a PUPS application
-    which is threaded ...
-----------------------------------------------------------------------------*/
+/*---------------------------------------------------------------*/
+/* Thread initialisation routine called by main in PUPS/3 server */
+/* which is threaded                                             */
+/*---------------------------------------------------------------*/
 
 _PUBLIC void pupsthread_init(void)
 
@@ -919,17 +935,17 @@ _PUBLIC void pupsthread_init(void)
 
 
 
-/*----------------------------------------------------------------------------
-    Create a new thread (setting up the threads environment). The first
-    argument is the address of the payload function ...
-----------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------*/
+/* Create a new thread (setting up the threads environment). The first */
+/* argument is the address of the payload function                     */
+/*---------------------------------------------------------------------*/
 
 _PUBLIC pthread_t pupsthread_create(const char *tfuncname,  // Payload function to be run by thread
                                     const void     *tfunc,  // Thread payload function
                                     const void     *targs)  // Argument list (string)
 
-{   int ret,
-        t_index;
+{    int32_t ret,
+             t_index;
 
     sigset_t       sigmask;
     pthread_t      tid;
@@ -1002,6 +1018,7 @@ _PUBLIC pthread_t pupsthread_create(const char *tfuncname,  // Payload function 
 
     (void)pthread_mutex_unlock(&ttab_mutex);
 
+
     /*-------------------------------------------------------*/
     /* Create the thread (returning NULL if we get an error) */
     /*-------------------------------------------------------*/
@@ -1033,15 +1050,15 @@ _PUBLIC pthread_t pupsthread_create(const char *tfuncname,  // Payload function 
 
 
 
-/*----------------------------------------------------------------------------
-    Thread launcher - perform thread initilisation and then start payload
-    function ...
-----------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------------*/
+/* Thread launcher - perform thread initilisation and then start payload */
+/* function                                                              */
+/*-----------------------------------------------------------------------*/
 
-_PRIVATE _THREADSAFE int pupsthread_launch(void *arg)
+_PRIVATE _THREADSAFE int32_t pupsthread_launch(void *arg)
 
-{   int t_index,
-        (*tfunc)(void *);
+{    int32_t t_index,
+             (*tfunc)(void *);
 
     void *targs = (void *)NULL;
 
@@ -1055,7 +1072,7 @@ _PRIVATE _THREADSAFE int pupsthread_launch(void *arg)
     /* Payload function is first argument */
     /*------------------------------------*/
 
-    t_index            = *((int *)arg);
+    t_index               = *((int *)arg);
 
 
     /*---------------------------------------------*/
@@ -1090,13 +1107,13 @@ _PRIVATE _THREADSAFE int pupsthread_launch(void *arg)
 
 
 
-/*----------------------------------------------------------------------------
-    Pause thread ...
-----------------------------------------------------------------------------*/
+/*--------------*/
+/* Pause thread */
+/*--------------*/
 
-_PUBLIC int pupsthread_pause(const pthread_t tid)
+_PUBLIC int32_t pupsthread_pause(const pthread_t tid)
 
-{   int t_index;
+{   int32_t t_index;
 
 
     /*--------------*/
@@ -1155,13 +1172,13 @@ _PUBLIC int pupsthread_pause(const pthread_t tid)
 
 
 
-/*----------------------------------------------------------------------------
-    Restart thread ...
-----------------------------------------------------------------------------*/
+/*----------------*/
+/* Restart thread */
+/*----------------*/
 
-_PUBLIC int pupsthread_cont(pthread_t tid)
+_PUBLIC int32_t pupsthread_cont(pthread_t tid)
 
-{   int t_index;
+{    int32_t t_index;
 
 
     /*--------------*/
@@ -1227,16 +1244,15 @@ _PUBLIC int pupsthread_cont(pthread_t tid)
 
 
 
+/*------------------------------------------------------------------*/
+/* Cancel a thread -- in the PUPS environment cancelling of threads */
+/* is asychronous so the thread terminates immediately              */
+/*------------------------------------------------------------------*/
 
-/*----------------------------------------------------------------------------
-    Cancel a thread -- in the PUPS environment cancelling of threads
-    is asychronous so the thread terminates immediately ...
-----------------------------------------------------------------------------*/
+_PUBLIC int32_t pupsthread_cancel(const pthread_t tid)
 
-_PUBLIC int pupsthread_cancel(const pthread_t tid)
-
-{   int  t_index;
-    char tio_name[SSIZE] = "";
+{   int32_t t_index;
+    char    tio_name[SSIZE] = "";
 
 
     /*--------------*/
@@ -1293,42 +1309,33 @@ _PUBLIC int pupsthread_cancel(const pthread_t tid)
 
 
 
-/*-----------------------------------------------------------------------------
-    Routine to cancel all currently running threads except caller ...
------------------------------------------------------------------------------*/
+/*-------------------------------------------------*/
+/* Routine to cancel all currently running threads */
+/* except caller (and root thread)                 */
+/*-------------------------------------------------*/
 
-_PUBLIC int pupsthread_cancel_all_other_threads(void)
+_PUBLIC int32_t pupsthread_cancel_all_other_threads(void)
 
-{   int i,
-        mytid,
-        my_index;
-
-
-    /*--------------------------------*/
-    /* Caller must be the root thread */
-    /*--------------------------------*/
-
-    mytid = syscall(SYS_gettid);
-    if(mytid == appl_root_tid)
-    {  pups_set_errno(EPERM);
-       return(-1);
-    }
-
-
-    /*----------------------------------*/
-    /* Only the root thread can process */
-    /* PSRP requests                    */
-    /*----------------------------------*/
-
-    if(pupsthread_is_root_thread() == FALSE)
-       pups_error("[pupsthread_cancel_all_other_threads] attempt by non root thread to perform PUPS/P3 global thread operation");
+{   uint32_t i;
 
     (void)pthread_mutex_lock(&ttab_mutex);
     for(i=0; i<n_threads; ++i)
-    {  if(ttab[i].tid == pthread_self())
-          my_index = i;
-       else if(ttab[i].tid != (pthread_t)NULL)
-          (void)pupsthread_cancel(ttab[i].tid);
+    {  
+
+       /*--------------------------------*/
+       /* Check for self and root thread */
+       /*--------------------------------*/
+
+       if(ttab[i].tid != pthread_self() && ttab[i].tid != appl_root_tid)
+       {  
+
+          /*------------------------------*/
+          /* Terminate next active thread */
+          /*------------------------------*/
+
+          if(ttab[i].tid != (pthread_t)NULL)
+             (void)pupsthread_cancel(ttab[i].tid);
+       }
     }      
     (void)pthread_mutex_unlock(&ttab_mutex);
 
@@ -1339,20 +1346,38 @@ _PUBLIC int pupsthread_cancel_all_other_threads(void)
 
 
 
-/*----------------------------------------------------------------------------
-    Terminate a thread deleting its thread table entry ...
-----------------------------------------------------------------------------*/
+/*----------------------------------------------------*/
+/* Terminate a thread deleting its thread table entry */
+/*----------------------------------------------------*/
 
-_PUBLIC _THREADSAFE void pupsthread_exit(void *retval)
+_PUBLIC _THREADSAFE void pupsthread_exit(const void *retval)
 
-{   int       t_index;
+{   int32_t   t_index;
     pthread_t tid;
+
+
+    /*-----------*/
+    /* Who am I? */
+    /*-----------*/
 
     tid = pthread_self();
 
-    pups_set_errno(OK);
 
-    if((t_index = pupsthread_tid2nid(tid)) == (-1))
+    /*-------------*/
+    /* Root thread */
+    /*-------------*/
+
+    if(tid == appl_root_tid)
+    {  pups_set_errno(EPERM);
+       return;
+    }
+
+
+    /*---------------------*/
+    /* Not in thread table */
+    /*---------------------*/
+
+    else if((t_index = pupsthread_tid2nid(tid)) == (-1))
     {  pups_set_errno(EINVAL);
        return;
     }
@@ -1370,6 +1395,6 @@ _PUBLIC _THREADSAFE void pupsthread_exit(void *retval)
     /*------------------------------*/
 
     pthread_exit(retval);
+    pups_set_errno(OK);
 }
-
 #endif /* PTHREAD_SUPPORT */

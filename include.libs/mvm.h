@@ -8,8 +8,8 @@
              NE3 4RT
              United Kingdom
 
-    Version: 2.00 
-    Dated:   4th January 2023
+    Version: 2.02 
+    Dated:   27th February 2024
     E-mail:  mao@tumblingdice.co.uk
 ------------------------------------------------------------------------------*/
 
@@ -37,7 +37,7 @@
 /* Version */
 /***********/
 
-#define MVMLIB_VERSION       "2.00"
+#define MVMLIB_VERSION       "2.02"
 
 
 /*-------------*/
@@ -107,10 +107,10 @@
 /* Page status information datastructure */
 /*---------------------------------------*/
 
-typedef struct {   int       v_page_usage;          // Times object has been accessed 
-                   int             v_page;          // Index of object in virtual array
-                   _BOOLEAN        locked;          // TRUE if page in use 
-                   void  *v_page_location;          // Address of object
+typedef struct {   uint32_t     v_page_usage;       // Times object has been accessed 
+                   uint32_t     v_page;             // Index of object in virtual array
+                   _BOOLEAN     locked;             // TRUE if page in use 
+                   void         *v_page_location;   // Address of object
                } page_status_type;
 
 
@@ -120,34 +120,34 @@ typedef struct {   int       v_page_usage;          // Times object has been acc
 /*------------------------------------------*/
 
 typedef struct {   char     name[SSIZE];            // Name of this virtual memory 
-                   int      v_page_slots;           // Number of pages in virtual memory 
-                   int      max_page_slots;         // Number of pages in physical memory
-                   int      page_slots;             // Number of pages in use
-                   int      next_lock;              // Number of items on lock list
-                   int      max_lock;               // Current maximum size of lock list
-                   int      ulist_ptr;              // Usage list pointer
-                   int      clock_ptr;              // Usage list clock pointer
-                   int      r_w_state;              // Memory access (read/write) state
-                   int      sched_policy;           // Page scehduling policy
-                   int      current_lock_state;     // Current page lock state flag
-                   int      fd;                     // Backing device descriptor
-                   long int v_page_base;            // Base (backing) address of mvm pages
-                   long int v_page_size;            // Size of page in bytes
+                   uint32_t v_page_slots;           // Number of pages in virtual memory 
+                   uint32_t max_page_slots;         // Number of pages in physical memory
+                   uint32_t page_slots;             // Number of pages in use
+                   uint32_t next_lock;              // Number of items on lock list
+                   uint32_t max_lock;               // Current maximum size of lock list
+                   uint32_t ulist_ptr;              // Usage list pointer
+                   uint32_t clock_ptr;              // Usage list clock pointer
+                    int32_t r_w_state;              // Memory access (read/write) state
+                    int32_t sched_policy;           // Page scehduling policy
+                    int32_t current_lock_state;     // Current page lock state flag
+                   des_t    fd;                     // Backing device descriptor
+                    int64_t v_page_base;            // Base (backing) address of mvm pages
+                    int64_t v_page_size;            // Size of page in bytes
                    _BOOLEAN aged_and_ordered;       // TRUE if aged and ordered
                    _BOOLEAN initialised;            // True if mvm memory initialised
-                   int      *v_page_map;            // Mapping between phys and virt pages
-                   int      *lock_map;              // Indices of locked physical pages
+                    int32_t *v_page_map;            // Mapping between phys and virt pages
+                    int32_t *lock_map;              // Indices of locked physical pages
                    void     **vmem;                 // The virtual memory
-                   int      *usage_map;             // Index physical pages by usage
+                    int32_t *usage_map;             // Index physical pages by usage
                    page_status_type *page_status;   // Page status array
                } mvm_type;
  
  
  
 
-/*------------------------------------------------------------------------------
-    Public function prototype exported by module ...
-------------------------------------------------------------------------------*/
+/*----------------------------------------------*/
+/* Public function prototype exported by module */
+/*----------------------------------------------*/
 
 #ifndef __NOT_LIB_SOURCE__
 
@@ -159,55 +159,58 @@ typedef struct {   char     name[SSIZE];            // Name of this virtual memo
 
 
 
-/*------------------------------------------------------------------------------
-    Prototype bindings ...
-------------------------------------------------------------------------------*/
+/*--------------------*/
+/* Prototype bindings */
+/*--------------------*/
 
 // Show MVM objects attached to current application
-_PROTOTYPE _EXPORT void mvm_show_mvm_objects(FILE *);
+_PROTOTYPE _EXPORT void mvm_show_mvm_objects(const FILE *);
 
-// Show meta virtual memory object statistics
-_PROTOTYPE _EXPORT void show_mvm(mvm_type *);
+// Show MVM object statistics
+_PROTOTYPE _EXPORT void mvm_stat(const FILE *, const mvm_type *);
 
 // Change cache size of meta virtual memory object
-_PROTOTYPE _EXPORT void mvm_set_cache_size(int, mvm_type);
+_PROTOTYPE _EXPORT void mvm_set_cache_size(int32_t, mvm_type);
 
 // Page a dynamic (data) object
-_PROTOTYPE _EXPORT int mvm_page(int        ,        // Page to cache
-                                mvm_type  *);       // Meta virtual memory mapper
+_PROTOTYPE _EXPORT int32_t mvm_page(uint32_t    ,        // Page to cache
+                                    mvm_type   *);       // Meta virtual memory mapper
 
 
 // Age and order pages of dynamic object
-_PROTOTYPE _EXPORT int mvm_age_and_order(mvm_type *);
+_PROTOTYPE _EXPORT int32_t mvm_age_and_order(mvm_type *);
 
 // Initialise meta virtual memory object object
-_PROTOTYPE _EXPORT void **mvm_init(char      *,     // Name of virtual memory
-                                   _BOOLEAN   ,     // Memory initialisation flag
-                                   int        ,     // Memeory access type
-                                   int        ,     // Page scheduling policy
-                                   int        ,     // Pages in virtual memory
-                                   int        ,     // Pages in physical memory
-                                   int        ,     // Backing store descriptor
-                                   long       ,     // Page size in virtual memory
-                                   mvm_type  *);    // Virtual memory structure
+_PROTOTYPE _EXPORT void **mvm_init(const char      *,     // Name of virtual memory
+                                   const _BOOLEAN   ,     // Memory initialisation flag
+                                   const int32_t    ,     // Memory access type
+                                   const int32_t    ,     // Page scheduling policy
+                                   const uint32_t   ,     // Pages in virtual memory
+                                   const uint32_t   ,     // Pages in physical memory
+                                   const des_t      ,     // Backing store descriptor
+                                   const size_t     ,     // Page size in virtual memory
+                                   mvm_type        *);    // Virtual memory structure
 
 // Destroy meta virtual memory object
-_PROTOTYPE _EXPORT int mvm_destroy(mvm_type *);
+_PROTOTYPE _EXPORT int32_t mvm_destroy(mvm_type *);
 
 // Reset virtual cache after meta virtual memory access operations
-_PROTOTYPE _EXPORT int mvm_reset_pager(mvm_type *);
+_PROTOTYPE _EXPORT int32_t mvm_reset_pager(mvm_type *);
 
 // Create swapfile associated with MVM object
-_PROTOTYPE _EXPORT int mvm_create_named_swapfile(char *, int, long);
+_PROTOTYPE _EXPORT int32_t mvm_create_named_swapfile(const char *, const uint32_t, const size_t);
 
 // Create MVM swapfile using open file handle
-_PROTOTYPE _EXPORT int mvm_create_swapfile(int, int, long);
+_PROTOTYPE _EXPORT int32_t mvm_create_swapfile(const int32_t, const uint32_t, const size_t);
 
 // Delete swapfile associated with MVM object
-_PROTOTYPE _EXPORT int mvm_delete_swapfile(int, char *);
+_PROTOTYPE _EXPORT int32_t mvm_delete_swapfile(const int32_t, const char *);
 
 // Mark memory as being initialised
-_PROTOTYPE _EXPORT int  mvm_initialised(mvm_type *);
+_PROTOTYPE _EXPORT int32_t  mvm_initialised(mvm_type *);
+
+// Set maximum (resident) cache for MVM object
+_PUBLIC void mvm_change_cache_size(const uint32_t, mvm_type *mvm);
 
 
 #undef _EXPORT

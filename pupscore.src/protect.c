@@ -1,4 +1,4 @@
-/*-------------------------------------------------------------------------------------------------------
+/*----------------------------------
     Purpose: Multi file homeostat 
 
     Author:  M.A. O'Neill
@@ -8,10 +8,10 @@
              NE3 4RT
              United Kingdom
 
-    Version: 2.00 
-    Dated:   26th January 2023
+    Version: 2.02
+    Dated:   11th December 2024
     E-mail:  mao@tumblingdice.co.uk
--------------------------------------------------------------------------------------------------------*/
+----------------------------------*/
 
 
 #include <me.h>
@@ -27,13 +27,14 @@
 #include <signal.h>
 #include <vstamp.h>
 #include <time.h>
+#include <bsd/bsd.h>
 
 
-/*--------------------*/
-/* Version of protect */
-/*--------------------*/
+/*---------*/
+/* Version */
+/*---------*/
 
-#define PROTECT_VERSION    "2.00"
+#define PROTECT_VERSION    "2.02"
 
 #ifdef BUBBLE_MEMORY_SUPPORT
 #include <bubble.h>
@@ -62,28 +63,23 @@
 #endif /* AARCH64 */
 #undef __DEFINE__
 
-
 #define DELAY 100000
 
 
-
-/*------------------------------------------------------------------------------------------------------
-    Get application information for slot manager ...
-------------------------------------------------------------------------------------------------------*/
-
-
-
+/*----------------------------------------------*/
+/* Get application information for slot manager */
+/*----------------------------------------------*/
 /*---------------------------*/ 
 /* Slot information function */
 /*---------------------------*/ 
 
-_PRIVATE void protect_slot(int level)
+_PRIVATE void protect_slot(int32_t level)
 {   (void)fprintf(stderr,"int [PUPS/PSRP] application protect %s: [ANSI C, PUPS/PSRP]\n",PROTECT_VERSION);
  
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 2005-2023 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 2005-2024 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
-       (void)fprintf(stderr,"File and directory protector (built %s %s)\n\n",__TIME__,__DATE__);
+       (void)fprintf(stderr,"File and directory protector (gcc %s: built %s %s)\n\n",__VERSION__,__TIME__,__DATE__);
     }
     else
        (void)fprintf(stderr,"\n");
@@ -127,9 +123,9 @@ _EXTERN void (* USE )() __attribute__ ((aligned(16))) = protect_usage;
 
 
 
-/*-------------------------------------------------------------------------------------------------------
-    Application build date ...
--------------------------------------------------------------------------------------------------------*/
+/*------------------------*/
+/* Application build date */
+/*------------------------*/
 
 _EXTERN char appl_build_time[SSIZE] = __TIME__;
 _EXTERN char appl_build_date[SSIZE] = __DATE__;
@@ -137,88 +133,88 @@ _EXTERN char appl_build_date[SSIZE] = __DATE__;
 
 
 
-/*-------------------------------------------------------------------------------------------------------
-    Defines which are private to this application ...
--------------------------------------------------------------------------------------------------------*/
+/*-----------------------------------------------*/
+/* Defines which are private to this application */
+/*-----------------------------------------------*/
 
 #define FOREVER               1
 #define DEFAULT_LIFETIME      600 
 
 
-/*-------------------------------------------------------------------------------------------------------
-    Functions which are private to this application ...
--------------------------------------------------------------------------------------------------------*/
+/*-------------------------------------------------*/
+/* Functions which are private to this application */
+/*-------------------------------------------------*/
 
 // Exit function
-_PROTOTYPE _PRIVATE int exit_func(char *arg);
+_PROTOTYPE _PRIVATE int32_t exit_func(char *arg);
 
 // Set/display principal (protected object)
-_PROTOTYPE _PRIVATE int set_principal(int, char *[]);
+_PROTOTYPE _PRIVATE int32_t set_principal(int32_t, char *[]);
 
 // Set/display protection lifetime (in seconds)
-_PRIVATE int set_lifetime(int, char *[]);
+_PROTOTYPE _PRIVATE int32_t set_lifetime(int32_t, char *[]);
 
 // Set/display file protection key
-_PROTOTYPE _PRIVATE int set_key(int, char *[]);
+_PROTOTYPE _PRIVATE int32_t set_key(int32_t, char *[]);
 
 // Protect a file (in principal directory)
-_PROTOTYPE _PRIVATE int myprotect(int, char *[]);
+_PROTOTYPE _PRIVATE int32_t protect_file(int32_t, char *[]);
 
 // Unprotect a file (in principal directory)
-_PROTOTYPE _PRIVATE int myunprotect(int, char *[]);
+_PROTOTYPE _PRIVATE int32_t unprotect_file(int32_t, char *[]);
 
 // Show list of protected file (in principal directory)
-_PROTOTYPE _PRIVATE int show_protected_files(int, char *[]);
+_PROTOTYPE _PRIVATE int32_t show_protected_files(int32_t, char *[]);
 
 // PSRP process status display dispatch function
-_PROTOTYPE _PRIVATE int psrp_process_status(int, char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_process_status(int32_t, char *[]);
 
 // Scan directory (for new files to protect)
 _PROTOTYPE _PRIVATE void scan_directory(char *);
 
 
 
-/*-------------------------------------------------------------------------------------------------------
-    Variables which are private to this module ...
--------------------------------------------------------------------------------------------------------*/
-                                                     /*------------------------------------------------*/
-_PRIVATE _BOOLEAN is_directory      = FALSE;         /* TRUE if we are protecting a directory of files */
-_PRIVATE _BOOLEAN do_defer          = FALSE;         /* TRUE if we have deferred protection enabled    */
-_PRIVATE char file_name[SSIZE]      = "";            /* Name of file/directory to be protected         */
-_PRIVATE char key[SSIZE]            = "all";         /* Key (for matching directory files)             */
-_PRIVATE char prot_pathname[SSIZE]  = "";            /* Protection flag (for protected directory)      */
-_PRIVATE char pathname[SSIZE]       = "";            /* Pathname                                       */
-_PRIVATE struct stat stat_buf;                       /* File (inode) statistics buffer                 */
-_PRIVATE int  n_files               = 0;             /* Number of protected files (in directory)       */
-_PRIVATE int fdes                   = 0;             /* Number of times principal attacked             */
-_PRIVATE time_t lifetime            = FOREVER;       /* Protection lifetime                            */
-                                                     /*------------------------------------------------*/
+/*--------------------------------------------*/
+/* Variables which are private to this module */
+/*--------------------------------------------*/
+                                                         /*------------------------------------------------*/
+_PRIVATE _BOOLEAN     is_directory          = FALSE;     /* TRUE if we are protecting a directory of files */
+_PRIVATE _BOOLEAN     do_defer              = FALSE;     /* TRUE if we have deferred protection enabled    */
+_PRIVATE char         file_name[SSIZE]      = "";        /* Name of file/directory to be protected         */
+_PRIVATE char         key[SSIZE]            = "all";     /* Key (for matching directory files)             */
+_PRIVATE char         prot_pathname[SSIZE]  = "";        /* Protection flag (for protected directory)      */
+_PRIVATE char         pathname[SSIZE]       = "";        /* Pathname                                       */
+_PRIVATE struct       stat stat_buf;                     /* File (inode) statistics buffer                 */
+_PRIVATE  des_t       fdes                  = 0;         /* Number of times principal attacked             */
+_PRIVATE uint32_t     n_files               = 0;         /* Number of protected files (in directory)       */
+_PRIVATE time_t       lifetime              = FOREVER;   /* Protection lifetime                            */
+                                                         /*------------------------------------------------*/
 
 #ifdef HYDRA_OF_LERNA
-                                                     /*------------------------------------------------*/
-_PRIVATE int child_pid;                              /* PID of child bud process                       */
-                                                     /*------------------------------------------------*/
+                                                         /*------------------------------------------------*/
+_PRIVATE pid_t child_pid;                                /* PID of child bud process                       */
+                                                         /*------------------------------------------------*/
 #endif /* HYDRA_OF_LERNA */
 
 
 
-/*-------------------------------------------------------------------------------------------------------
-    Software I.D. tag (used if CKPT support enabled to discard stale dynamic
-    checkpoint files) ...
--------------------------------------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------------*/
+/* Software I.D. tag (used if CKPT support enabled to discard stale dynamic */
+/* checkpoint files)                                                        */
+/*--------------------------------------------------------------------------*/
 
-#define VTAG  3831
-extern int appl_vtag = VTAG;
-
-
+#define VTAG  4374
+extern  int32_t appl_vtag = VTAG;
 
 
 
-/*-------------------------------------------------------------------------------------------------------
-    Main - decode command tail then interpolate using parameters supplied by user ...
--------------------------------------------------------------------------------------------------------*/
 
-_PUBLIC int pups_main(int argc, char *argv[])
+
+/*------------------*/
+/* Main entry point */
+/*------------------*/
+
+_PUBLIC  int32_t pups_main(int32_t argc, char *argv[])
 
 {   DIR           *dirp       = (DIR *)NULL;
     struct dirent *next_entry = (struct dirent *)NULL;
@@ -299,8 +295,6 @@ refork:
            /* Check to see if we have any new entries in directory -- if they match */
            /* key we will have to protect them                                      */
            /*-----------------------------------------------------------------------*/
-
-
            /*-----------------------------------------------------------------------*/
            /* Check to see if we have any new entries in directory -- if they match */
            /* key we will have to protect them                                      */
@@ -335,17 +329,17 @@ refork:
     #endif  /* HYDRA_OF_LERNA */
 
 
-/*------------------------------------------------------------------------------------------------------
-    Get standard items form the command tail ...
-------------------------------------------------------------------------------------------------------*/
+   /*-------------------------------------------*/
+   /*  Get standard items from the command tail */
+   /*-------------------------------------------*/
 
     pups_std_init(TRUE,
                   &argc,
                   PROTECT_VERSION,
                   "M.A. O'Neill",
                   "protect",
-                  "2023",
-                  argv);
+                  "2024",
+                  (void *)argv);
 
 
     /*-----------------------------------------------------*/
@@ -371,7 +365,7 @@ refork:
     }
 
     if((ptr = pups_locate(&init,"lifetime",&argc,args,0)) !=  NOT_FOUND) 
-    {  if((lifetime = pups_i_dec(&ptr,&argc,args)) == (int)INVALID_ARG)
+    {  if((lifetime = pups_i_dec(&ptr,&argc,args)) == (int32_t)INVALID_ARG)
           pups_error("[protect] expecting lifetime (in seconds)");
 
        if(appl_verbose == TRUE)
@@ -399,7 +393,7 @@ refork:
     /* Complain about any unparsed arguments */
     /*---------------------------------------*/
 
-    (void)pups_t_arg_errs(argd,args);
+    (void)pups_t_arg_errs(argd,(void *)args);
 
 
     /*---------------------------------------------------------*/
@@ -420,8 +414,8 @@ refork:
     /* dispatch table objects                                      */
     /*-------------------------------------------------------------*/
 
-    (void)psrp_attach_static_function("protect",  (void *)&myprotect);
-    (void)psrp_attach_static_function("unprotect",(void *)&myunprotect);
+    (void)psrp_attach_static_function("protect",  (void *)&protect_file);
+    (void)psrp_attach_static_function("unprotect",(void *)&unprotect_file);
     (void)psrp_attach_static_function("protstat", (void *)&show_protected_files);
     (void)psrp_attach_static_function("key",      (void *)&set_key);
     (void)psrp_attach_static_function("lifetime", (void *)&set_lifetime);
@@ -450,8 +444,6 @@ refork:
     /*-----------------------------*/
     /* Payload of application here */
     /*-----------------------------*/
-
-
     /*------------------------*/
     /* Do we have a directory */
     /*------------------------*/
@@ -473,9 +465,9 @@ refork:
        (void)snprintf(prot_pathname,SSIZE,"%s.prot",file_name);
 
        if(access(prot_pathname,F_OK | R_OK | W_OK) != (-1))
-       {  FILE *stream = (FILE *)NULL;
-          int  prot_pid;
-          char prot_host[SSIZE] = "";
+       {  FILE     *stream          = (FILE *)NULL;
+          int32_t  prot_pid;
+          char     prot_host[SSIZE] = "";
 
           stream = fopen(prot_pathname,"r"); 
           (void)fscanf(stream,"%d",&prot_pid);
@@ -663,27 +655,27 @@ refork:
 
 
 
-/*----------------------------------------------------------------------------------------------------
-    Display process status (to attached PSRP client process) ...
-----------------------------------------------------------------------------------------------------*/
+/*----------------------------------------------------------*/
+/* Display process status (to attached PSRP client process) */
+/*----------------------------------------------------------*/
 
-_PRIVATE int psrp_process_status(int argc, char *argv[])
+_PRIVATE int32_t psrp_process_status(int32_t argc, char *argv[])
 
 {
    (void)fprintf(psrp_out,"\n    Protect (version %s)\n",PROTECT_VERSION);
    (void)fprintf(psrp_out,"    ======================\n\n");
    (void)fflush(psrp_out);
 
-#if defined(CRIIU_SUPPORT)
+    #if defined(CRIIU_SUPPORT)
     (void)fprintf(psrp_out,"    Binary is Criu enabled (checkpointable)\n");
-#endif  /* CRIU_SUPPORT */
+    #endif  /* CRIU_SUPPORT */
 
    if(is_directory == TRUE)
    {  (void)fprintf(psrp_out,"    Protecting directory %s (%d files)\n",file_name,n_files);
       (void)fprintf(psrp_out,"    \"protstat\" PSRP option shows list of protected filenames\n\n");
    }
    else
-   {  int lost_cnt;
+   {  int32_t lost_cnt;
 
       lost_cnt = pups_lost(fdes);
 
@@ -710,17 +702,17 @@ _PRIVATE int psrp_process_status(int argc, char *argv[])
 
 
 
-/*-----------------------------------------------------------------------------------------------------
-    Routine to automically extended protection to key-match files which have been added to
-    the protected directory ...
------------------------------------------------------------------------------------------------------*/
+/*----------------------------------------------------------------------------------------*/
+/* Routine to automically extended protection to key-match files which have been added to */
+/* the protected directory                                                                */
+/*----------------------------------------------------------------------------------------*/
 
 _PRIVATE void scan_directory(char *dir_name)
 
-{   int i,
-        index,
-        n_used                = 0,
-        n_alloc               = 0;
+{   uint32_t      i,
+                  index,
+                  n_used      = 0,
+                  n_alloc     = 0;
 
     DIR           *dirp       = (DIR *)NULL;
     struct dirent *next_entry = (struct dirent *)NULL;
@@ -793,8 +785,8 @@ _PRIVATE void scan_directory(char *dir_name)
        /*---------------------------*/
 
        if((index = pups_get_ftab_index_by_name(nlist[i])) == (-1) && (strin(nlist[i],key) == TRUE || strcmp(key,"all") == 0))
-       {  int fdes = (-1);
-          char hname[SSIZE] = "";
+       {  des_t fdes         = (-1);
+          char  hname[SSIZE] = "";
 
           fdes = pups_open(nlist[i],0,LIVE);
           (void)pups_creator(fdes);
@@ -842,17 +834,17 @@ _PRIVATE void scan_directory(char *dir_name)
 
 
 
-/*------------------------------------------------------------------------------------------------------
-    Add files (in directory) to protected list ...
-------------------------------------------------------------------------------------------------------*/
+/*--------------------------------------------*/
+/* Add files (in directory) to protected list */
+/*--------------------------------------------*/
 
-_PRIVATE int myprotect(int argc, char *argv[])
+_PRIVATE int32_t protect_file(int32_t argc, char *argv[])
 
-{   int  index,
-         fdes = (-1);
+{   int32_t index;
+    des_t   fdes            = (-1);
 
-    char hname[SSIZE]    = "",
-         pathname[SSIZE] = "";
+    char    hname[SSIZE]    = "",
+            pathname[SSIZE] = "";
 
 
     /*--------------------------*/
@@ -957,16 +949,16 @@ _PRIVATE int myprotect(int argc, char *argv[])
 
 
 
-/*------------------------------------------------------------------------------------------------------
-    Revoke protection (on currently protected file) ...
-------------------------------------------------------------------------------------------------------*/
+/*-------------------------------------------------*/
+/* Revoke protection (on currently protected file) */
+/*-------------------------------------------------*/
 
-_PRIVATE int myunprotect(int argc, char *argv[])
+_PRIVATE int32_t unprotect_file(int32_t argc, char *argv[])
 
-{   int index;
+{   int32_t index;
 
-    char pathname[SSIZE]  = "",
-         upathname[SSIZE] = "";
+    char    pathname[SSIZE]  = "",
+            upathname[SSIZE] = "";
 
 
     /*--------------------------*/
@@ -1041,16 +1033,15 @@ _PRIVATE int myunprotect(int argc, char *argv[])
 
 
 
-/*------------------------------------------------------------------------------------------------------
-    Show files which are currently protected ...
-------------------------------------------------------------------------------------------------------*/
+/*------------------------------------------*/
+/* Show files which are currently protected */
+/*------------------------------------------*/
 
-_PRIVATE int show_protected_files(int argc, char *argv[])
+_PRIVATE int32_t show_protected_files(int32_t argc, char *argv[])
 
-{   int cnt = 0;
-
-    DIR           *dirp       = (DIR *)NULL;
-    struct dirent *next_entry = (struct dirent *)NULL;
+{   uint32_t      cnt          = 0;
+    DIR           *dirp        = (DIR *)NULL;
+    struct dirent *next_entry  = (struct dirent *)NULL;
 
 
     /*--------------------------*/
@@ -1113,11 +1104,11 @@ _PRIVATE int show_protected_files(int argc, char *argv[])
 
 
 
-/*-------------------------------------------------------------------------------------------------------
-    Set/show matched image I.D. key ...
--------------------------------------------------------------------------------------------------------*/
+/*--------------------------------*/
+/* Set/show (protection) lifetime */
+/*--------------------------------*/
 
-_PRIVATE int set_lifetime(int argc, char *argv[])
+_PRIVATE int32_t set_lifetime(int32_t argc, char *argv[])
 
 {
 
@@ -1162,10 +1153,10 @@ _PRIVATE int set_lifetime(int argc, char *argv[])
        (void)fflush(psrp_out);
     }
     else
-    {  int itmp;
+    {  int32_t itmp;
 
        if(sscanf(argv[1],"%d",&itmp) != 1 || itmp <= 0)
-       {  (void)fprintf(psrp_out,"\nprotection lifetime parameter must be a positive integer\n\n",lifetime);
+       {  (void)fprintf(psrp_out,"\nprotection lifetime parameter must be a positive  integer\n\n",lifetime);
           (void)fflush(psrp_out);
 
           return(PSRP_OK);
@@ -1196,12 +1187,11 @@ _PRIVATE int set_lifetime(int argc, char *argv[])
 
 
 
+/*------------------------------*/
+/* Set/show file protection key */
+/*------------------------------*/
 
-/*-------------------------------------------------------------------------------------------------------
-    Set/show matched image I.D. key ...
--------------------------------------------------------------------------------------------------------*/
-
-_PRIVATE int set_key(int argc, char *argv[])
+_PRIVATE int32_t set_key(int32_t argc, char *argv[])
 
 {
 
@@ -1253,13 +1243,13 @@ _PRIVATE int set_key(int argc, char *argv[])
 
 
 
-/*-------------------------------------------------------------------------------------------------------
-    Set principal (which is protected, or in which files are protected) ...
--------------------------------------------------------------------------------------------------------*/
+/*-----------------------------------------------------*/
+/* Set principal (directory which is to be  protected) */
+/*-----------------------------------------------------*/
 
-_PRIVATE int set_principal(int argc, char *argv[])
+_PRIVATE int32_t set_principal(int32_t argc, char *argv[])
 
-{   int index;
+{   int32_t       index;
     DIR           *dirp       = (DIR *)NULL;
     struct dirent *next_entry = (struct dirent *)NULL;
 
@@ -1368,11 +1358,11 @@ _PRIVATE int set_principal(int argc, char *argv[])
 
 
 
-/*-------------------------------------------------------------------------------------------------------
-    Exit function -- rename all files which have a .uprot extension ...
--------------------------------------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------*/
+/* Exit function -- rename all files which have a .uprot extension */
+/*-----------------------------------------------------------------*/
 
-_PRIVATE int exit_func(char *arg)
+_PRIVATE int32_t exit_func(char *arg)
 
 {   DIR           *dirp      = (DIR *)NULL;
     struct dirent *next_item = (struct dirent *)NULL;

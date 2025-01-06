@@ -1,5 +1,5 @@
-/*-----------------------------------------------------------------------------
-    Purpose: Cantor cellular database core library.
+/*------------------------------------------------
+    Purpose: Cantor cellular database core library
 
     Author:  M.A. O'Neill
              Tumbling Dice Ltd
@@ -9,9 +9,9 @@
              United Kingdom
 
     Version: 3.00 
-    Dated:   4th January 2023
+    Dated:   10th Decemeber 2024
     E-mail:  mao@@tumblingdice.co.uk
------------------------------------------------------------------------------*/
+------------------------------------------------*/
 
 
 #include <stdio.h>
@@ -21,6 +21,7 @@
 #include <vstamp.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <bsd/bsd.h>
 
 #ifdef PERSISTENT_HEAP_SUPPORT
 #include <pheap.h>
@@ -47,13 +48,13 @@
 /* Slot usage function */
 /*---------------------*/
 
-_PRIVATE void cantorlib_slot(int level)
+_PRIVATE void cantorlib_slot(int32_t level)
 {   (void)fprintf(stderr,"lib cantorlib %s: [ANSI C]\n",CANTOR_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 1994-2023 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 1994-2024 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
-       (void)fprintf(stderr,"PUPS/P3 cellular database core library (built %s %s)\n\n",__TIME__,__DATE__);
+       (void)fprintf(stderr,"PUPS/P3 cellular database core library (gcc %s: built %s %s)\n\n",__VERSION__,__TIME__,__DATE__);
     }
     else
        (void)fprintf(stderr,"\n");
@@ -80,53 +81,49 @@ _EXTERN void (* SLOT )() __attribute__ ((aligned(16))) = cantorlib_slot;
 /*----------------------------------------------------------*/
 
 // Clear link
-_PROTOTYPE _PRIVATE link_type *_clear_link(link_type *, int);
+_PROTOTYPE _PRIVATE link_type *_clear_link(link_type *, const uint32_t);
 
 //Clear linklist
-_PROTOTYPE _PRIVATE link_type **_clear_linklist(link_type **, int, int);
+_PROTOTYPE _PRIVATE link_type **_clear_linklist(link_type **, const uint32_t, const uint32_t);
 
 // Clear object
-_PROTOTYPE _PRIVATE object_type *_clear_object(object_type *, int);
+_PROTOTYPE _PRIVATE object_type *_clear_object(object_type *, const uint32_t);
 
 // Clear object
-_PROTOTYPE _PRIVATE object_type **_clear_objectlist(object_type **, int, int);
+_PROTOTYPE _PRIVATE object_type **_clear_objectlist(object_type **, uint32_t, uint32_t);
 
 // Clear node
-_PROTOTYPE _PRIVATE node_type *_clear_node(node_type *, int);
+_PROTOTYPE _PRIVATE node_type *_clear_node(node_type *, const uint32_t);
 
 // Clear nodelist
-_PROTOTYPE _PRIVATE nodelist_type *_clear_nodelist(nodelist_type *, int);
+_PROTOTYPE _PRIVATE nodelist_type *_clear_nodelist(nodelist_type *, const uint32_t);
 
 // Add node to nodelist
-_PROTOTYPE _PRIVATE int _add_node_to_nodelist(nodelist_type *, node_type *, int, char *);
+_PROTOTYPE _PRIVATE int32_t _add_node_to_nodelist(nodelist_type *, const node_type *, const uint32_t, const char *);
 
 // Remove node from nodelist
-_PROTOTYPE _PRIVATE int _remove_node_from_nodelist(nodelist_type *, char *, int);
+_PROTOTYPE _PRIVATE int32_t _remove_node_from_nodelist(nodelist_type *, const char *, const uint32_t);
 
 // Add object to node
-_PROTOTYPE _PRIVATE int _add_object_to_node(node_type *, object_type *, int, char *);
+_PROTOTYPE _PRIVATE int32_t _add_object_to_node(node_type *, const object_type *, const uint32_t, const char *);
 
 // Remove object from node
-_PROTOTYPE _PRIVATE int _remove_object_from_node(node_type *, char *, int);
+_PROTOTYPE _PRIVATE int32_t _remove_object_from_node(node_type *, const char *, const uint32_t);
 
 // Add link to node
-_PROTOTYPE _PRIVATE int _add_link_to_node(node_type *, link_type *, int, char *);
+_PROTOTYPE _PRIVATE int32_t _add_link_to_node(node_type *, const link_type *, const uint32_t, const char *);
 
 // Remove link from node
-_PROTOTYPE _PRIVATE int _remove_link_from_node(node_type *, char *, int);
+_PROTOTYPE _PRIVATE int32_t _remove_link_from_node(node_type *, const char *, const uint32_t);
 
 // Add node to link (routelist)
-_PROTOTYPE _PRIVATE int _add_node_to_link(link_type *, node_type *, int, char *);
-
-
+_PROTOTYPE _PRIVATE int32_t _add_node_to_link(link_type *, const node_type *, const uint32_t, const char *);
 
 
 #ifdef PTHREAD_SUPPORT
-/*------------------------------------------------------------------------------
-    Initialises mutexes ...
-------------------------------------------------------------------------------*/
-
-
+/*--------------------*/
+/* Initialise mutexes */
+/*--------------------*/
 /*------------*/
 /* Node mutex */
 /*------------*/
@@ -214,13 +211,13 @@ _PUBLIC void cantor_init_nodelist_mutex(nodelist_type *nodelist)
 
 
 
-/*------------------------------------------------------------------------------
-    Get the index of node (given its name) ...
-------------------------------------------------------------------------------*/
+/*----------------------------------------*/
+/* Get the index of node (given its name) */
+/*----------------------------------------*/
 
-_PUBLIC int cantor_get_node_index_from_name(nodelist_type *nodelist, char *name)
+_PUBLIC int32_t cantor_get_node_index_from_name(nodelist_type *nodelist, const char *name)
 
-{   int i;
+{   uint32_t i;
 
     if(nodelist == (nodelist_type *)NULL || name == (char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -235,7 +232,7 @@ _PUBLIC int cantor_get_node_index_from_name(nodelist_type *nodelist, char *name)
        #endif /* PTHREAD_SUPPORT */
  
        if(nodelist->nodes[i] != (node_type *)NULL                                          &&
-          (nodelist->nodes[i] = (node_type *)cantor_pointer_live(nodelist->nodes[i],TRUE)) &&
+          (nodelist->nodes[i] = (node_type *)cantor_pointer_live(nodelist->nodes[i],TRUE)) && 
           strcmp(nodelist->nodes[i]->name,name) == 0                                        )
        {  
 
@@ -260,11 +257,9 @@ _PUBLIC int cantor_get_node_index_from_name(nodelist_type *nodelist, char *name)
 
 
 
-/*------------------------------------------------------------------------------
-    Clear a node ...
-------------------------------------------------------------------------------*/
-
-
+/*--------------*/
+/* Clear a node */
+/*--------------*/
 /*---------------------------*/
 /* Target node on local heap */
 /*---------------------------*/
@@ -280,14 +275,14 @@ _PUBLIC node_type *cantor_clear_node(node_type *node)
 /* Target node on persistent heap */
 /*--------------------------------*/
 
-_PUBLIC node_type *cantor_phclear_node(node_type *node, int hdes)
+_PUBLIC node_type *cantor_phclear_node(node_type *node, const uint32_t hdes)
 
 {   return(_clear_node(node,hdes));
 }
 #endif /* PERSISTENT_HEAP_SUPPORT */
 
 
-_PRIVATE node_type *_clear_node(node_type *node, int hdes)
+_PRIVATE node_type *_clear_node(node_type *node, const uint32_t hdes)
 
 {   if(node == (node_type *)NULL)
     {  pups_set_errno(EINVAL);
@@ -361,11 +356,9 @@ _PRIVATE node_type *_clear_node(node_type *node, int hdes)
 
 
 
-/*------------------------------------------------------------------------------
-    Clear a nodelist ...
-------------------------------------------------------------------------------*/
-
-
+/*------------------*/
+/* Clear a nodelist */ 
+/*------------------*/
 /*-------------------------------*/
 /* Target nodelist on local heap */
 /*-------------------------------*/
@@ -380,15 +373,15 @@ _PUBLIC nodelist_type *cantor_clear_nodelist(nodelist_type *nodelist)
 /* Target nodelist on persistent heap */
 /*------------------------------------*/
 
-_PUBLIC nodelist_type *cantor_phclear_nodelist(nodelist_type *nodelist, int hdes)
+_PUBLIC nodelist_type *cantor_phclear_nodelist(nodelist_type *nodelist, const uint32_t    hdes)
 {   return(_clear_nodelist(nodelist,hdes));
 }
 #endif /* PERSISTENT_HEAP_SUPPORT */
 
 
-_PRIVATE nodelist_type *_clear_nodelist(nodelist_type *nodelist, int hdes)
+_PRIVATE nodelist_type *_clear_nodelist(nodelist_type *nodelist, const uint32_t hdes)
 
-{   int i;
+{   uint32_t i;
 
     if(nodelist == (nodelist_type *)NULL)
     {  pups_set_errno(EINVAL);
@@ -455,14 +448,14 @@ _PRIVATE nodelist_type *_clear_nodelist(nodelist_type *nodelist, int hdes)
 
 
 
-/*------------------------------------------------------------------------------
-    Add node to nodelist ...
-------------------------------------------------------------------------------*/
+/*----------------------*/
+/* Add node to nodelist */
+/*----------------------*/
 /*------------------------------------------------*/
 /* Target nodelist (to add node to) on local heap */
 /*------------------------------------------------*/
 
-_PUBLIC int cantor_add_node_to_nodelist(nodelist_type *nodelist, node_type *node)
+_PUBLIC int32_t cantor_add_node_to_nodelist(nodelist_type *nodelist, const node_type *node)
 {   return(_add_node_to_nodelist(nodelist,node,(-1),(char *)NULL));
 }
 
@@ -472,15 +465,15 @@ _PUBLIC int cantor_add_node_to_nodelist(nodelist_type *nodelist, node_type *node
 /* Target nodelist (to add node to) on peristent heap */
 /*----------------------------------------------------*/
 
-_PUBLIC int cantor_phadd_node_to_nodelist(nodelist_type *nodelist, node_type *node, int hdes, char *name)
+_PUBLIC int32_t cantor_phadd_node_to_nodelist(nodelist_type *nodelist, const node_type *node, const uint32_t hdes, const char *name)
 {   return(_add_node_to_nodelist(nodelist,node,hdes,name));
 }
 #endif /* PERSISTENT_HEAP_SUPPORT */
 
 
-_PRIVATE int _add_node_to_nodelist(nodelist_type *nodelist, node_type *node, int hdes, char *name)
+_PRIVATE int32_t _add_node_to_nodelist(nodelist_type *nodelist, const node_type *node, const uint32_t hdes, const char *name)
 
-{   int node_index;
+{    int32_t node_index;
 
     if(nodelist == (nodelist_type *)NULL || node == (node_type *)NULL)
     {  pups_set_errno(EINVAL);
@@ -569,7 +562,7 @@ _PRIVATE int _add_node_to_nodelist(nodelist_type *nodelist, node_type *node, int
        ++nodelist->node_cnt;
     }
     else
-    {  int i;
+    {  uint32_t i;
 
 
        /*---------------------------------*/
@@ -598,14 +591,14 @@ _PRIVATE int _add_node_to_nodelist(nodelist_type *nodelist, node_type *node, int
 
 
 
-/*------------------------------------------------------------------------------------------
-    Remove node from nodelist ...
-------------------------------------------------------------------------------------------*/
+/*---------------------------*/
+/* Remove node from nodelist */
+/*---------------------------*/
 /*--------------------------------------------------------*/
 /* Target nodelist (to remove node from) is on local heap */
 /*--------------------------------------------------------*/
 
-_PUBLIC int cantor_remove_node_from_nodelist(nodelist_type *nodelist, char *name)
+_PUBLIC int32_t cantor_remove_node_from_nodelist(nodelist_type *nodelist, const char *name)
 {   return(_remove_node_from_nodelist(nodelist,name,(-1)));
 }
 
@@ -615,15 +608,15 @@ _PUBLIC int cantor_remove_node_from_nodelist(nodelist_type *nodelist, char *name
 /* Target nodelist (to remove node from) is on persistent heap */
 /*-------------------------------------------------------------*/
 
-_PUBLIC int cantor_phremove_node_from_nodelist(nodelist_type *nodelist, char *name, int hdes)
+_PUBLIC int32_t cantor_phremove_node_from_nodelist(nodelist_type *nodelist, const char *name, const uint32_t hdes)
 {   return(_remove_node_from_nodelist(nodelist,name,hdes));
 }
 #endif /* PERSISTENT_HEAP_SUPPORT */
 
 
-_PRIVATE int _remove_node_from_nodelist(nodelist_type *nodelist, char *name, int hdes)
+_PRIVATE int32_t _remove_node_from_nodelist(nodelist_type *nodelist, const char *name, const uint32_t hdes)
 
-{   int i;
+{   uint32_t i;
 
     if(nodelist == (nodelist_type *)NULL || name == (char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -687,11 +680,11 @@ _PRIVATE int _remove_node_from_nodelist(nodelist_type *nodelist, char *name, int
 
 
 
-/*---------------------------------------------------------------------------------
-    Set nodelist name ...
----------------------------------------------------------------------------------*/
+/*-------------------*/
+/* Set nodelist name */
+/*-------------------*/
 
-_PUBLIC int cantor_set_nodelist_name(nodelist_type *nodelist, char *nodelist_name)
+_PUBLIC int32_t cantor_set_nodelist_name(nodelist_type *nodelist, const char *nodelist_name)
 
 {   if(nodelist == (nodelist_type *)NULL || nodelist_name == (char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -716,11 +709,11 @@ _PUBLIC int cantor_set_nodelist_name(nodelist_type *nodelist, char *nodelist_nam
 
 
 
-/*---------------------------------------------------------------------------------
-    Set nodelist type ...
----------------------------------------------------------------------------------*/
+/*-------------------*/
+/* Set nodelist type */
+/*-------------------*/
 
-_PUBLIC int cantor_set_nodelist_type(nodelist_type *nodelist, char *type)
+_PUBLIC int32_t cantor_set_nodelist_type(nodelist_type *nodelist, const char *type)
 
 {   if(nodelist == (nodelist_type *)NULL || type == (char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -745,16 +738,14 @@ _PUBLIC int cantor_set_nodelist_type(nodelist_type *nodelist, char *type)
 
 
 
-/*---------------------------------------------------------------------------------
-    Add an object to a node ...
----------------------------------------------------------------------------------*/
-
-
+/*-------------------------*/
+/* Add an object to a node */
+/*-------------------------*/
 /*----------------------------------------------*/
 /* Target node (to add object to) on local heap */
 /*----------------------------------------------*/
 
-_PUBLIC int cantor_add_object_to_node(node_type *node, object_type *object)
+_PUBLIC int32_t cantor_add_object_to_node(node_type *node, const object_type *object)
 {   return(_add_object_to_node(node,object,(-1),(char *)NULL));
 }
 
@@ -764,15 +755,15 @@ _PUBLIC int cantor_add_object_to_node(node_type *node, object_type *object)
 /* Target node (to add object to) on persistent heap */
 /*---------------------------------------------------*/
 
-_PUBLIC int cantor_phadd_object_to_node(node_type *node, object_type *object, int hdes, char *name)
+_PUBLIC int32_t cantor_phadd_object_to_node(node_type *node, const object_type *object, const uint32_t hdes, const char *name)
 {   return(_add_object_to_node(node,object,hdes,name));
 }
 #endif /* PERSISTENT_HEAP_SUPPORT */
 
 
-_PRIVATE int _add_object_to_node(node_type *node, object_type *object, int hdes, char *name)
+_PRIVATE int32_t _add_object_to_node(node_type *node, const object_type *object, const uint32_t hdes, const char *name)
 
-{   int object_index = 0;
+{    int32_t object_index = 0;
 
     if(node == (node_type *)NULL || object == (object_type *)NULL)
     {  pups_set_errno(EINVAL);
@@ -841,7 +832,7 @@ _PRIVATE int _add_object_to_node(node_type *node, object_type *object, int hdes,
        ++node->object_cnt;
     }
     else
-    {  int i;
+    {  uint32_t i;
 
 
        /*-----------------------------------------*/
@@ -885,16 +876,14 @@ _PRIVATE int _add_object_to_node(node_type *node, object_type *object, int hdes,
 
 
 
-/*-----------------------------------------------------------------------------------
-    Remove an object from a node ...
------------------------------------------------------------------------------------*/
-
-
+/*------------------------------*/
+/* Remove an object from a node */
+/*------------------------------*/
 /*----------------------------------------------------*/
 /* Target node (containing object) node on local heap */
 /*----------------------------------------------------*/
 
-_PUBLIC int cantor_remove_object_from_node(node_type *node, char *object_tag)
+_PUBLIC int32_t cantor_remove_object_from_node(node_type *node, const char *object_tag)
 {   return(_remove_object_from_node(node,object_tag,(-1)));
 }
 
@@ -904,15 +893,15 @@ _PUBLIC int cantor_remove_object_from_node(node_type *node, char *object_tag)
 /* Target node (containing object) node on persistent heap */
 /*---------------------------------------------------------*/
 
-_PUBLIC int cantor_phremove_object_from_node(node_type *node, char *object_tag, int hdes)
+_PUBLIC int32_t cantor_phremove_object_from_node(node_type *node, const char *object_tag, const uint32_t hdes)
 {   return(_remove_object_from_node(node,object_tag,hdes));
 }
 #endif /* PERSISTENT_HEAP_SUPPORT */
 
 
-_PRIVATE int _remove_object_from_node(node_type *node, char *object_tag, int hdes)
+_PRIVATE int32_t _remove_object_from_node(node_type *node, const char *object_tag, const uint32_t hdes)
 
-{   int i;
+{   uint32_t i;
 
     if(node == (node_type *)NULL || object_tag == (char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -947,7 +936,7 @@ _PRIVATE int _remove_object_from_node(node_type *node, char *object_tag, int hde
               #endif /* PTHREAD_SUPPORT */
 
               pups_set_errno(EINVAL);
-              return((link_type *)NULL);
+              return(-1);
           }
           else
           #endif /* PERSISTENT_HEAP_SUPPORT */
@@ -977,13 +966,13 @@ _PRIVATE int _remove_object_from_node(node_type *node, char *object_tag, int hde
 
 
 
-/*--------------------------------------------------------------------------------------
-    Check to see if node name is unique (within given nodelist) ...
---------------------------------------------------------------------------------------*/
+/*-------------------------------------------------------------*/
+/* Check to see if node name is unique (within given nodelist) */
+/*-------------------------------------------------------------*/
 
-_PUBLIC _BOOLEAN cantor_node_name_unique(nodelist_type *nodelist, char *name)
+_PUBLIC _BOOLEAN cantor_node_name_unique(nodelist_type *nodelist, const char *name)
 
-{   int i;
+{   uint32_t i;
 
     if(nodelist == (nodelist_type *)NULL || name == (char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -1021,13 +1010,13 @@ _PUBLIC _BOOLEAN cantor_node_name_unique(nodelist_type *nodelist, char *name)
 
 
 
-/*--------------------------------------------------------------------------------------
-    Check to see if an object tag associated with given node is unique ...
---------------------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------*/
+/* Check to see if an object tag associated with given node is unique */
+/*--------------------------------------------------------------------*/
 
-_PUBLIC _BOOLEAN cantor_object_tag_unique(node_type *node, char *object_tag)
+_PUBLIC _BOOLEAN cantor_object_tag_unique(node_type *node, const char *object_tag)
 
-{   int i;
+{   uint32_t i;
 
     if(node == (node_type *)NULL || object_tag == (char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -1068,13 +1057,13 @@ _PUBLIC _BOOLEAN cantor_object_tag_unique(node_type *node, char *object_tag)
 
 
 
-/*---------------------------------------------------------------------------------------
-    Get index of an object (given its name) ...
----------------------------------------------------------------------------------------*/
+/*-----------------------------------------*/
+/* Get index of an object (given its name) */
+/*-----------------------------------------*/
 
-_PUBLIC _BOOLEAN cantor_get_object_index_from_tag(node_type *node, char *object_tag)
+_PUBLIC int32_t cantor_get_object_index_from_tag(node_type *node, const char *object_tag)
 
-{   int i;
+{   uint32_t i;
 
     if(node == (node_type *)NULL || object_tag == (char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -1116,11 +1105,11 @@ _PUBLIC _BOOLEAN cantor_get_object_index_from_tag(node_type *node, char *object_
 
 
 
-/*---------------------------------------------------------------------------------------
-    Get tag of an object (given its index) ...
----------------------------------------------------------------------------------------*/
+/*----------------------------------------*/
+/* Get tag of an object (given its index) */
+/*----------------------------------------*/
 
-_PUBLIC int cantor_get_object_tag_from_index(char *tag, node_type *node, int object_index)
+_PUBLIC int32_t cantor_get_object_tag_from_index(char *tag, const node_type *node, const uint32_t object_index)
 
 {   if(node == (node_type *)NULL || tag == (char *)NULL ||  object_index < 0 || object_index > node->object_alloc)
     {  pups_set_errno(EINVAL);
@@ -1144,14 +1133,14 @@ _PUBLIC int cantor_get_object_tag_from_index(char *tag, node_type *node, int obj
 
 
 
-/*---------------------------------------------------------------------------------------
-    Associate a link with a node ...
----------------------------------------------------------------------------------------*/
+/*------------------------------*/
+/* Associate a link with a node */
+/*------------------------------*/
 /*--------------------*/
 /* Link on local heap */
 /*--------------------*/
 
-_PUBLIC int cantor_add_link_to_node(node_type *node, link_type *link)
+_PUBLIC int32_t cantor_add_link_to_node(node_type *node, const link_type *link)
 {   return(_add_link_to_node(node,link,(-1),(char *)NULL));
 }
 
@@ -1161,15 +1150,15 @@ _PUBLIC int cantor_add_link_to_node(node_type *node, link_type *link)
 /* Link on persistent heap */
 /*-------------------------*/
 
-_PUBLIC int cantor_phadd_link_to_node(node_type *node, link_type *link, int hdes, char *name)
+_PUBLIC int32_t cantor_phadd_link_to_node(node_type *node, const link_type *link, const uint32_t hdes, const char *name)
 {   return(_add_link_to_node(node,link,hdes,name));
 }
 #endif /* PERSISTENT_HEAP_SUPPORT */
 
 
-_PRIVATE int _add_link_to_node(node_type *node, link_type *link, int hdes, char *name)
+_PRIVATE int32_t _add_link_to_node(node_type *node, const link_type *link, const uint32_t hdes, const char *name)
 
-{   int link_index;
+{   int32_t link_index;
 
     if(node == (node_type *)NULL || link == (link_type *)NULL)
     {  pups_set_errno(EINVAL);
@@ -1198,7 +1187,7 @@ _PRIVATE int _add_link_to_node(node_type *node, link_type *link, int hdes, char 
           #endif /* PTHREAD_SUPPORT */
 
           pups_set_errno(EINVAL);
-          return((link_type *)NULL);
+          return(-1);
        }
        else
        #endif /* PERSISTENT_HEAP_SUPPORT */
@@ -1241,7 +1230,7 @@ _PRIVATE int _add_link_to_node(node_type *node, link_type *link, int hdes, char 
        ++node->link_cnt;
     }
     else
-    {  int i;
+    {  uint32_t i;
 
 
        /*---------------------------------------*/
@@ -1269,14 +1258,14 @@ _PRIVATE int _add_link_to_node(node_type *node, link_type *link, int hdes, char 
 
 
 
-/*------------------------------------------------------------------------------------------
-    Dissociate a link from a node ...
-------------------------------------------------------------------------------------------*/
+/*-------------------------------*/
+/* Dissociate a link from a node */
+/*-------------------------------*/
 /*---------------------------*/
 /* Target link on local heap */
 /*---------------------------*/
 
-_PUBLIC int cantor_remove_link_from_node(node_type *node, char *link_tag)
+_PUBLIC int32_t cantor_remove_link_from_node(node_type *node, const char *link_tag)
 {   return(_remove_link_from_node(node,link_tag,(-1)));
 }
 
@@ -1286,14 +1275,14 @@ _PUBLIC int cantor_remove_link_from_node(node_type *node, char *link_tag)
 /* Target link on persistent heap */
 /*--------------------------------*/
 
-_PUBLIC int cantor_phremove_link_from_node(node_type *node, char *link_tag, int hdes)
+_PUBLIC int32_t cantor_phremove_link_from_node(node_type *node, const char *link_tag, const uint32_t hdes)
 {   return(_remove_link_from_node(node,link_tag,hdes));
 }
 #endif /* PERSISTENT_HEAP_SUPPORT */
 
-_PRIVATE int _remove_link_from_node(node_type *node, char *link_tag, int hdes)
+_PRIVATE int32_t _remove_link_from_node(node_type *node, const char *link_tag, const uint32_t hdes)
 
-{   int i;
+{   uint32_t i;
 
     if(node == (node_type *)NULL || link_tag == (char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -1358,13 +1347,13 @@ _PRIVATE int _remove_link_from_node(node_type *node, char *link_tag, int hdes)
 
 
 
-/*-------------------------------------------------------------------------------------------
-    Is a link tag associated with given node unique? ...
--------------------------------------------------------------------------------------------*/
+/*--------------------------------------------------*/
+/* Is a link tag associated with given node unique? */
+/*--------------------------------------------------*/
 
-_PUBLIC _BOOLEAN cantor_link_tag_unique(node_type *node, char *link_tag)
+_PUBLIC _BOOLEAN cantor_link_tag_unique(node_type *node, const char *link_tag)
 
-{   int i;
+{   uint32_t i;
 
     if(node == (node_type *)NULL || link_tag == (char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -1406,13 +1395,13 @@ _PUBLIC _BOOLEAN cantor_link_tag_unique(node_type *node, char *link_tag)
 
 
 
-/*-------------------------------------------------------------------------------------------
-    Get link index given link tag and node containing that tag ...
--------------------------------------------------------------------------------------------*/
+/*------------------------------------------------------------*/
+/* Get link index given link tag and node containing that tag */
+/*------------------------------------------------------------*/
 
-_PUBLIC int cantor_get_link_index_from_tag(node_type *node, char *link_tag)
+_PUBLIC int32_t cantor_get_link_index_from_tag(node_type *node, const char *link_tag)
 
-{   int i;
+{   uint32_t i;
 
     if(node == (node_type *)NULL || link_tag == (char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -1453,11 +1442,11 @@ _PUBLIC int cantor_get_link_index_from_tag(node_type *node, char *link_tag)
 
 
 
-/*-------------------------------------------------------------------------------------------
-    Get link tag given link index ...
--------------------------------------------------------------------------------------------*/
+/*-------------------------------*/
+/* Get link tag given link index */
+/*-------------------------------*/
 
-_PUBLIC int cantor_get_link_tag_from_index(char *tag, node_type *node, int link_index)
+_PUBLIC int32_t cantor_get_link_tag_from_index(char *tag, node_type *node, const uint32_t link_index)
 
 {  
 
@@ -1489,11 +1478,11 @@ _PUBLIC int cantor_get_link_tag_from_index(char *tag, node_type *node, int link_
 
 
 
-/*-------------------------------------------------------------------------------------------
-    Name a node ...
--------------------------------------------------------------------------------------------*/
+/*-------------*/
+/* Name a node */
+/*-------------*/
 
-_PUBLIC int cantor_set_node_name(node_type *node, char *node_name)
+_PUBLIC int32_t cantor_set_node_name(node_type *node, const char *node_name)
 
 {   if(node == (node_type *)NULL || node_name == (char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -1517,11 +1506,11 @@ _PUBLIC int cantor_set_node_name(node_type *node, char *node_name)
 
 
 
-/*-------------------------------------------------------------------------------------------
-    Set type of a node ...
--------------------------------------------------------------------------------------------*/
+/*--------------------*/
+/* Set type of a node */
+/*--------------------*/
 
-_PUBLIC int cantor_set_node_type(node_type *node, char *type)
+_PUBLIC int32_t cantor_set_node_type(node_type *node, const char *type)
 
 {   if(node == (node_type *)NULL || type  == (char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -1545,13 +1534,13 @@ _PUBLIC int cantor_set_node_type(node_type *node, char *type)
 
 
 
-/*-------------------------------------------------------------------------------------------
-   Display (limited) information about node (print it to file) ...
--------------------------------------------------------------------------------------------*/
+/*-------------------------------------------------------------*/
+/* Display (limited) information about node (print it to file) */
+/*-------------------------------------------------------------*/
 
-_PUBLIC int cantor_show_node_info(FILE *stream, node_type *node)
+_PUBLIC int32_t cantor_show_node_info(FILE *stream, node_type *node)
 
-{   int i;
+{   uint32_t i;
 
     /*----------------------------------*/
     /* Only the root thread can process */
@@ -1603,7 +1592,7 @@ _PUBLIC int cantor_show_node_info(FILE *stream, node_type *node)
                                                                                                                                   i,
                                                                                                               node->objects[i]->tag,
                                                                                                              node->objects[i]->type,
-                                                                                         (unsigned long int)node->objects[i]->olink);
+                                                                                         (uint64_t         )node->objects[i]->olink);
                 else
                    (void)fprintf(stream,"    %4d object \"%s\" [type %-16s] attached to node (object pointer not set)\n",
                                                                                                                        i,
@@ -1628,7 +1617,6 @@ _PUBLIC int cantor_show_node_info(FILE *stream, node_type *node)
 
        (void)fprintf(stream,"\n\n    Link list\n");
        (void)fprintf(stream,"    =========\n\n");
-       for(i=0; i<node->object_alloc; ++i)
        for(i=0; i<node->link_alloc; ++i)
        {  if(node->links[i] != (link_type *)NULL)
           {  if(node->links[i] = (link_type *)cantor_pointer_live(node->links[i],TRUE))
@@ -1663,9 +1651,9 @@ _PUBLIC int cantor_show_node_info(FILE *stream, node_type *node)
 
 
 
-/*------------------------------------------------------------------------------
-    Clear a link ...
-------------------------------------------------------------------------------*/
+/*--------------*/
+/* Clear a link */
+/*--------------*/
 /*---------------------------*/
 /* Target link on local heap */
 /*---------------------------*/
@@ -1680,13 +1668,13 @@ _PUBLIC link_type *cantor_clear_link(link_type *link)
 /* Target link on persistent heap */
 /*--------------------------------*/
 
-_PUBLIC link_type *cantor_phclear_link(link_type *link, int hdes)
+_PUBLIC link_type *cantor_phclear_link(link_type *link, const uint32_t hdes)
 {   return(_clear_link(link,hdes));
 }
 #endif /* PERSISTENT_HEAP_SUPPORT */
 
 
-_PRIVATE link_type *_clear_link(link_type *link, int hdes)
+_PRIVATE link_type *_clear_link(link_type *link, const uint32_t hdes)
 
 {   if(link == (link_type *)NULL)
     {  pups_set_errno(EINVAL);
@@ -1735,14 +1723,14 @@ _PRIVATE link_type *_clear_link(link_type *link, int hdes)
 
 
 
-/*------------------------------------------------------------------------------
-    Clear linklist ...
-------------------------------------------------------------------------------*/
+/*----------------*/
+/* Clear linklist */
+/*----------------*/
 /*-------------------------------*/
 /* Target linklist on local heap */
 /*-------------------------------*/
 
-_PUBLIC link_type **cantor_clear_linklist(link_type **link, int size)
+_PUBLIC link_type **cantor_clear_linklist(link_type **link, uint32_t size)
 {   return(_clear_linklist(link,size,(-1)));
 }
 
@@ -1752,15 +1740,15 @@ _PUBLIC link_type **cantor_clear_linklist(link_type **link, int size)
 /* Target linklist on persistent heap */
 /*------------------------------------*/
 
-_PUBLIC link_type **cantor_phclear_linklist(link_type **link, int size, int hdes)
+_PUBLIC link_type **cantor_phclear_linklist(link_type **link, const unsigned size, const uint32_t  hdes)
 {   return(_clear_linklist(link,size,hdes));
 }
 #endif /* PERSISTENT_HEAP_SUPPORT */
 
 
-_PRIVATE link_type **_clear_linklist(link_type **link, int size, int hdes)
+_PRIVATE link_type **_clear_linklist(link_type **link, const uint32_t size, const uint32_t hdes)
 
-{   int i;
+{   uint32_t i;
 
     if(link == (link_type **)NULL || size <= 0 || hdes < 0 || hdes > appl_max_pheaps)
     {  pups_set_errno(EINVAL);
@@ -1787,16 +1775,14 @@ _PRIVATE link_type **_clear_linklist(link_type **link, int size, int hdes)
 
 
 
-/*-------------------------------------------------------------------------------
-    Add an object to a link ...
--------------------------------------------------------------------------------*/
-
-
+/*-------------------------*/
+/* Add an object to a link */
+/*-------------------------*/
 /*--------------------------------*/
-/* Desitnation link on local heap */
+/* Destination link on local heap */
 /*--------------------------------*/
 
-_PUBLIC int cantor_add_node_to_link(link_type *link, node_type *node)
+_PUBLIC int32_t cantor_add_node_to_link(link_type *link, const node_type *node)
 {   return( _add_node_to_link(link,node,(-1),(char *)NULL));
 }
 
@@ -1806,15 +1792,15 @@ _PUBLIC int cantor_add_node_to_link(link_type *link, node_type *node)
 /* Destination link on persistent heap */
 /*-------------------------------------*/
 
-_PUBLIC int cantor_phadd_node_to_link(link_type *link, node_type *node, int hdes, char *name)
+_PUBLIC int32_t cantor_phadd_node_to_link(link_type *link, const node_type *node, const uint32_t hdes, const char *name)
 {   return( _add_node_to_link(link,node,hdes,name));
 }
 #endif /* PERSISTENT_HEAP_SUPPORT */
 
 
-_PRIVATE int _add_node_to_link(link_type *link, node_type *node, int hdes, char *name)
+_PRIVATE int32_t _add_node_to_link(link_type *link, const node_type *node, const uint32_t hdes, const char *name)
 
-{   int i;
+{   uint32_t i;
 
     if(link == (link_type *)NULL || node == (node_type *)NULL)
     {  pups_set_errno(EINVAL);
@@ -1895,13 +1881,13 @@ _PRIVATE int _add_node_to_link(link_type *link, node_type *node, int hdes, char 
 
 
 
-/*--------------------------------------------------------------------------------
-    Remove node from a link ...
---------------------------------------------------------------------------------*/
+/*-------------------------*/
+/* Remove node from a link */
+/*-------------------------*/
 
-_PUBLIC int cantor_remove_node_from_link(link_type *link, char *name)
+_PUBLIC int32_t cantor_remove_node_from_link(link_type *link, const char *name)
 
-{   int i;
+{   uint32_t i;
 
     if(link == (link_type *)NULL || name == (char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -1934,14 +1920,15 @@ _PUBLIC int cantor_remove_node_from_link(link_type *link, char *name)
 
 
 
-/*--------------------------------------------------------------------------------
-    Show link information (print to file)) ...
---------------------------------------------------------------------------------*/
+/*----------------------------------------*/
+/* Show link information (print to file)) */
+/*----------------------------------------*/
 
-_PUBLIC void cantor_show_link_info(FILE *stream, link_type *link)
+_PUBLIC void cantor_show_link_info(const FILE *stream, link_type *link)
 
-{   int i,
-        cnt = 0;
+{    int32_t i,
+             cnt = 0;
+
 
     /*----------------------------------*/
     /* Only the root thread can process */
@@ -2002,19 +1989,17 @@ _PUBLIC void cantor_show_link_info(FILE *stream, link_type *link)
 
 
 
-/*--------------------------------------------------------------------------------
-    Copy link ...
---------------------------------------------------------------------------------*/
-
-
+/*-----------*/
+/* Copy link */
+/*-----------*/
 /*--------------------------------*/
 /* Destination link on local heap */
 /*--------------------------------*/
 
-_PUBLIC int cantor_copy_link(char *tag, link_type *from, link_type *to)
+_PUBLIC int32_t cantor_copy_link(const char *tag, link_type *from, link_type *to)
 
-{   int i,
-        cnt = 0;
+{    int32_t i,
+             cnt = 0;
 
     if(tag == (char *)NULL || from == (link_type *)NULL || to == (link_type *)NULL)
     {  pups_set_errno(OK);
@@ -2068,10 +2053,10 @@ _PUBLIC int cantor_copy_link(char *tag, link_type *from, link_type *to)
 /* Destination link on persistent heap */
 /*-------------------------------------*/
 
-_PUBLIC int cantor_phcopy_link(int hdes, char *tag, link_type *from, link_type *to)
+_PUBLIC int32_t cantor_phcopy_link(const uint32_t hdes, const char *tag, link_type *from, link_type *to)
 
-{   int i,
-        cnt = 0;
+{   uint32_t i,
+             cnt = 0;
 
     if(tag == (char *)NULL || from == (link_type *)NULL || to == (link_type *)NULL || hdes < 0 || hdes > appl_max_pheaps)
     {  pups_set_errno(OK);
@@ -2122,19 +2107,17 @@ _PUBLIC int cantor_phcopy_link(int hdes, char *tag, link_type *from, link_type *
 
 
 
-/*-----------------------------------------------------------------------------------
-    Copy a node ...
------------------------------------------------------------------------------------*/
-
-
+/*-------------*/
+/* Copy a node */
+/*-------------*/
 /*--------------------------------*/
 /* Destination node on local heap */
 /*--------------------------------*/
 
-_PUBLIC int cantor_copy_node(char *name, node_type *from, node_type *to)
+_PUBLIC int32_t cantor_copy_node(const char *name, node_type *from, node_type *to)
 
-{   int i,
-        cnt = 0;
+{   uint32_t i,
+             cnt = 0;
 
     if(name == (char *)NULL || from == (node_type *)NULL || to == (node_type *)NULL)
     {  pups_set_errno(OK);
@@ -2218,10 +2201,10 @@ _PUBLIC int cantor_copy_node(char *name, node_type *from, node_type *to)
 /* Destination node on persistent heap */
 /*-------------------------------------*/
 
-_PUBLIC int cantor_phcopy_node(int hdes, char *name, node_type *from, node_type *to)
+_PUBLIC int32_t cantor_phcopy_node(const uint32_t hdes, const char *name, node_type *from, node_type *to)
 
-{   int i,
-        cnt = 0;
+{   uint32_t i,
+             cnt = 0;
 
     if(from == (node_type *)NULL || to == (node_type *)NULL || hdes < 0 || hdes > appl_max_pheaps)
     {  pups_set_errno(OK);
@@ -2303,17 +2286,17 @@ _PUBLIC int cantor_phcopy_node(int hdes, char *name, node_type *from, node_type 
 
 
 
-/*-----------------------------------------------------------------------------------
-     Copy a nodelist ...
------------------------------------------------------------------------------------*/
+/*-----------------*/
+/* Copy a nodelist */
+/*-----------------*/
 /*------------------------------------*/
 /* Destination nodelist on local heap */
 /*------------------------------------*/
 
-_PUBLIC int cantor_copy_nodelist(char *name, nodelist_type *from, nodelist_type *to)
+_PUBLIC int32_t cantor_copy_nodelist(const char *name, nodelist_type *from, nodelist_type *to)
 
-{   int i,
-        cnt = 0;
+{   uint32_t i,
+             cnt = 0;
 
     if(name == (char *)NULL || from == (nodelist_type *)NULL || to == (nodelist_type *)NULL)
     {  pups_set_errno(OK);
@@ -2378,10 +2361,10 @@ _PUBLIC int cantor_copy_nodelist(char *name, nodelist_type *from, nodelist_type 
 /* Destination nodelist on persistent heap */
 /*-----------------------------------------*/
 
-_PUBLIC int cantor_phcopy_nodelist(int hdes, char *name, nodelist_type *from, nodelist_type *to)
+_PUBLIC int32_t cantor_phcopy_nodelist(const uint32_t hdes, const char *name, nodelist_type *from, nodelist_type *to)
 
-{   int i,
-        cnt = 0;
+{   uint32_t i,
+             cnt = 0;
 
     if(from == (nodelist_type *)NULL || to == (nodelist_type *)NULL)
     {  pups_set_errno(OK);
@@ -2445,11 +2428,11 @@ _PUBLIC int cantor_phcopy_nodelist(int hdes, char *name, nodelist_type *from, no
 
 
 
-/*-----------------------------------------------------------------------------------
-    Set link tag ...
------------------------------------------------------------------------------------*/
+/*--------------*/
+/* Set link tag */
+/*--------------*/
 
-_PUBLIC int cantor_set_link_tag(link_type *link, char *tag)
+_PUBLIC int32_t cantor_set_link_tag(link_type *link, const char *tag)
 
 {   if(link == (link_type *)NULL || tag == (char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -2473,11 +2456,11 @@ _PUBLIC int cantor_set_link_tag(link_type *link, char *tag)
 
 
 
-/*-----------------------------------------------------------------------------------
-    Set link type ...
------------------------------------------------------------------------------------*/
+/*---------------*/
+/* Set link type */
+/*---------------*/
 
-_PUBLIC int cantor_set_link_type(link_type *link, char *type)
+_PUBLIC int32_t cantor_set_link_type(link_type *link, const char *type)
 
 {   if(link == (link_type *)NULL || type == (char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -2501,11 +2484,11 @@ _PUBLIC int cantor_set_link_type(link_type *link, char *type)
 
 
 
-/*-----------------------------------------------------------------------------------
-    Set link flux ...
------------------------------------------------------------------------------------*/
+/*---------------*/
+/* Set link flux */
+/*---------------*/
 
-_PUBLIC int cantor_set_link_flux(link_type *link, FTYPE flux)
+_PUBLIC int32_t cantor_set_link_flux(link_type *link, const FTYPE flux)
 
 {   if(link == (link_type *)NULL)
     {  pups_set_errno(EINVAL);
@@ -2529,11 +2512,11 @@ _PUBLIC int cantor_set_link_flux(link_type *link, FTYPE flux)
 
 
 
-/*-----------------------------------------------------------------------------------
-    Set link length ...
------------------------------------------------------------------------------------*/
+/*-----------------*/
+/* Set link length */
+/*-----------------*/
 
-_PUBLIC int cantor_set_link_length(link_type *link, FTYPE length)
+_PUBLIC int32_t cantor_set_link_length(link_type *link, const FTYPE length)
 
 {   if(link == (link_type *)NULL)
     {  pups_set_errno(EINVAL);
@@ -2557,14 +2540,14 @@ _PUBLIC int cantor_set_link_length(link_type *link, FTYPE length)
 
 
 
-/*-----------------------------------------------------------------------------------
-    Compare a pair of nodes ...
------------------------------------------------------------------------------------*/
+/*-------------------------*/
+/* Compare a pair of nodes */
+/*-------------------------*/
 
 _PUBLIC _BOOLEAN cantor_compare_nodes(node_type *n1, node_type *n2)
 
-{   int i,
-        matched = 0;
+{   uint32_t i,
+             matched = 0;
 
     if(n1 == (node_type *)NULL || n2 == (node_type *)NULL)
     {  pups_set_errno(EINVAL);
@@ -2588,7 +2571,7 @@ _PUBLIC _BOOLEAN cantor_compare_nodes(node_type *n1, node_type *n2)
     /*-----------------*/
 
     for(i=0; i<n1->object_alloc; ++i)
-    {  int j;
+    {  uint32_t j;
 
        for(j=i; j<n2->object_alloc; ++j)
        {  if(n1->objects[i] == n2->objects[j])
@@ -2615,7 +2598,7 @@ _PUBLIC _BOOLEAN cantor_compare_nodes(node_type *n1, node_type *n2)
 
     matched = 0;
     for(i=0; i<n1->link_alloc; ++i)
-    {  int j;
+    {  uint32_t j;
 
        for(j=i; j<n2->link_alloc; ++j)
        {  if(n1->links[i] == n2->links[j])
@@ -2647,9 +2630,9 @@ _PUBLIC _BOOLEAN cantor_compare_nodes(node_type *n1, node_type *n2)
 
 
 
-/*------------------------------------------------------------------------------
-    Clear an object ...
-------------------------------------------------------------------------------*/
+/*-----------------*/
+/* Clear an object */
+/*-----------------*/
 /*----------------------*/
 /* Object on local heap */
 /*----------------------*/
@@ -2664,13 +2647,13 @@ _PUBLIC object_type *cantor_clear_object(object_type *object)
 /* Object on persistent heap */
 /*---------------------------*/
 
-_PUBLIC object_type *cantor_phclear_object(object_type *object, int hdes)
+_PUBLIC object_type *cantor_phclear_object(object_type *object, const uint32_t hdes)
 {   return(_clear_object(object,hdes));
 }
 #endif /* PERSISTENT_HEAP_SUPPORT */
 
 
-_PRIVATE object_type *_clear_object(object_type *object, int hdes)
+_PRIVATE object_type *_clear_object(object_type *object, const uint32_t hdes)
 
 
 {   if(object == (object_type *)NULL)
@@ -2710,14 +2693,14 @@ _PRIVATE object_type *_clear_object(object_type *object, int hdes)
 
 
 
-/*------------------------------------------------------------------------------
-    Clear an object list ...
-------------------------------------------------------------------------------*/
+/*----------------------*/
+/* Clear an object list */
+/*----------------------*/
 /*---------------------------*/
 /* Object list on local heap */
 /*---------------------------*/
 
-_PUBLIC object_type **cantor_clear_objectlist(object_type **object, int size)
+_PUBLIC object_type **cantor_clear_objectlist(object_type **object, const uint32_t size)
 {   return(_clear_objectlist(object,size,(-1)));
 }
 
@@ -2726,15 +2709,15 @@ _PUBLIC object_type **cantor_clear_objectlist(object_type **object, int size)
 /* Object list on persistent heap */
 /*--------------------------------*/
 
-_PUBLIC  object_type **cantor_phclear_objectlist(object_type **object, int size, int hdes)
+_PUBLIC  object_type **cantor_phclear_objectlist(object_type **object, const uint32_t size, const uint32_t hdes)
 {   return(_clear_objectlist(object,size,hdes));
 }
 #endif /* PERSISTENT_HEAP_SUPPORT */
 
 
-_PRIVATE object_type **_clear_objectlist(object_type **object, int size, int hdes)
+_PRIVATE object_type **_clear_objectlist(object_type **object, const uint32_t size, const uint32_t hdes)
 
-{   int i;
+{   uint32_t i;
 
     if(object == (object_type **)NULL || size <= 0)
     {  pups_set_errno(EINVAL);
@@ -2763,11 +2746,11 @@ _PRIVATE object_type **_clear_objectlist(object_type **object, int size, int hde
 
 
 
-/*-----------------------------------------------------------------------------------
-    Set object name ...
------------------------------------------------------------------------------------*/
+/*-----------------*/
+/* Set object name */
+/*-----------------*/
 
-_PUBLIC int cantor_set_object_tag(object_type *object, char *tag)
+_PUBLIC int32_t cantor_set_object_name(object_type *object, const char *tag)
 
 {   if(object == (object_type *)NULL || tag == (char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -2791,11 +2774,11 @@ _PUBLIC int cantor_set_object_tag(object_type *object, char *tag)
 
 
 
-/*-----------------------------------------------------------------------------------
-    Set object type ...
------------------------------------------------------------------------------------*/
+/*-----------------*/
+/* Set object type */
+/*-----------------*/
 
-_PUBLIC int cantor_set_object_type(object_type *object, char *type)
+_PUBLIC int32_t cantor_set_object_type(object_type *object, const char *type)
 
 {   if(object == (object_type *)NULL || type == (char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -2818,12 +2801,12 @@ _PUBLIC int cantor_set_object_type(object_type *object, char *type)
 
 
 
-/*-------------------------------------------------------------------------------------
-    Add a databag or DLL to an object ...
--------------------------------------------------------------------------------------*/
+/*-----------------------------------*/
+/* Add a databag or DLL to an object */
+/*-----------------------------------*/
 
-_PUBLIC int cantor_set_olink(object_type *object,  // Object
-                             void        *olink)   // Link data or DLL
+_PUBLIC int32_t cantor_set_olink(object_type *object,  // Object
+                                 const void  *olink)   // Link data or DLL
 
 {   if(object == (object_type *)NULL || olink == (void *)NULL)
     {  pups_set_errno(EINVAL);
@@ -2847,12 +2830,12 @@ _PUBLIC int cantor_set_olink(object_type *object,  // Object
 
 
 
-/*-------------------------------------------------------------------------------------
-    Is the pointer live?  ...
--------------------------------------------------------------------------------------*/
+/*----------------------*/
+/* Is the pointer live? */
+/*----------------------*/
 
-_PUBLIC void *cantor_pointer_live(void     *pointer,                // Pointer to test (returns NULL if pointer invalid)
-                                  _BOOLEAN restore_default_handler) // Restore default handlers post test
+_PUBLIC void *cantor_pointer_live(const void     *pointer,                // Pointer to test (returns NULL if pointer invalid)
+                                  const _BOOLEAN restore_default_handler) // Restore default handlers post test
 
 {   void  *ret = (void *)NULL;
     _BYTE test;
@@ -2899,16 +2882,16 @@ _PUBLIC void *cantor_pointer_live(void     *pointer,                // Pointer t
 
 
 
-/*-------------------------------------------------------------------------------------------
-   Show (limited) node information (HTML) ...
--------------------------------------------------------------------------------------------*/
+/*----------------------------------------*/
+/* Show (limited) node information (HTML) */
+/*----------------------------------------*/
 
-_PUBLIC int cantor_vhtml_node_info(_BOOLEAN  full_node_info,  // TRUE if full link information required 
-                                   char      *dir,            // Directory containing (virtual) HTML file
-                                   char      *filename,       // Name of virtual HTML file
-                                   node_type *node)           // Node containing data
+_PUBLIC int32_t cantor_vhtml_node_info(const _BOOLEAN  full_node_info,  // TRUE if full link information required 
+                                       const char      *dir,            // Directory containing (virtual) HTML file
+                                       const char      *filename,       // Name of virtual HTML file
+                                       node_type       *node)           // Node containing data
 
-{   int i;
+{   uint32_t i;
 
     char current_dir[SSIZE] = "";
     FILE *stream            = (FILE *)NULL;
@@ -2974,7 +2957,7 @@ _PUBLIC int cantor_vhtml_node_info(_BOOLEAN  full_node_info,  // TRUE if full li
           (void)fprintf(stream,"<hr><center><h3>Cantor version %s<br>Node is NULL</h3></center><hr><br><br>\n",CANTOR_VERSION);
 
        (void)fprintf(stream,"<br><hr><br><center><h6>Web page generated automatically by <b>cantor</b> vhtml generator (version 1.00)\n");
-       (void)fprintf(stream,"(C) M.A. O'Neill, Tumbling Dice, 2023 (mao@@tumblingdice.co.uk)</center><br><br>\n");
+       (void)fprintf(stream,"(C) M.A. O'Neill, Tumbling Dice, 2024 (mao@@tumblingdice.co.uk)</center><br><br>\n");
        (void)fprintf(stream,"</body></html>\n");
        (void)fflush(stream);
 
@@ -3037,7 +3020,7 @@ _PUBLIC int cantor_vhtml_node_info(_BOOLEAN  full_node_info,  // TRUE if full li
                                                                                                                 node->objects[i]->tag,
                                                                                                                           object_info,
                                                                                                                node->objects[i]->type,
-                                                                                               (unsigned long)node->objects[i]->olink);
+                                                                                                    (uint64_t)node->objects[i]->olink);
                 }
                 else
                    (void)fprintf(stream,"%04d object <b>%s</b> [type %-16s] attached to node (object pointer not set)<br>\n",
@@ -3102,7 +3085,7 @@ _PUBLIC int cantor_vhtml_node_info(_BOOLEAN  full_node_info,  // TRUE if full li
     }
 
     (void)fprintf(stream,"<br><hr><br><center><h6>Web page generated automatically by <b>cantor</b> vhtml generator (version 1.00)\n");
-    (void)fprintf(stream,"(C) M.A. O'Neill, Tumbling Dice, 2023 (mao@@tumblingdice.co.uk)</center><br><br>\n");
+    (void)fprintf(stream,"(C) M.A. O'Neill, Tumbling Dice, 2024 (mao@@tumblingdice.co.uk)</center><br><br>\n");
     (void)fprintf(stream,"</body></html>\n");
     (void)fflush(stream);
 
@@ -3122,16 +3105,16 @@ _PUBLIC int cantor_vhtml_node_info(_BOOLEAN  full_node_info,  // TRUE if full li
 
 
 
-/*--------------------------------------------------------------------------------
-    Show link information (HTML) ...
---------------------------------------------------------------------------------*/
+/*------------------------------*/
+/* Show link information (HTML) */
+/*------------------------------*/
 
-_PUBLIC int cantor_vhtml_link_info(char *dir,         // Directory of generated (virtual) HTML file
-                                   char *filename,    // Filename of (virtual) HTML file
-                                   link_type *link)   // Link data
+_PUBLIC int32_t cantor_vhtml_link_info(const char *dir,         // Directory of generated (virtual) HTML file
+                                       const char *filename,    // Filename of (virtual) HTML file
+                                       link_type  *link)        // Link data
 
-{   int i,
-        cnt = 0;
+{    int32_t i,
+             cnt = 0;
 
     char current_dir[SSIZE] = "";
     FILE *stream            = (FILE *)NULL;
@@ -3182,7 +3165,7 @@ _PUBLIC int cantor_vhtml_link_info(char *dir,         // Directory of generated 
 
        (void)fprintf(stream,"<br><hr><br>\n");
        (void)fprintf(stream,"<center><h6>Web page generated automatically by <b>cantor</b> vhtml generator version 1.00<br>\n");
-       (void)fprintf(stream,"(C) M.A. O'Neill, Tumbling Dice, 2023 (mao@@tumblingdice.co.uk)</center><br><br>\n");
+       (void)fprintf(stream,"(C) M.A. O'Neill, Tumbling Dice, 2024 (mao@@tumblingdice.co.uk)</center><br><br>\n");
        (void)fprintf(stream,"</body></html>\n");
        (void)fflush(stream);
 
@@ -3260,7 +3243,7 @@ _PUBLIC int cantor_vhtml_link_info(char *dir,         // Directory of generated 
 
        (void)fprintf(stream,"<br><hr><br>\n");
        (void)fprintf(stream,"<center><h6>Web page generated automatically by <b>cantor</b> vhtml generator version 1.00<br>\n");
-       (void)fprintf(stream,"(C) M.A. O'Neill, Tumbling Dice, 2023 (mao@@tumblingdice.co.uk)</center><br><br>\n");
+       (void)fprintf(stream,"(C) M.A. O'Neill, Tumbling Dice, 2024 (mao@@tumblingdice.co.uk)</center><br><br>\n");
        (void)fprintf(stream,"</body></html>\n");
        (void)fflush(stream);
     }
@@ -3280,13 +3263,13 @@ _PUBLIC int cantor_vhtml_link_info(char *dir,         // Directory of generated 
 
 
 
-/*----------------------------------------------------------------------------------
-    Display node (as VHTML page) ...
-----------------------------------------------------------------------------------*/
+/*------------------------------*/
+/* Display node (as VHTML page) */
+/*------------------------------*/
 
-_PUBLIC int cantor_vhtml_node_browse(_BOOLEAN   full_node_info,  // TRUE if full node data required 
-                                     char      *browser,         // Browser to display (virtual) HTML
-                                     node_type *node)            // Node containing data
+_PUBLIC int32_t cantor_vhtml_node_browse(const _BOOLEAN  full_node_info,   // TRUE if full node data required 
+                                         const char      *browser,         // Browser to display (virtual) HTML
+                                         const node_type *node)            // Node containing data
 
 {   FILE *stream = (FILE *)NULL;
 
@@ -3358,13 +3341,13 @@ _PUBLIC int cantor_vhtml_node_browse(_BOOLEAN   full_node_info,  // TRUE if full
 
 
 
-/*---------------------------------------------------------------------------------------
-    Display a list of nodes (with their associated links) as HTML ...
----------------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------*/
+/* Display a list of nodes (with their associated links) as HTML */
+/*---------------------------------------------------------------*/
 
-_PUBLIC int cantor_vhtml_nodelist_browse(_BOOLEAN        full_node_info,  // TRUE if full node information required
-                                          char          *browser,         // Browser to display (virtual) HTML
-                                          nodelist_type *nodelist)        // Nodelist containing data nodes
+_PUBLIC int32_t cantor_vhtml_nodelist_browse(const _BOOLEAN   full_node_info,   // TRUE if full node information required
+                                             const char       *browser,         // Browser to display (virtual) HTML
+                                             nodelist_type    *nodelist)        // Nodelist containing data nodes
 
 {   FILE *stream = (FILE *)NULL;
 
@@ -3375,12 +3358,13 @@ _PUBLIC int cantor_vhtml_nodelist_browse(_BOOLEAN        full_node_info,  // TRU
          rm_command[SSIZE]              = "",
          current_dir[SSIZE]             = "";
 
-    int i,
-        ret,
-        cnt          = 0,
-        active_nodes = 0;
+     int32_t i,
+             ret,
+             cnt                        = 0,
+             active_nodes               = 0;
 
     static _BOOLEAN in_vhtml_node_browse = FALSE;
+
 
     /*----------------------------------*/
     /* Only the root thread can process */
@@ -3499,7 +3483,7 @@ _PUBLIC int cantor_vhtml_nodelist_browse(_BOOLEAN        full_node_info,  // TRU
 
     (void)fprintf(stream,"<br><hr><br>\n");
     (void)fprintf(stream,"<center><h6>Web page generated automatically by <b>cantor</b> vhtml generator version 1.00<br>\n");
-    (void)fprintf(stream,"(C) M.A. O'Neill, Tumbling Dice, 2023 (mao@@tumblingdice.co.uk)</center><br><br>\n");
+    (void)fprintf(stream,"(C) M.A. O'Neill, Tumbling Dice, 2024 (mao@@tumblingdice.co.uk)</center><br><br>\n");
     (void)fprintf(stream,"</body></html>\n");
     (void)fflush(stream);
 
@@ -3541,23 +3525,22 @@ _PUBLIC int cantor_vhtml_nodelist_browse(_BOOLEAN        full_node_info,  // TRU
 
 
 
-/*---------------------------------------------------------------------------------------
-    Convert a link to a set of pairwise rules. These are passed to an enslaved
-    rgen ruleset convertor and hence to a subslaved cluster object clusterer with
-    sybiotic xtopol network visualiser ...
----------------------------------------------------------------------------------------*/
+/*-------------------------------------------------------------------------------*/
+/* Convert a link to a set of pairwise rules. These are passed to an enslaved    */
+/* rgen ruleset convertor and hence to a subslaved cluster object clusterer with */
+/* sybiotic xtopol network visualiser                                            */
+/*-------------------------------------------------------------------------------*/
 
-_PUBLIC int cantor_rulefile_from_clustered_link(char      *filename,  // Filename for rgen file
-                                                int       n_links,    // Number of link lists
-                                                link_type **links)    // List of link lists
+_PUBLIC int32_t cantor_rulefile_from_clustered_link(const char      *filename,  // Filename for rgen file
+                                                    const uint32_t    n_links,  // Number of link lists
+                                                    link_type         **links)  // List of link lists
 
-{  int i,
-       j,
-       k;
+{  uint32_t i,
+            j,
+            k;
 
-   node_type **routelist = (node_type **)NULL;
-
-   FILE *stream = (FILE *)NULL;
+   node_type **routelist     = (node_type **)NULL;
+   FILE      *stream         = (FILE *)NULL;
 
    char rule_filename[SSIZE] = "",
         *rgen_pathname       = (char *)NULL,
@@ -3585,7 +3568,7 @@ _PUBLIC int cantor_rulefile_from_clustered_link(char      *filename,  // Filenam
  
    (void)fprintf(stream,"#----------------------------------------------------------------------------------\n");
    (void)fprintf(stream,"#  Rgen (binary) rule file automatically generated from link data by\n");
-   (void)fprintf(stream,"#  Cantor version %s, (C) M.A. O'Neill, Tumbling Dice, 2023\n",CANTOR_VERSION);
+   (void)fprintf(stream,"#  Cantor version %s, (C) M.A. O'Neill, Tumbling Dice, 2024\n",CANTOR_VERSION);
    (void)fprintf(stream,"#-----------------------------------------------------------------------------------\n\n");
    (void)fprintf(stream,"\n\n#  Format is node1, node2, link, link_flux, link_length\n\n");
    (void)fflush(stream);
@@ -3639,21 +3622,19 @@ _PUBLIC int cantor_rulefile_from_clustered_link(char      *filename,  // Filenam
 
 
 
-/*------------------------------------------------------------------------------
-    Intersection of a pair of links ...
-------------------------------------------------------------------------------*/
-
-
+/*---------------------------------*/
+/* Intersection of a pair of links */
+/*---------------------------------*/
 /*-------------------------------------*/
 /* Desintation linklists on local heap */
 /*-------------------------------------*/
 
-_PUBLIC int cantor_link_intersection(char      *name,     // Name of intersection set1
-                                     link_type *link_1,   // Insersection of link set2 and set3
-                                     link_type *link_2,   // Set2
-                                     link_type *link_3)   // Set3
+_PUBLIC int32_t cantor_link_intersection(const char *name,     // Name of intersection link
+                                         link_type  *link_1,   // Insersection of link set2 and set3
+                                         link_type  *link_2,   // Set2
+                                         link_type  *link_3)   // Set3
 
-{   int i;
+{   uint32_t i;
 
     if(name == (char *)NULL ||
        link_1 == (link_type *)NULL ||
@@ -3674,7 +3655,7 @@ _PUBLIC int cantor_link_intersection(char      *name,     // Name of intersectio
     (void)cantor_set_link_type(link_1,"intersection");
 
     for(i=0; i<link_2->node_alloc; ++i)
-    {  int      j;
+    {   int32_t      j;
        _BOOLEAN matched = FALSE;
 
        for(j=i; j<link_3->node_alloc; ++j)
@@ -3704,13 +3685,13 @@ _PUBLIC int cantor_link_intersection(char      *name,     // Name of intersectio
 /* Destination linklist on persistent heap */
 /*-----------------------------------------*/
 
-_PUBLIC int cantor_phlink_intersection(int       hdes,     // Heap descriptor set1
-                                       char      *name,    // name of intersection set1
-                                       link_type *link_1,  // Insersection of set2 and set3
-                                       link_type *link_2,  // Set2
-                                       link_type *link_3)  // Set3
+_PUBLIC int32_t cantor_phlink_intersection(const uint32_t  hdes,     // Heap descriptor for intersection link
+                                           const char      *name,    // Name of intersection link
+                                           link_type       *link_1,  // Insersection of set2 and set3
+                                           link_type       *link_2,  // Set2
+                                           link_type       *link_3)  // Set3
 
-{   int i;
+{   uint32_t i;
 
     if(name   == (char *)NULL       ||
        link_1 == (link_type *)NULL  ||
@@ -3731,7 +3712,7 @@ _PUBLIC int cantor_phlink_intersection(int       hdes,     // Heap descriptor se
     (void)cantor_set_link_type(link_1,"intersection");
 
     for(i=0; i<link_2->node_alloc; ++i)
-    {  int      j;
+    {   int32_t      j;
        _BOOLEAN matched = FALSE;
 
        for(j=i; j<link_3->node_alloc; ++j)
@@ -3759,21 +3740,19 @@ _PUBLIC int cantor_phlink_intersection(int       hdes,     // Heap descriptor se
 
 
 
-/*------------------------------------------------------------------------------
-    Union of a pair of links ...
-------------------------------------------------------------------------------*/
-
-
+/*--------------------------*/
+/* Union of a pair of links */
+/*--------------------------*/
 /*-----------------------------------*/
 /* Desination linklist on local heap */
 /*-----------------------------------*/
 
-_PUBLIC int cantor_link_union(char      *name,    // Name of union set1
-                              link_type *link_1,  // Union of set2 & set3
-                              link_type *link_2,  // Set2
-                              link_type *link_3)  // Set3
+_PUBLIC int32_t cantor_link_union(const char  *name,    // Name of union link
+                                  link_type   *link_1,  // Union of set2 & set3 
+                                  link_type   *link_2,  // Set2
+                                  link_type   *link_3)  // Set3
 
-{   int i;
+{   uint32_t i;
 
     if(name == (char *)NULL || link_1 == (link_type *)NULL || link_2 == (link_type *)NULL || link_3 == (link_type *)NULL)
     {  pups_set_errno(EINVAL);
@@ -3812,17 +3791,17 @@ _PUBLIC int cantor_link_union(char      *name,    // Name of union set1
 
 
 #ifdef PERSISTENT_HEAP_SUPPORT
-/*------------------------------------------*/
-/* Destination rlLinklist on peristent heap */
-/*------------------------------------------*/
+/*----------------------------------------*/
+/* Destination linklist on peristent heap */
+/*----------------------------------------*/
 
-_PUBLIC int cantor_phlink_union(int          hdes,  // Heap descriptor set1
-                                char        *name,  // Name of set1
-                                link_type *link_1,  // Unions of set2 and set3
-                                link_type *link_2,  // Set2
-                                link_type *link_3)  // Set3
+_PUBLIC int32_t cantor_phlink_union(const uint32_t  hdes,     // Heap descriptor of union link
+                                    const char      *name,    // Name of union link
+                                    link_type       *link_1,  // Unions of set2 and set3
+                                    link_type       *link_2,  // Set2
+                                    link_type       *link_3)  // Set3
 
-{   int i;
+{   uint32_t i;
 
     if(name == (char *)NULL         ||
        link_1 == (link_type *)NULL  ||
@@ -3866,21 +3845,19 @@ _PUBLIC int cantor_phlink_union(int          hdes,  // Heap descriptor set1
 
 
 
-/*------------------------------------------------------------------------------
-    Difference of a pair of links ...
-------------------------------------------------------------------------------*/
-
-
+/*-------------------------------*/
+/* Difference of a pair of links */
+/*-------------------------------*/
 /*-------------------------------------*/
 /* Destination linklists on local heap */
 /*-------------------------------------*/
 
-_PUBLIC int cantor_link_difference(char      *name,    // Name of difference set1
-                                   link_type *link_1,  // Difference of set2 and set3
-                                   link_type *link_2,  // Set2
-                                   link_type *link_3)  // Set3
+_PUBLIC int32_t cantor_link_difference(const char  *name,    // Name of difference link
+                                       link_type   *link_1,  // Difference of set2 and set3
+                                       link_type   *link_2,  // Set2
+                                       link_type   *link_3)  // Set3
 
-{   int i;
+{   uint32_t i;
 
     if(name   == (char *)NULL       ||
        link_1 == (link_type *)NULL  ||
@@ -3901,7 +3878,7 @@ _PUBLIC int cantor_link_difference(char      *name,    // Name of difference set
     (void)cantor_set_link_type(link_1,"difference");
 
     for(i=0; i<link_2->node_alloc; ++i)
-    {  int      j;
+    {   int32_t j;
        _BOOLEAN matched = FALSE;
 
        for(j=i; j<link_3->node_alloc; ++j)
@@ -3916,7 +3893,7 @@ _PUBLIC int cantor_link_difference(char      *name,    // Name of difference set
     }
 
     for(i=0; i<link_3->node_alloc; ++i)
-    {  int      j;
+    {   int32_t      j;
        _BOOLEAN matched = FALSE;
 
        for(j=i; j<link_2->node_alloc; ++j)
@@ -3948,13 +3925,13 @@ _PUBLIC int cantor_link_difference(char      *name,    // Name of difference set
 /* Destination linklist on pesistent heap */
 /*----------------------------------------*/
 
-_PUBLIC int cantor_phlink_difference(int       hdes,     // Heap descriptor for set1
-                                     char      *name,    // Name of set1
-                                     link_type *link_1,  // Difference of set2 and set3
-                                     link_type *link_2,  // Set2
-                                     link_type *link_3)  // Set3
+_PUBLIC int32_t cantor_phlink_difference(const uint32_t  hdes,     // Heap descriptor for difference link
+                                         const char      *name,    // Name of difference link
+                                         link_type       *link_1,  // Difference of set2 and set3
+                                         link_type       *link_2,  // Set2
+                                         link_type       *link_3)  // Set3
 
-{   int i;
+{   uint32_t i;
 
     if(name   == (char *)NULL       ||
        link_1 == (link_type *)NULL  ||
@@ -3975,7 +3952,7 @@ _PUBLIC int cantor_phlink_difference(int       hdes,     // Heap descriptor for 
     (void)cantor_set_link_type(link_1,"difference");
 
     for(i=0; i<link_2->node_alloc; ++i)
-    {  int      j;
+    {   int32_t j;
        _BOOLEAN matched = FALSE;
 
        for(j=i; j<link_3->node_alloc; ++j)
@@ -3990,7 +3967,7 @@ _PUBLIC int cantor_phlink_difference(int       hdes,     // Heap descriptor for 
     }
 
     for(i=0; i<link_3->node_alloc; ++i)
-    {  int      j;
+    {   int32_t j;
        _BOOLEAN matched = FALSE;
 
        for(j=i; j<link_2->node_alloc; ++j)
@@ -4018,21 +3995,19 @@ _PUBLIC int cantor_phlink_difference(int       hdes,     // Heap descriptor for 
 
 
 
-/*------------------------------------------------------------------------------
-    (Object) intersection of a pair of nodes ...
-------------------------------------------------------------------------------*/
-
-
+/*------------------------------------------*/
+/* (Object) intersection of a pair of nodes */
+/*------------------------------------------*/
 /*--------------------------------*/
 /* Destination node on local heap */
 /*--------------------------------*/
 
-_PUBLIC int cantor_object_intersection(char      *name,    // Name of intersection node1      
-                                       node_type *node_1,  // Intersection of nodes1 and node2
-                                       node_type *node_2,  // Node2
-                                       node_type *node_3)  // Node3
+_PUBLIC int32_t cantor_object_intersection(const char *name,    // Name of intersection node      
+                                           node_type  *node_1,  // Intersection of nodes1 and node2
+                                           node_type  *node_2,  // Node2
+                                           node_type  *node_3)  // Node3
 
-{   int i;
+{   uint32_t i;
 
     if(name   == (char *)NULL       ||
        node_1 == (node_type *)NULL  ||
@@ -4053,7 +4028,7 @@ _PUBLIC int cantor_object_intersection(char      *name,    // Name of intersecti
     (void)cantor_set_node_type(node_1,"intersection");
 
     for(i=0; i<node_2->object_alloc; ++i)
-    {  int      j;
+    {   int32_t j;
        _BOOLEAN matched = FALSE;
 
        for(j=i; j<node_3->object_alloc; ++j)
@@ -4080,16 +4055,16 @@ _PUBLIC int cantor_object_intersection(char      *name,    // Name of intersecti
 
 #ifdef PERSISTENT_HEAP_SUPPORT
 /*-------------------------------------*/
-/* Desitnation node on persistent heap */
+/* Destination node on persistent heap */
 /*-------------------------------------*/
 
-_PUBLIC int cantor_phobject_intersection(int        hdes,    // Heap descriptor for node1
-                                         char      *name,    // Name of node1
-                                         node_type *node_1,  // Intersection of node2 and node3
-                                         node_type *node_2,  // Node2
-                                         node_type *node_3)  // Node3
+_PUBLIC int32_t cantor_phobject_intersection(const uint32_t  hdes,    // Heap descriptor for intrsection node
+                                             const char      *name,   // Name of interection node
+                                             node_type       *node_1,  // Intersection of node2 and node3
+                                             node_type       *node_2,  // Node2
+                                             node_type       *node_3)  // Node3
 
-{   int i;
+{   uint32_t i;
 
     if(name   == (char *)NULL       ||
        node_1 == (node_type *)NULL  ||
@@ -4110,7 +4085,7 @@ _PUBLIC int cantor_phobject_intersection(int        hdes,    // Heap descriptor 
     (void)cantor_set_node_type(node_1,"union");
 
     for(i=0; i<node_2->object_alloc; ++i)
-    {  int      j;
+    {   int32_t j;
        _BOOLEAN matched = FALSE;
 
        for(j=i; j<node_3->object_alloc; ++j)
@@ -4138,21 +4113,19 @@ _PUBLIC int cantor_phobject_intersection(int        hdes,    // Heap descriptor 
 
 
 
-/*------------------------------------------------------------------------------
-    (Object) union  of a pair of nodes ...
-------------------------------------------------------------------------------*/
-
-
+/*------------------------------------*/
+/* (Object) union  of a pair of nodes */
+/*------------------------------------*/
 /*--------------------------------*/
 /* Destination node on local heap */
 /*--------------------------------*/
 
-_PUBLIC int cantor_object_union(char      *name,    // Name of node1
-                                node_type *node_1,  // Union of node1 and node2
-                                node_type *node_2,  // Node2
-                                node_type *node_3)  // Node3
+_PUBLIC int32_t cantor_object_union(const char    *name,  // Name of union node
+                                    node_type   *node_1,  // Union of node1 and node2
+                                    node_type   *node_2,  // Node2
+                                    node_type   *node_3)  // Node3
 
-{   int i;
+{   uint32_t i;
 
     if(name   == (char *)NULL       ||
        node_1 == (node_type *)NULL  ||
@@ -4198,14 +4171,14 @@ _PUBLIC int cantor_object_union(char      *name,    // Name of node1
 /* Desintantion node on persistent heap */
 /*--------------------------------------*/
 
-_PUBLIC int cantor_phobject_union(int        hdes,    // Heap descriptor for node1
-                                  char      *name,    // Name of node1
-                                  node_type *node_1,  // Union of node2 and node3
-                                  node_type *node_2,  // Node2
-                                  node_type *node_3)  // Node3
+_PUBLIC int32_t cantor_phobject_union(const uint32_t  hdes,     // Heap descriptor for union node
+                                      const char      *name,    // Name of union node
+                                      node_type       *node_1,  // Union of node2 and node3
+                                      node_type       *node_2,  // Node2
+                                      node_type       *node_3)  // Node3
 
-{   int i,
-        j;
+{   uint32_t i,
+             j;
 
     _BOOLEAN  matched;
     link_type *ret = (link_type *)NULL;
@@ -4249,21 +4222,19 @@ _PUBLIC int cantor_phobject_union(int        hdes,    // Heap descriptor for nod
 
 
 
-/*------------------------------------------------------------------------------
-    (Object) difference of a pair of nodes ...
-------------------------------------------------------------------------------*/
-
-
+/*----------------------------------------*/
+/* (Object) difference of a pair of nodes */
+/*----------------------------------------*/
 /*--------------------------------*/
 /* Destination node on local heap */
 /*--------------------------------*/
 
-_PUBLIC int cantor_object_difference(char      *name,    // Name of difference node1
-                                     node_type *node_1,  // Difference of node2 and node3
-                                     node_type *node_2,  // Node2
-                                     node_type *node_3)  // Node3
+_PUBLIC int32_t cantor_object_difference(const char  *name,    // Name of difference node
+                                         node_type   *node_1,  // Difference of node2 and node3
+                                         node_type   *node_2,  // Node2
+                                         node_type   *node_3)  // Node3
 
-{   int i;
+{   uint32_t i;
 
     if(name   == (char *)NULL       ||
        node_1 == (node_type *)NULL  ||
@@ -4284,7 +4255,7 @@ _PUBLIC int cantor_object_difference(char      *name,    // Name of difference n
     (void)cantor_set_node_type(node_1,"difference");
 
     for(i=0; i<node_2->object_alloc; ++i)
-    {  int      j;
+    {   int32_t j;
        _BOOLEAN matched = FALSE;
 
        for(j=i; j<node_3->object_alloc; ++j)
@@ -4299,7 +4270,7 @@ _PUBLIC int cantor_object_difference(char      *name,    // Name of difference n
     }
 
     for(i=0; i<node_3->object_alloc; ++i)
-    {  int      j;
+    {   int32_t j;
        _BOOLEAN matched = FALSE;
 
        for(j=i; j<node_2->object_alloc; ++j)
@@ -4329,13 +4300,13 @@ _PUBLIC int cantor_object_difference(char      *name,    // Name of difference n
 /* Destination node on persistent heap */
 /*-------------------------------------*/
 
-_PUBLIC int cantor_phobject_difference(int        hdes,    // Heap descriptor for node1
-                                       char      *name,    // Name of node1
-                                       node_type *node_1,  // Difference of node2 and node3
-                                       node_type *node_2,  // Node2
-                                       node_type *node_3)  // Node3
+_PUBLIC  int32_t cantor_phobject_difference(const uint32_t  hdes,    // Heap descriptor for difference node 
+                                            const char      *name,    // Name of difference node
+                                            node_type       *node_1,  // Difference of node2 and node3
+                                            node_type       *node_2,  // Node2
+                                            node_type       *node_3)  // Node3
 
-{   int i;
+{   uint32_t i;
 
     if(name   == (char *)NULL       ||
        node_1 == (node_type *)NULL  ||
@@ -4356,7 +4327,7 @@ _PUBLIC int cantor_phobject_difference(int        hdes,    // Heap descriptor fo
     (void)cantor_set_node_type(node_1,"difference");
 
     for(i=0; i<node_2->object_alloc; ++i)
-    {  int      j;
+    {   int32_t j;
        _BOOLEAN matched = FALSE;
 
        for(j=i; j<node_3->object_alloc; ++j)
@@ -4371,7 +4342,7 @@ _PUBLIC int cantor_phobject_difference(int        hdes,    // Heap descriptor fo
     }
 
     for(i=0; i<node_3->object_alloc; ++i)
-    {  int      j;
+    {   int32_t j;
        _BOOLEAN matched = FALSE;
 
        for(j=i; j<node_2->object_alloc; ++j)
@@ -4399,21 +4370,19 @@ _PUBLIC int cantor_phobject_difference(int        hdes,    // Heap descriptor fo
 
 
 
-/*------------------------------------------------------------------------------
-    (Node) intersection of a pair of nodelists ...
-------------------------------------------------------------------------------*/
-
-
+/*--------------------------------------------*/
+/* (Node) intersection of a pair of nodelists */
+/*--------------------------------------------*/
 /*------------------------------------*/
 /* Destination nodelist on local heap */
 /*------------------------------------*/
 
-_PUBLIC int nodelist_intersection(char          *name,        // Name of nodelist1
-                                  nodelist_type *nodelist_1,  // Intersection of nodelist1 and nodelist2
-                                  nodelist_type *nodelist_2,  // Nodelist2
-                                  nodelist_type *nodelist_3)  // Nodelist3
+_PUBLIC int32_t nodelist_intersection(const char     *name,        // Name of  int32_terection nodelist
+                                      nodelist_type  *nodelist_1,  // Intersection of nodelist1 and nodelist2
+                                      nodelist_type  *nodelist_2,  // Nodelist2
+                                      nodelist_type  *nodelist_3)  // Nodelist3
 
-{   int i;
+{   uint32_t i;
 
     if(name       == (char *)NULL           ||
        nodelist_1 == (nodelist_type *)NULL  ||
@@ -4434,7 +4403,7 @@ _PUBLIC int nodelist_intersection(char          *name,        // Name of nodelis
     (void)cantor_set_nodelist_type(nodelist_1,"intersection");
 
     for(i=0; i<nodelist_2->node_alloc; ++i)
-    {  int      j;
+    {   int32_t j;
        _BOOLEAN matched = FALSE;
 
        for(j=i; j<nodelist_3->node_alloc; ++j)
@@ -4461,16 +4430,16 @@ _PUBLIC int nodelist_intersection(char          *name,        // Name of nodelis
 
 #ifdef PERSISTENT_HEAP_SUPPORT
 /*-----------------------------------------*/
-/* Desitnation nodelist on persistent heap */
+/* Destination nodelist on persistent heap */
 /*-----------------------------------------*/
 
-_PUBLIC int cantor_phnodelist_intersection(int            hdes,        // Heap descriptor for nodelist1
-                                           char          *name,        // Name of nodelist1
-                                           nodelist_type *nodelist_1,  // Intersection of nodelist2 and nodelist3
-                                           nodelist_type *nodelist_2,  // Nodelist2
-                                           nodelist_type *nodelist_3)  // Nodelist3
+_PUBLIC int32_t cantor_phnodelist_intersection(const uint32_t  hdes,         // Heap descriptor for intersection nodelist
+                                               const char      *name,        // Name of intersection nodelist
+                                               nodelist_type   *nodelist_1,  // Intersection of nodelist2 and nodelist3
+                                               nodelist_type   *nodelist_2,  // Nodelist2
+                                               nodelist_type   *nodelist_3)  // Nodelist3
 
-{   int i;
+{   uint32_t i;
 
     if(name       == (char *)NULL           ||
        nodelist_1 == (nodelist_type *)NULL  ||
@@ -4491,7 +4460,7 @@ _PUBLIC int cantor_phnodelist_intersection(int            hdes,        // Heap d
     (void)cantor_set_nodelist_type(nodelist_1,"intersection");
 
     for(i=0; i<nodelist_2->node_alloc; ++i)
-    {  int      j;
+    {   int32_t      j;
        _BOOLEAN matched = FALSE;
 
        for(j=i; j<nodelist_3->node_alloc; ++j)
@@ -4519,22 +4488,20 @@ _PUBLIC int cantor_phnodelist_intersection(int            hdes,        // Heap d
 
 
 
-/*------------------------------------------------------------------------------
-    (Node) union of a pair of nodelists ...
-------------------------------------------------------------------------------*/
-
-
+/*-------------------------------------*/
+/* (Node) union of a pair of nodelists */
+/*-------------------------------------*/
 /*-------------------------*/
 /* Nodelists on local heap */
 /*-------------------------*/
 
-_PUBLIC int nodelist_union(char          *name,        // Name of nodelist1
-                           nodelist_type *nodelist_1,  // Intersection of nodelist2 and nodelist3
-                           nodelist_type *nodelist_2,  // Nodelist2
-                           nodelist_type *nodelist_3)  // Nodelist3
+_PUBLIC int32_t nodelist_union(const char    *name,        // Name of union nodelist
+                               nodelist_type *nodelist_1,  // Intersection of nodelist2 and nodelist3
+                               nodelist_type *nodelist_2,  // Nodelist2
+                               nodelist_type *nodelist_3)  // Nodelist3
 
-{   int i,
-        j;
+{   uint32_t i,
+             j;
 
     if(name == (char *)NULL || nodelist_1 == (nodelist_type *)NULL || nodelist_2 == (nodelist_type *)NULL || nodelist_3 == (nodelist_type *)NULL)
     {  pups_set_errno(EINVAL);
@@ -4577,13 +4544,13 @@ _PUBLIC int nodelist_union(char          *name,        // Name of nodelist1
 /* Destination nodelist on persistent heap */
 /*-----------------------------------------*/
 
-_PUBLIC int cantor_phnodelist_union(int            hdes,        // Heap descriptor for nodelist1
-                                    char          *name,        // Name of nodelist1
-                                    nodelist_type *nodelist_1,  // Union of nodelist2 and nodelist3
-                                    nodelist_type *nodelist_2,  // Nodelist2
-                                    nodelist_type *nodelist_3)  // Nodelist3
+_PUBLIC int32_t cantor_phnodelist_union(const uint32_t  hdes,         // Heap descriptor for union nodelist
+                                        const char      *name,        // Name of union nodelist
+                                        nodelist_type   *nodelist_1,  // Union of nodelist2 and nodelist3
+                                        nodelist_type   *nodelist_2,  // Nodelist2
+                                        nodelist_type   *nodelist_3)  // Nodelist3
 
-{   int i;
+{   uint32_t i;
 
     if(name       == (char *)NULL           ||
        nodelist_1 == (nodelist_type *)NULL  ||
@@ -4627,21 +4594,19 @@ _PUBLIC int cantor_phnodelist_union(int            hdes,        // Heap descript
 
 
 
-/*------------------------------------------------------------------------------
-    (Node) difference of a pair of nodelists ...
-------------------------------------------------------------------------------*/
-
-
+/*------------------------------------------*/
+/* (Node) difference of a pair of nodelists */
+/*------------------------------------------*/
 /*-----------------------------------*/
 /* Desination Nodelist on local heap */
 /*-----------------------------------*/
 
-_PUBLIC int cantor_nodelist_difference(char          *name,        // Name of nodelist1
-                                       nodelist_type *nodelist_1,  // Difference of nodelist2 and nodelist3
-                                       nodelist_type *nodelist_2,  // Nodelist2
-                                       nodelist_type *nodelist_3)  // Nodelist3
+_PUBLIC int32_t cantor_nodelist_difference(const char    *name,        // Name of difference nodelist
+                                           nodelist_type *nodelist_1,  // Difference of nodelist2 and nodelist3
+                                           nodelist_type *nodelist_2,  // Nodelist2
+                                           nodelist_type *nodelist_3)  // Nodelist3
 
-{   int i;
+{   uint32_t i;
 
     if(name       == (char *)NULL           ||
        nodelist_1 == (nodelist_type *)NULL  ||
@@ -4662,7 +4627,7 @@ _PUBLIC int cantor_nodelist_difference(char          *name,        // Name of no
     (void)cantor_set_nodelist_type(nodelist_1,"difference");
 
     for(i=0; i<nodelist_2->node_alloc; ++i)
-    {  int      j;
+    {   int32_t      j;
        _BOOLEAN matched = FALSE;
 
        for(j=i; j<nodelist_3->node_alloc; ++j)
@@ -4677,7 +4642,7 @@ _PUBLIC int cantor_nodelist_difference(char          *name,        // Name of no
     }
 
     for(i=0; i<nodelist_3->node_alloc; ++i)
-    {  int      j;
+    {   int32_t      j;
        _BOOLEAN matched = FALSE;
 
        for(j=i; j<nodelist_2->node_alloc; ++j)
@@ -4707,13 +4672,13 @@ _PUBLIC int cantor_nodelist_difference(char          *name,        // Name of no
 /* Destination nodelist on persistent heap */
 /*-----------------------------------------*/
 
-_PUBLIC int cantor_phnodelist_difference(int            hdes,        // Heap descriptor nodelist1
-                                         char          *name,        // Name of nodelist1
-                                         nodelist_type *nodelist_1,  // Difference of nodelist2 and nodelist3
-                                         nodelist_type *nodelist_2,  // Nodelist2
-                                         nodelist_type *nodelist_3)  // Nodelist3
+_PUBLIC  int32_t cantor_phnodelist_difference(const uint32_t  hdes,         // Heap descriptor for difference nodelist
+                                              const char      *name,        // Name of nodelist1
+                                              nodelist_type   *nodelist_1,  // Difference of nodelist2 and nodelist3
+                                              nodelist_type   *nodelist_2,  // Nodelist2
+                                              nodelist_type   *nodelist_3)  // Nodelist3
 
-{   int i;
+{   uint32_t i;
 
     if(name       == (char *)NULL           ||
        nodelist_1 == (nodelist_type *)NULL  ||
@@ -4734,7 +4699,7 @@ _PUBLIC int cantor_phnodelist_difference(int            hdes,        // Heap des
     (void)cantor_set_nodelist_type(nodelist_1,"union");
 
     for(i=0; i<nodelist_2->node_alloc; ++i)
-    {  int      j;
+    {   int32_t j;
        _BOOLEAN matched = FALSE;
 
        for(j=i; j<nodelist_3->node_alloc; ++j)
@@ -4749,7 +4714,7 @@ _PUBLIC int cantor_phnodelist_difference(int            hdes,        // Heap des
     }
 
     for(i=0; i<nodelist_3->node_alloc; ++i)
-    {  int      j;
+    {   int32_t j;
        _BOOLEAN matched = FALSE;
 
        for(j=0; j<nodelist_2->node_alloc; ++j)

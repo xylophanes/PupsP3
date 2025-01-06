@@ -1,5 +1,5 @@
-/*-------------------------------------------------------------------------------------------------------
-    Purpose: Vector (to given PSRP server). 
+/*----------------------------------------
+    Purpose: Vector (to given PSRP server) 
 
     Author:  M.A. O'Neill
              Tumbling Dice Ltd
@@ -8,10 +8,10 @@
              NE3 4RT
              United Kingdom
 
-    Version: 2.00 
-    Dated:   4th January 2023
+    Version: 2.02 
+    Dated:   12th December 2024
     E-mail:  mao@tumblingdice.co.uk
--------------------------------------------------------------------------------------------------------*/
+-----------------------------------------*/
 
 
 #include <me.h>
@@ -39,20 +39,20 @@
 #define VECTOR_VERSION    "2.00"
 
 
-/*------------------------------------------------------------------------------------------------------
-    Get application information for slot manager ...
-------------------------------------------------------------------------------------------------------*/
+/*----------------------------------------------*/
+/* Get application information for slot manager */
+/*----------------------------------------------*/
 /*---------------------------*/ 
 /* Slot information function */
 /*---------------------------*/ 
 
-_PRIVATE void vector_slot(int level)
+_PRIVATE void vector_slot(int32_t level)
 {   (void)fprintf(stderr,"int app vector %s: [ANSI C]\n",VECTOR_VERSION);
  
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 2002-2023 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 2002-2024 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. ONeill\n");
-       (void)fprintf(stderr,"PSRP remote server vector (built %s %s)\n\n",__TIME__,__DATE__);
+       (void)fprintf(stderr,"PSRP remote server vector (gcc %s: built %s %s)\n\n",__VERSION__,__TIME__,__DATE__);
     }
     else
        (void)fprintf(stderr,"\n");
@@ -93,9 +93,9 @@ _EXTERN void (* USE )() __attribute__ ((aligned(16))) = vector_usage;
 #endif /* SLOT */
 
 
-/*-------------------------------------------------------------------------------------------------------
-    Application build date ...
--------------------------------------------------------------------------------------------------------*/
+/*------------------------*/
+/* Application build date */
+/*------------------------*/
 
 _EXTERN char appl_build_time[SSIZE] = __TIME__;
 _EXTERN char appl_build_date[SSIZE] = __DATE__;
@@ -103,41 +103,40 @@ _EXTERN char appl_build_date[SSIZE] = __DATE__;
 
 
 
-/*-------------------------------------------------------------------------------------------------------
-    Functions which are private to this application ...
--------------------------------------------------------------------------------------------------------*/
+/*-------------------------------------------------*/
+/* Functions which are private to this application */
+/*-------------------------------------------------*/
 
 // Initialise link (to remote host) 
-_PROTOTYPE _PRIVATE int psrp_link(int, char *[]);
+_PROTOTYPE _PRIVATE  int32_t psrp_link(int32_t, char *[]);
 
 
 
 
-/*-------------------------------------------------------------------------------------------------------
-    Variables which are private to this module ...
--------------------------------------------------------------------------------------------------------*/
+/*--------------------------------------------*/
+/* Variables which are private to this module */
+/*--------------------------------------------*/
 
 _PRIVATE char r_host[SSIZE]   = "",
               r_server[SSIZE] = "";
 
 
-/*-------------------------------------------------------------------------------------------------------
-    Software I.D. tag (used if CKPT support enabled to discard stale dynamic
-    checkpoint files) ...
--------------------------------------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------------*/
+/* Software I.D. tag (used if CKPT support enabled to discard stale dynamic */
+/* checkpoint files)                                                        */
+/*--------------------------------------------------------------------------*/
 
 #define VTAG  2154
-
-extern int appl_vtag = VTAG;
-
+extern  int32_t appl_vtag = VTAG;
 
 
 
-/*--------------------------------------------------------------------------------------------------------
-    Main - decode command tail then interpolate using parameters supplied by user ...
---------------------------------------------------------------------------------------------------------*/
 
-_PUBLIC int pups_main(int argc, char *argv[])
+/*------------------*/
+/* Main entry point */
+/*------------------*/
+
+_PUBLIC  int32_t pups_main(int32_t argc, char *argv[])
 
 {   
 
@@ -157,7 +156,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
                   VECTOR_VERSION,
                   "M.A. O'Neill",
                   "(PSRP) vector",
-                  "2023",
+                  "2024",
                   argv);
 
 
@@ -251,13 +250,13 @@ _PUBLIC int pups_main(int argc, char *argv[])
 
 
 
-/*-------------------------------------------------------------------------------------------------------------
-    Initialise link (to remote host) ...
--------------------------------------------------------------------------------------------------------------*/
+/*----------------------------------*/
+/* Initialise link (to remote host) */
+/*----------------------------------*/
 
-_PRIVATE int psrp_link(int argc, char *argv[])
+_PRIVATE int32_t psrp_link(int32_t argc, char *argv[])
 
-{   int  status;
+{   int32_t  status;
     char psrp_cmd[SSIZE] = "";
 
     (void)snprintf(psrp_cmd,SSIZE,"exec psrp -verbose -sname %s -on %s",r_server,r_host,channel_name_in,channel_name_out);

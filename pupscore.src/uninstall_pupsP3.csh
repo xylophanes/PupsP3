@@ -4,21 +4,23 @@
 #  Uninstall PUPS/P3 and support components
 #  $1 logfile
 #
-#  (C) M.A. O'Neill. Tumbling Dice 2000-2022
+#  (C) M.A. O'Neill. Tumbling Dice 2000-2025
 #-------------------------------------------
 #--------------------
 # Target architecture
 #--------------------
-set arch = `uname -a | awk '{print $12}'`
+set arch = `uname -m`
 
 
 #-------------------
 # Initialise logfile
 #--------------------
 
-if($1 == "" || $1 == null || $1 == /dev/null) then
+if($# == 0) then
+	set logFile = /dev/tty
+else if($1 == "null" || $1 == "/dev/null") then
 	set logFi1e = /dev/null
-else if($1 == "tty" || $1 == /dev/tty) then
+else if($1 == "tty" || $1 == "/dev/tty") then
 	set logFile = /dev/tty
 else
 	set logFile = $1
@@ -35,7 +37,7 @@ endif
 #-------
 
 echo ""																>>& $logFile		
-echo "    P3-2022 (SUP3) uninstall script (C) M.A. O'Neill Tumbling Dice 2000-2022"						>>& $logFile
+echo "    P3-2025 (SUP3) uninstall script (C) M.A. O'Neill Tumbling Dice 2000-2025"						>>& $logFile
 echo ""																>>& $logFile
 
 
@@ -80,13 +82,13 @@ endif
 #-----
 # man1
 #-----
-set man1_remove_list =   "hdid.1 ecrypt.1 pupsconf.1 vstamp.1 vtagup.1 p2c.1 appgen.1 libgen.1 dllgen.1                \
+set man1_remove_list =   "pupsconf.1 vstamp.1 vtagup.1 p2c.1 appgen.1 libgen.1 dllgen.1 isatty.1                       \
                           hupter.1 nkill.1 htype.1 farm.1 ssave.1 restart.1 cpuload.1 lol.1 gob.1 arse.1 mktty.1       \
                           mkfile.1 lyosome.1 psrptool.1 servertool.1 stripper.1 iscard.1 isint ishex.1                 \
                           isfloat.1 tas.1 ask.1 suffix.1 prefix.1 gethostip.1 catfiles.1 new_session.1                 \
                           leaf.1 branch.1 upcase.1 downcase.1 striplc.1 error.1 psrp.1 embryo.1 pass.1 maggot.1 fsw.1  \
                           protect.1 xcat.1 xtee.1 tcell.1 mantohtml.1 manc.1 tall.1 pupsuname.1 configure.1            \
-                          somake.1"
+                          somake.1 dllbuild.1"
 
 #-----
 # man3
@@ -107,11 +109,11 @@ set man7_remove_list =   "pups.7"
 # Binaries (bin)
 #---------------
 
-set bin_remove_list  =	"hdid ecrypt pupsconf vstamp vtagup p2c appgen libgen dllgen hupter nkill htype               \
+set bin_remove_list  =	"pupsconf vstamp vtagup p2c appgen libgen dllgen hupter nkill htype isatty                    \
                          farm ssave cpuload lol gob arse mktty mkfile lyosome psrptool servertool stripper iscard     \
                          isint ishex isfloat tas ask suffix prefix gethostip catfiles new_session upcase              \
                          leaf, branch downcase striplc error psrp embryo pass maggot fsw protect xcat xtee tcell      \
-                         mantohtml manc.sh C2MAN.sh tall pupsuname configure somake pupsp3-version"
+                         mantohtml manc.sh C2MAN.sh tall pupsuname configure somake dllbuild pupsp3-version"
 
 
 #----------------
@@ -237,15 +239,6 @@ else
 
 endif
 
-
-#------------------------------
-# Remove soft dongle directory
-#------------------------------
-
-echo "    ... removing PUPS/P3 dongle directory ('`whoami`/.sdongles')"								>>& $logFile
-if(-e `whoami`/.sdongles) then
-	\rm -rf `whoami`/.sdongles												>& /dev/null 
-endif
 
 echo ""																>>& $logFile
 echo "  ----------------------------------------------------------------------------------------------------------"		>>& $logFile

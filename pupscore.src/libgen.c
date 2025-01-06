@@ -1,5 +1,5 @@
-/*---------------------------------------------------------------------------------------
-     Purpose: Generate a library stub from skeleton library template.
+/*------------------------------------------------------------------
+     Purpose: Generate a library stub from skeleton library template
 
      Author:  M.A. O'Neill
               Tumbling Dice Ltd
@@ -8,10 +8,10 @@
               NE3 4RT
               United Kingdom
 
-     Version: 2.01
-     Dated:   24th May 2023
+     Version: 2.02
+     Dated:   10th October 2024
      E-mail:  mao@tumblingdice.co.uk
----------------------------------------------------------------------------------------*/
+------------------------------------------------------------------*/
 
 #include <stdio.h>
 #include <unistd.h>
@@ -20,6 +20,7 @@
 #include <string.h>
 #include <bsd/string.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 #ifdef HAVE_READLINE
 #include <readline/readline.h>
@@ -31,7 +32,7 @@
 /* Version of libgen */
 /*-------------------*/
 
-#define LIBGEN_VERSION   "2.01"
+#define LIBGEN_VERSION   "2.02"
 
 
 /*-------------*/
@@ -52,14 +53,14 @@
 
 
 
-/*---------------------------------------------------------------------------------------
-    Strip control characters from string ...
----------------------------------------------------------------------------------------*/
+/*--------------------------------------*/
+/* Strip control characters from string */
+/*--------------------------------------*/
 
 _PRIVATE void strstrp(char *s_in, char *s_out)
 
-{   int i,
-        cnt = 0;
+{   size_t i,
+           cnt = 0;
 
     for(i=0; i<strlen(s_in); ++i)
     {  if(s_in[i] == '\n' || s_in[i] == '\r')
@@ -77,11 +78,11 @@ _PRIVATE void strstrp(char *s_in, char *s_out)
 
 
 
-/*---------------------------------------------------------------------------------------
-    Read input (with line editing if supported) ...
----------------------------------------------------------------------------------------*/
+/*---------------------------------------------*/
+/* Read input (with line editing if supported) */
+/*---------------------------------------------*/
 
-_PRIVATE void read_line(char *line, char *prompt)
+_PRIVATE void read_line(char *line, const char *prompt)
 
 {   char *tmp_line = (char *)NULL;
 
@@ -112,17 +113,17 @@ _PRIVATE void read_line(char *line, char *prompt)
 
         } while(strcmp(line,"") == 0);
 
-    (void)free(tmp_line);
+    (void)free((void *)tmp_line);
 }
 
 
 
 
-/*---------------------------------------------------------------------------------------
-    Main entry point to process ...
----------------------------------------------------------------------------------------*/
+/*------------------*/
+/* Main entry point */
+/*------------------*/
 
-_PUBLIC int main(int argc, char *argv[])
+_PUBLIC int32_t main(int32_t argc, char *argv[])
 
 {   char tmpstr[SSIZE]            = "",
          functype[SSIZE]          = "",
@@ -143,8 +144,13 @@ _PUBLIC int main(int argc, char *argv[])
 
     _BOOLEAN lib_init             = FALSE;
 
+
+    /*--------------------*/
+    /* parse command line */
+    /*--------------------*/
+
     if(argc == 1 || argc == 2 && (strcmp(argv[1],"-usage") == 0 || strcmp(argv[1],"-help") == 0))
-    {  (void)fprintf(stderr,"\nPUPS/P3 Library function generator version %s (C) Tumbling Dice, 2002-2023 (built %s %s)\n",LIBGEN_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nPUPS/P3 Library function generator version %s (C) Tumbling Dice, 2002-2024 (gcc %s: built %s %s)\n",LIBGEN_VERSION,__VERSION__,__TIME__,__DATE__);
        (void)fprintf(stderr,"Usage: libgen [skeleton LIB file | skeleton LIB function file]\n\n");
        (void)fflush(stderr);
        (void)fprintf(stderr,"LIBGEN is free software, covered by the GNU General Public License, and you are\n");
@@ -192,7 +198,7 @@ _PUBLIC int main(int argc, char *argv[])
        }
     }
     else
-    {  (void)fprintf(stderr,"\nPUPS/P3 LIB generator version %s, (C) Tumbling Dice, 2023 (built %s %s)1\n",LIBGEN_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nPUPS/P3 LIB generator version %s, (C) Tumbling Dice, 2024 (gcc %s: built %s %s)1\n",LIBGEN_VERSION,__VERSION__,__TIME__,__DATE__);
        (void)fprintf(stderr,"Usage: libgen [skeleton library file]  [skeleton library function file]\n\n");
        (void)fflush(stderr);
        (void)fprintf(stderr,"LIBGEN is free software, covered by the GNU General Public License, and you are\n");
@@ -218,7 +224,7 @@ _PUBLIC int main(int argc, char *argv[])
        exit(255);
     }
 
-    (void)fprintf(stderr,"\nPUPS/P3 LIB template generator version %s (C) M.A. O'Neill, Tumbling Dice, 2023\n\n",LIBGEN_VERSION);
+    (void)fprintf(stderr,"\nPUPS/P3 LIB template generator version %s (C) M.A. O'Neill, Tumbling Dice, 2024\n\n",LIBGEN_VERSION);
     (void)fflush(stderr); 
 
     (void)read_line(lib_name,"libgen (LIB name)> ");
@@ -245,6 +251,8 @@ _PUBLIC int main(int argc, char *argv[])
        (void)strstrp(purpose,tmpstr);
        (void)snprintf(sed_cmd,SSIZE,"s/@PURPOSE/%s/g; ",tmpstr);
        (void)strlcat(sed_cmds,sed_cmd,SSIZE);
+
+// MAO -- version?
 
        (void)read_line(author,"libgen (Author)> ");
        (void)strstrp(author,tmpstr);
@@ -311,7 +319,7 @@ _PUBLIC int main(int argc, char *argv[])
                                                             lib_func_name,lib_name,lib_name,lib_name);
     else
        (void)fprintf(stderr,"\n\nLbrary function template \"%s\" appended to \"%s.c\"\n\n",lib_func_name,lib_name);
+    (void)fflush(stderr);
 
-    (void)fflush(stderr); 
     exit(0);
 }

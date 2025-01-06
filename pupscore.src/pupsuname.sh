@@ -1,9 +1,9 @@
 #!/bin/bash
 #
-#--------------------------------------------------
+#---------------------------------------------------
 # Get PUPS/P3 system architecture
-# (C) M.A. O'Neill, Tumbling Dice, 4th January 2022 
-#-------------------------------------------------- 
+# (C) M.A. O'Neill, Tumbling Dice, 2nd February 2025 
+#--------------------------------------------------- 
 #--------------------
 # Parse command line
 #--------------------
@@ -26,7 +26,7 @@ if [ "$#" -gt 0 ] ; then
 
 	else
 		echo ""
-		echo "    PUPS-2000 (SUPUPS) system architecture identifier script (c) M.A. O'Neill, Tumbling Dice 2002-2022"
+		echo "    PUPSP3 (SUPUPS) system architecture identifier script (c) M.A. O'Neill, Tumbling Dice 2002-2025"
 		echo ""
 
         	echo "Usage: pupsuname [upcase]"

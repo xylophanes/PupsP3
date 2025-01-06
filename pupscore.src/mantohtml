@@ -2,7 +2,7 @@
 #
 #---------------------------------------------------------------------------
 #  Generate HTML versions of PUPS man pages ...
-#  M.A. O'Neill, Tumbling Dice, 2002-2022
+#  M.A. O'Neill, Tumbling Dice, 2002-2024
 #
 #  $1 is man page root directory (where sources to be man paged are located)
 #  $2 is man page directory 
@@ -10,7 +10,7 @@
 
 if($# != 2 || $1 == "--usage") then
 	echo ""
-	echo "    PUPSP3 (SUPUPS) manpage to HTML convertor (C) M.A. O'Neill, Tumbling Dice 2002-2022"
+	echo "    PUPSP3 (SUPUPS) manpage to HTML convertor (C) M.A. O'Neill, Tumbling Dice 2002-2024"
 	echo "    Usage: mantohtml <man page root directory> <HTML directory>"
 	echo ""
 	exit 0

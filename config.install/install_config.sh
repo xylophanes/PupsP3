@@ -2,15 +2,14 @@
 
 #-----------------------------------------------------------
 #  Install configuration directory in p3 directory hierarchy
-#  M.A. O'Neill, Tumbling Dice, 2009-2022
+#  M.A. O'Neill, Tumbling Dice, 2009-2024
 #
 #  $1 is the OS architecture (e.g Linux) 
-#  $2 is the P3 build type (vanilla or cluster)
 #-----------------------------------------------------------
 
 echo ""
 echo "    PUPS/P3 Configuration installer (version 3.00)"
-echo "    M.A. O'Neill, Tumbling Dice 2000-2020"
+echo "    M.A. O'Neill, Tumbling Dice 2000-2024"
 echo ""
 
 if [ "$1" = "" ] ; then
@@ -25,17 +24,7 @@ else
 	arch=$1
 fi 
 
-if [ "$2" = "" ] ; then
-	btype=cluster
-elif [ "$2" != vanilla ]  &&  [ "$2" != cluster ] ; then
-	echo ""
-	echo "    config_install ERROR: expecting 'vanilla' or 'cluster'"
-	echo ""
-
-	exit 255
-else
-	btype=$2
-fi
+btype=cluster
 
 
 #---------------------------
@@ -120,8 +109,6 @@ else
 		else
 			libPath="/usr/lib" 
 		fi
-
-echo PATH $libPath
 
 		incPath="/usr/include/p3"
 	fi

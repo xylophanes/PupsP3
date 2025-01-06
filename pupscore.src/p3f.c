@@ -1,5 +1,5 @@
-/*-------------------------------------------------------------------------------------
-     Purpose: Test to see if a given process is PUPS/P3 aware.
+/*-----------------------------------------------------------
+     Purpose: Test to see if a given process is PUPS/P3 aware
 
      Author:  M.A. O'Neill
               Tumbling Dice Ltd
@@ -8,10 +8,10 @@
               NE3 4RT
               United Kingdom
 
-     Version: 2.01 
-     Dated:   24th May 2023
+     Version: 2.02 
+     Dated:   10th December 2024
      E-mail:  mao@tumblingdice.co.uk
-------------------------------------------------------------------------------------*/
+-----------------------------------------------------------*/
 
 #include <stdio.h>
 #include <string.h>
@@ -23,11 +23,13 @@
 #include <xtypes.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <fcntl.h>
+#include <stdint.h>
 
 
-/*------------------------------------------------------------------------------------
-     Get signal mapping appropriate to OS and hardware architecture ...
-------------------------------------------------------------------------------------*/
+/*----------------------------------------------------------------*/
+/* Get signal mapping appropriate to OS and hardware architecture */
+/*----------------------------------------------------------------*/
 
 #define __DEFINE__
 #if defined(I386) || defined(X86_64)
@@ -50,14 +52,14 @@
 
 
 
-/*-----------------------------------------------------------------------------------
-    Defines which are local to this application ...
------------------------------------------------------------------------------------*/
+/*---------*/
+/* Defines */
+/*---------*/
 /*----------------*/
 /* Version of p3f */
 /*----------------*/
 
-#define P3F_VERSION    "2.01"
+#define P3F_VERSION    "2.02"
 
 
 /*-------------*/
@@ -69,27 +71,28 @@
 
 
 
-/*----------------------------------------------------------------------------------
-    Convert (local) pidname to list of matching PIDS ... 
-----------------------------------------------------------------------------------*/
+/*--------------------------------------------------*/
+/* Convert (local) pidname to list of matching PIDS */
+/*--------------------------------------------------*/
 
-_PRIVATE int local_pname_to_pid(FILE      *stream,
-                                _BOOLEAN  binname,
-                                _BOOLEAN  *is_pid,
-                                char     *pidname)
+_PRIVATE pid_t local_pname_to_pid(const FILE     *stream,
+                                  const _BOOLEAN  binname,
+                                  _BOOLEAN        *is_pid,
+                                  const char      *pidname)
 
 
-{  int  pid,
-        cnt                 = 0,
-        looper              = TRUE;
+{  pid_t         pid;
 
-   char strdum[SSIZE]       = "",
-        cmdline[SSIZE]      = "",
-        ps_cmd[SSIZE]       = "";
+   uint32_t      cnt             = 0;
+   _BOOLEAN      looper          = TRUE;
 
-   FILE          *pstream   = (FILE *)NULL;
-   DIR           *dirp      = (DIR *)NULL;
-   struct dirent *next_item = (struct dirent *)NULL;
+   char          strdum[SSIZE]   = "",
+                 cmdline[SSIZE]  = "",
+                 ps_cmd[SSIZE]   = "";
+
+   FILE          *pstream        = (FILE *)NULL;
+   DIR           *dirp           = (DIR *)NULL;
+   struct dirent *next_item      = (struct dirent *)NULL;
 
 
    /*---------------------------------------------------------------*/
@@ -100,7 +103,7 @@ _PRIVATE int local_pname_to_pid(FILE      *stream,
    if(sscanf(pidname,"%d",&pid) == 1)
    {  if(pid <= 1)
       {  if(stream != (FILE *)NULL)
-         {  (void)fprintf(stream,"freeze: %d is not a valid PID\n",pid);
+         {  (void)fprintf(stream,"ERROR p3f: %d is not a valid PID\n",pid);
             (void)fflush(stream);
          }
 
@@ -127,11 +130,10 @@ _PRIVATE int local_pname_to_pid(FILE      *stream,
         /*----------------------------------------*/
 
         if(sscanf(next_item->d_name,"%d",&pid) == 1)
-        {    int i,
-                 nb,
-                 fdes = (-1);
-
-           char procpidpath[SSIZE] = "";
+        {  size_t  i;
+           ssize_t nb;
+           des_t   fdes = (-1);
+           char    procpidpath[SSIZE] = "";
 
            if(binname == TRUE)
            {  (void)snprintf(procpidpath,SSIZE,"/proc/%d/cmdline",pid);
@@ -141,7 +143,12 @@ _PRIVATE int local_pname_to_pid(FILE      *stream,
               (void)close(fdes);
            }
            else
-           {  /* Get name of binary */
+           {
+
+              /*--------------------*/
+              /* Get name of binary */
+              /*--------------------*/
+
               (void)snprintf(procpidpath,SSIZE,"/proc/%d/exe",pid);
               (void)readlink(procpidpath,cmdline,SSIZE);
            }
@@ -182,15 +189,15 @@ stripped:
 
 
 
-/*------------------------------------------------------------------------------------
-    Look for the occurence of string s2 within string s1 ...
-------------------------------------------------------------------------------------*/
+/*------------------------------------------------------*/
+/* Look for the occurence of string s2 within string s1 */
+/*------------------------------------------------------*/
 
-_PRIVATE _BOOLEAN strin(char *s1, char *s2)
+_PRIVATE _BOOLEAN strin(const char *s1, const char *s2)
 
-{   int i,
-        cmp_size,
-        chk_limit;
+{   size_t i,
+           cmp_size,
+           chk_limit;
 
     if(strlen(s2) > strlen(s1))
        return(FALSE);
@@ -210,21 +217,17 @@ _PRIVATE _BOOLEAN strin(char *s1, char *s2)
 
 
 
-/*-----------------------------------------------------------------------------------
-    Is our process P3 aware ...
------------------------------------------------------------------------------------*/
+/*-------------------------*/
+/* Is our process P3 aware */
+/*-------------------------*/
 
-_PRIVATE _BOOLEAN p3_aware(int pid, char *chan_dir)
+_PRIVATE _BOOLEAN p3_aware(const pid_t pid, const char *chan_dir)
 
 {   DIR           *dirp         = (DIR *)NULL;
     struct dirent *next_item    = (struct dirent *)NULL;
     char          pidstr[SSIZE] = "";
 
 
-    /*---------------------------------------*/
-    /* Asdsuming default P3 patchboard here! */ 
-    /*---------------------------------------*/
- 
     dirp = opendir(chan_dir); 
     (void)snprintf(pidstr,SSIZE,"%d",pid);
 
@@ -244,29 +247,35 @@ _PRIVATE _BOOLEAN p3_aware(int pid, char *chan_dir)
 
 
 
-/*-----------------------------------------------------------------------------------
-    Main entry point ...
------------------------------------------------------------------------------------*/
+/*------------------*/
+/* Main entry point */
+/*------------------*/
 
-_PUBLIC int main(int argc, char *argv[])
+_PUBLIC int32_t main(int32_t argc, char *argv[])
 
-{   int i,
-        decoded    = 0,
-        start      = 1,
-        target_pid = (-1);
+{   uint32_t i,
+             decoded            = 0,
+             start              = 1;
 
-    char chan_name[SSIZE] = "/tmp",
-         hostname[SSIZE]  = "",
-         chan_dir[SSIZE]  = "";
+    pid_t     target_pid        = (-1);
 
-    _BOOLEAN do_verbose = FALSE,
-             is_pid     = FALSE;
+    char      chan_name[SSIZE]  = "/tmp",
+              hostname[SSIZE]   = "",
+              chan_dir[SSIZE]   = "";
+
+    _BOOLEAN  do_verbose        = FALSE,
+              is_pid            = FALSE;
 
     (void)gethostname(hostname,SSIZE);
+
+
+    /*--------------------*/
+    /* Parse command line */
+    /*--------------------*/
  
     for(i=0; i<argc; ++i)
     {  if(argc == 1 || strcmp(argv[i],"-help") == 0 || strcmp(argv[i],"-usage") == 0)
-       { (void)fprintf(stderr,"\np3f version %s, (C) Tumbling Dice 2011-2023 (built %s %s)\n\n",P3F_VERSION,__TIME__,__DATE__);
+       { (void)fprintf(stderr,"\np3f version %s, (C) Tumbling Dice 2011-2024 (gcc %s: built %s %s)\n\n",P3F_VERSION,__VERSION__,__TIME__,__DATE__);
          (void)fprintf(stderr,"P3F is free software, covered by the GNU General Public License, and you are\n");
          (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
          (void)fprintf(stderr,"See the GPL and LGPL licences at www.gnu.org for further details\n");
@@ -330,7 +339,7 @@ _PUBLIC int main(int argc, char *argv[])
     }
 
     if(argc - decoded > 1)
-    {  (void)fprintf(stderr,"\np3f version %s, (C) Tumbling Dice 2011-2023 (built %s %s)\n\n",P3F_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\np3f version %s, (C) Tumbling Dice 2011-2024 (gcc %s: built %s %s)\n\n",P3F_VERSION,__VERSION__,__TIME__,__DATE__);
        (void)fprintf(stderr,"P3F is free software, covered by the GNU General Public License, and you are\n");
        (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
        (void)fprintf(stderr,"See the GPL and LGPL licences at www.gnu.org for further details\n");

@@ -1,0 +1,58 @@
+#----------------------------------------------------------------
+# Configuration file for installed cluster enabled Linux system
+# M.A. O'Neill, Tumbling Dice, 2009-2024 
+#----------------------------------------------------------------
+
+TARGET_OS
+linux
+
+#--------------------------------------
+# Architecture dependent compile flags
+#--------------------------------------
+TARGET_ARCHDEPCFLAGS
+-DBSD_FUNCTION_SUPPORT -DHAVE_CURSES -DSSH_SUPPORT -DHAVE_READLINE -DGLIBC -DFLOAT -DTIFF_SUPPORT -DIMG_SUPPORT -DZLIB_SUPPORT
+
+#-------
+# CFLAGS
+#-------
+TARGET_CFLAGS
+-w -Wfatal-errors OPTIMIZE -rdynamic -I. -IINCPATH -DARCH -D_GNU_SOURCE -D_XOPEN_SOURCE -DFTYPE -DPSRP_ENABLED
+-DCHAN_IS_POLL -DSHADOW_SUPPORT -DPERSISTENT_HEAP_SUPPORT -DSOCKET_SUPPORT -DDLL_SUPPORT -DPSRP_AUTHENTICATE
+-DPTHREAD_SUPPORT -DIPV6_SUPPORT -DCRIU_SUPPORT -DBUBBLE_MEMORY_SUPPORT -DMAIL_SUPPORT 
+-D__NO_PROTO__ -DHAVE_PROC_FS
+
+#-------------------
+# Target load flags
+#-------------------
+TARGET_LDFLAGS
+-LLIBPATH LIBPATH/cmain.o -lpups -lphmalloc -lbubble -lbsd -lreadline -lncurses -ltinfo -lm -ltiff -lcrypt -ldl -lz -lpthread
+
+#--------------------------------------
+# Architecture dependent load flags
+#--------------------------------------
+TARGET_ARCHDEPLDFLAGS
+none
+
+TARGET_LIBEXT
+linux.cluster
+
+#------------------
+# Location of libc 
+#------------------
+TARGET_LIBC_LOCATION
+LIBPATH
+
+#-----------------------------
+# Location of binary directory
+#-----------------------------
+TARGET_INSTALL_DIR
+BASEPATH/bin
+
+#----------------------------
+# Location of "man" directory
+#----------------------------
+TARGET_MAN_DIR
+BASEPATH/share/man/man1
+
+end
+

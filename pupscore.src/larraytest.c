@@ -1,4 +1,4 @@
-/*-------------------------------------------------------------------------------------------------------
+/*------------------------------------------------------
     Purpose: Test process list vector and matrix library 
 
      Author:  M.A. O'Neill
@@ -8,10 +8,10 @@
               NE3 4RT
               United Kingdom
 
-    Version: 2.00 
-    Dated:   4th January 2023
+    Version: 2.02 
+    Dated:   10th October 2024
     E-mail:  mao@tumblingdice.co.uk
--------------------------------------------------------------------------------------------------------*/
+------------------------------------------------------*/
 
 #define TEST_THREADS
 
@@ -42,7 +42,7 @@
 /* Version of this application */
 /*-----------------------------*/
 
-#define LARRAYTEST_VERSION    "2.00"
+#define LARRAYTEST_VERSION    "2.02"
 
 #ifdef BUBBLE_MEMORY_SUPPORT
 #include <bubble.h>
@@ -51,22 +51,20 @@
 
 
 
-/*------------------------------------------------------------------------------------------------------
-    Get application information for slot manager ...
-------------------------------------------------------------------------------------------------------*/
-
-
+/*----------------------------------------------*/
+/* Get application information for slot manager */
+/*----------------------------------------------*/
 /*---------------------------*/ 
 /* Slot information function */
 /*---------------------------*/ 
 
-_PRIVATE void larraytest_slot(int level)
+_PRIVATE void larraytest_slot(int32_t level)
 {   (void)fprintf(stderr,"int app (PSRP) larraytest %s: [ANSI C, PUPS MTD D]\n",LARRAYTEST_VERSION);
  
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 2013-2023 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 2013-2024 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. ONeill\n");
-       (void)fprintf(stderr,"Unassigned PSRP dynamic process (PUPS format) (built %s)\n\n",__DATE__);
+       (void)fprintf(stderr,"Unassigned PSRP dynamic process (PUPS format) (gcc %s: built %s %s)\n\n",__VERSION__,__TIME__,__DATE__);
     }
     else
        (void)fprintf(stderr,"\n");
@@ -90,9 +88,9 @@ _PRIVATE void larraytest_usage(void)
     (void)fprintf(stderr,"SIGINIT SIGCHAN SIGPSRP: Process status [PSRP] request (protocol %2.2fF)\n",PSRP_PROTOCOL_VERSION);
     (void)fprintf(stderr,"SIGCLIENT: tell client server is about to segment\n");
 
-#ifdef CRUI_SUPPORT
+    #ifdef CRUI_SUPPORT
     (void)fprintf(stderr,"SIGCHECK SIGRESTART:      checkpoint and restart signals\n");
-#endif /* CRIU_SUPPORT */
+    #endif /* CRIU_SUPPORT */
 
     (void)fprintf(stderr,"SIGALIVE: check for existence of client on signal dispatch host\n");
     (void)fflush(stderr);
@@ -108,9 +106,9 @@ _EXTERN void (* USE )() __attribute__ ((aligned(16))) = larraytest_usage;
 
 
 
-/*-------------------------------------------------------------------------------------------------------
-   Application build date ...
--------------------------------------------------------------------------------------------------------*/
+/*------------------------*/
+/* Application build date */
+/*------------------------*/
 
 _EXTERN char appl_build_time[SSIZE] = __TIME__;
 _EXTERN char appl_build_date[SSIZE] = __DATE__;
@@ -118,33 +116,33 @@ _EXTERN char appl_build_date[SSIZE] = __DATE__;
 
 
 
-/*-------------------------------------------------------------------------------------------------------
-    Software I.D. tag (used if CKPT support enabled to discard stale dynamic
-    checkpoint files) ...
--------------------------------------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------------*/
+/* Software I.D. tag (used if CKPT support enabled to discard stale dynamic */
+/* checkpoint files)                                                        */
+/*--------------------------------------------------------------------------*/
 
 #define VTAG  3978
 
-extern int appl_vtag = VTAG;
+extern int32_t appl_vtag = VTAG;
 
 
 
 
-/*--------------------------------------------------------------------------------------------------------
-    Main - decode command tail then interpolate using parameters supplied by user ...
---------------------------------------------------------------------------------------------------------*/
+/*------------------*/
+/* Main entry point */
+/*------------------*/
 
-_PUBLIC int pups_main(int argc, char *argv[])
+_PUBLIC  int32_t pups_main(int argc, char *argv[])
 
-{   int i,
-        j,
-        pos,
-        bytes,
-        components,
-        iter = 0;
+{   int32_t i,
+            j,
+            pos,
+            bytes,
+            components,
+            iter = 0;
 
-    FTYPE pattern_vector[32],
-          pattern_matrix[32*32];
+    FTYPE   pattern_vector[32],
+            pattern_matrix[32*32];
 
     unsigned char *ptr = (unsigned char *)NULL;
     vlist_type *vector = (vlist_type *)   NULL;
@@ -167,7 +165,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
                   TEST_VERSION,
                   "M.A. O'Neill",
                   "(PSRP) larraytest",
-                  "2023",
+                  "2024",
                   argv);
 
 
@@ -284,7 +282,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
     // Name it
     (void)lvector_set_name("listVectorASCIIReload",vector);
 
-    // Print it (deflated) */
+    // Print it (deflated)
     (void)lvector_print(stderr,5,vector);
 
     // Rename it
@@ -296,7 +294,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
     // Destroy it
     vector = lvector_destroy(vector);
 
-    // Reload it from binary file */
+    // Reload it from binary file
     vector = lvector_load_from_binary_file("fred.vlb");
 
     // Print it (deflated)

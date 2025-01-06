@@ -1,6 +1,6 @@
 #-------------------------------------------------
 # Makefile for jmalloc - the bubble memory library
-# M.A. O'Neill, Tumbling Dice 04/01/2022 
+# M.A. O'Neill, Tumbling Dice 12/12/2024 
 #-------------------------------------------------
 #-------------------------------------------------
 # -fcommon is needed becasue gcc does not handle
@@ -8,10 +8,10 @@
 #-------------------------------------------------
 
 CC	=	gcc
-CFLAGS	=	TARGET_CFLAGS TARGET_ARCHDEPCFLAGS -DP3_SUPPORT -I. -I../include.libs -fcommon -fPIC -finline-functions
+CFLAGS	=	TARGET_CFLAGS TARGET_ARCHDEPCFLAGS -DP3_SUPPORT -I. -I../include.libs -fcommon -fPIC -finline-functions -funsafe-math-optimizations
 FFLAGS	=	-g -DDEBUG -DPUPS_SUPPORT
 
-SOURCES	=	jmalloc.c cmain.o
+SOURCES	=	jmalloc.c
 
 OBJECTS	=	$(SOURCES:.c=.o)
 HDRS	=	../include.libs/libbubble.h ../include.libs/checkpoint.h ../include.libs/prototypes.h ../include.libs/local.h \
@@ -20,7 +20,7 @@ HDRS	=	../include.libs/libbubble.h ../include.libs/checkpoint.h ../include.libs/
 all:		build install 
 build:		c
 
-c:		libbubble.a cmain.o
+c:		libbubble.a 
 
 libbubble.a:	$(OBJECTS)
 		@rm -f libbubble.a

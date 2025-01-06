@@ -2,7 +2,7 @@
 #
 #-------------------------------------------------------------------------------------
 #  Generate stub man page documentation from a C or C++ source using c2man application
-#  (C) M.A. O'Neill 2009-2021
+#  (C) M.A. O'Neill 2009-2025
 #
 #  $1 is source file to generate man page from.
 #  $2 is name of man page file.

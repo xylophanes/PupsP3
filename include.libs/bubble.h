@@ -9,7 +9,7 @@
              United Kingdom
 
     Version: 2.00 
-    Dated:   4th January 2023
+    Dated:   5th February 2024
     E-Mail:  mao@tumblingdice.co.uk
 ------------------------------------------------------------------------------*/
 
@@ -19,11 +19,11 @@
 
 #include <stdio.h>
 
-#ifdef PUPS_SUPPORT
+#ifdef P3_SUPPORT
 #define __NOT_LIB_SOURCE__
 #include <xtypes.h>
 #include <utils.h>
-#endif /* PUPS_SUPPORT */
+#endif /* P3_SUPPORT */
 
 #include <setjmp.h>
 #include <sys/types.h>
@@ -105,17 +105,17 @@ typedef struct jmalloc {
 } *Jmalloc;
 
 
-#ifdef PUPS_SUPPORT
+#ifdef P3_SUPPORT
 #ifdef  __STDC__
 /*------------------------*/
 /* functions in jmalloc.c */
 /*------------------------*/
 
 _PROTOTYPE _PUBLIC void *mmap_sbrk(unsigned long);
-_PROTOTYPE _PUBLIC int  mallopt(int, int);
-_PROTOTYPE _PUBLIC void jmalloc_usage(int, FILE *);
+_PROTOTYPE _PUBLIC int32_t  mallopt(int32_t,  int32_t);
+_PROTOTYPE _PUBLIC void jmalloc_usage(int32_t, FILE *);
 #endif /* __STDC__ */
-#endif /* PUPS_SUPPORT */
+#endif /* P3_SUPPORT */
 
 
                               /*-----------------------------------------------*/
@@ -127,13 +127,11 @@ _PROTOTYPE _PUBLIC void jmalloc_usage(int, FILE *);
 /* Define TRUE and FALSE if we need to */
 /*-------------------------------------*/
 
-#ifndef TRUE
-#define TRUE		1
-#endif /* TRUE /
+#undef TRUE
+#define TRUE            255 
 
-#ifndef FALSE
+#undef FALSE
 #define FALSE		0
-#endif /*  FALSE */
 
 
 /*------------------------*/

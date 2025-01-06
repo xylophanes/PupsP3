@@ -1,5 +1,5 @@
-/*------------------------------------------------------------------------------
-    Purpose: Check status of file system before trying to write data to it.
+/*------------------------------------------------------------------------
+    Purpose: Check status of file system before trying to write data to it
 
      Author:  M.A. O'Neill
               Tumbling Dice Ltd
@@ -8,10 +8,10 @@
               NE3 4RT
               United Kingdom
 
-    Version: 5.00 
-    Dated:   5th October 2023 
+    Version: 5.02 
+    Dated:   10th December 2024 
     E-mail:  mao@tumblingdice.co.uk 
-------------------------------------------------------------------------------*/
+------------------------------------------------------------------------*/
 
 #include <me.h>
 #include <utils.h>
@@ -20,6 +20,7 @@
 #include <psrp.h>
 #include <unistd.h>
 #include <vstamp.h>
+#include <sched.h>
 
 
 /*----------------*/
@@ -58,28 +59,28 @@
 
 
 
-/*------------------------------------------------------------------------------
-    Version ID (used by CKPT enabled binaries to discard stale checkpoint
-    files) ...
-------------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------------*/
+/* Version ID (used by CKPT enabled binaries to discard stale checkpoint */
+/* files)                                                                */
+/*-----------------------------------------------------------------------*/
 
 #include <vstamp.h>
 
 
-/*------------------------------------------------------------------------------
-    Get application information for slot manager ...
-------------------------------------------------------------------------------*/
+/*----------------------------------------------*/
+/* Get application information for slot manager */
+/*----------------------------------------------*/
 /*---------------------------*/
 /* Slot information function */
 /*---------------------------*/
 
-_PRIVATE void fsw_slot(int level)
+_PRIVATE void fsw_slot(int32_t level)
 {   (void)fprintf(stderr,"int app fsw %s: [ANSI C]\n",FSW_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 2005-2023 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 2005-2024 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
-       (void)fprintf(stderr,"File system status filter (built %s %s)\n\n",__TIME__,__DATE__);
+       (void)fprintf(stderr,"File system status filter (gcc %s: built %s %s)\n\n",__VERSION__,__TIME__,__DATE__);
     }
     else
        (void)fprintf(stderr,"\n");
@@ -121,9 +122,9 @@ _EXTERN void (* USE )() __attribute__ ((aligned(16))) = fsw_usage;
 
 
 
-/*------------------------------------------------------------------------------
-    Application build date ...
-------------------------------------------------------------------------------*/
+/*------------------------*/
+/* Application build date */
+/*------------------------*/
 
 _EXTERN char appl_build_time[SSIZE] = __TIME__;
 _EXTERN char appl_build_date[SSIZE] = __DATE__;
@@ -132,32 +133,32 @@ _EXTERN char appl_build_date[SSIZE] = __DATE__;
 
 
 
-/*------------------------------------------------------------------------------
-    Private variables required by this application ...
-------------------------------------------------------------------------------*/
+/*------------------------------------------------*/
+/* Private variables required by this application */
+/*------------------------------------------------*/
 
                                               /*---------------------------------------*/
-_PRIVATE int fs_blocks               = 128;   /* Default minimum blocks in file system */
-_PRIVATE char output_f_name[SSIZE];           /* O/P file homeostatically protected    */
+_PRIVATE  int32_t fs_blocks          = 128;   /* Default minimum blocks in file system */
+_PRIVATE  char output_f_name[SSIZE];          /* O/P file homeostatically protected    */
 _PRIVATE _BOOLEAN output_homeostasis = FALSE; /* Homeostatic if TRUE                   */
 _PRIVATE _BOOLEAN guarding           = FALSE; /* TRUE if guarding a file resource      */
                                               /*---------------------------------------*/
 
 
 
-/*------------------------------------------------------------------------------
-    Local prototype function declarations ...
-------------------------------------------------------------------------------*/
+/*---------------------------------------*/
+/* Local prototype function declarations */
+/*---------------------------------------*/
 
-_PROTOTYPE _PRIVATE int psrp_process_status(int, char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_process_status(int32_t, char *[]);
 
 
 
-/*------------------------------------------------------------------------------
-    Report process status ...
-------------------------------------------------------------------------------*/
+/*-----------------------*/
+/* Report process status */
+/*-----------------------*/
 
-_PRIVATE int psrp_process_status(int argc, char *argv[])
+_PRIVATE int32_t psrp_process_status(int32_t argc, char *argv[])
 
 {    (void)fprintf(psrp_out,"\n    File system watcher/migrator status\n");
      (void)fprintf(psrp_out,"    ===================================\n\n");
@@ -193,26 +194,26 @@ _PRIVATE int psrp_process_status(int argc, char *argv[])
 
 
                
-/*------------------------------------------------------------------------------
-    Software I.D. tag (used if CKPT support enabled to discard stale dynamic
-    checkpoint files) ...
--------------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------------*/
+/* Software I.D. tag (used if CKPT support enabled to discard stale dynamic */
+/* checkpoint files)                                                        */
+/*--------------------------------------------------------------------------*/
 
-#define VTAG  3831
+#define VTAG  4373
 
-extern int appl_vtag = VTAG;
-
-
+extern int32_t appl_vtag = VTAG;
 
 
-/*------------------------------------------------------------------------------
-    Main entry point ...
-------------------------------------------------------------------------------*/
 
-_PUBLIC int pups_main(int argc, char *argv[])
+
+/*------------------*/
+/* Main entry point */
+/*------------------*/
+
+_PUBLIC int32_t pups_main(int32_t argc, char *argv[])
 
                                     /*---------------------------------*/
-{   int      bytes_read;            /* Number of bytes read from stdin */
+{   int32_t  bytes_read;            /* Number of bytes read from stdin */
     char     line_of_input[SSIZE];  /* Line buffer                     */
     _BOOLEAN guard = FALSE;         /* True if we are guarding file    */
                                     /*---------------------------------*/
@@ -224,11 +225,10 @@ _PUBLIC int pups_main(int argc, char *argv[])
 
     (void)psrp_ignore_requests();
 
+
     /*--------------------*/
     /* Parse command tail */
     /*--------------------*/
-
-
     /*-----------------------------*/
     /* Do standard initialisations */
     /*-----------------------------*/
@@ -238,10 +238,10 @@ _PUBLIC int pups_main(int argc, char *argv[])
                   FSW_VERSION,
                   "M.A. O'Neill",
                   "fsw",
-                  "2023",
-                  argv);
+                  "2024",
+                  (void *)argv);
 
-    (void)psrp_init(PSRP_STATUS_ONLY  | PSRP_HOMEOSTATIC_STREAMS, &psrp_process_status);
+    (void)psrp_init(PSRP_STATUS_ONLY  | PSRP_HOMEOSTATIC_STREAMS, (void *)&psrp_process_status);
     (void)psrp_load_default_dispatch_table();
     (void)psrp_accept_requests();
 
@@ -261,7 +261,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
     {  if((fs_blocks = pups_i_dec(&ptr,&argc,args)) == INVALID_ARG)
           pups_error("[fsw] expecting wait state trigger block count");
 
-       fs_blocks = iabs(fs_blocks);
+       fs_blocks = abs(fs_blocks);
     }
 
 
@@ -270,7 +270,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
     /*---------------------*/
 
     if ((ptr = pups_locate(&init,"homeostatic",&argc,args,0)) != NOT_FOUND)
-    {  int  outdes = (-1);
+    {   int32_t  outdes = (-1);
 
        if(strccpy(output_f_name,pups_str_dec(&ptr,&argc,args)) == (char *)NULL)
           pups_error("[fsw] expecting name of output file to protect");
@@ -312,7 +312,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
     /* Check command tail for unparsed arguments */
     /*-------------------------------------------*/
 
-    pups_t_arg_errs(argd,args);
+    pups_t_arg_errs(argd,(void *)args);
 
 
     (void)pups_set_fs_hsm_parameters(1,fs_blocks,(char *)NULL); 

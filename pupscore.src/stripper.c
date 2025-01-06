@@ -1,4 +1,4 @@
-/*------------------------------------------------------------------
+/*--------------------------------------------------
      Purpose: Strips comments out (file/FIFO) stream
 
      Author:  M.A. O'Neill
@@ -7,23 +7,27 @@
               Newcastle
               NE3 4RT
 
-     Version: 2.00 
-     Dated:   9th October 2023 
+     Version: 2.02 
+     Dated:   11th December 2024 
      E-mail:  mao@tumblingdice.co.uk
--------------------------------------------------------------------*/
+-------------------------------------------------*/
 
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
 #include <xtypes.h>
+#include <stdint.h>
 
 
-/*---------------------*/
-/* Version of stripper */
-/*---------------------*/
+/*---------*/
+/* Defines */
+/*---------*/
+/*---------*/
+/* Version */
+/*---------*/
 
-#define STRIPPER_VERSION    "2.00"
+#define STRIPPER_VERSION    "2.02"
 
 
 /*-------------*/
@@ -33,18 +37,14 @@
 #define SSIZE               2048 
 
 
-/*-------------------------------------------------------------------
-    Variables which are globally local to this application ...
--------------------------------------------------------------------*/
-
-/*-------------------------------------------------------------------
-    Return first non whitespace character in a string ...
--------------------------------------------------------------------*/
+/*---------------------------------------------------*/
+/* Return first non whitespace character in a string */
+/*---------------------------------------------------*/
 
 _PRIVATE char *strfirst(char *s1)
 
-{   int i,
-        size;
+{   size_t i,
+           size;
 
     size = strlen(s1);
     for(i=0; i<size; ++i)
@@ -59,14 +59,14 @@ _PRIVATE char *strfirst(char *s1)
 
 
 
-/*-------------------------------------------------------------------
-    Test for empty string (contains only whitespace and
-    control chars) ...
--------------------------------------------------------------------*/
+/*-----------------------------------------------------*/
+/* Test for empty string (contains only whitespace and */
+/* control chars)                                      */
+/*-----------------------------------------------------*/
 
 _PRIVATE _BOOLEAN strempty(char *s)
 
-{   int i;
+{   size_t i;
 
     for(i=0; i<strlen(s); ++i)
     {  if(s[i] != ' ' && s[i] != '\n')
@@ -79,15 +79,15 @@ _PRIVATE _BOOLEAN strempty(char *s)
 
 
 
-/*-------------------------------------------------------------------
-    Look for the occurence of string s2 within string s1 ...
--------------------------------------------------------------------*/
+/*------------------------------------------------------*/
+/* Look for the occurence of string s2 within string s1 */
+/*------------------------------------------------------*/
 
-_PRIVATE _BOOLEAN strin(char *s1, char *s2)
+_PRIVATE _BOOLEAN strin(const char *s1, const char *s2)
 
-{   int i,
-        cmp_size,
-        chk_limit;
+{   size_t  i,
+            cmp_size,
+            chk_limit;
 
     if(strlen(s2) > strlen(s1))
        return(FALSE);
@@ -106,11 +106,11 @@ _PRIVATE _BOOLEAN strin(char *s1, char *s2)
 
 
 
-/*--------------------------------------------------------------------
-    Strip comments in place ...
---------------------------------------------------------------------*/
+/*-------------------------*/
+/* Strip comments in place */
+/*-------------------------*/
 
-_PRIVATE _BOOLEAN strip_comment(FILE *stream, int *line_cnt, char *line)
+_PRIVATE _BOOLEAN strip_comment(const FILE *stream,  int32_t *line_cnt, char *line)
 
 {
 
@@ -133,29 +133,34 @@ _PRIVATE _BOOLEAN strip_comment(FILE *stream, int *line_cnt, char *line)
 
 
 
-/*-------------------------------------------------------------------
-    Main entry point
--------------------------------------------------------------------*/
+/*------------------*/
+/* Main entry point */
+/*------------------*/
 
-_PUBLIC int main(int argc, char *argv[])
+_PUBLIC  int32_t main(int32_t argc, char *argv[])
 
-{   int i,
-        line_cnt   = 0,
-        decoded    = 0,
-        n_comments = 0;
+{   uint32_t i,
+             line_cnt        = 0,
+             decoded         = 0,
+             n_comments      = 0;
 
-    _BOOLEAN do_verbose  = FALSE,
-             not_comment = FALSE,
-             looper      = TRUE;
+    _BOOLEAN do_verbose      = FALSE,
+             not_comment     = FALSE,
+             looper          = TRUE;
 
-    char hostname[SSIZE] = "",
-         line[SSIZE]     = "";
+    char     hostname[SSIZE] = "",
+             line[SSIZE]     = "";
+
+
+    /*--------------------*/
+    /* Parse command line */
+    /*--------------------*/
 
     for(i=0; i<argc; ++i)
     {  if(argc == 1 || strcmp(argv[1],"-usage") == 0 || strcmp(argv[1],"-help") == 0)
        {  
 
-          (void)fprintf(stderr,"\nstripper version %s, (C) Tumbling Dice 2002-2023 (built %s)\n\n",STRIPPER_VERSION,__TIME__,__DATE__);
+          (void)fprintf(stderr,"\nstripper version %s, (C) Tumbling Dice 2002-2024 (gcc %s: built %s %s)\n\n",STRIPPER_VERSION,__VERSION__,__TIME__,__DATE__);
           (void)fprintf(stderr,"STRIPPER is free software, covered by the GNU General Public License, and you are\n");
           (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
           (void)fprintf(stderr,"See the GPL and LGPL licences at www.gnu.org for further details\n");
@@ -173,7 +178,7 @@ _PUBLIC int main(int argc, char *argv[])
     }
 
     if(do_verbose == TRUE)
-    {  (void)fprintf(stderr,"\n    stripper (comment stripper)  version %s, (C) Tumbling Dice, 2023\n\n",STRIPPER_VERSION);
+    {  (void)fprintf(stderr,"\n    stripper (comment stripper)  version %s, (C) Tumbling Dice, 2024\n\n",STRIPPER_VERSION);
        (void)fflush(stderr);
     }
 

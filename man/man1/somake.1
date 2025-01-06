@@ -1,4 +1,4 @@
-.TH SOMAKE "16th April 2015" "PUPSP3 Scripts" "PUPSP3 Scripts"
+.TH SOMAKE "2nd February 2024" "PUPSP3 Scripts" "PUPSP3 Scripts"
 
 .SH NAME
 SOMAKE \- generate a PUPS shared object (.so) from object (.o) file or archive (.a) file.
@@ -10,7 +10,8 @@ SOMAKE \- generate a PUPS shared object (.so) from object (.o) file or archive (
 .I [usage | --usage] 
 .I !shared library name!
 .I !<list of .o files>!
-[2> <log file>]
+.I [<list of libaries>]
+[2> <error/satus log file>]
 .br
 
 .SH DESCRIPTION
@@ -24,6 +25,14 @@ to generate a shared library (.so) from the list input object (.o) files,
 The shared object object which is generated can be manipulated by the
 POSIX dynamic link loader
 .I ld.so.
+f a list of librares (in
+.so
+or
+.a
+format and enclosed in parentheses) is supplied, they will also
+be linked with the output
+I .so
+file.
 .br
 
 
@@ -32,7 +41,7 @@ POSIX dynamic link loader
 .B -usage
 .B --usage 
 prints out help information about
-.I share(1)
+.I somake(1)
 .br
 
 .SH EXIT STATUS

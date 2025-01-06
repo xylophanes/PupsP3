@@ -1,10 +1,10 @@
 #-----------------------------------------------
 # Makefile for cache - test fast caching library 
-# M.A. O'Neill, Tumbling Dice 04/01/2022 
+# M.A. O'Neill, Tumbling Dice 12/12/2024 
 #-----------------------------------------------
 
 CFLAGS		= -fopenmp -ffast-math TARGET_CFLAGS -DDAISY_TEST
-ARCHDEPCFLAGS	= TARGET_ARCHDEPCFLAGS -ffast-math -fopenmp
+ARCHDEPCFLAGS	= TARGET_ARCHDEPCFLAGS -ffast-math -funsafe-math-optimizations -fopenmp
 LDFLAGS		= TARGET_LIBS -lgomp
 ARCHDEPLDFLAGS	= TARGET_ARCHDEPLDFLAGS
 CC		= gcc

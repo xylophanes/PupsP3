@@ -1,7 +1,7 @@
 /*--------------------------------------------------------------------------------
    Includes for memory limit warnings.
    Copyright (C) 1990, 1993, 1994 Free Software Foundation, Inc.
-   Copyright (C) 2001-2023, Mark O'Neill, Tumbling Dice <mao@tumblingdice.co.uk>
+   Copyright (C) 2001-2024, Mark O'Neill, Tumbling Dice <mao@tumblingdice.co.uk>
 
    This file is based on part of the GNU C Library.
 
@@ -91,7 +91,7 @@ static POINTER data_space_start;
 /* Number of bytes of writable memory we can expect to be able to get */
 /*--------------------------------------------------------------------*/
 
-static unsigned int lim_data;
+static uint32_t    lim_data;
 
 #ifdef NO_LIM_DATA
 

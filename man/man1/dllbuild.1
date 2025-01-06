@@ -1,0 +1,72 @@
+.TH SOMAKE "2nd February 2024" "PUPSP3 Scripts" "PUPSP3 Scripts"
+
+.SH NAME
+DLLBUILD \- generate a PUPS shared object (.so) from C source file.
+
+.br
+
+.SH SYNOPSIS
+.B dllbuild 
+.I [usage | help] 
+.I !C source file name!
+.I [<list of libraries>]
+[2> <error/status log file>]
+.br
+
+.SH DESCRIPTION
+.I dllbuild(1)
+is a
+.I bash(1)
+shellscript which calls
+.I gcc(1)
+to generate a shared library (.so) from the input C source file,
+.I C source file name.
+The shared object object which is generated can be manipulated by the
+POSIX dynamic link loader
+.I ld.so.
+If a list of librares (in
+.so
+or
+.a
+format and enclosed in parentheses) is supplied, they will also
+be linked with the output
+I .so
+file.
+.br
+
+
+.SH OPTIONS
+
+.B usage
+.B help 
+prints out help information about
+.I dllbuild(1)
+.br
+
+.SH EXIT STATUS
+
+255: error
+.br
+1:
+.B usage
+or
+.B help
+.br
+0: no error
+.br
+
+.SH ENVIRONMENTAL VARIABLES
+none.
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br
+
+.SH SEE ALSO
+gcc(1),ld(1),bash(1)
+.br

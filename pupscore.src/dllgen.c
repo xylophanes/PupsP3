@@ -1,4 +1,4 @@
-/*---------------------------------------------------------------------------------------
+/*---------------------------------------------------------
      Purpose: Generate a dll (source) library from template 
 
      Author:  M.A. O'Neill
@@ -8,10 +8,10 @@
               NE3 4RT
               United Kingdom
 
-     Version: 2.01
-     Dated:   24th May 2023
+     Version: 2.02
+     Dated:   10th December 2024
      E-mail:  mao@tumblingdice.co.uk
----------------------------------------------------------------------------------------*/
+---------------------------------------------------------*/
 
 #include <stdio.h>
 #include <unistd.h>
@@ -20,6 +20,9 @@
 #include <string.h>
 #include <bsd/string.h>
 #include <stdlib.h>
+#include <ctype.h>
+#include <stdint.h>
+
 
 #ifdef HAVE_READLINE
 #include <readline/readline.h>
@@ -31,7 +34,7 @@
 /* Version of dllgen */ 
 /*-------------------*/
 
-#define DLLGEN_VERSION    "2.01"
+#define DLLGEN_VERSION    "2.02"
 
 
 /*-------------*/
@@ -52,21 +55,20 @@
 
 
 
-/*---------------------------------------------------------------------------------------
-    Strip control characters from string ...
----------------------------------------------------------------------------------------*/
+/*--------------------------------------*/
+/* Strip control characters from string */
+/*--------------------------------------*/
 
-_PRIVATE void strstrp(char *s_in, char *s_out)
+_PRIVATE void strstrp(const char *s_in, char *s_out)
 
-{   int i,
-        cnt = 0;
+{   size_t i,
+           cnt = 0;
 
     for(i=0; i<strlen(s_in); ++i)
     {  if(s_in[i] == '\n' || s_in[i] == '\r')
           ++i;
-
-       if(s_in[i] == '\'')
-          s_in[i] = ',';
+       else if(iscntrl(s_in[i]))
+          ++i;
 
        s_out[cnt++] = s_in[i];
     }
@@ -77,11 +79,11 @@ _PRIVATE void strstrp(char *s_in, char *s_out)
 
 
 
-/*---------------------------------------------------------------------------------------
-    Read input (with line editing if supported) ...
----------------------------------------------------------------------------------------*/
+/*---------------------------------------------*/
+/* Read input (with line editing if supported) */
+/*---------------------------------------------*/
 
-_PRIVATE void read_line(char *line, char *prompt)
+_PRIVATE void read_line(char *line, const char *prompt)
 
 {   char *tmp_line = (char *)NULL;
 
@@ -118,11 +120,11 @@ _PRIVATE void read_line(char *line, char *prompt)
 
 
 
-/*---------------------------------------------------------------------------------------
-    Main entry point to process ...
----------------------------------------------------------------------------------------*/
+/*-----------------------------*/
+/* Main entry point to process */
+/*-----------------------------*/
 
-_PUBLIC int main(int argc, char *argv[])
+_PUBLIC int32_t main(int32_t argc, char *argv[])
 
 {   char tmpstr[SSIZE]            = "",
          dll_skelpapp[SSIZE]      = "",
@@ -142,8 +144,13 @@ _PUBLIC int main(int argc, char *argv[])
 
     _BOOLEAN dll_init             = FALSE;
 
+
+    /*--------------------*/
+    /* Parse command line */
+    /*--------------------*/
+
     if(argc == 1 || argc > 4 || argc == 2 && (strcmp(argv[1],"-usage") == 0 || strcmp(argv[1],"-help") == 0))
-    {  (void)fprintf(stderr,"\nPUPS/P3 DLL generator version %s, (C) Tumbling Dice, 2002-2023 (built %s %s)\n",DLLGEN_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nPUPS/P3 DLL generator version %s, (C) Tumbling Dice, 2002-2024 (gcc %s: built %s %s)\n",DLLGEN_VERSION,__VERSION__,__TIME__,__DATE__);
        (void)fprintf(stderr,"Usage: dllgen [skeleton DLL file | skeleton DLL function file]\n\n");
        (void)fflush(stderr);
        (void)fprintf(stderr,"DLLGEN is free software, covered by the GNU General Public License, and you are\n");
@@ -189,7 +196,7 @@ _PUBLIC int main(int argc, char *argv[])
        }
     }
     else
-    {  (void)fprintf(stderr,"\nPUPS/P3 DLL generator version %s, (C) Tumbling Dice, 2002-2023 (built %s %s)\n",DLLGEN_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nPUPS/P3 DLL generator version %s, (C) Tumbling Dice, 2002-2024 (gcc %s: built %s %s)\n",DLLGEN_VERSION,__VERSION__,__TIME__,__DATE__);
        (void)fprintf(stderr,"Usage: dllgen [skeleton DLL file | skeleton DLL function file]\n\n");
        (void)fflush(stderr);
        (void)fprintf(stderr,"DLLGEN is free software, covered by the GNU General Public License, and you are\n");
@@ -215,7 +222,7 @@ _PUBLIC int main(int argc, char *argv[])
        exit(255);
     }
 
-    (void)fprintf(stderr,"\nPUPS/P3 DLL template generator version %s (C) M.A. O'Neill, Tumbling Dice, 2002-2023\n\n",DLLGEN_VERSION);
+    (void)fprintf(stderr,"\nPUPS/P3 DLL template generator version %s (C) M.A. O'Neill, Tumbling Dice, 2002-2024\n\n",DLLGEN_VERSION);
     (void)fflush(stderr); 
 
     (void)read_line(dll_name,"dllgen (DLL name)> ");
@@ -273,6 +280,11 @@ _PUBLIC int main(int argc, char *argv[])
        }
     }
 
+
+    /*----------------------------*/
+    /* Generate DLL from template */
+    /*----------------------------*/
+
     (void)read_line(dll_func_name,"dllgen (DLL function name)> ");
     (void)strstrp(dll_func_name,tmpstr);
     (void)strlcpy(dll_func_name,tmpstr,SSIZE);
@@ -283,9 +295,9 @@ _PUBLIC int main(int argc, char *argv[])
     (void)read_line(dlldes,"dllgen (Description of DLL function> ");
     (void)strstrp(dll_func_name,tmpstr);
     (void)strstrp(dlldes,tmpstr);
-    (void)sprintf(sed_cmd,SSIZE,"s/@DLLDES/%s/g; '",tmpstr);
+    (void)snprintf(sed_cmd,SSIZE,"s/@DLLDES/%s/g; '",tmpstr);
     (void)strlcat(sed_cmds,sed_cmd,SSIZE);
-    (void)sprintf(sed_skelpdll,SSIZE,"sed %s < %s >> %s.c",sed_cmds,dll_func_skelpapp,dll_name);
+    (void)snprintf(sed_skelpdll,SSIZE,"sed %s < %s >> %s.c",sed_cmds,dll_func_skelpapp,dll_name);
 
     if(system(sed_skelpdll) == (-1))
     {  (void)fprintf(stderr,"\ndllgen: failed to execute stream editor (sed) command\n\n");

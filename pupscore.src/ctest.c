@@ -1,7 +1,7 @@
-/*-----------------------------------------------*/
-/* Check criu functionality                      */
-/* M.A. O'Neill, Tumbling Dice, 4th January 2023 */
-/*-----------------------------------------------*/
+/*-------------------------------------------------*/
+/* Check criu functionality                        */
+/* M.A. O'Neill, Tumbling Dice, 26th February 2024 */
+/*-------------------------------------------------*/
 
 #include <stdio.h>
 #include <string.h>
@@ -32,7 +32,7 @@ char checkpoint_dir[SSIZE] = "";
 /* Signal handler for SIGTERM and SIGINT */
 /*---------------------------------------*/
 
-int term_handler(int signum)
+static int32_t term_handler(int32_t signum)
 
 {   char rm_cmd[SSIZE] = "";
 
@@ -47,7 +47,7 @@ int term_handler(int signum)
 /* Handle (regular) alarm */
 /*------------------------*/
 
-int alarm_handler(int signum)
+static int32_t alarm_handler(int32_t signum)
 
 {   (void)fprintf(stderr,"ALARM\n");
     (void)fflush(stderr);
@@ -63,13 +63,14 @@ int alarm_handler(int signum)
 /* Main entry point */
 /*------------------*/
 
-int main(int argc, char *argv[])
+int32_t main(int32_t argc, char *argv[])
 
-{   int  pid,
-         iter     = 0,
-         dumpiter = 10;
+{   pid_t    pid             = (-1);
 
-    char criu_cmd[SSIZE] = "";
+    uint32_t iter            = 0,
+             dumpiter        = 10;
+
+    char     criu_cmd[SSIZE] = "";
 
 
     /*-------------------------------*/

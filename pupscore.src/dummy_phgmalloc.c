@@ -3,7 +3,7 @@
 /* have not compiled shgmalloc.o         */
 /*---------------------------------------*/
 
-int dummy(void)
+int32_t dummy(void)
 
 {
 }

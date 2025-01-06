@@ -1,5 +1,5 @@
-/*----------------------------------------------------------------------------------------
-    Purpose: get textual infomation for use in shell script.
+/*---------------------------------------------------------
+    Purpose: get textual infomation for use in shell script
 
     Author:  M.A. O'Neill
              Tumbling Dice Ltd
@@ -8,10 +8,10 @@
              NE3 4RT
              United Kingdom
 
-    Version: 4.04 
-    Dated:   24th May 2023 
+    Version: 4.05 
+    Dated:   10th December 2024 
     E-mail:  mao@tumblingdice.co.uk
------------------------------------------------------------------------------------------*/
+--------------------------------------------------------*/
 
 #include <stdio.h>
 #include <string.h>
@@ -54,22 +54,22 @@
 
 
 
-/*----------------------------------------------------------------------------------------
-    Variables which are local to this application ...
-----------------------------------------------------------------------------------------*/
+/*-----------------------------------------------*/
+/* Variables which are local to this application */
+/*-----------------------------------------------*/
 
-_PRIVATE int child_pid = (-1);
+_PRIVATE pid_t child_pid = (-1);
 
 
-/*----------------------------------------------------------------------------------------
-    Look for the occurence of string s2 within string s1 ...
-----------------------------------------------------------------------------------------*/
+/*------------------------------------------------------*/
+/* Look for the occurence of string s2 within string s1 */
+/*------------------------------------------------------*/
 
 _PRIVATE _BOOLEAN strin(char *s1, char *s2)
 
-{   int i,
-        cmp_size,
-        chk_limit;
+{   size_t i,
+           cmp_size,
+           chk_limit;
 
     if(strlen(s2) > strlen(s1))
        return(FALSE);
@@ -87,9 +87,9 @@ _PRIVATE _BOOLEAN strin(char *s1, char *s2)
 
 
 
-/*----------------------------------------------------------------------------------------
-    Test for empty string (contains only whitespace and control chars) ...
-----------------------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------*/
+/* Test for empty string (contains only whitespace and control chars) */ 
+/*--------------------------------------------------------------------*/
 
 _PRIVATE _BOOLEAN strempty(const char *s)
 
@@ -121,10 +121,10 @@ _PRIVATE _BOOLEAN strempty(const char *s)
 
 
 
-/*--------------------------------------------------------------------------------------
-    Routine to copy a string filtering out characters which have been
-    marked as excluded ...
---------------------------------------------------------------------------------------*/
+/*-------------------------------------------------------------------*/
+/* Routine to copy a string filtering out characters which have been */
+/* marked as excluded                                                */
+/*-------------------------------------------------------------------*/
 
 _PUBLIC size_t strexccpy(const char *s1, char *s2, const char *ex_ch)
 
@@ -172,11 +172,11 @@ exclude:   continue;
 
 
 
-/*----------------------------------------------------------------------------------------
-    Handler for signals ...
-----------------------------------------------------------------------------------------*/
+/*--------------*/
+/* Exit handler */
+/*--------------*/
 
-_PRIVATE int exit_handler(int signum)
+_PRIVATE int32_t exit_handler(int32_t signum)
 
 {   if(child_pid != (-1))
        (void)kill(child_pid,SIGTERM);
@@ -190,14 +190,14 @@ _PRIVATE int exit_handler(int signum)
 
 
 
-/*----------------------------------------------------------------------------------------
-    Test to see if string contains spaces ...
-----------------------------------------------------------------------------------------*/
+/*---------------------------------------*/
+/* Test to see if string contains spaces */
+/*---------------------------------------*/
 
-_PRIVATE int no_space(char *s)
+_PRIVATE  int32_t no_space(char *s)
 
-{   int i,
-        cnt = 0;
+{   uint32_t i,
+             cnt = 0;
 
 
     /*----------------------*/
@@ -235,30 +235,35 @@ _PRIVATE int no_space(char *s)
 
 
 
-/*----------------------------------------------------------------------------------------
-    Main entry point ...
-----------------------------------------------------------------------------------------*/
+/*------------------*/
+/* Main entry point */
+/*------------------*/
 
-_PUBLIC int main(int argc, char *argv[])
+_PUBLIC int32_t main(int32_t argc, char *argv[])
 
-{   int  ret,
-         in,
-         status,
-         out,
-         err,
-         prompt_index                    = 1;
+{    int32_t  ret,
+              in,
+              status,
+              out,
+              err,
+              prompt_index               = 1;
 
     _BOOLEAN looper                      = TRUE;
 
     char     value[SSIZE]                = "",
              ask_history[SSIZE]          = "",
              ask_history_pathname[SSIZE] = "";
-;
+
     FILE     *out_stream                 = (FILE *)NULL;
+
+
+    /*--------------------*/
+    /* Parse command line */
+    /*--------------------*/
 
     if(argc == 2 && (strcmp(argv[1],"-usage") == 0 || strcmp(argv[1],"-help") == 0))
     {  
-       (void)fprintf(stderr,"\nask version %s, (C) Tumbling Dice 2003-2023 (built %s %s)\n\n",ASK_VERSION,__TIME__,__DATE__);
+       (void)fprintf(stderr,"\nask version %s, (C) Tumbling Dice 2003-2024 (gcc %s: built %s %s)\n\n",ASK_VERSION,__VERSION__,__TIME__,__DATE__);
        (void)fprintf(stderr,"ASK is free software, covered by the GNU General Public License, and you are\n");
        (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
        (void)fprintf(stderr,"See the GPL and LGPL licences at www.gnu.org for further details\n");
@@ -376,10 +381,10 @@ _PUBLIC int main(int argc, char *argv[])
                /*---------------------------------------*/
 
 	       if(argv[prompt_index][0] == '^')
-               {  unsigned int i,
-		               cnt  = 0;
+               {  uint32_t i,
+                           cnt          = 0;
 
-		  char space[SSIZE] = "";
+		  char     space[SSIZE] = "";
 
 		  /*-------------------*/
                   /* Whitespace filler */
@@ -417,10 +422,10 @@ _PUBLIC int main(int argc, char *argv[])
                /*---------------------------------------*/
 
 	       if(argv[prompt_index][0] == '^')
-               {  unsigned int i,
-		               cnt  = 0;
+               {  uint32_t i,
+		           cnt          = 0;
 
-		  char space[SSIZE] = "";
+		  char     space[SSIZE] = "";
 
 		  /*-------------------*/
                   /* Whitespace filler */
@@ -457,8 +462,8 @@ _PUBLIC int main(int argc, char *argv[])
 
             looper  = TRUE;
             if(strin(value,"!") == TRUE)
-            {  int  n_spaces              = 0;
-               char ls_output_buffer[256] = "";
+            {  int32_t  n_spaces              = 0;
+               char     ls_output_buffer[256] = "";
 
                /*-------------------------*/
                /* Skip any leading spaces */

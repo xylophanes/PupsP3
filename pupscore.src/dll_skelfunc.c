@@ -1,4 +1,4 @@
-/*---------------------------------------------------------------------------------------
+/*----------------------------------------------------------------------------
     Each dynamic function must supply four pieces of information. Firstly the
     _BOOLEAN <func>_is_orifice = TRUE tells the binder (in dlllib) that this
     function may be legitately exported. The <func>_prototype is used to make
@@ -9,7 +9,7 @@
 
     The last piece of infomation supplied is, of course, the function
     itself ...
----------------------------------------------------------------------------------------*/
+---------------------------------------------------------------------------*/
 
 
 /*------------------------------------------------*/
@@ -37,7 +37,7 @@ _PUBLIC char     *@DLL_FUNC_NAME_prototype = "";
 /* The function actually exported */
 /*--------------------------------*/
 
-_PUBLIC int @DLL_FUNC_NAME(int argc, char *argv[])
+_PUBLIC  int32_t @DLL_FUNC_NAME(int32_t argc, char *argv[])
 
 {
 

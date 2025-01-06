@@ -1,5 +1,5 @@
-/*-----------------------------------------------------------------------------
-    Purpose: General purpose utilities library.
+/*--------------------------------------------
+    Purpose: General purpose utilities library
 
     Author:  M.A. O'Neill
              Tumbling Dice Ltd
@@ -8,10 +8,10 @@
              NE3 4RT
              United Kingdom
 
-    Version: 7.20
-    Dated:   26th October 2023 
+    Version: 8.11 
+    Dated:   2nd January 2025 
     E-Mail:  mao@tumblingdice.co.uk
-----------------------------------------------------------------------------*/
+--------------------------------------------*/
 
 
 #include <me.h>
@@ -24,6 +24,7 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <sys/sysinfo.h>
 #include <dirent.h>
 #include <string.h>
 #include <bsd/string.h>
@@ -35,7 +36,10 @@
 #include <stdarg.h>
 #include <sys/timeb.h>
 #include <xtypes.h>
-
+#include <poll.h>
+#include <syscall.h>
+#include <zlib.h>
+#include <cache.h>
 
 
 /*-------------------------------------------------------------*/
@@ -55,10 +59,6 @@
 #ifdef SHADOW_SUPPORT
 #include <shadow.h>
 #endif /* SHADOW_SUPPORT */
-
-#ifdef SECURE
-#include <sed_securicor.h>
-#endif /* SECURE */
 
 #include <termios.h>
 #include <netdb.h> 
@@ -146,11 +146,6 @@ int __builtin_va_alist;
 #endif /* VA_BROKEN */
 
 
-#ifdef DRAFT_POSIX_SIGACTION
-#define SA_RESTART 0x0
-#endif /* DRAFT_POSIX_SIGACTION */
-
-
 /*----------------------------------------*/
 /* Variables imported by this application */
 /*----------------------------------------*/
@@ -158,10 +153,10 @@ int __builtin_va_alist;
 
 _IMPORT _BOOLEAN psrp_reactivate_client;
 _IMPORT _BOOLEAN in_psrp_new_segment;
-_IMPORT int      psrp_seg_cnt;
-_IMPORT int      chlockdes;
-_IMPORT int      c_client;
-_IMPORT int      psrp_client_pid[MAX_CLIENTS];
+_IMPORT int32_t  psrp_seg_cnt;
+_IMPORT int32_t  chlockdes;
+_IMPORT int32_t  c_client;
+_IMPORT pid_t    psrp_client_pid[MAX_CLIENTS];
 
 
 
@@ -169,188 +164,189 @@ _IMPORT int      psrp_client_pid[MAX_CLIENTS];
 /* Standard globals required by std_init */
 /*---------------------------------------*/
 
+_PUBLIC char      boldOn [8]  = "\e[1m",                                                // Make character bold
+                  boldOff[8]  = "\e[m";                                                 // Macke character non-bold
+ 
+_PUBLIC pid_t     appl_pid,                                                             // Process id
+                  appl_ppid,                                                            // Parent process
+                  appl_remote_pid,                                                      // Remote PID to relay signals to 
+	          appl_softdog_pid            = (-1),                                   // Software watchdog process PID
+                  appl_sid;                                                             // Session (process group) id
        
-_PUBLIC int  ptr,                                                             // Argument pointer
-             sargc,                                                           // Argument count
-             t_args,                                                          // Total number of arguments
-             vitimer_quantum,                                                 // Time interval for (PSRP) timers
-             pupshold_cnt                  = 0,                               // Number of PUPS/P3 signals held
-	     appl_fsa_mode,                                                   // Filesystem access mode
-             appl_t_args,                                                     // Total application command tail arguments
-             appl_alloc_opt,                                                  // Allocation options (for pups_malloc etc.)
-             appl_max_files,                                                  // Maximum number of file table slots
-             appl_max_child,                                                  // Maximum number of child table slots
-             appl_max_pheaps,                                                 // Maximum number of persistent heap table slots
-             appl_max_vtimers,                                                // Maximum number of virtual timers
-             appl_max_orifices,                                               // Maximum number of orifice table slots
-             appl_vtag,                                                       // Version ID tag  for application
-             appl_last_child,                                                 // PID of last child forked by pups_system
-             appl_sid,                                                        // Session (process group) id
-             appl_pid,                                                        // Process id
-             appl_ppid,                                                       // Parent process
-             appl_uid,                                                        // Process UID
-             appl_gid,                                                        // Process GID
+_PUBLIC uid_t     appl_uid;                                                             // Process UID
+_PUBLIC gid_t     appl_gid;                                                             // Process GID
 
-#ifdef CRIU_SUPPORT
-             appl_criu_ssaves             = 0,                                // Number of times state has been saved
-             appl_criu_poll_time          = DEFAULT_CRIU_POLL_TIME,           // Poll time for (Criu) state saving
-#endif /* CRIU_SUPPORT */
+_PUBLIC  int32_t  ptr,                                                                   // Argument pointer
+                  sargc,                                                                 // Argument count
+                  t_args,                                                                // Total number of arguments
+                  vitimer_quantum,                                                       // Time interval for (PSRP) timers
+                  pupshold_cnt                  = 0,                                     // Number of PUPS/P3 signals held
+	          appl_fsa_mode,                                                         // Filesystem access mode
+                  appl_t_args,                                                           // Total application command tail arguments
+                  appl_alloc_opt,                                                        // Allocation options (for pups_malloc etc.)
+                  appl_max_files,                                                        // Maximum number of file table slots
+                  appl_max_child,                                                        // Maximum number of child table slots
+                  appl_max_pheaps,                                                       // Maximum number of persistent heap table slots
+                  appl_max_vtimers,                                                      // Maximum number of virtual timers
+                  appl_max_orifices,                                                     // Maximum number of orifice table slots
+                  appl_vtag,                                                             // Version ID tag  for application
+                  appl_last_child,                                                       // PID of last child forked by pups_system
+
+                  #ifdef CRIU_SUPPORT
+                  appl_criu_ssaves             = 0,                                      // Number of times state has been saved
+                  appl_criu_poll_time          = DEFAULT_CRIU_POLL_TIME,                 // Poll time for (Criu) state saving
+                  #endif /* CRIU_SUPPORT */
 
 
-#ifdef _OPENMP
-             appl_omp_threads,                                                // Number of OMP threads
-#endif /* _OPENMP */
+                  #ifdef _OPENMP
+                  appl_omp_threads,                                                      // Number of OMP threads
+                  #endif /* _OPENMP */
+
+                  appl_tty                     = (-1),                                   // Applications controlling terminal
+                  appl_timestamp,                                                        // Application compilation time stamp
+                  appl_nice_lvl                = 10,                                     // Process niceness
+                  appl_softdog_timeout         = DEFAULT_SOFTDOG_TIMEOUT;                // Software watchdog timeout
+
 
 #ifdef PTHREAD_SUPPORT
-             appl_root_tid                = (-1),                             // LWP of root thread
-             appl_root_thread,                                                // Root (initial) thread for process 
+_PUBLIC pthread_t appl_root_tid                = (pthread_t)NULL;                        // Root (initial) thread for process 
 #endif /* PTHREAD_SUPPORT */
 
-             appl_tty                     = (-1),                             // Applications controlling terminal
-             appl_remote_pid,                                                 // Remote PID to relay signals to 
-             appl_timestamp,                                                  // Application compilation time stamp
-             appl_nice_lvl                = 10,                               // Process niceness
-             appl_softdog_timeout         = DEFAULT_SOFTDOG_TIMEOUT,          // Software watchdog timeout
-	     appl_softdog_pid             = (-1);                             // Software watchdog process PID
+_PUBLIC   int32_t pupsighold_cnt[MAX_SIGS]     = { [0 ... MAX_SIGS-1] = 1 };             // Counter for signal states
 
-
-_PUBLIC  int pupsighold_cnt[MAX_SIGS]     = { [0 ... MAX_SIGS-1] = 1 };       // Counter for signal states
-
-_PUBLIC _BOOLEAN 
-
-         appl_verbose                     = FALSE,                            // Set appl_verbose reporting mode
-         appl_resident                    = FALSE;                            // TRUE if application is memory resident
-         appl_enable_resident             = FALSE;                            // TRUE if application can be memory resident
-         appl_proprietary                 = FALSE;                            // TRUE if application is proprietary
-         appl_nodetach                    = FALSE,                            // Don't detach stdio in background
-         test_mode                        = FALSE,                            // Set test mode
-         init                             = TRUE,                             // Initialise tail decoder system
-         appl_pg_leader                   = FALSE,                            // Application is process group leader
-         appl_wait                        = FALSE,                            // TRUE if process stopped
-         appl_fgnd                        = TRUE,                             // TRUE if in foreground pgrp
-         appl_snames_crypted              = FALSE,                            // If TRUE encrypt shadow files
-	 appl_softdog_enabled             = FALSE,                            // TRUE if software watchdog enabled
-         argd[255];                                                           // Argument decode status flags
+_PUBLIC _BOOLEAN  appl_verbose                     = FALSE,                              // Set appl_verbose reporting mode
+                  appl_resident                    = FALSE,                              // TRUE if application is memory resident
+                  appl_enable_resident             = FALSE,                              // TRUE if application can be memory resident
+                  appl_proprietary                 = FALSE,                              // TRUE if application is proprietary
+                  appl_nodetach                    = FALSE,                              // Don't detach stdio in background
+                  test_mode                        = FALSE,                              // Set test mode
+                  init                             = TRUE,                               // Initialise tail decoder system
+                  appl_pg_leader                   = FALSE,                              // Application is process group leader
+                  appl_wait                        = FALSE,                              // TRUE if process stopped
+                  appl_fgnd                        = TRUE,                               // TRUE if in foreground pgrp
+                  appl_snames_crypted              = FALSE,                              // If TRUE encrypt shadow files
+	          appl_softdog_enabled             = FALSE,                              // TRUE if software watchdog enabled
+                  argd[255];                                                             // Argument decode status flags
 
 #ifdef CRIU_SUPPORT
-         appl_criu_ssave                  = FALSE;                            // TRUE if (Criu) state saving enabled
+                  appl_criu_ssave                  = FALSE;                              // TRUE if (Criu) state saving enabled
 
-_PUBLIC char appl_criu_ssave_dir[SSIZE]   = "";                               // Criu checkpoint directory for state saving
-_PUBLIC char appl_criu_dir[SSIZE]         = "/tmp";                           // Criu directory (holds migratable files and checkpoint directories)
+_PUBLIC char      appl_criu_ssave_dir[SSIZE]       = "";                                 // Criu checkpoint directory for state saving
+_PUBLIC char      appl_criu_dir[SSIZE]             = "/tmp";                             // Criu directory (holds migratable files and checkpoint directories)
 #endif /* CRIU_SUPPORT */
 
 
 #ifdef SSH_SUPPORT
-_PUBLIC char     ssh_remote_port[SSIZE]   = "22";                             // Port for remote node
-_PUBLIC char     ssh_remote_uname[SSIZE]  = "";                               // Username for remote node
-_PUBLIC _BOOLEAN ssh_compression          = FALSE;                            // Use compressed ssh network tunneling
+_PUBLIC char      ssh_remote_port[SSIZE]           = "22";                               // Port for remote node
+_PUBLIC char      ssh_remote_uname[SSIZE]          = "";                                 // Username for remote node
+_PUBLIC _BOOLEAN  ssh_compression                  = FALSE;                              // Use compressed ssh network tunneling
 #endif /* SSH_SUPPORT */
 
 #ifdef MAIL_SUPPORT
-_PUBLIC _BOOLEAN appl_mailable            = FALSE;                            // TRUE if process supports mail
+_PUBLIC _BOOLEAN appl_mailable                     = FALSE;                              // TRUE if process supports mail
 #endif /* MAIL_SUPPORT */
 
-_PUBLIC _BOOLEAN appl_secure              = FALSE;                            // TRUE if application secure
-_PUBLIC _BOOLEAN appl_kill_pg             = FALSE;                            // If TRUE kill process group on exit
-_PUBLIC _BOOLEAN appl_default_chname      = TRUE;                             // TRUE if PSRP channel name default
-_PUBLIC _BOOLEAN appl_have_pen            = FALSE;                            // TRUE if binname != execution name
-_PUBLIC _BOOLEAN appl_psrp                = FALSE;                            // TRUE if application PSRP enabled
-_PUBLIC _BOOLEAN appl_psrp_load           = TRUE;                             // If TRUE load PSRP resources at start
-_PUBLIC _BOOLEAN appl_psrp_save           = FALSE;                            // If TRUE save dispatch table at exit
-_PUBLIC _BOOLEAN appl_etrap               = FALSE;                            // If TRUE trap-wait in pups_exit()
-_PUBLIC _BOOLEAN appl_ppid_exit           = FALSE;                            // If TRUE exit if parent terminates
-_PUBLIC _BOOLEAN appl_rooted              = FALSE;                            // If TRUE system context cannot migrate
-_PUBLIC _BOOLEAN pups_process_homeostat   = FALSE;                            // TRUE if process homeostat enabled 
-_PUBLIC _BOOLEAN ignore_pups_signals      = TRUE;                             // Ignore PUPS signals if TRUE
-_PUBLIC _BOOLEAN pups_abort_restart       = FALSE;                            // TRUE if abort handler enabled
-_PUBLIC _BOOLEAN in_vt_handler            = FALSE;                            // TRUE if in vt_handler()
-_PUBLIC  sigjmp_buf pups_restart_buf;                                         // Abort restart buffer
+_PUBLIC _BOOLEAN  appl_secure                      = FALSE;                              // TRUE if application secure
+_PUBLIC _BOOLEAN  appl_kill_pg                     = FALSE;                              // If TRUE kill process group on exit
+_PUBLIC _BOOLEAN  appl_default_chname              = TRUE;                               // TRUE if PSRP channel name default
+_PUBLIC _BOOLEAN  appl_have_pen                    = FALSE;                              // TRUE if binname != execution name
+_PUBLIC _BOOLEAN  appl_psrp                        = FALSE;                              // TRUE if application PSRP enabled
+_PUBLIC _BOOLEAN  appl_psrp_load                   = TRUE;                               // If TRUE load PSRP resources at start
+_PUBLIC _BOOLEAN  appl_psrp_save                   = FALSE;                              // If TRUE save dispatch table at exit
+_PUBLIC _BOOLEAN  appl_etrap                       = FALSE;                              // If TRUE trap-wait in pups_exit()
+_PUBLIC _BOOLEAN  appl_ppid_exit                   = FALSE;                              // If TRUE exit if parent terminates
+_PUBLIC _BOOLEAN  appl_rooted                      = FALSE;                              // If TRUE system context cannot migrate
+_PUBLIC _BOOLEAN  pups_process_homeostat           = FALSE;                              // TRUE if process homeostat enabled 
+_PUBLIC _BOOLEAN  ignore_pups_signals              = TRUE;                               // Ignore PUPS signals if TRUE
+_PUBLIC _BOOLEAN  pups_abort_restart               = FALSE;                              // TRUE if abort handler enabled
+_PUBLIC _BOOLEAN  in_pups_exit                     = FALSE;                              // TRUE if in pups_exit()
+_PUBLIC _BOOLEAN  in_vt_handler                    = FALSE;                              // TRUE if in vt_handler()
+
+_PUBLIC  sigjmp_buf pups_restart_buf;                                                    // Abort restart buffer
 
 
-_PUBLIC _BOOLEAN    ftab_extend           = TRUE;                             // TRUE if extening file table
-_PUBLIC  ftab_type  *ftab                 = (ftab_type *)NULL;                // PUPS file table
-_PUBLIC  chtab_type *chtab                = (chtab_type *)NULL;               // PUPS child (process) table
-_PUBLIC  sigtab_type sigtab[MAX_SIGS];                                        // Addresses of signal handlers
-_PUBLIC  vttab_type *vttab                = (vttab_type *)NULL;               // Virtual timer table
+_PUBLIC _BOOLEAN   ftab_extend                     = TRUE;                               // TRUE if extening file table
+_PUBLIC ftab_type  *ftab                           = (ftab_type *)NULL;                  // PUPS file table
+_PUBLIC chtab_type *chtab                          = (chtab_type *)NULL;                 // PUPS child (process) table
+_PUBLIC sigtab_type sigtab[MAX_SIGS];                                                    // Addresses of signal handlers
+_PUBLIC vttab_type *vttab                          = (vttab_type *)NULL;                 // Virtual timer table
 
 
-_PUBLIC char        date[SSIZE]           = "";                               // Date stamp
-_PUBLIC char        errstr[SSIZE]         = "";                               // Error string
-_PUBLIC char        appl_machid[SSIZE]    = "";                               // Unique machine (host) i.d.
+_PUBLIC char      date[SSIZE]                      = "";                                 // Date stamp
+_PUBLIC char      errstr[SSIZE]                    = "";                                 // Error string
+_PUBLIC char      appl_machid[SSIZE]               = "";                                 // Unique machine (host) i.d.
 
-_PUBLIC char *version                     = (char *)NULL,                     // Version of the code
-             *appl_owner                  = (char *)NULL,                     // Owner of this application
-             *appl_password               = (char *)NULL,                     // Application owners password
-             *appl_crypted                = (char *)NULL,                     // Application encrypted owners password
-             *appl_name                   = (char *)NULL,                     // Name of application
-             *appl_remote_host            = (char *)NULL,                     // Name of remote host for signal relay
-             *appl_fifo_dir               = (char *)NULL,                     // Name of default FIFO patchboard
-             *appl_ch_name                = (char *)NULL,                     // Name of application PSRP channel
-             *appl_logfile                = (char *)NULL,                     // Error/log file
+_PUBLIC char      version[SSIZE]                   = "",                                 // Version of the code
+                  appl_owner[SSIZE]                = "",                                 // Owner of this application
+                  appl_password[SSIZE]             = "",                                 // Application owners password
+                  appl_crypted[SSIZE]              = "",                                 // Application encrypted owners password
+                  appl_name[SSIZE]                 = "",                                 // Name of application
+                  appl_remote_host[SSIZE]          = "",                                 // Name of remote host for signal relay
+                  appl_fifo_dir[SSIZE]             = "",                                 // Name of default FIFO patchboard
+                  appl_ch_name[SSIZE]              = "",                                 // Name of application PSRP channel
+                  appl_logfile[SSIZE]              = "",                                 // Error/log file
 
-#ifdef MAIL_SUPPORT
-             *appl_mdir                   = (char *)NULL,                     // MH inbox for this process
-             *appl_mh_folder              = (char *)NULL,                     // MH folder for this process
-             *appl_mime_dir               = (char *)NULL,                     // MIME message parts workspace
-             *appl_mime_type              = (char *)NULL,                     // MIME message type
-             *appl_replyto                = (char *)NULL,                     // MH reply address
-#endif /* MAIL_SUPPORT */
+                  #ifdef MAIL_SUPPORT
+                  appl_mdir[]                      = "",                                 // MH inbox for this process
+                  appl_mh_folder[]                 = "",                                 // MH folder for this process
+                  appl_mime_dir[]                  = "",                                 // MIME message parts workspace
+                  appl_mime_type[]                 = "",                                 // MIME message type
+                  appl_replyto[]                   = "",                                 // MH reply address
+                  #endif /* MAIL_SUPPORT */
 
-             *appl_tunnel_path            = (char *)NULL,                     // Pathname for process tunnel
-             *appl_bin_name               = (char *)NULL,                     // Name of process binary
-             *appl_ttyname                = (char *)NULL,                     // Name of process controlling terminal
-             *appl_pam_name               = (char *)NULL,                     // Name of PSRP authentication module
-             *author                      = (char *)NULL,                     // Author name
-             *revdate                     = (char *)NULL,                     // Revision date
-             *arg_f_name                  = (char *)NULL,                     // Name of comamnd tail argument file
-             *args[256]                   = { [0 ... 255] = (char *)NULL },   // Secondary argument vector
-	     *appl_home                   = (char *)NULL,                     // Effective home directory
-             *appl_cwd                    = (char *)NULL,                     // Current working directory
-             *appl_cmd_str                = (char *)NULL,                     // Application command string
-             *appl_host                   = (char *)NULL,                     // Application host processor node
-             *appl_state                  = (char *)NULL,                     // Application state information
-             *appl_err                    = (char *)NULL,                     // Application error information
-             appl_argfifo[SSIZE]          = "";                               // Argument FIFO (for memory resident application)
+                  appl_tunnel_path[SSIZE]          = "",                                 // Pathname for process tunnel
+                  appl_bin_name[SSIZE]             = "",                                 // Name of process binary
+                  appl_ttyname[SSIZE]              = "",                                 // Name of process controlling terminal
+                  appl_pam_name[SSIZE]             = "",                                 // Name of PSRP authentication module
+                  author[SSIZE]                    = "",                                 // Author name
+                  revdate[SSIZE]                   = "",                                 // Revision date
+                  arg_f_name[SSIZE]                = "",                                 // Name of comamnd tail argument file
+	          appl_home[SSIZE]                 = "",                                 // Effective home directory
+                  appl_cwd[SSIZE]                  = "",                                 // Current working directory
+                  appl_cmd_str[SSIZE]              = "",                                 // Application command string
+                  appl_host[SSIZE]                 = "",                                 // Application host processor node
+                  appl_state[SSIZE]                = "",                                 // Application state information
+                  appl_err[SSIZE]                  = "",                                 // Application error information
+                  appl_argfifo[SSIZE]              = "",                                 // Argument FIFO (for memory resident application)
+                  *args[ARGS]                      = { [0 ... ARGS-1] = (char *)NULL };  // Secondary argument vector
 
-_PUBLIC int  (*appl_mail_handler)(char *);                                    // Application specific mail handler
+_PUBLIC  int32_t  (*appl_mail_handler)(char *);                                          // Application specific mail handler
 
 
 /*----------------------------------------*/
 /* Private variables used by this routine */
 /*----------------------------------------*/
-
-
 /*------------------------------*/
 /* Homeostatis status for stdio */
 /*------------------------------*/
 
-_PRIVATE  int in_state   = NONE;
-_PRIVATE  int pin_state  = NONE;
-_PRIVATE  int out_state  = NONE;
-_PRIVATE  int pout_state = NONE;
-_PRIVATE  int err_state  = NONE;
-_PRIVATE  int perr_state = NONE;
+_PRIVATE  int32_t in_state   = NONE;
+_PRIVATE  int32_t pin_state  = NONE;
+_PRIVATE  int32_t out_state  = NONE;
+_PRIVATE  int32_t pout_state = NONE;
+_PRIVATE  int32_t err_state  = NONE;
+_PRIVATE  int32_t perr_state = NONE;
 
 
 /*----------------------------------------------------------*/
 /* Error handler parameters (preset to PUPS default values) */
 /*----------------------------------------------------------*/
 
-_PRIVATE  int  err_action   = PRINT_ERROR_STRING | EXIT_ON_ERROR;
-_PRIVATE  int  err_code     = (-2);
-_PRIVATE  FILE *err_stream  = (FILE *)NULL;
-_PRIVATE  FILE *fgnd_stdin  = (FILE *)NULL;
-_PRIVATE  FILE *fgnd_stdout = (FILE *)NULL;
-_PRIVATE  FILE *fgnd_stderr = (FILE *)NULL;
+_PRIVATE  int32_t err_action   = PRINT_ERROR_STRING | EXIT_ON_ERROR;           // Default error action
+_PRIVATE  int32_t err_code     = (-2);                                         // PUPS/P3 error code
+_PRIVATE  FILE *err_stream  = (FILE *)NULL;                                    // Error/status log stream
+_PRIVATE  FILE *fgnd_stdin  = (FILE *)NULL;                                    // Foreground stream (standard input)
+_PRIVATE  FILE *fgnd_stdout = (FILE *)NULL;                                    // Foreground stream (standard ouput)
+_PRIVATE  FILE *fgnd_stderr = (FILE *)NULL;                                    // Foreground stream (standard error)
 
 
-_PRIVATE _BOOLEAN in_setvitimer     = FALSE;      				// TRUE if in setvitimer
-_PRIVATE _BOOLEAN no_vt_services    = FALSE;    				// TRUE if VT services disabled
-_PRIVATE _BOOLEAN do_closeall       = FALSE;      				// TRUE if closeall entered
-_PRIVATE _BOOLEAN started_detached  = FALSE;      				// TRUE if application has been detached
-_PRIVATE _BOOLEAN default_argfile   = FALSE;      				// TRUE if default argument file
-_PRIVATE _BOOLEAN in_close_routine  = FALSE;      				// TRUE if in pups_close() or pups_fclose()
-_PRIVATE _BOOLEAN jump_vector       = TRUE;       				// Context OK for longjmp() if TRUE
+_PRIVATE _BOOLEAN in_setvitimer     = FALSE;                                   // TRUE if in setvitimer
+_PRIVATE _BOOLEAN no_vt_services    = FALSE;                                   // TRUE if VT services disabled
+_PRIVATE _BOOLEAN do_closeall       = FALSE;                                   // TRUE if closeall entered
+_PRIVATE _BOOLEAN started_detached  = FALSE;                                   // TRUE if application has been detached
+_PRIVATE _BOOLEAN default_argfile   = FALSE;                                   // TRUE if default argument file
+_PRIVATE _BOOLEAN in_close_routine  = FALSE;                                   // TRUE if in pups_close() or pups_fclose()
+_PRIVATE _BOOLEAN jump_vector       = TRUE;                                    // Context OK for longjmp() if TRUE
 
 
 
@@ -358,23 +354,23 @@ _PRIVATE _BOOLEAN jump_vector       = TRUE;       				// Context OK for longjmp(
 /* Private variables used by virtual interval timers */
 /*---------------------------------------------------*/
 
-_PRIVATE int         start_index        = 0;
-_PRIVATE int         active_v_timers    = 0;
-_PRIVATE _BOOLEAN    vt_no_reset        = FALSE;
+_PRIVATE int32_t       start_index      = 0;
+_PRIVATE int32_t       active_v_timers  = 0;
+_PRIVATE _BOOLEAN  vt_no_reset      = FALSE;
 
 
 /*---------------------------------------*/
 /* Private variables used by child table */
 /*---------------------------------------*/
 
-_PRIVATE int         n_children          = 0;
+_PRIVATE  int32_t       n_children       = 0;
 
 
 /*----------------------*/
 /* Checkpoint file name */
 /*----------------------*/
 
-_PRIVATE char        ckpt_file_name[SSIZE] = "";
+_PRIVATE char ckpt_file_name[SSIZE] = "";
 
 
 
@@ -417,19 +413,17 @@ _PRIVATE pthread_mutex_t copy_mutex     = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP
 /*-------------------------------------------------*/
 /* Slot and usage functions - used by slot manager */
 /*-------------------------------------------------*/
-
-
 /*---------------*/
 /* Slot function */
 /*---------------*/
 
-_PRIVATE void utilib_slot(int level)
+_PRIVATE void utilib_slot(const int32_t level)
 {   (void)fprintf(stderr,"int lib utilib %s: [ANSI C]\n",UTILIB_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 1985-2023 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 1985-2025 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
-       (void)fprintf(stderr,"PUPS/P3 general purpose utilities library (built %s %s)\n\n",__TIME__,__DATE__);
+       (void)fprintf(stderr,"PUPS/P3 general purpose utilities library (gcc %s: built %s %s)\n\n",__VERSION__,__TIME__,__DATE__);
     }
     else
        (void)fprintf(stderr,"\n");
@@ -441,7 +435,7 @@ _PRIVATE void utilib_slot(int level)
 /* Usage function */
 /*----------------*/
 
-_PRIVATE void utilib_usage()
+_PRIVATE void utilib_usage(void)
 {   (void)fprintf(stderr,"\nGeneric PUPS/P3 options\n");  
     (void)fprintf(stderr,"=======================\n\n");
     (void)fprintf(stderr,"[-mra [-cpu <cpu available:%f>] [-mem <mem required:%d> [-timeout <hours:%f>]\n",
@@ -458,9 +452,11 @@ _PRIVATE void utilib_usage()
     (void)fprintf(stderr,"[-mail_dir <mail directory>]\n");
 #endif /* MAIL_SUPPORT */
 
+#ifndef SINGLE_THREAD
 #ifdef _OPENMP
     (void)fprintf(stderr,"[-omp_threads]\n");
 #endif /* _OPENMP */
+#endif /* SINGLE_THREAD */
 
     if(appl_enable_resident == TRUE)
        (void)fprintf(stderr,"[-resident <command argument FIFO>]\n");
@@ -471,7 +467,6 @@ _PRIVATE void utilib_usage()
     (void)fprintf(stderr,"[-closestdio]\n");
     (void)fprintf(stderr,"[-tunnel]\n");
     (void)fprintf(stderr,"[-log]\n");
-
     (void)fprintf(stderr,"[-cwd <working directory>]\n");
     (void)fprintf(stderr,"[-growth_protection] <retrys> [-nice <lvl: %d>]\n",appl_nice_lvl);
     (void)fprintf(stderr,"[-pen <process execution name:application name>]\n");
@@ -486,38 +481,38 @@ _PRIVATE void utilib_usage()
     (void)fprintf(stderr,"[-pgrp <process group leader pid>]\n");
     (void)fprintf(stderr,"[-channel_name <process PSRP channel name>]\n");
 
-#ifdef SSH_SUPPORT
+    #ifdef SSH_SUPPORT
     (void)fprintf(stderr,"[-ssh_port <port>\n");
     (void)fprintf(stderr,"[-ssh_compress]\n");
-#endif /* SSH_SUPPORT */
+    #endif /* SSH_SUPPORT */
 
-#ifdef CRIU_SUPPORT
+    #ifdef CRIU_SUPPORT
     (void)fprintf(stderr,"[-ssave [-sspoll <criu state save poll time seconds:%d>] [-cd <criu directory:/tmp]]\n",appl_poll_time);
-#endif /* CRIU_SUPPORT */
+    #endif /* CRIU_SUPPORT */
 
     (void)fprintf(stderr,"[-softdog [-softdog <watchdog timeout seconds:%d>]\n",appl_softdog_timeout);
     (void)fprintf(stderr,"[-stdio_dead]\n");
     (void)fprintf(stderr,"[-pam <PUPS authentication module name>]\n");
     (void)fprintf(stderr,"[-shadows_crypted:FALSE]\n");
 
-#ifndef SUPPRESS_PSRP_USAGE
+    #ifndef SUPPRESS_PSRP_USAGE
     (void)fprintf(stderr,"[-psrp_autoload:FALSEE]\n");
     (void)fprintf(stderr,"[-psrp_autosave:FALSE]\n");
-#endif /* SUPPRESS_PSRP_USAGE */
+    #endif /* SUPPRESS_PSRP_USAGE */
 
     (void)fprintf(stderr,"[-vitab <max virtual timers:32>]\n");
     (void)fprintf(stderr,"[-ftab <max files:32>]\n");
     (void)fprintf(stderr,"[-chtab <max children:32>]\n");
 
 
-#ifdef DLL_SUPPORT
+    #ifdef DLL_SUPPORT
     (void)fprintf(stderr,"[-ortab <max DLL orifices:32>]\n");
-#endif /* DLL_SUPPORT */
+    #endif /* DLL_SUPPORT */
 
 
-#ifdef PERSISTENT_HEAP_SUPPORT
+    #ifdef PERSISTENT_HEAP_SUPPORT
     (void)fprintf(stderr,"[-phtab <max persistent heaps:32>]\n");
-#endif /* PERSISTENT_HEAP_SUPPORT */
+    #endif /* PERSISTENT_HEAP_SUPPORT */
 
     (void)fprintf(stderr,"\n\nApplication specific options\n");
     (void)fprintf(stderr,"============================\n\n");
@@ -546,7 +541,7 @@ _EXTERN char appl_build_date[SSIZE];
 /* Application shell */
 /*-------------------*/
 
-_PUBLIC char *shell = (char *)NULL;
+_PUBLIC char shell[SSIZE] = "";
 
 
 /*-------------------------------------------------*/
@@ -554,9 +549,9 @@ _PUBLIC char *shell = (char *)NULL;
 /*-------------------------------------------------*/
 
 
-                           /*-----------------------------------*/
-_PRIVATE int sbrk_retrys;  /* Maximum number of retrys for sbrk */
-                           /*-----------------------------------*/
+                               /*-----------------------------------*/
+_PRIVATE int32_t sbrk_retrys;  /* Maximum number of retrys for sbrk */
+                               /*-----------------------------------*/
 
 
 /*-------------------------------------------------------*/
@@ -565,49 +560,50 @@ _PRIVATE int sbrk_retrys;  /* Maximum number of retrys for sbrk */
 
 #ifdef CRIU_SUPPORT
 // Perioidically save state (via Criu)
-_PROTOTYPE _PRIVATE int ssave_homeostat(void *, char *);
+_PROTOTYPE _PRIVATE int32_t ssave_homeostat(void *, char *);
 #endif /* CRIU_SUPPORT */
 
-/* Extract embedded window resizing data from buffer */       /*-----------------------------*/
-_PROTOTYPE _PRIVATE _BOOLEAN ws_extract(int    ,              /* File descriptor for ibuf    */
-                                        _BYTE *,              /* Input buffer                */
-                                        unsigned long  int  , /* Bytes in input buffer       */
-                                        _BYTE *,              /* Pre resize buffer           */
-                                        unsigned long  int *, /* Number of pre resize bytes  */
-                                        _BYTE *,              /* Post resize buffer          */
-                                        unsigned long  int*,  /* Number of post resize bytes */
-                               struct winsize *);             /* Winsize structure           */ 
-                                                              /*-----------------------------*/
+//Extract embedded window resizing data from buffer
+                                                  /*-----------------------------*/
+_PRIVATE _BOOLEAN ws_extract(des_t           ,    /* File descriptor for ibuf    */
+                             _BYTE          *,    /* Input buffer                */
+                             size_t         *,    /* Bytes in input buffer       */
+                             _BYTE          *,    /* Pre resize buffer           */
+                             size_t         *,    /* Number of pre resize bytes  */
+                             _BYTE          *,    /* Post resize buffer          */
+                             size_t         *,    /* Number of post resize bytes */
+                             struct winsize *);   /* Winsize structure           */
+                                                  /*-----------------------------*/
 
 // Abort restart handler
-_PROTOTYPE _PRIVATE int pups_restart_handler(int);
+_PROTOTYPE _PRIVATE int32_t pups_restart_handler(int32_t);
 
 
 #ifdef CRIU_SUPPORT
 // Handler for state saving
-_PROTOTYPE _PRIVATE int ssave_handler(int);
+_PROTOTYPE _PRIVATE int32_t ssave_handler(int32_t);
 #endif /* CRIU_SUPPORT */
 
 // Handler for SIGTTIN/SIGTTOU
-_PROTOTYPE _PRIVATE int fgio_handler(int);
+_PROTOTYPE _PRIVATE int32_t fgio_handler(int32_t);
 
 // Handler for SIGTTIN/SIGTTOU
-_PROTOTYPE _PRIVATE int segbusfpe_handler(int);
+_PROTOTYPE _PRIVATE int32_t segbusfpe_handler(int32_t);
 
 // Handler to deal with segmentation violations
 _PROTOTYPE _PRIVATE void catch_sigsegv(void);
 
 // Process group leaders handler for SIGTERM
-_PROTOTYPE _PRIVATE int pg_leaders_term_handler(int);
+_PROTOTYPE _PRIVATE int32_t pg_leaders_term_handler(int32_t);
 
 // Process group leaders handler for SIGHUP (SIGTSTP)
-_PROTOTYPE _PRIVATE int pg_leaders_stop_handler(int);
+_PROTOTYPE _PRIVATE int32_t pg_leaders_stop_handler(int32_t);
 
 // Process group leaders handler for SIGCONT
-_PROTOTYPE _PRIVATE int pg_leaders_cont_handler(int);
+_PROTOTYPE _PRIVATE int32_t pg_leaders_cont_handler(int32_t);
 
 // Handler for SIGCONT (for PUPS processes other than process group leader)
-_PROTOTYPE _PRIVATE int pups_cont_handler(int);
+_PROTOTYPE _PRIVATE  int32_t pups_cont_handler(int32_t);
 
 
 /*------------------------------------------------------*/
@@ -615,22 +611,22 @@ _PROTOTYPE _PRIVATE int pups_cont_handler(int);
 /* PUPS exit functions on reciept of SIGQUIT            */
 /*------------------------------------------------------*/
 
-_PROTOTYPE _PRIVATE int pups_exit_handler(int);
+_PROTOTYPE _PRIVATE  int32_t pups_exit_handler(int32_t);
 
 // Handler for SIGCHLD
-_PROTOTYPE _PRIVATE void chld_handler(int);
+_PROTOTYPE _PRIVATE void chld_handler(int32_t);
 
 // Initialise PUPS virtual interval timers
-_PROTOTYPE _PRIVATE void initvitimers(int);
+_PROTOTYPE _PRIVATE void initvitimers(int32_t);
 
 // Initialise PUPS file table
-_PROTOTYPE _PRIVATE void initftab(int, int);
+_PROTOTYPE _PRIVATE void initftab(int32_t,  int32_t);
 
 // Initialise signal status
 _PROTOTYPE _PRIVATE void initsigstatus(void);
 
 // Hoemeostat which reconnects migrating file system objects
-_PROTOTYPE _PRIVATE int reconnect(int, _BOOLEAN *);
+_PROTOTYPE _PRIVATE  int32_t reconnect(int32_t, _BOOLEAN *);
 
 // Initialise PUPS persistent heaps
 _PROTOTYPE _PRIVATE void shm_init(void);
@@ -641,13 +637,13 @@ _PROTOTYPE _PRIVATE void tinit(void);
 
 
 
-/*-----------------------------------------------------------------------------
-    Make sure correct signal mask is used if we are multithreaded ...
------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------*/
+/* Make sure correct signal mask is used if we are multithreaded */
+/*---------------------------------------------------------------*/
 
-_PUBLIC int pups_sigprocmask(int how,  const sigset_t *restrict set, sigset_t *restrict oset)
+_PUBLIC int32_t pups_sigprocmask(int32_t how,  const sigset_t *restrict set, sigset_t *restrict oset)
 
-{   int ret;
+{    int32_t ret;
 
      #ifdef PTHREAD_SUPPORT
      ret = pthread_sigmask(how,set,oset);
@@ -661,10 +657,10 @@ _PUBLIC int pups_sigprocmask(int how,  const sigset_t *restrict set, sigset_t *r
 
 
 
-/*-----------------------------------------------------------------------------
-    Get time accurate to milliseconds - this funtcion has to be double
-    precision because of the size of the integers in the timeb structure ...
------------------------------------------------------------------------------*/
+/*----------------------------------------------------------------------*/
+/* Get time accurate to milliseconds - this funtcion has to be double   */
+/* precision because of the size of the integers in the timeb structure */
+/*----------------------------------------------------------------------*/
 
 _PUBLIC double millitime(void)
 
@@ -680,18 +676,16 @@ _PUBLIC double millitime(void)
 
 
 
-/*-----------------------------------------------------------------------------
-    Get ip_address and node name of Internet device ...
------------------------------------------------------------------------------*/
+/*-------------------------------------------------*/
+/* Get IPV4 address and node name of Internet host */
+/*-------------------------------------------------*/
 
-_PUBLIC int pups_get_ip_info(const char *dev_name, char *ip_addr, char *node_name)
+_PUBLIC int32_t pups_get_ip_info(const char *dev_name, char *ip_addr, char *node_name)
 {
-    int fd;
-
+    int32_t            fd;
     struct ifreq       ifr;
     struct sockaddr_in sin;
-
-    char buf[SSIZE] = "";
+    unsigned char      buf[SSIZE] = "";
 
     if(dev_name  == (char *)NULL  ||
        ip_addr   == (char *)NULL  ||
@@ -703,10 +697,7 @@ _PUBLIC int pups_get_ip_info(const char *dev_name, char *ip_addr, char *node_nam
     fd = socket(AF_INET, SOCK_DGRAM, 0);
     ifr.ifr_addr.sa_family = AF_INET;
 
-    if(dev_name == (char *)NULL)
-       (void)snprintf(ifr.ifr_name, IFNAMSIZ, "eth0");
-    else
-       (void)snprintf(ifr.ifr_name, IFNAMSIZ, dev_name);
+    (void)snprintf(ifr.ifr_name, IFNAMSIZ, dev_name);
 
     if(ioctl(fd, SIOCGIFADDR, &ifr) == (-1))
     {  pups_set_errno(EINVAL);
@@ -714,18 +705,18 @@ _PUBLIC int pups_get_ip_info(const char *dev_name, char *ip_addr, char *node_nam
     }
 
 
-    /*------------------------------------------------*/
-    /* Get IPV4 I.P. address (in human readable form) */
-    /* Need to use inet_ntop for IPV4 and IPV6        */
-    /*------------------------------------------------*/
+    /*-------------------------------------------*/
+    /* Get IPV4 address (in human readable form) */
+    /* Need to use inet_ntop for IPV4 and IPV6   */
+    /*-------------------------------------------*/
 
     snprintf(ip_addr,SSIZE, (char *)inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr));
     (void)close(fd);
 
 
-    /*-------------------------------------------*/
-    /* Get network node name (from I.P. address) */
-    /*-------------------------------------------*/
+    /*-----------------------------------------*/
+    /* Get network node name (from IP address) */
+    /*-----------------------------------------*/
 
     (void)memset(&sin, 0, sizeof(sin));
     sin.sin_family      = AF_INET;
@@ -745,11 +736,11 @@ _PUBLIC int pups_get_ip_info(const char *dev_name, char *ip_addr, char *node_nam
 
 
 
-/*-----------------------------------------------------------------------------
-    Round a floating point number to N significant figures
------------------------------------------------------------------------------*/
+/*--------------------------------------------------------*/
+/* Round a floating point number to N significant figures */
+/*--------------------------------------------------------*/
 
-_PUBLIC FTYPE sigfig(const FTYPE arg, const unsigned int digits)
+_PUBLIC FTYPE sigfig(const FTYPE arg, const uint32_t digits)
 
 {   FTYPE factor,
           sigfig_arg;
@@ -767,9 +758,9 @@ _PUBLIC FTYPE sigfig(const FTYPE arg, const unsigned int digits)
 
 
 
-/*-----------------------------------------------------------------------------
-    Find the square of a floating point argument ...
------------------------------------------------------------------------------*/
+/*----------------------------------------------*/
+/* Find the square of a floating point argument */
+/*----------------------------------------------*/
 
 _PUBLIC FTYPE sqr(const FTYPE arg)
 
@@ -779,13 +770,13 @@ _PUBLIC FTYPE sqr(const FTYPE arg)
 
 
 
-/*----------------------------------------------------------------------------
-    Swap a pair of integer arguments ...
-----------------------------------------------------------------------------*/
+/*----------------------------------------*/
+/* Swap a pair of short integer arguments */
+/*----------------------------------------*/
 
-void iswap(int *arg_1, int *arg_2)
+_PUBLIC void sswap(int16_t *arg_1, int16_t *arg_2)
 
-{   int temp;
+{   int16_t temp;
 
     temp   = *arg_1;
     *arg_1 = *arg_2;
@@ -795,11 +786,42 @@ void iswap(int *arg_1, int *arg_2)
 
 
 
-/*----------------------------------------------------------------------------
-    Swap a pair of floating point arguments ...
-----------------------------------------------------------------------------*/
+/*---------------------------------*/
+/* Swap a pair of intger arguments */
+/*---------------------------------*/
 
-void fswap(FTYPE *arg_1, FTYPE *arg_2)
+_PUBLIC void iswap(int32_t *arg_1,  int32_t *arg_2)
+
+{    int32_t temp;
+
+    temp   = *arg_1;
+    *arg_1 = *arg_2;
+    *arg_2 = temp;
+}
+
+
+
+
+/*---------------------------------------*/
+/* Swap a pair of int64_t eger arguments */
+/*---------------------------------------*/
+
+_PUBLIC void lswap(int64_t *arg_1, int64_t *arg_2)
+
+{    int64_t temp;
+
+    temp   = *arg_1;
+    *arg_1 = *arg_2;
+    *arg_2 = temp;
+}
+
+
+
+/*-----------------------------------------*/
+/* Swap a pair of floating point arguments */
+/*-----------------------------------------*/
+
+_PUBLIC void fswap(FTYPE *arg_1, FTYPE *arg_2)
 
 {   FTYPE temp;
 
@@ -810,14 +832,14 @@ void fswap(FTYPE *arg_1, FTYPE *arg_2)
 
 
 
-/*------------------------------------------------------------------------------
-    Procedure to strip comments of the form {token} comment {token} from an
-    ASCII text file ...
------------------------------------------------------------------------------*/
+/*------------------------------------------------------------*/
+/* Strip comments of the form {token} comment {token} from an */
+/* ASCII text file                                            */
+/*------------------------------------------------------------*/
 
 _PUBLIC FILE *pups_strp_commnts(const char token, const FILE *c_file, char *tmp_f_name)
 
-{  int i;
+{  uint32_t i;
 
    char ch,
         *line = (char *)NULL;
@@ -891,17 +913,19 @@ _PUBLIC FILE *pups_strp_commnts(const char token, const FILE *c_file, char *tmp_
 
         } while(looper == TRUE);
 
-/*-----------------------------------------------------------------------------
-   Free all resources which are no longer required ...
------------------------------------------------------------------------------*/
+
+   /*---------------------------------------*/
+   /* Free all resources no longer required */
+   /*---------------------------------------*/
 
    pups_set_errno(OK);
    (void)pups_free(line);
    (void)fclose(c_file);
 
-/*-----------------------------------------------------------------------------
-   Rewind stripped data file, and return a pointer to it ...
------------------------------------------------------------------------------*/
+
+   /*-------------------------------------------------------*/
+   /* Rewind stripped data file, and return a pointer to it */
+   /*-------------------------------------------------------*/
 
    (void)rewind(t_file);
    return(t_file);
@@ -909,18 +933,18 @@ _PUBLIC FILE *pups_strp_commnts(const char token, const FILE *c_file, char *tmp_
 
 
 
-/*-----------------------------------------------------------------------------
-    Return first non whitespace character in a string ...
------------------------------------------------------------------------------*/
+/*---------------------------------------------------*/
+/* Return first non whitespace character in a string */
+/*---------------------------------------------------*/
 
-_PUBLIC char *strfirst(char *s1)
+_PUBLIC char *strfirst(const char *s1)
 
-{   int i,
-        size;
+{   uint32_t i,
+             size;
 
     if(s1 == (char *)NULL)
     {  pups_set_errno(EINVAL);
-       return(-1);
+       return((char *)NULL);
     }
 
     size = strlen(s1);
@@ -937,14 +961,14 @@ _PUBLIC char *strfirst(char *s1)
 
 
 
-/*-----------------------------------------------------------------------------
-    Alternative comment stripping algorithm which strips comments in place ...
------------------------------------------------------------------------------*/
+/*----------------------------*/
+/* Strips comments 'in place' */
+/*----------------------------*/
 
-_PUBLIC _BOOLEAN strip_comment(const FILE *stream, int *line_cnt, char *line)
+_PUBLIC _BOOLEAN strip_comment(const FILE *stream,  int32_t *line_cnt, char *line)
 
 {  
-    if(stream == (const FILE *)NULL || line_cnt == (int *)NULL || line == (char *)NULL)
+    if(stream == (const FILE *)NULL || line_cnt == (int32_t *)NULL || line == (char *)NULL)
     {  pups_set_errno(EINVAL);
        return(-1);
     }
@@ -975,25 +999,25 @@ _PUBLIC _BOOLEAN strip_comment(const FILE *stream, int *line_cnt, char *line)
 
 
 
-/*----------------------------------------------------------------------------
-    Convert ASCII character to integer ...
-----------------------------------------------------------------------------*/
+/*------------------------------------*/
+/* Convert ASCII character to integer */
+/*------------------------------------*/
 
-_PUBLIC int actoi(const char ch)
+_PUBLIC int32_t actoi(const char ch)
 
-{   if((int)ch >= (int)'0' && (int)ch <= (int)'9')
-       return((int)ch - 0x30);
+{   if((int32_t)ch >= (int32_t)'0' && (int32_t)ch <= (int32_t)'9')
+       return((int32_t)ch - 0x30);
     else
        return(-1);
 }
 
 
 
-/*-----------------------------------------------------------------------------
-    Procedure to test whether an integer is even ...
------------------------------------------------------------------------------*/
+/*-----------------------------*/
+/* Test for short even integer */
+/*-----------------------------*/
 
-_PUBLIC _BOOLEAN ieven(const int arg)
+_PUBLIC _BOOLEAN seven(const int16_t arg)
 
 {   if(arg%2 > 0)
        return(FALSE);
@@ -1004,40 +1028,58 @@ _PUBLIC _BOOLEAN ieven(const int arg)
 
 
 
-/*-----------------------------------------------------------------------------
-   Routine to test whether an integer is odd ...
------------------------------------------------------------------------------*/
+/*-----------------------*/
+/* Test for even integer */
+/*-----------------------*/
 
-_PUBLIC _BOOLEAN iodd(const int arg)
+_PUBLIC _BOOLEAN ieven(const int32_t arg)
 
 {   if(arg%2 > 0)
-       return(TRUE);
-    else
        return(FALSE);
-}
-
-
-
-/*-----------------------------------------------------------------------------
-    Routine to find the absolute value of an integer ...
------------------------------------------------------------------------------*/
-
-_PUBLIC int iabs(const int arg)
-
-{   if(arg < 0)
-       return(-arg);
     else
-       return(arg);
+       return(TRUE);
 }
 
 
 
 
-/*-----------------------------------------------------------------------------
-    Return the sign of integer argument ...
------------------------------------------------------------------------------*/
+/*----------------------------*/
+/* Test for long even integer */
+/*----------------------------*/
 
-_PUBLIC int isign(const int arg)
+_PUBLIC _BOOLEAN leven(const int64_t  arg)
+
+{   if(arg%2 > 0)
+       return(FALSE);
+    else
+       return(TRUE);
+}
+
+
+
+
+/*------------------------------*/
+/*  Test for short integer sign */
+/*------------------------------*/
+
+_PUBLIC  int32_t ssign(const int16_t arg)
+
+{   if(arg > 0)
+       return((int32_t)1);
+    else if(arg < 0)
+       return((int32_t)(-1));
+
+    return((int32_t)0);
+}
+
+
+
+
+/*-----------------------*/
+/* Test for integer sign */
+/*-----------------------*/
+
+_PUBLIC  int32_t isign(const int32_t arg)
 
 {   if(arg > 0)
        return((int)1);
@@ -1050,11 +1092,43 @@ _PUBLIC int isign(const int arg)
 
 
 
-/*-----------------------------------------------------------------------------
-    Find the maximum of a pair of integers ...
------------------------------------------------------------------------------*/
+/*----------------------------*/
+/* Test for long integer sign */
+/*----------------------------*/
 
-_PUBLIC int imax(const int a, const int b)
+_PUBLIC  int32_t lsign(const int64_t arg)
+
+{   if(arg > 0)
+       return((int32_t)1);
+    else if(arg < 0)
+       return((int32_t)(-1));
+
+    return((int32_t)0);
+}
+
+
+
+
+/*--------------------------------------------*/
+/* Find the maximum of pair of short integers */
+/*--------------------------------------------*/
+
+_PUBLIC int32_t smax(const int16_t a, const int16_t b)
+
+{   if(a >= b)
+       return((int32_t)a);
+    else
+       return((int32_t)b);
+}
+
+
+
+
+/*--------------------------------------*/
+/* Find the maximum of pair of integers */
+/*--------------------------------------*/
+
+_PUBLIC int32_t imax(const int32_t a, const int32_t b)
 
 {   if(a >= b)
        return(a);
@@ -1065,24 +1139,24 @@ _PUBLIC int imax(const int a, const int b)
 
 
 
-/*-----------------------------------------------------------------------------
-    Find the minimum of a pair of integers ...
------------------------------------------------------------------------------*/
+/*-------------------------------------------*/
+/* Find the maximum of pair of int64_t egers */
+/*-------------------------------------------*/
 
-_PUBLIC int imin(const int a, const int b)
+_PUBLIC  int32_t lmax(const  int64_t  a, const int64_t  b)
 
-{   if(a < b)
-       return(a);
+{   if(a >= b)
+       return((int32_t)a);
     else
-       return(b);
+       return((int32_t)b);
 }
 
 
 
 
-/*-----------------------------------------------------------------------------
-    Return the sign of floating point argument ...
------------------------------------------------------------------------------*/
+/*--------------------------------------------*/
+/* Return the sign of floating point argument */
+/*--------------------------------------------*/
 
 _PUBLIC FTYPE fsign(const FTYPE arg)
 
@@ -1098,23 +1172,22 @@ _PUBLIC FTYPE fsign(const FTYPE arg)
 
 
 
-/*------------------------------------------------------------------------------
-    Procedure to round  floating point value to the nearest integer ...
-------------------------------------------------------------------------------*/
+/*---------------------------------------------------*/
+/* Round floating point value to the nearest integer */
+/*---------------------------------------------------*/
 
-_PUBLIC int iround(const FTYPE x)
-{   return((int)rint(x));
+_PUBLIC  int32_t iround(const FTYPE x)
+{   return((int32_t)rint(x));
 }
 
 
 
 
- 
-/*-----------------------------------------------------------------------------
-    Routine to pause program while under development ...
------------------------------------------------------------------------------*/
+/*-----------------------------------------*/
+/* Pause program (while under development) */
+/*-----------------------------------------*/
 
-_PUBLIC int upause(const char *prompt)
+_PUBLIC int32_t upause(const char *prompt)
 
 {   char ch;
 
@@ -1126,8 +1199,8 @@ _PUBLIC int upause(const char *prompt)
        pups_set_errno(OK);
 
     (void)fprintf(stderr,"%s\n",prompt);
-    (void)fflush(stdin);
-    (void)scanf("%c",&ch);
+    (void)fflush (stdin);
+    (void)scanf  ("%c",&ch);
 
     if(pups_get_errno() == OK)
        return(0);
@@ -1138,22 +1211,22 @@ _PUBLIC int upause(const char *prompt)
 
 
 
-/*-----------------------------------------------------------------------------
-    Test to see if file is on a mounted filesystem. If it is, return
-    details of the host exporting the filesystem ...
------------------------------------------------------------------------------*/
+/*------------------------------------------------------------------*/
+/* Test to see if file is on a mounted filesystem. If it is, return */
+/* details of the host exporting the filesystem                     */
+/*------------------------------------------------------------------*/
 
 _PUBLIC _BOOLEAN pups_get_fs_mountinfo(const char *f_name, char *mount_host)
 
-{   int  f_index,
-         status;
+{    int32_t f_index,
+             status;
 
-    FILE *mtab_stream = (FILE *)NULL;
+    FILE     *mtab_stream      = (FILE *)NULL;
 
-    char line[SSIZE]      = "",
-         cwd[SSIZE]       = "",
-         import_fs[SSIZE] = "",
-         pathname[SSIZE]  = "";
+    char     line[SSIZE]       = "",
+             cwd[SSIZE]        = "",
+             import_fs[SSIZE]  = "",
+             pathname[SSIZE]   = "";
 
 
     if(f_name == (const char *)NULL || mount_host == (char *)NULL)
@@ -1224,13 +1297,13 @@ _PUBLIC _BOOLEAN pups_get_fs_mountinfo(const char *f_name, char *mount_host)
 
 
 
-/*-----------------------------------------------------------------------------
-    Find next free file table index (returns (-1) if file table full) ...
------------------------------------------------------------------------------*/
+/*-------------------------------------------------------------------*/
+/* Find next free file table index (returns (-1) if file table full) */
+/*-------------------------------------------------------------------*/
 
-_PUBLIC int pups_find_free_ftab_index(void)
+_PUBLIC int32_t pups_find_free_ftab_index(void)
 
-{   int i;
+{   uint32_t i;
 
     #ifdef PTHREAD_SUPPORT
     (void)pthread_mutex_lock(&ftab_mutex);
@@ -1239,27 +1312,6 @@ _PUBLIC int pups_find_free_ftab_index(void)
     for(i=0; i<appl_max_files; ++i)
        if(ftab[i].fdes == (-1))
        {  pups_set_errno(OK);
-
-
-          if(ftab[i].fname == (char *)NULL)
-             ftab[i].fname = (char *)pups_malloc(SSIZE);
-
-          if(ftab[i].hname == (char *)NULL)
-             ftab[i].hname = (char *)pups_malloc(SSIZE);
-
-          if(ftab[i].fshadow == (char *)NULL)
-             ftab[i].fshadow = (char *)pups_malloc(SSIZE);
-
-          #ifdef SSH_SUPPORT
-          if(ftab[i].rd_host == (char *)NULL)
-            ftab[i].rd_host = (char *)pups_malloc(SSIZE);
-
-          if(ftab[i].rd_ssh_port == (char *)NULL)
-             ftab[i].rd_ssh_port = (char *)pups_malloc(SSIZE);
-          #endif /*SSH_SUPPORT */
-
-          if(ftab[i].fs_name == (char *)NULL)
-             ftab[i].fs_name  = (char *)pups_malloc(SSIZE);
 
           ftab[i].fname[0]    = '\0';
           ftab[i].hname[0]    = '\0';
@@ -1271,7 +1323,7 @@ _PUBLIC int pups_find_free_ftab_index(void)
           (void)pthread_mutex_unlock(&ftab_mutex);
           #endif /* PTHREAD_SUPPORT */
 
-          return(i);
+          return((int32_t)i);
        }
 
     #ifdef PTHREAD_SUPPORT
@@ -1285,14 +1337,14 @@ _PUBLIC int pups_find_free_ftab_index(void)
 
 
 
-/*-----------------------------------------------------------------------------
-    Get the file table entry which corresponds to descriptor (returns (-1)
-    if there is no entry) ...
------------------------------------------------------------------------------*/
+/*------------------------------------------------------------------------*/
+/* Get the file table entry which corresponds to descriptor (returns (-1) */
+/* if there is no entry)                                                  */
+/*------------------------------------------------------------------------*/
 
-_PUBLIC int pups_get_ftab_index(const int fdes)
+_PUBLIC int32_t pups_get_ftab_index(const des_t fdes)
 
-{   int i;
+{   uint32_t i;
 
     #ifdef PTHREAD_SUPPORT
     (void)pthread_mutex_lock(&ftab_mutex);
@@ -1307,7 +1359,7 @@ _PUBLIC int pups_get_ftab_index(const int fdes)
           #endif /* PTHREAD_SUPPORT */
 
           pups_set_errno(OK);
-          return(i);
+          return((int32_t)i);
        }
     }
 
@@ -1322,14 +1374,60 @@ _PUBLIC int pups_get_ftab_index(const int fdes)
 
 
 
-/*----------------------------------------------------------------------------
-    Set file table entry identification tag ...
-----------------------------------------------------------------------------*/
+/*-----------------------------------------*/
+/* Update PSRP channel entry in file table */
+/*-----------------------------------------*/
 
-_PUBLIC int pups_set_ftab_id(const int fdes, const int id)
+_PUBLIC int32_t pups_update_psrp_channel_ftab_entry(const char *chname, const char *chid)
 
-{   int i,
-        f_index;
+{   uint32_t i;
+
+
+    /*--------------*/
+    /* Sanity check */
+    /*--------------*/
+
+    if(strcmp(chid,"#in") != 0 && strcmp(chid,"#out") != 0)
+    {  pups_set_errno(EINVAL);
+       return(-1);
+    }
+
+    #ifdef PTHREAD_SUPPORT
+    (void)pthread_mutex_lock(&ftab_mutex);
+    #endif /* PTHREAD_SUPPORT */
+
+    for(i=0; i<appl_max_files; ++i)
+    {  if(strin(ftab[i].fname,chid) == TRUE)
+       {  (void)strlcpy(ftab[i].fname,chname,SSIZE); 
+
+          #ifdef PTHREAD_SUPPORT
+          (void)pthread_mutex_unlock(&ftab_mutex);
+          #endif /* PTHREAD_SUPPORT */
+
+          pups_set_errno(OK);
+          return((int32_t)i);
+       }
+    }
+
+    #ifdef PTHREAD_SUPPORT
+    (void)pthread_mutex_unlock(&ftab_mutex);
+    #endif /* PTHREAD_SUPPORT */
+
+    pups_set_errno(ESRCH);
+    return(-1);
+}
+
+
+
+
+/*-----------------------------------------*/
+/* Set file table entry identification tag */
+/*-----------------------------------------*/
+
+_PUBLIC int32_t pups_set_ftab_id(const des_t fdes, const int32_t id)
+
+{   uint32_t i;
+    int32_t  f_index;
 
     if(fdes < 0 || fdes >= appl_max_files || id < 0)
     {  pups_set_errno(EINVAL);
@@ -1369,13 +1467,13 @@ _PUBLIC int pups_set_ftab_id(const int fdes, const int id)
 
 
 
-/*----------------------------------------------------------------------------
-    Get file table entry (by identification tag) ...
-----------------------------------------------------------------------------*/
+/*----------------------------------------------*/
+/* Get file table entry (by identification tag) */
+/*----------------------------------------------*/
 
-_PUBLIC int pups_get_ftab_index_by_id(const int id)
+_PUBLIC int32_t pups_get_ftab_index_by_id(const int32_t id)
 
-{   int i;
+{   uint32_t i;
 
     if(id < 0)
     {  pups_set_errno(EINVAL);
@@ -1395,7 +1493,7 @@ _PUBLIC int pups_get_ftab_index_by_id(const int id)
           #endif /* PTHREAD_SUPPORT */
 
           pups_set_errno(OK);
-          return(i);
+          return((int32_t)i);
        }
     }
 
@@ -1411,13 +1509,13 @@ _PUBLIC int pups_get_ftab_index_by_id(const int id)
 
 
 
-/*----------------------------------------------------------------------------
-    Get file table entry (by filename) ...
-----------------------------------------------------------------------------*/
+/*------------------------------------*/
+/* Get file table entry (by filename) */
+/*------------------------------------*/
 
-_PUBLIC int pups_get_ftab_index_by_name(const char *name)
+_PUBLIC int32_t pups_get_ftab_index_by_name(const char *name)
 
-{   int i;
+{   uint32_t i;
 
     if(name == (const char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -1437,7 +1535,7 @@ _PUBLIC int pups_get_ftab_index_by_name(const char *name)
           #endif /* PTHREAD_SUPPORT */
 
           pups_set_errno(OK);
-          return(i);
+          return((int32_t)i);
        }
     }
 
@@ -1453,12 +1551,11 @@ _PUBLIC int pups_get_ftab_index_by_name(const char *name)
 
 
 
+/*-----------------------*/
+/* Clear file table slot */
+/*-----------------------*/
 
-/*----------------------------------------------------------------------------
-    Clear file table slot ...
-----------------------------------------------------------------------------*/
-
-_PUBLIC int pups_clear_ftab_slot(const _BOOLEAN destroy, const int f_index)
+_PUBLIC int32_t pups_clear_ftab_slot(const _BOOLEAN destroy, const int32_t f_index)
 
 {   if(f_index < 0 || f_index >= appl_max_files)
     {  pups_set_errno(EINVAL);
@@ -1475,7 +1572,6 @@ _PUBLIC int pups_clear_ftab_slot(const _BOOLEAN destroy, const int f_index)
     ftab[f_index].mode              = (-1);
     ftab[f_index].stream            = (FILE *)NULL;
     ftab[f_index].psrp              = FALSE;
-    ftab[f_index].creator           = FALSE;
     ftab[f_index].homeostatic       = 0;
     ftab[f_index].handler           = (void *)NULL;
     ftab[f_index].homeostat         = (void *)NULL;
@@ -1486,20 +1582,22 @@ _PUBLIC int pups_clear_ftab_slot(const _BOOLEAN destroy, const int f_index)
     ftab[f_index].locked            = FALSE;
 
     #ifdef ZLIB_SUPPORT
-    ftab[f_index].zstream           = (gzFILE *)NULL;
+    ftab[f_index].zstream           = (gzFile)NULL;
     #endif /* ZLIB_SUPPORT */
 
     if(destroy == TRUE)
-    {  ftab[f_index].fname       = (char *)pups_free((void *)ftab[f_index].fname);
-       ftab[f_index].hname       = (char *)pups_free((void *)ftab[f_index].hname);
-       ftab[f_index].fshadow     = (char *)pups_free((void *)ftab[f_index].fshadow);
+    {  (void)strlcpy(ftab[f_index].fname,  "",SSIZE); 
+       (void)strlcpy(ftab[f_index].hname,  "",SSIZE);
+       (void)strlcpy(ftab[f_index].fshadow,"",SSIZE);
 
        #ifdef SSH_SUPPORT
-       ftab[f_index].rd_host     = (char *)pups_free((void *)ftab[f_index].rd_host);
-       ftab[f_index].rd_ssh_port = (char *)pups_free((void *)ftab[f_index].rd_ssh_port);
+       (void)strlcpy(ftab[f_index].rd_host,    "",SSIZE); 
+       (void)strlcpy(ftab[f_index].rd_ssh_port,"",SSIZE);
        #endif /* SSH_SUPPORT */
 
-       ftab[f_index].fs_name     = (char *)pups_free((void *)ftab[f_index].fs_name);
+       (void)strlcpy( ftab[f_index].fs_name,"",SSIZE);
+
+       ftab[f_index].creator           = FALSE;
     }
 
     #ifdef PTHREAD_SUPPORT
@@ -1512,13 +1610,13 @@ _PUBLIC int pups_clear_ftab_slot(const _BOOLEAN destroy, const int f_index)
 
 
 
-/*----------------------------------------------------------------------------
-    Initialise the PUPS extended file descriptor table ...
-----------------------------------------------------------------------------*/
+/*----------------------------------------------------*/
+/* Initialise the PUPS extended file descriptor table */
+/*----------------------------------------------------*/
 
-_PRIVATE void initftab(int max_files, int stdio_homeostasis)
+_PRIVATE void initftab(int max_files, int32_t stdio_homeostasis)
 
-{   int         i;
+{   uint32_t    i;
     struct stat buf;
 
     if((ftab = (ftab_type *)pups_calloc(max_files,sizeof(ftab_type))) == (ftab_type *)NULL)
@@ -1527,21 +1625,25 @@ _PRIVATE void initftab(int max_files, int stdio_homeostasis)
     }
 
     (void)fstat(0,&buf);
-    ftab[0].st_mode     = (int)buf.st_mode;
+    ftab[0].st_mode     = (int32_t)buf.st_mode;
     ftab[0].stream      = stdin;
     ftab[0].mode        = 0;
 
     (void)fstat(1,&buf);
-    ftab[1].st_mode     = (int)buf.st_mode;
+    ftab[1].st_mode     = (int32_t)buf.st_mode;
     ftab[1].stream      = stdout;
     ftab[1].mode        = 1;
 
     (void)fstat(2,&buf);
-    ftab[2].st_mode     = (int)buf.st_mode;
+    ftab[2].st_mode     = (int32_t)buf.st_mode;
     ftab[2].stream      = stderr;
     ftab[2].mode        = 2;
 
-    ftab[0].fname = (char *)pups_malloc(SSIZE);
+
+    /*------------------*/
+    /* Initialise stdio */
+    /*------------------*/
+
     if(isatty(0) == 1)
     {  ftab[0].named = TRUE;
        (void)snprintf(ftab[0].fname,SSIZE,"%s/pups.%s.%s.stdin.pst.%d:%d", appl_fifo_dir,appl_name,appl_host,getpid(),getuid());
@@ -1551,7 +1653,6 @@ _PRIVATE void initftab(int max_files, int stdio_homeostasis)
        (void)snprintf(ftab[0].fname,SSIZE,"<redirected.0>");
     }
 
-    ftab[1].fname = (char *)pups_malloc(SSIZE);
     if(isatty(1) == 1)
     {  ftab[1].named = TRUE;
        (void)snprintf(ftab[1].fname,SSIZE,"%s/pups.%s.%s.stdout.pst.%d:%d",appl_fifo_dir,appl_name,appl_host,getpid(),getuid());
@@ -1561,7 +1662,6 @@ _PRIVATE void initftab(int max_files, int stdio_homeostasis)
        (void)snprintf(ftab[1].fname,SSIZE,"<redirected.1>");
     }
 
-    ftab[2].fname = (char *)pups_malloc(SSIZE);
     if(isatty(2) == 1)
     {  ftab[2].named = TRUE;
        (void)snprintf(ftab[2].fname,SSIZE,"%s/pups.%s.%s.stderr.pst.%d:%d",appl_fifo_dir,appl_name,appl_host,getpid(),getuid());
@@ -1575,7 +1675,7 @@ _PRIVATE void initftab(int max_files, int stdio_homeostasis)
     {  char stdio_homeostat_name[SSIZE];
 
        #ifdef ZLIB_SUPPORT
-       ftab[i].zstream           = (gzFILE *)NULL;
+       ftab[i].zstream           = (gzFile)NULL;
        #endif /* ZLIB_SUPPORT */
 
        ftab[i].psrp              = FALSE;
@@ -1591,24 +1691,15 @@ _PRIVATE void initftab(int max_files, int stdio_homeostasis)
        ftab[i].rd_pid            = (-1);
        ftab[i].fifo_pid          = (-1);
 
-       ftab[i].fs_name = (char *)pups_malloc(SSIZE); 
        (void)strlcpy(ftab[i].fs_name,".",SSIZE);
-
-       ftab[i].fshadow = (char *)pups_malloc(SSIZE); 
        (void)strlcpy(ftab[i].fshadow,"none",SSIZE);
 
-
        #ifdef SSH_SUPPORT
-       ftab[i].rd_host = (char *)pups_malloc(SSIZE); 
        (void)strlcpy(ftab[i].rd_host,"none",SSIZE);
-
-       ftab[i].rd_ssh_port = (char *)pups_malloc(SSIZE); 
        (void)strlcpy(ftab[i].rd_ssh_port,ssh_remote_port,SSIZE);
        #endif /* SSH_SUPPORT */
 
-       ftab[i].hname   = (char *)pups_malloc(SSIZE); 
        (void)strlcpy(ftab[i].hname,"none",SSIZE);
-
        if(isatty(i) == 1)
           (void)symlink("/dev/tty",ftab[i].fname);
 
@@ -1630,6 +1721,11 @@ _PRIVATE void initftab(int max_files, int stdio_homeostasis)
        }
     }
 
+
+    /*-------------------------------*/
+    /* Initialise rest of file table */
+    /*-------------------------------*/
+
     for(i=3; i<appl_max_files; ++i)
        pups_clear_ftab_slot(FALSE,i);
 }
@@ -1638,13 +1734,13 @@ _PRIVATE void initftab(int max_files, int stdio_homeostasis)
 
 
 
-/*----------------------------------------------------------------------------
-    Get the number of time a given filesystem resource has been lost ...
-----------------------------------------------------------------------------*/
+/*------------------------------------------------------------------*/
+/* Get the number of time a given filesystem resource has been lost */
+/*------------------------------------------------------------------*/
 
-_PUBLIC int pups_lost(const int fdes)
+_PUBLIC int32_t pups_lost(const des_t fdes)
 
-{   int i;
+{   uint32_t i;
 
     #ifdef PTHREAD_SUPPORT
     (void)pthread_mutex_lock(&ftab_mutex);
@@ -1659,7 +1755,7 @@ _PUBLIC int pups_lost(const int fdes)
           #endif /* PTHREAD_SUPPORT */
 
           pups_set_errno(OK); 
-          return(ftab[i].lost_cnt);
+          return((int32_t)ftab[i].lost_cnt);
        }
     }
 
@@ -1673,13 +1769,13 @@ _PUBLIC int pups_lost(const int fdes)
 
 
 
-/*----------------------------------------------------------------------------
-    Test if file descriptor is living ...
-----------------------------------------------------------------------------*/
+/*-----------------------------------*/
+/* Test if file descriptor is living */
+/*-----------------------------------*/
 
-_PUBLIC _BOOLEAN pups_fd_islive(const int fdes)
+_PUBLIC _BOOLEAN pups_fd_islive(const des_t fdes)
 
-{   int i;
+{   uint32_t i;
 
     pups_set_errno(OK);
     for(i=0; i<appl_max_files; ++i)
@@ -1719,15 +1815,16 @@ _PUBLIC _BOOLEAN pups_fd_islive(const int fdes)
 
 
 
-/*----------------------------------------------------------------------------
-    Make a file descriptor living ...
-----------------------------------------------------------------------------*/
+/*-------------------------------*/
+/* Make a file descriptor living */
+/*-------------------------------*/
 
-_PUBLIC int pups_fd_alive(const int fdes, const char *handler_name, const void *handler)
+_PUBLIC int32_t pups_fd_alive(const des_t fdes, const char *handler_name, const void *handler)
 
-{   int  i;
-    char handler_args[SSIZE] = "",
-         cntl_chars[]        = {'\1', '\2', '\3', '\4', '\5', '\6'};
+{   uint32_t i;
+
+    char     handler_args[SSIZE] = "",
+             cntl_chars[]        = {'\1', '\2', '\3', '\4', '\5', '\6'};
 
     if(handler_name == (const char *)NULL || handler == (const void *)NULL)
     {  pups_set_errno(EINVAL);
@@ -1739,10 +1836,10 @@ _PUBLIC int pups_fd_alive(const int fdes, const char *handler_name, const void *
     #endif /* PTHREAD_SUPPORT */
 
     for(i=0; i<appl_max_files; ++i)
-    {  int ret;
+    {   int32_t ret;
 
        if(ftab[i].fdes == fdes)
-       {  int t_index;
+       {   int32_t t_index;
  
           if(ftab[i].creator == FALSE)
           {  
@@ -1758,9 +1855,9 @@ _PUBLIC int pups_fd_alive(const int fdes, const char *handler_name, const void *
           if(ftab[i].psrp == TRUE)
           {  
 
-            #ifdef PTHREAD_SUPPORT
-            (void)pthread_mutex_unlock(&ftab_mutex);
-            #endif /* PTHREAD_SUPPORT */
+             #ifdef PTHREAD_SUPPORT
+             (void)pthread_mutex_unlock(&ftab_mutex);
+             #endif /* PTHREAD_SUPPORT */
 
              pups_set_errno(EACCES);
              return(-1);
@@ -1774,7 +1871,7 @@ _PUBLIC int pups_fd_alive(const int fdes, const char *handler_name, const void *
           /*------------------------------------------*/
 
           if(ftab[i].homeostatic > 0)
-          {  int ret;
+          {  int32_t ret;
 
              ++ftab[i].homeostatic;
              ret = ftab[i].homeostatic - 1;
@@ -1812,12 +1909,11 @@ _PUBLIC int pups_fd_alive(const int fdes, const char *handler_name, const void *
           /*------------------------------------------------*/
 
           else
-          {  int  j,
-                  cnt,
-                  index,
-                  c_index;
+          {  uint32_t j,
+                      cnt,
+                      c_index;
 
-             char cntl_str[SSIZE] = ""; 
+             char     cntl_str[SSIZE] = ""; 
 
 
              /*--------------------------------------------------*/
@@ -1852,7 +1948,7 @@ _PUBLIC int pups_fd_alive(const int fdes, const char *handler_name, const void *
                 /*--------------------------------------------------*/
 
                 for(j=1; j<8; ++j)
-                {  c_index = (int)(drand48()*6.0);
+                {  c_index = (int32_t)(drand48()*6.0);
                    (void)snprintf(cntl_str,SSIZE,"%c",cntl_chars[c_index]);
                    (void)strlcat(fshadow_name,cntl_str,SSIZE);
                 }
@@ -1964,15 +2060,17 @@ _PUBLIC int pups_fd_alive(const int fdes, const char *handler_name, const void *
 
 
 
-/*----------------------------------------------------------------------------
-    Make the current application the creator of the object associated with
-    file descriptor (which means it will have the responsibility of
-    destroying it in a multiprocess environment)  ...
-----------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------------------*/
+/* Make the current application the creator of the object associated with      */
+/* file descriptor (which means it will have the responsibility of             */
+/* destroying it in a multiprocess environment)                                */
+/*                                                                             */
+/* To quote J. Robert Oppenhiemer "I am become death, the destroyer of worlds" */
+/*-----------------------------------------------------------------------------*/
 
-_PUBLIC int pups_creator(const int fdes)
+_PUBLIC int32_t pups_creator(const des_t fdes)
 
-{   int i;
+{   uint32_t i;
 
 
     #ifdef PTHREAD_SUPPORT
@@ -1982,7 +2080,6 @@ _PUBLIC int pups_creator(const int fdes)
     for(i=0; i<appl_max_files; ++i)
     {  if(ftab[i].fdes == fdes)
        {
-
           #ifdef PTHREAD_SUPPORT
           (void)pthread_mutex_unlock(&ftab_mutex);
           #endif /* PTHREAD_SUPPORT */
@@ -1990,7 +2087,7 @@ _PUBLIC int pups_creator(const int fdes)
           if(appl_verbose == TRUE)
           {  (void)strdate(date);
              (void)fprintf(stderr,"%s %s (%d@%s:%s): %s has acquired creator privileges for \"%s\"\n",
-                           date,appl_name,appl_pid,appl_host,appl_owner,appl_name,ftab[i].fname);
+                                 date,appl_name,appl_pid,appl_host,appl_owner,appl_name,ftab[i].fname);
              (void)fflush(stderr);
           }
 
@@ -2001,7 +2098,6 @@ _PUBLIC int pups_creator(const int fdes)
        #ifdef PTHREAD_SUPPORT
        (void)pthread_mutex_unlock(&ftab_mutex);
        #endif /* PTHREAD_SUPPORT */
-
     }
 
     pups_set_errno(ESRCH);
@@ -2011,14 +2107,14 @@ _PUBLIC int pups_creator(const int fdes)
 
 
 
-/*----------------------------------------------------------------------------
-    Relieve this application of the onerous burden of being the creator of
-    the object referenced by fdes ...
-----------------------------------------------------------------------------*/
+/*----------------------------------------------------------------------------------*/
+/* Relieve this application of the onerous burden of being the creator/destroyer of */
+/* the object referenced by fdes                                                    */
+/*----------------------------------------------------------------------------------*/
 
-_PUBLIC int pups_not_creator(const int fdes)
+_PUBLIC int32_t pups_not_creator(const des_t fdes)
 
-{   int i;
+{   uint32_t i;
 
     if(fdes < 0)
     {  pups_set_errno(EBADF);
@@ -2060,24 +2156,24 @@ _PUBLIC int pups_not_creator(const int fdes)
 
 
 
-/*----------------------------------------------------------------------------
-    Test to see if file is live ...
-----------------------------------------------------------------------------*/
+/*-----------------------------*/
+/* Test to see if file is live */
+/*-----------------------------*/
 
 _PUBLIC _BOOLEAN pups_isalive(const char *name)
 
-{  int i;
+{   uint32_t i;
 
-   pups_set_errno(OK);
+    pups_set_errno(OK);
 
-   if(name == (const char *)NULL)
-   {  pups_set_errno(EINVAL);
-      return(-1);
-   }
+    if(name == (const char *)NULL)
+    {  pups_set_errno(EINVAL);
+       return(-1);
+    }
 
-   #ifdef PTHREAD_SUPPORT
-   (void)pthread_mutex_lock(&ftab_mutex);
-   #endif /* PTHREAD_SUPPORT */
+    #ifdef PTHREAD_SUPPORT
+    (void)pthread_mutex_lock(&ftab_mutex);
+    #endif /* PTHREAD_SUPPORT */
 
     for(i=0; i<appl_max_files; ++i)
     {  if(ftab[i].fname              != (char *)NULL    &&
@@ -2102,13 +2198,13 @@ _PUBLIC _BOOLEAN pups_isalive(const char *name)
 
 
 
-/*----------------------------------------------------------------------------
-    Protect an unopened file ...
-----------------------------------------------------------------------------*/
+/*--------------------------*/
+/* Protect an unopened file */
+/*--------------------------*/
 
-_PUBLIC int pups_protect(const char *name, const char *handler_name, const void *handler)
+_PUBLIC int32_t pups_protect(const char *name, const char *handler_name, const void *handler)
 
-{    int fdes = (-1);
+{    des_t fdes = (-1);
 
      if(name == (const char *)NULL || handler_name == (const char *)NULL || handler == (const void *)NULL)
      {  pups_set_errno(EINVAL);
@@ -2134,23 +2230,22 @@ _PUBLIC int pups_protect(const char *name, const char *handler_name, const void 
 
 
 
-/*-----------------------------------------------------------------------------
-    Unprotect a file (which is currently homeostatically protected by the
-    calling application) ...
------------------------------------------------------------------------------*/
+/*-------------------------------*/
+/* Stop protecting unopened file */
+/*-------------------------------*/
 
-_PUBLIC int pups_unprotect(const char *name)
+_PUBLIC int32_t pups_unprotect(const char *name)
 
-{  int i;
+{   uint32_t i;
 
-   if(name == (const char *)NULL)
-   {  pups_set_errno(EINVAL);
-      return(-1);
-   }
+    if(name == (const char *)NULL)
+    {  pups_set_errno(EINVAL);
+       return(-1);
+    }
 
-   #ifdef PTHREAD_SUPPORT
-   (void)pthread_mutex_lock(&ftab_mutex);
-   #endif /* PTHREAD_SUPPORT */
+    #ifdef PTHREAD_SUPPORT
+    (void)pthread_mutex_lock(&ftab_mutex);
+    #endif /* PTHREAD_SUPPORT */
 
 
     for(i=0; i<appl_max_files; ++i)
@@ -2231,33 +2326,32 @@ _PUBLIC int pups_unprotect(const char *name)
           pups_set_errno(OK);
           return(0);
        }
-   }
+    }
 
-   #ifdef PTHREAD_SUPPORT
-   (void)pthread_mutex_unlock(&ftab_mutex);
-   #endif /* PTHREAD_SUPPORT */
+    #ifdef PTHREAD_SUPPORT
+    (void)pthread_mutex_unlock(&ftab_mutex);
+    #endif /* PTHREAD_SUPPORT */
 
-   pups_set_errno(ESRCH);
-   return(-1);
+    pups_set_errno(ESRCH);
+    return(-1);
 }
 
 
 
 
-/*----------------------------------------------------------------------------
-    Make a living descriptor inanimate (and remove hoemeostatic protection
-    of underlying inode-object) ...
-----------------------------------------------------------------------------*/
+/*------------------------------------------------------------------------*/
+/* Make a living descriptor inanimate (and remove hoemeostatic protection */
+/* of underlying inode-object)                                            */
+/*------------------------------------------------------------------------*/
 
-_PUBLIC int pups_fd_dead(const int fdes)
+_PUBLIC int32_t pups_fd_dead(const des_t fdes)
 
-{  int  i; 
-   char fname[SSIZE] = "";
+{   uint32_t i; 
+    char     fname[SSIZE] = "";
 
     #ifdef PTHREAD_SUPPORT
     (void)pthread_mutex_lock(&ftab_mutex);
     #endif /* PTHREAD_SUPPORT */
-
 
     for(i=0; i<appl_max_files; ++i) 
     {  if(ftab[i].fdes == fdes)
@@ -2351,14 +2445,14 @@ _PUBLIC int pups_fd_dead(const int fdes)
 
 
 
-/*----------------------------------------------------------------------------
-    Check the file table closing all open files and releasing their
-    resources ...
-----------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------*/
+/* Check the file table closing all open files and releasing their */
+/* resources                                                       */
+/*-----------------------------------------------------------------*/
 
 _PUBLIC void pups_closeall(void)
 
-{   int i;
+{   uint32_t i;
 
     #ifdef PTHREAD_SUPPORT
     (void)pthread_mutex_lock(&ftab_mutex);
@@ -2404,13 +2498,14 @@ _PUBLIC void pups_closeall(void)
 
 
 
-/*----------------------------------------------------------------------------
-    Get ftab index (from file descriptor) ...
-----------------------------------------------------------------------------*/
 
-_PUBLIC int pups_get_ftab_index_from_fd(unsigned const int fdes)
+/*---------------------------------------*/
+/* Get ftab index (from file descriptor) */
+/*---------------------------------------*/
 
-{   int i;
+_PUBLIC int32_t pups_get_ftab_index_from_fd(const des_t fdes)
+
+{   uint32_t i;
 
     #ifdef PTHREAD_SUPPORT
     (void)pthread_mutex_lock(&ftab_mutex);
@@ -2425,7 +2520,7 @@ _PUBLIC int pups_get_ftab_index_from_fd(unsigned const int fdes)
             #endif /* PTHREAD_SUPPORT */
 
             pups_set_errno(OK);
-            return(i);
+            return((int32_t)i);
         }
     }
 
@@ -2440,13 +2535,13 @@ _PUBLIC int pups_get_ftab_index_from_fd(unsigned const int fdes)
 
 
 
-/*----------------------------------------------------------------------------
-    Get ftab index (from stream pointer) ...
-----------------------------------------------------------------------------*/
+/*--------------------------------------*/
+/* Get ftab index (from stream pointer) */
+/*--------------------------------------*/
 
-_PUBLIC int pups_get_ftab_index_from_stream(const FILE *stream)
+_PUBLIC int32_t pups_get_ftab_index_from_stream(const FILE *stream)
 
-{   int i;
+{   uint32_t i;
 
     if(stream == (const FILE *)NULL)
     {  pups_set_errno(EINVAL);
@@ -2466,7 +2561,7 @@ _PUBLIC int pups_get_ftab_index_from_stream(const FILE *stream)
             #endif /* PTHREAD_SUPPORT */
 
             pups_set_errno(OK);
-            return(i);
+            return((int32_t)i);
         }
     }
 
@@ -2482,25 +2577,22 @@ _PUBLIC int pups_get_ftab_index_from_stream(const FILE *stream)
 
 
 #ifdef ZLIB_SUPPORT
+/*--------------------------------------------------*/
+/* Open file associated with compressed data stream */
+/*--------------------------------------------------*/
 
-/*----------------------------------------------------------------------------
-    Open file associated with compressed data stream ...
-----------------------------------------------------------------------------*/
+_PUBLIC gzFile pups_gzopen(const char *f_name, const char *mode, const int32_t h_state)
 
+{    int32_t i_mode,
+             z_index,
+             zdes  = (-1);
 
-_PUBLIC gzFILE *pups_gzopen(const char *f_name, const char *mode, const int h_state)
-
-{   int i_mode,
-        z_index,
-        zdes  = (-1);
-
-    gzFILE *zstream = (gzFILE *)NULL;
-
+    gzFile zstream = (gzFile)NULL;
 
     if(f_name == (char *)NULL  ||
        mode   == (char *)NULL   )
     {  pups_set_errno(EINVAL);
-       return((gzFILE *)NULL);
+       return((gzFile)NULL);
     }
 
 
@@ -2519,7 +2611,7 @@ _PUBLIC gzFILE *pups_gzopen(const char *f_name, const char *mode, const int h_st
              i_mode = 2;
           else
           {  pups_set_errno(EINVAL);
-             return((gzFILE *)NULL);
+             return((gzFile)NULL);
           }
        }
     }
@@ -2530,15 +2622,15 @@ _PUBLIC gzFILE *pups_gzopen(const char *f_name, const char *mode, const int h_st
     /*---------------------------------*/
 
     if((zdes = pups_open(f_name,i_mode,h_state)) == (-1))
-       return((gzFILE *)NULL);
+       return((gzFile)NULL);
 
 
     /*----------------------------------------*/
     /* Associate zstream with this descriptor */
     /*----------------------------------------*/
 
-    if((zstream = gzdopen(zdes,mode)) == (gzFILE *)NULL)
-       return((gzFILE *)NULL);
+    if((zstream = gzdopen(zdes,mode)) == (gzFile)NULL)
+       return((gzFile)NULL);
 
     z_index               = pups_get_ftab_index(zdes); 
     ftab[z_index].zstream = zstream;
@@ -2550,15 +2642,15 @@ _PUBLIC gzFILE *pups_gzopen(const char *f_name, const char *mode, const int h_st
 
 
 
-/*----------------------------------------------------------------------------
-    Get ftab index (from zstream pointer) ...
-----------------------------------------------------------------------------*/
+/*---------------------------------------*/
+/* Get ftab index (from zstream pointer) */
+/*---------------------------------------*/
 
-_PUBLIC int pups_get_ftab_index_from_zstream(const gzFILE *zstream)
+_PUBLIC int32_t pups_get_ftab_index_from_zstream(const gzFile zstream)
 
-{   int i;
+{   uint32_t i;
 
-    if(zstream == (const gzFILE *)NULL)
+    if(zstream == (const gzFile)NULL)
     {  pups_set_errno(EINVAL);
        return(-1);
     }
@@ -2576,13 +2668,13 @@ _PUBLIC int pups_get_ftab_index_from_zstream(const gzFILE *zstream)
          #endif /* PTHREAD_SUPPORT */
 
           pups_set_errno(OK);
-          return(i);
+          return((int32_t)i);
        }
     }
 
-   #ifdef PTHREAD_SUPPORT
-   (void)pthread_mutex_unlock(&ftab_mutex);
-   #endif /* PTHREAD_SUPPORT */
+    #ifdef PTHREAD_SUPPORT
+    (void)pthread_mutex_unlock(&ftab_mutex);
+    #endif /* PTHREAD_SUPPORT */
 
     pups_set_errno(ESRCH);
     return(-1);
@@ -2591,39 +2683,38 @@ _PUBLIC int pups_get_ftab_index_from_zstream(const gzFILE *zstream)
 
 
 
-/*----------------------------------------------------------------------------
-    Close a file associated with a compressed data stream ...
-----------------------------------------------------------------------------*/
+/*-------------------------------------------------------*/
+/* Close a file associated with a compressed data stream */
+/*-------------------------------------------------------*/
 
-_PUBLIC gzFILE *pups_gzclose(const gzFILE *zstream)
+_PUBLIC gzFile pups_gzclose(const gzFile zstream)
 
-{   int z_index;
+{    int32_t z_index;
 
-    if(zstream == (gzFILE *)NULL)
+    if(zstream == (gzFile *)NULL)
     {  pups_set_errno(EINVAL);
-       return((gzFILE *)NULL);
+       return((gzFile)NULL);
     }
  
     if((z_index = pups_get_ftab_index_from_zstream(zstream)) == (-1))
     {  pups_set_errno(EBADF);
-       return((gzFILE *)NULL);
+       return((gzFile)NULL);
     }
 
     (void)gzclose(zstream);
     (void)pups_close(ftab[z_index].fdes);
 
     pups_set_errno(OK);
-    return((gzFILE *)NULL);
+    return((gzFile)NULL);
 }
-
 #endif /* ZLIB_SUPPORT */
 
 
 
 
-/*-----------------------------------------------------------------------------
-    Check to see if file is hidden ...
------------------------------------------------------------------------------*/
+/*--------------------------------*/
+/* Check to see if file is hidden */
+/*--------------------------------*/
 
 _PRIVATE _BOOLEAN pups_hidden_leaf(const char *fname)
 
@@ -2639,30 +2730,29 @@ _PRIVATE _BOOLEAN pups_hidden_leaf(const char *fname)
 
 
 
-/*----------------------------------------------------------------------------
-    Check for the existence of a file - if it exists, open it, otherwise
-    print error code and abort ...
-----------------------------------------------------------------------------*/
-
-
+/*----------------------------------------------------------------------*/
+/* Check for the existence of a file - if it exists, open it, otherwise */
+/* print error code and abort                                           */
+/*----------------------------------------------------------------------*/
 /*--------------------------------------------*/
 /* Forward declaration of ch_index() function */
 /*--------------------------------------------*/
 
-_PUBLIC long int ch_index(const char *, const char);
+_PUBLIC ssize_t ch_index(const char *, const char);
 
 
 /*----------------------------------------------*/
 /* Forward declaration of the strinp() function */
 /*----------------------------------------------*/
 
-_PUBLIC _BOOLEAN strinp(unsigned long int *, const char *, const char *);
+_PUBLIC _BOOLEAN strinp(size_t *, const char *, const char *);
 
-_PUBLIC FILE *pups_fopen(char *f_name, char *mode, int h_state)
 
-{   FILE   *stream = (FILE *)NULL;
-    int    pos;
-    struct statfs  buf;
+_PUBLIC FILE *pups_fopen(const char *f_name, const char *mode, int32_t h_state)
+
+{   FILE          *stream = (FILE *)NULL;
+    int32_t       pos;
+    struct statfs buf;
 
 
     /*-------------------------*/     
@@ -2683,9 +2773,9 @@ _PUBLIC FILE *pups_fopen(char *f_name, char *mode, int h_state)
     }
 
 
-    /*------------------------------*/
-    /* Hidden files are not allowed */
-    /*------------------------------*/
+    /*-------------------------------*/
+    /* Hidden leaves are not allowed */
+    /*-------------------------------*/
 
     if(pups_hidden_leaf(f_name) == TRUE)
     {  (void)pupsrelse(ALL_PUPS_SIGS);
@@ -2703,7 +2793,7 @@ _PUBLIC FILE *pups_fopen(char *f_name, char *mode, int h_state)
     /* Try to open a local pipe stream */
     /*---------------------------------*/
 
-    if(strinp((unsigned long int *)&pos,f_name,"|") == TRUE)
+    if(strinp((size_t *)&pos,f_name,"|") == TRUE)
     {  if((stream = pups_fcopen(&f_name[pos+1],shell,mode)) == (FILE *)NULL)
        {  (void)pupsrelse(ALL_PUPS_SIGS);
           return((FILE *)NULL);
@@ -2714,16 +2804,16 @@ _PUBLIC FILE *pups_fopen(char *f_name, char *mode, int h_state)
           return(stream);
        }
     }
-    else
+
 
     /*---------------------------*/
     /* Process as a regular file */
     /*---------------------------*/
 
-    {  int i,
-           f_index,
-           st_mode,
-           cnt = 0;
+    else
+    {  int32_t f_index,
+               st_mode,
+               cnt = 0;
 
        struct   stat buf;
        _BOOLEAN fix_perms = FALSE;
@@ -2872,7 +2962,6 @@ _PUBLIC FILE *pups_fopen(char *f_name, char *mode, int h_state)
        #ifdef PTHREAD_SUPPORT
        (void)pthread_mutex_unlock(&ftab_mutex);
        #endif /* PTHREAD_SUPPORT */
-
     }
 
 
@@ -2890,15 +2979,15 @@ _PUBLIC FILE *pups_fopen(char *f_name, char *mode, int h_state)
 
 
 
-/*-----------------------------------------------------------------------------
-    Extended fdopen command -- adds stream information to PUPS filetable if
-    the passed descriptor is associated with PUPS filetable ...
------------------------------------------------------------------------------*/
+/*-------------------------------------------------------------------------*/
+/* Extended fdopen command -- adds stream information to PUPS filetable if */
+/* the passed descriptor is associated with PUPS filetable                 */
+/*-------------------------------------------------------------------------*/
 
-_PUBLIC FILE *pups_fdopen(const int fdes, const char *mode)
+_PUBLIC FILE *pups_fdopen(const des_t fdes, const char *mode)
 
-{   int  f_index;
-    FILE *ret = (FILE *)NULL;
+{   int32_t f_index;
+    FILE    *ret = (FILE *)NULL;
 
     if(mode == (const char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -2956,15 +3045,15 @@ _PUBLIC FILE *pups_fdopen(const int fdes, const char *mode)
 
 
 
-/*-----------------------------------------------------------------------------
-    Check for the existence of a file - if it exists, open it, otherwise
-    print error code and abort ...
------------------------------------------------------------------------------*/
+/*----------------------------------------------------------------------*/
+/* Check for the existence of a file - if it exists, open it, otherwise */
+/* print error code and abort                                           */
+/*----------------------------------------------------------------------*/
 
-_PUBLIC int pups_open(const char *f_name, const int mode, int h_state)
+_PUBLIC int32_t pups_open(const char *f_name, const int32_t mode, int32_t h_state)
 
-{   int pos,
-        fdes    = (-1);
+{    int32_t pos;
+     des_t   fdes  = (-1);
 
     struct statfs  buf;
 
@@ -2994,7 +3083,7 @@ _PUBLIC int pups_open(const char *f_name, const int mode, int h_state)
     if(pups_hidden_leaf(f_name) == TRUE)
     {  (void)pupsrelse(ALL_PUPS_SIGS);
        pups_set_errno(EINVAL);
-       return((FILE *)NULL);
+       return(-1);
     }
 
 
@@ -3012,7 +3101,7 @@ _PUBLIC int pups_open(const char *f_name, const int mode, int h_state)
     /* Try to open a local pipe stream */
     /*---------------------------------*/
 
-    if(strinp((unsigned long int *)&pos,f_name,"|") == TRUE)
+    if(strinp((size_t *)&pos,f_name,"|") == TRUE)
     {  if((fdes = pups_copen(&f_name[pos+1],shell,mode)) == (-1))
        {  (void)pupsrelse(ALL_PUPS_SIGS);
           pups_set_errno(EEXIST);
@@ -3030,13 +3119,12 @@ _PUBLIC int pups_open(const char *f_name, const int mode, int h_state)
     /*----------------------------*/
 
     else
-    {  int i,
-           st_mode,
-           f_index;
+    {  int32_t st_mode,
+               f_index;
 
-       struct stat buf;
-       char   f_lock_name[SSIZE] = "";
-       _BOOLEAN fix_perms        = FALSE;
+       struct   stat buf;
+       char     f_lock_name[SSIZE] = "";
+       _BOOLEAN fix_perms          = FALSE;
 
 
        /*----------------------------------------------------------*/
@@ -3101,7 +3189,7 @@ _PUBLIC int pups_open(const char *f_name, const int mode, int h_state)
        /*----------------------------------------------------------*/
 
        (void)stat(f_name,&buf);
-       st_mode = (int)buf.st_mode;
+       st_mode = (int32_t)buf.st_mode;
 
        if(fdes == (-1))
        {
@@ -3121,8 +3209,9 @@ _PUBLIC int pups_open(const char *f_name, const int mode, int h_state)
 
              if(chmod(f_name,st_mode) == (-1))
              {   if(appl_verbose == TRUE)
-                 {  (void)fprintf(err_stream,"ERROR pusp_open: problem with permissions for file \"%s\" [%s:%d]\n",
-                                                                                         f_name,appl_name,appl_pid);
+                 {  (void)fprintf(err_stream,"%sERROR%s pusp_open: problem with permissions for file \"%s\" [%s:%d]\n",
+                                                                                                        boldOn,boldOff,
+                                                                                             f_name,appl_name,appl_pid);
                     (void)fflush(err_stream);
                  }
 
@@ -3146,8 +3235,9 @@ _PUBLIC int pups_open(const char *f_name, const int mode, int h_state)
           }
           else
           {  if(appl_verbose == TRUE)
-             {  (void)fprintf(err_stream,errstr,"ERROR pups_open: problem with permissions for file \"%s\" [%s:%d]\n",
-                                                                                            f_name,appl_name,appl_pid);
+             {  (void)fprintf(err_stream,errstr,"%sERROR%s pups_open: problem with permissions for file \"%s\" [%s:%d]\n",
+                                                                                                           boldOn,boldOff,
+                                                                                                f_name,appl_name,appl_pid);
                 (void)fflush(err_stream);
              }
 
@@ -3207,15 +3297,15 @@ _PUBLIC int pups_open(const char *f_name, const int mode, int h_state)
 
 
 
-/*-----------------------------------------------------------------------------
-    Close (extended mode) file descriptor ...
------------------------------------------------------------------------------*/
+/*---------------------------------------*/
+/* Close (extended mode) file descriptor */
+/*---------------------------------------*/
 
-_PUBLIC int pups_close(const int fdes)
+_PUBLIC int32_t pups_close(const des_t fdes)
 
-{   int i,
-        ret,
-        my_errno;
+{    int32_t i,
+             ret,
+             my_errno;
 
 
     /*-------------------------*/
@@ -3234,7 +3324,7 @@ _PUBLIC int pups_close(const int fdes)
     {  if(ftab[i].fdes == fdes)
        {  char f_lock_name[SSIZE] = "";
 
-          if(ftab[i].homeostatic > 0 && ftab[i].psrp == FALSE)
+          if(ftab[i].homeostatic > 0 && ftab[i].psrp == TRUE)
              (void)pups_fd_dead(ftab[i].fdes);
 
 
@@ -3258,7 +3348,7 @@ _PUBLIC int pups_close(const int fdes)
           /*------------------------------------------------------------*/
 
           if(ftab[i].fifo_pid > 0 && kill(ftab[i].fifo_pid,SIGALIVE) != (-1))
-          {  int status;
+          {  int32_t status;
 
              (void)pups_noauto_child();
 
@@ -3289,12 +3379,36 @@ _PUBLIC int pups_close(const int fdes)
           /*-----------------------------------------------------------*/
 
           if(ftab[i].fifo_pid < 0)
-          {  int status;
+          {  int32_t status;
 
              (void)pupswaitpid(FALSE,(-ftab[i].fifo_pid),&status);
           } 
+
+
+          /*-------------------------------------------------*/
+          /* Make sure that we do not remove /dev/tty        */
+          /* this is possible if application is runnning as  */
+          /* suid root and we do not protect /dev/tty with   */
+          /* a guard link                                    */
+          /*-------------------------------------------------*/
+
+          if(getuid() == 0)
+          {  if(strcmp(ftab[i].fshadow,"/dev/tty") == 0)
+                (void)link("/dev/tty","/dev/ttyprot");
+          }
  
           (void)unlink(ftab[i].fshadow);
+
+
+          /*------------------------------*/
+          /* Restore controlling terminal */
+          /*------------------------------*/
+
+          if(getuid() == 0)
+          {  if(strcmp(ftab[i].fshadow,"/dev/tty") == 0)
+                (void)rename("/dev/ttyprot","/dev/tty");
+          }
+
           pups_clear_ftab_slot(FALSE,i);
 
           in_close_routine = FALSE;
@@ -3307,7 +3421,7 @@ _PUBLIC int pups_close(const int fdes)
           pupsrelse(ALL_PUPS_SIGS);
           pups_set_errno(OK);
 
-          return(-1);
+          return(0);
        }
     }
 
@@ -3331,16 +3445,16 @@ _PUBLIC int pups_close(const int fdes)
 
 
 
-/*-----------------------------------------------------------------------------
-    Close (extended mode) stream) ...
------------------------------------------------------------------------------*/
+/*-------------------------------*/
+/* Close (extended mode) stream) */
+/*-------------------------------*/
 
 _PUBLIC FILE *pups_fclose(const FILE *stream)
 
-{   int  i,
-         fdes = (-1);
+{   int32_t i,
+            fdes = (-1);
 
-    FILE *ret = (FILE *)NULL;
+    FILE    *ret = (FILE *)NULL;
 
 
     /*-------------------------*/
@@ -3388,7 +3502,7 @@ _PUBLIC FILE *pups_fclose(const FILE *stream)
           /*------------------------------------------------------------*/
 
           if(ftab[i].fifo_pid > 0 && kill(ftab[i].fifo_pid,SIGALIVE) != (-1))
-          {  int status;
+          {  int32_t status;
 
              (void)pups_noauto_child();
 
@@ -3415,7 +3529,7 @@ _PUBLIC FILE *pups_fclose(const FILE *stream)
              /*-----------------------------------------------------------*/
 
              if(ftab[i].fifo_pid < 0)
-             {  int status;
+             {  int32_t status;
                 (void)pupswaitpid(FALSE,(-ftab[i].fifo_pid),&status);
              }
           }
@@ -3458,19 +3572,19 @@ _PUBLIC FILE *pups_fclose(const FILE *stream)
 
 
 
-/*-----------------------------------------------------------------------------
-    Display file descriptors which are open on this application ...
------------------------------------------------------------------------------*/
+/*--------------------------------------------------*/
+/* Display extended file descriptors which are open */ 
+/*--------------------------------------------------*/
 
 _PUBLIC void pups_show_open_fdescriptors(const FILE *stream)
 
-{   int i,
-        files        = 0;
+{   uint32_t i,
+             files = 0;
 
-    char ftype[SSIZE]  = "",
-         fstate[SSIZE] = "",
-         fbuf[SSIZE]   = "",
-         fdid[SSIZE]   = "";
+    char     ftype[SSIZE]  = "",
+             fstate[SSIZE] = "",
+             fbuf[SSIZE]   = "",
+             fdid[SSIZE]   = "";
 
 
     /*----------------------------------*/
@@ -3523,18 +3637,18 @@ _PUBLIC void pups_show_open_fdescriptors(const FILE *stream)
              (void)strlcat(fstate," dynamic homeostat",SSIZE);
 
           #ifdef ZLIB_SUPPORT
-          if(ftab[i].stream == (FILE *)NULL && ftab[i].zstream == (gzFILE *)NULL)
+          if(ftab[i].stream == (FILE *)NULL && ftab[i].zstream == (gzFile *)NULL)
           #else
           if(ftab[i].stream == (FILE *)NULL)
           #endif /* ZLIB_SUPPORT */
 
              (void)strlcpy(fbuf,"",SSIZE);
           else if(ftab[i].stream != (FILE *)NULL)
-             (void)snprintf(fbuf,SSIZE,"(file handle %016lx)", (unsigned long int)ftab[i].stream);
+             (void)snprintf(fbuf,SSIZE,"(file handle %016lx)", (uint64_t)ftab[i].stream);
 
           #ifdef ZLIB_SUPPORT
-          else if(ftab[i].zstream != (gzFILE *)NULL)
-             (void)snprintf(fbuf,SSIZE,"(file zhandle %016lx)",(unsigned long int)ftab[i].zstream);
+          else if(ftab[i].zstream != (gzFile *)NULL)
+             (void)snprintf(fbuf,SSIZE,"(file zhandle %016lx)",(uint64_t)ftab[i].zstream);
           #endif /* ZLIB_SUPPORT */
 
 
@@ -3543,10 +3657,10 @@ _PUBLIC void pups_show_open_fdescriptors(const FILE *stream)
           /*--------------*/
 
           if(ftab[i].psrp == TRUE)
-          {  int idum,
-                 schan;
+          {   int32_t idum,
+                      schan;
 
-             char strdum[SSIZE] = "";
+             char     strdum[SSIZE] = "";
 
 
              /*-----------------------------------*/
@@ -3602,15 +3716,15 @@ _PUBLIC void pups_show_open_fdescriptors(const FILE *stream)
 
              #ifdef PERSISTENT_HEAP_SUPPORT
              if(ftab[i].pheap == TRUE) 
-             {  int f_index;
+             {   int32_t f_index;
 
                 f_index = msm_fdes2hdes(ftab[i].fdes);
-                (void)snprintf(fdid,SSIZE,"[peristent heap at %016lx virtual]",(unsigned long int)htable[f_index].addr);
+                (void)snprintf(fdid,SSIZE,"[peristent heap at %016lx virtual]",(uint64_t)htable[f_index].addr);
              }
              else
              #endif /* PERSISTENT_HEAP_SUPPORT */
 
-                (void)strlcpy(fdid,"",SSIZE);
+             (void)strlcpy(fdid,"",SSIZE);
           }
 
           (void)fprintf(stream,"    %04d: \"%-48s\"\tfdes %04d,\t(%s, %s) %s %s\n",i,
@@ -3655,32 +3769,30 @@ _PUBLIC void pups_show_open_fdescriptors(const FILE *stream)
 
 
 
-/*-----------------------------------------------------------------------------
-    Decode the sign character, '-' ...
------------------------------------------------------------------------------*/
+/*--------------------------------*/
+/* Decode the sign character, '-' */
+/*--------------------------------*/
 
-_PUBLIC int chsign(const char ch_arg)
+_PUBLIC int32_t chsign(const char ch_arg)
 
 {   pups_set_errno(OK);
 
     if(ch_arg == '-')
-       return((int)-1);
+       return((int32_t)-1);
     else
-       return((int)1);
+       return((int32_t)1);
 }
 
 
 
-/*-----------------------------------------------------------------------------
-    Standard error handling routines ...
------------------------------------------------------------------------------*/
-
-
+/*----------------------------------*/
+/* Standard error handling routines */
+/*----------------------------------*/
 /*----------------------------------------------------*/
 /* Set PUPS error handler parameters (not threadsafe) */
 /*----------------------------------------------------*/
 
-_PUBLIC void pups_seterror(const FILE *stream, const int action, const int code)
+_PUBLIC void pups_seterror(const FILE *stream, const int32_t action, const int32_t code)
 
 {   err_stream = stream;
     err_action = action;
@@ -3693,7 +3805,7 @@ _PUBLIC void pups_seterror(const FILE *stream, const int action, const int code)
 /* PUPS error handler (threadsafe) */
 /*---------------------------------*/
 
-_PUBLIC int pups_error(const char *errstr)
+_PUBLIC int32_t pups_error(const char *errstr)
 
 {   if(err_action == NONE)
        return(0); 
@@ -3703,7 +3815,8 @@ _PUBLIC int pups_error(const char *errstr)
     #endif /* PTHREAD_SUPPORT */
 
     if(err_action & PRINT_ERROR_STRING)
-    {  (void)fprintf(err_stream,"    ERROR %s [%s (%d@%s:%s)]\n",errstr,appl_name,appl_pid,appl_host,appl_owner);
+    {  (void)fprintf(err_stream,"    %sERROR%s %s [%s (%d@%s:%s)]\n", boldOn,boldOff,errstr,
+                                                    appl_name,appl_pid,appl_host,appl_owner);
        (void)fflush(err_stream);
     }
 
@@ -3723,10 +3836,10 @@ _PUBLIC int pups_error(const char *errstr)
 
 
 
-/*------------------------------------------------------------------------------
-    Routine to find any occurence of string s2 in sting s1, the length of
-    s1 must be greater then s2 ...
-------------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------------*/
+/* Routine to find any occurence of string s2 in sting s1, the length of */
+/* s1 must be greater then s2                                            */
+/*-----------------------------------------------------------------------*/
 
 _PUBLIC _BOOLEAN strncmps(const char *s1, const char *s2)
 
@@ -3776,9 +3889,9 @@ _PUBLIC _BOOLEAN strncmps(const char *s1, const char *s2)
 
 
 
-/*------------------------------------------------------------------------------
-    Routine to strip an extension from a string ...
-------------------------------------------------------------------------------*/
+/*---------------------------------------------*/
+/* Routine to strip an extension from a string */
+/*---------------------------------------------*/
 
 _PUBLIC _BOOLEAN strrext(const char *s1, char *s2, const char dm_char)
 
@@ -3819,9 +3932,9 @@ _PUBLIC _BOOLEAN strrext(const char *s1, char *s2, const char dm_char)
 
 
 
-/*------------------------------------------------------------------------------
-    Routine to reverse strip an extension from a string ...
-------------------------------------------------------------------------------*/
+/*-----------------------------------------------------*/
+/* Routine to reverse strip an extension from a string */
+/*-----------------------------------------------------*/
 
 _PUBLIC _BOOLEAN strrextr(const char *s1, char *s2, const char dm_char)
 
@@ -3859,10 +3972,10 @@ _PUBLIC _BOOLEAN strrextr(const char *s1, char *s2, const char dm_char)
 
 
 
-/*------------------------------------------------------------------------------
-    Routine to extract substrings which are demarkated by a user defined
-    character ...
-------------------------------------------------------------------------------*/
+/*----------------------------------------------------------------------*/
+/* Routine to extract substrings which are demarkated by a user defined */
+/* character                                                            */
+/*----------------------------------------------------------------------*/
                                           /*----------------------------------*/
 _PUBLIC _BOOLEAN strext(const char dm_ch, /* Demarcation character            */
                         char       *s1,   /* Extracted sub string             */
@@ -3932,7 +4045,7 @@ _PUBLIC _BOOLEAN strext(const char dm_ch, /* Demarcation character            */
           ++s2_index;
 
 
-    /*---------------------------------------------------------*.
+    /*---------------------------------------------------------*/
     /* If we have reached the end of the string - reinitialise */
     /*---------------------------------------------------------*/
 
@@ -3975,24 +4088,24 @@ _PUBLIC _BOOLEAN strext(const char dm_ch, /* Demarcation character            */
 
 
 
-/*------------------------------------------------------------------------------
-    Routine to extract substrings which are demarcated by a user defined
-    character for multiple comparison operations ...
-------------------------------------------------------------------------------*/
-                                            /*--------------------------------*/
-_PUBLIC _BOOLEAN m_strext(const int  i_key, /* Instance key for operation     */
-                          const char dm_ch, /* Demarcation character          */
-                          char         *s1, /* Extracted sub string           */
-                          const char   *s2) /* Argument string                */
-                                            /*--------------------------------*/
+/*----------------------------------------------------------------------*/
+/* Routine to extract substrings which are demarcated by a user defined */
+/* character for multiple comparison operations                         */
+/*----------------------------------------------------------------------*/
+                                                /*--------------------------------*/
+_PUBLIC _BOOLEAN m_strext(const  int32_t i_key, /* Instance key for operation     */
+                          const char     dm_ch, /* Demarcation character          */
+                          char             *s1, /* Extracted sub string           */
+                          const char       *s2) /* Argument string                */
+                                                /*--------------------------------*/
 
-{   int    i;
-    size_t s1_index = 0;
+{   size_t i,
+           s1_index = 0;
 
-    _IMMORTAL _BOOLEAN entered = FALSE;                         /*---------------------------------*/ 
-    _IMMORTAL size_t  s2_index[N_STREXT_STRINGS];               /* Current pointer into arg string */
-    _IMMORTAL char    s2_was[N_STREXT_STRINGS][SSIZE];  /* Copy of current argument string */
-                                                                /*---------------------------------*/
+    _IMMORTAL _BOOLEAN entered = FALSE;                  /*---------------------------------*/ 
+    _IMMORTAL size_t   s2_index[N_STREXT_STRINGS];       /* Current pointer into arg string */
+    _IMMORTAL char     s2_was[N_STREXT_STRINGS][SSIZE];  /* Copy of current argument string */
+                                                         /*---------------------------------*/
 
 
     /*---------------------------------------------------------*/
@@ -4132,12 +4245,12 @@ _PUBLIC _BOOLEAN m_strext(const int  i_key, /* Instance key for operation     */
 
 
 
-/*------------------------------------------------------------------------------
-    Routine to copy a string filtering out characters which have been
-    marked as excluded ...
-------------------------------------------------------------------------------*/
+/*-------------------------------------------------------------------*/
+/* Routine to copy a string filtering out characters which have been */
+/*  marked as excluded                                               */
+/*-------------------------------------------------------------------*/
 
-_PUBLIC size_t strexccpy(const char *s1, char *s2, const char *ex_ch)
+_PUBLIC ssize_t strexccpy(const char *s1, char *s2, const char *ex_ch)
 
 {   size_t i,
            j,
@@ -4187,12 +4300,13 @@ exclude:   continue;
 
 
 
-/*------------------------------------------------------------------------------
-    Routine to return the position of a character within a string - if
-    the character is not in the string (-1) is returned ...
-------------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------*/
+/* Routine to return the position of a character within a string   */
+/* (distance from start of string). If the character is not in the */
+/* string (-1) is returned                                         */
+/*-----------------------------------------------------------------*/
 
-_PUBLIC long int ch_pos(const char *s, const char ch)
+_PUBLIC ssize_t ch_pos(const char *s, const char ch)
 
 {   size_t i,
            size;
@@ -4214,7 +4328,7 @@ _PUBLIC long int ch_pos(const char *s, const char ch)
 
        for(i=0; i<size; ++i)
        {  if(s[i] == ch)
-             return(i);
+             return((int32_t)i);
        }
  
        return(-1);
@@ -4227,12 +4341,13 @@ _PUBLIC long int ch_pos(const char *s, const char ch)
 
 
 
-/*------------------------------------------------------------------------------
-    Routine to return the reverse position of a character within a string - if
-    the character is not in the string (-1) is returned ...
-------------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------------*/
+/* Routine to return the reverse position of a character within a string */
+/* (distance from end of string). If the character is not in the string  */
+/* (-1) is returned                                                      */ 
+/*-----------------------------------------------------------------------*/
 
-_PUBLIC long int rch_pos(const char *s, const char ch)
+_PUBLIC ssize_t rch_pos(const char *s, const char ch)
 
 {   size_t i,
            size;
@@ -4254,7 +4369,7 @@ _PUBLIC long int rch_pos(const char *s, const char ch)
 
        for(i=strlen(s)-1; i != 0; --i)
        {  if(s[i] == ch)
-             return(i);
+             return((int32_t)i);
        }
 
        return(-1);
@@ -4267,9 +4382,9 @@ _PUBLIC long int rch_pos(const char *s, const char ch)
 
 
 
-/*------------------------------------------------------------------------------
-    Test for empty string (contains only whitespace and control chars) ...
-------------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------*/
+/* Test for empty string (contains only whitespace and control chars) */
+/*--------------------------------------------------------------------*/
 
 _PUBLIC _BOOLEAN strempty(const char *s)
 
@@ -4306,15 +4421,15 @@ _PUBLIC _BOOLEAN strempty(const char *s)
 
 
 
-/*------------------------------------------------------------------------------
-    Generate a string filled with random numeric characters ...
-------------------------------------------------------------------------------*/
+/*----------------------------------------------------------*/
+/* Generate random string containing hexidecimal characters */
+/*----------------------------------------------------------*/
 
-_PUBLIC int strand(const size_t size, char *s)
+_PUBLIC int32_t strand(const size_t size, char *s)
 
-{   size_t    i;
-    char      next_char;
-    short int next_digit;
+{   size_t  i;
+    char    next_char;
+    int16_t next_digit;
 
 
     if(s == (const char *)NULL || size == 0)
@@ -4323,41 +4438,41 @@ _PUBLIC int strand(const size_t size, char *s)
     }
 
 
-    /*--------------------------------------------------*/
-    /* Populate string with random (numeric) characters */
-    /*--------------------------------------------------*/
+    /*--------------------------------------------------------------*/
+    /* Populate string with random (hexidecimal) numeric characters */
+    /*--------------------------------------------------------------*/
 
     for(i=0; i<size; ++i)
-    {  next_digit = (int)FLOOR(drand48()*16.0);
+    {  next_digit = (int32_t)FLOOR(drand48()*16.0);
        switch(next_digit)
-       {     case 0:  next_char = '0';
+       {     case 0:  next_char  = '0';
                       break;
 
-             case 1:  next_char = '1';
+             case 1:  next_char  = '1';
                       break;
 
-             case 2:  next_char = '2';
+             case 2:  next_char  = '2';
                       break;
 
-             case 3:  next_char = '3';
+             case 3:  next_char  = '3';
                       break;
 
-             case 4:  next_char = '4';
+             case 4:  next_char  = '4';
                       break;
 
-             case 5:  next_char = '5';
+             case 5:  next_char  = '5';
                       break;
 
-             case 6:  next_char = '6';
+             case 6:  next_char  = '6';
                       break;
 
-             case 7:  next_char = '7';
+             case 7:  next_char  = '7';
                       break;
 
-             case 8:  next_char = '8';
+             case 8:  next_char  = '8';
                       break;
 
-             case 9:  next_char = '9';
+             case 9:  next_char  = '9';
                       break;
 
              case 10:  next_char = 'a';
@@ -4399,19 +4514,18 @@ _PUBLIC int strand(const size_t size, char *s)
 
 
  
-/*------------------------------------------------------------------------------
-    Routine to extract substrings which are demarcated by user defined
-    characters ...
-------------------------------------------------------------------------------*/
+/*-------------------------------------------------------*/
+/* Extract substrings demarcated by arbitrary characters */
+/*-------------------------------------------------------*/
                                                   /*--------------------------------*/
 _PUBLIC _BOOLEAN mdc_strext(const char   *dm_ch,  /* Demarcation characters string  */
-                            int          *dm_bit, /* Bit codes for matched dm chars */
+                            int32_t      *dm_bit, /* Bit codes for matched dm chars */
                             char         *s1,     /* Extracted sub string           */
                             const char   *s2)     /* Argument string                */
                                                   /*--------------------------------*/
 
 {   size_t dm_ch_index,
-           s1_index        = 0;
+           s1_index            = 0;
                                                /*---------------------------------*/
     _IMMORTAL size_t s2_index  = 0;            /* Current pointer into arg string */
     _IMMORTAL char *s2_was     = (char *)NULL; /* Copy of current argument string */
@@ -4428,7 +4542,7 @@ _PUBLIC _BOOLEAN mdc_strext(const char   *dm_ch,  /* Demarcation characters stri
     if(s1     == (char *)NULL          ||
        s2     == (const char *)NULL    ||
        dm_ch  == (const char *)NULL    ||
-       dm_bit == (int *) NULL           )
+       dm_bit == (int32_t *)   NULL     )
     {  pups_set_errno(EINVAL);
        return(-1);
     }
@@ -4466,7 +4580,7 @@ _PUBLIC _BOOLEAN mdc_strext(const char   *dm_ch,  /* Demarcation characters stri
     while((dm_ch_index = ch_pos(dm_ch,s2[s2_index])) != (-1) &&
           s2[s2_index] != '\0'                               &&
           s2[s2_index] != '\n'                                )
-    {     *dm_bit |= (int)pow(2.0,(FTYPE)dm_ch_index);
+    {     *dm_bit |= (int32_t)pow(2.0,(FTYPE)dm_ch_index);
           ++s2_index;
     }
 
@@ -4509,7 +4623,7 @@ _PUBLIC _BOOLEAN mdc_strext(const char   *dm_ch,  /* Demarcation characters stri
        return(FALSE);
     }
     else
-    {  *dm_bit |= (int)pow(2.0,(FTYPE)dm_ch_index);
+    {  *dm_bit |= (int32_t)pow(2.0,(FTYPE)dm_ch_index);
        return(TRUE);
     }
 
@@ -4519,15 +4633,14 @@ _PUBLIC _BOOLEAN mdc_strext(const char   *dm_ch,  /* Demarcation characters stri
 
 
 
-/*------------------------------------------------------------------------------
-    Routine to extract substrings which are demarcated by  user defined
-    characters ...
-------------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------*/
+/* Extract substrings which are demarcated by arbitrary characters */
+/* ----------------------------------------------------------------*/
                                                     /*--------------------------------------*/
 _PUBLIC _BOOLEAN mdc_strext2(const char  *dm_ch,    /* Demarcation characters string        */
-                             int         *dm_bit_l, /* Bit codes for left matched dm chars  */
-                             int         *dm_bit_r, /* Bit codes for right matched dm chars */
-                             int         *pos,      /* Current position in argument string  */
+                             int32_t     *dm_bit_l, /* Bit codes for left matched dm chars  */
+                             int32_t     *dm_bit_r, /* Bit codes for right matched dm chars */
+                             size_t      *pos,      /* Current position in argument string  */
                              char        *s1,       /* Extracted sub string                 */
                              const char  *s2)       /* Argument string                      */
                                                     /*--------------------------------------*/
@@ -4553,9 +4666,9 @@ _PUBLIC _BOOLEAN mdc_strext2(const char  *dm_ch,    /* Demarcation characters st
     if(s1       == (char *)      NULL    ||
        s2       == (const char *)NULL    ||
        dm_ch    == (const char *)NULL    ||
-       dm_bit_l == (int *)       NULL    ||
-       dm_bit_r == (int *)       NULL    ||
-       pos      == (int *)       NULL     )
+       dm_bit_l == (int32_t *)   NULL    ||
+       dm_bit_r == (int32_t *)   NULL    ||
+       pos      == (int32_t *)   NULL     )
     {  pups_set_errno(EINVAL);
        return(-1);
     }
@@ -4605,7 +4718,7 @@ _PUBLIC _BOOLEAN mdc_strext2(const char  *dm_ch,    /* Demarcation characters st
     while((dm_ch_index = ch_pos(dm_ch,s2[s2_index])) != (-1) &&
           s2[s2_index] != '\0'                               &&
           s2[s2_index] != '\n'                                )
-    {    *dm_bit_l |= (int)pow(2.0,(FTYPE)dm_ch_index); 
+    {    *dm_bit_l |= (int32_t)pow(2.0,(FTYPE)dm_ch_index); 
          ++s2_index;
     }
 
@@ -4645,12 +4758,12 @@ _PUBLIC _BOOLEAN mdc_strext2(const char  *dm_ch,    /* Demarcation characters st
     if(s2[s2_index] == '\0' || s2[s2_index] == '\n')
     {  s2_index = 0;
        *pos = s2_index;
-       *dm_bit_r |= (int)pow(2.0,(FTYPE)dm_ch_index);
+       *dm_bit_r |= (int32_t)pow(2.0,(FTYPE)dm_ch_index);
        (void)pups_free(s2_was);
        return(FALSE);
     }
     else
-    {  *dm_bit_r |= (int)pow(2.0,(FTYPE)dm_ch_index);
+    {  *dm_bit_r |= (int32_t)pow(2.0,(FTYPE)dm_ch_index);
        ++s2_index;
        *pos = s2_index;
        return(TRUE);
@@ -4662,11 +4775,12 @@ _PUBLIC _BOOLEAN mdc_strext2(const char  *dm_ch,    /* Demarcation characters st
 
 
 
-/*-----------------------------------------------------------------------------
-    Look for the occurence of string s2 within string s1 ...
------------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------------------*/
+/* Look for the occurence of string s2 within string s1 (retruning index of start */
+/* of string 1 within string 2)                                                   */
+/*--------------------------------------------------------------------------------*/
 
-_PUBLIC _BOOLEAN strinp(unsigned long int *c_index, const char *s1, const char *s2)
+_PUBLIC _BOOLEAN strinp(size_t *c_index, const char *s1, const char *s2)
 
 {   size_t i,
            size_1,
@@ -4678,7 +4792,7 @@ _PUBLIC _BOOLEAN strinp(unsigned long int *c_index, const char *s1, const char *
        return(-1);
     }
 
-    if(c_index != (unsigned long int *)NULL)
+    if(c_index != (uint64_t *)NULL)
        *c_index = 0;
 
     size_1    = strlen(s1);
@@ -4700,7 +4814,7 @@ _PUBLIC _BOOLEAN strinp(unsigned long int *c_index, const char *s1, const char *
 
        for(i=0; i<chk_limit; ++i)
        {  if(strncmp(&s1[i],s2,size_2) == 0)
-          {  if(c_index != (unsigned long int *)NULL)
+          {  if(c_index != (uint64_t *)NULL)
                 *c_index = i;
 
              return(TRUE);
@@ -4716,10 +4830,83 @@ _PUBLIC _BOOLEAN strinp(unsigned long int *c_index, const char *s1, const char *
 
 
 
+/*-----------------------------------------------------------------------------*/
+/* Case insensitive comparison of two strings (up to n significant characters) */
+/*-----------------------------------------------------------------------------*/
 
-/*-----------------------------------------------------------------------------
-    Look for the occurence of string s2 within string s1 ...
------------------------------------------------------------------------------*/
+_PUBLIC int32_t strncmpi(const char *s1, const char *s2, size_t n)
+{
+    while(n--)
+    {
+        char c1 = *s1,
+             c2 = *s2;
+
+        if (c1 == '\0' && c2 == '\0')
+           break;
+
+        if (isalpha(c1) && isupper(c1))
+           c1 = tolower(c1);
+
+        if (isalpha(c2) && isupper(c2))
+           c2 = tolower(c2);
+
+        if (c1 < c2)
+           return (-1);
+
+        if (c1 > c2)
+           return (1);
+
+        s1++; s2++;
+    }
+
+    return (0);
+}
+
+
+
+
+/*------------------------------*/
+/* convert string to upper case */
+/*------------------------------*/
+
+_PUBLIC char *strlower (const char *in)
+{
+    char *s = (char *)NULL;
+
+    for (s = in; *s; s++)
+    {   if (isupper(*s))
+           *s = tolower(*s);
+    }
+
+    return (in);
+}
+
+
+
+
+
+/*------------------------------*/
+/* convert string to upper case */
+/*------------------------------*/
+
+_PUBLIC char *strtoupper(const char *in)
+{
+    char *s = (char *)NULL;
+
+    for (s = in; *s; s++)
+    {   if (islower(*s))
+           *s = toupper(*s);
+    }
+
+    return (in);
+}
+
+
+
+
+/*------------------------------------------------------*/
+/* Look for the occurence of string s2 within string s1 */
+/*------------------------------------------------------*/
 
 _PUBLIC _BOOLEAN strin(const char *s1, const char *s2)
 
@@ -4765,9 +4952,9 @@ _PUBLIC _BOOLEAN strin(const char *s1, const char *s2)
 
 
 
-/*-----------------------------------------------------------------------------
-    Return tail of string s1 which begins at string s2 ...
------------------------------------------------------------------------------*/
+/*--------------------------------------------------*/
+/* Return tail of string s1 beginning at string s2  */
+/*--------------------------------------------------*/
 
 _PUBLIC char *strin2(const char *s1, const char *s2)
 
@@ -4778,7 +4965,7 @@ _PUBLIC char *strin2(const char *s1, const char *s2)
 
     if(s1 == (const char *)NULL || s2 == (const char *)NULL)
     {  pups_set_errno(EINVAL);
-       return(-1);
+       return((char *)NULL);
     }
 
     size_1 = strlen(s1);
@@ -4813,9 +5000,9 @@ _PUBLIC char *strin2(const char *s1, const char *s2)
 
 
 
-/*-----------------------------------------------------------------------------
-    Look for token demarcated occurence of string s2 within string s1 ...
------------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------------------*/
+/* Look for character token demarcated occurence of string s2 within string s1 */
+/*-----------------------------------------------------------------------------*/
 
 _PUBLIC _BOOLEAN strintok(const char *s1, const char *s2, const char *dm_chars)
 
@@ -4894,9 +5081,9 @@ _PUBLIC _BOOLEAN strintok(const char *s1, const char *s2, const char *dm_chars)
 
 
 
-/*-----------------------------------------------------------------------------
-    Check if string 3 is to right of string 2 within string 1 ...
------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------*/
+/* Check if string 3 is to the right of string 2 within string 1 */
+/*---------------------------------------------------------------*/
 
 _PUBLIC _BOOLEAN stright(const char *s1, const char *s2, const char *s3)
 
@@ -4947,9 +5134,9 @@ _PUBLIC _BOOLEAN stright(const char *s1, const char *s2, const char *s3)
 
 
 
-/*--------------------------------------------------------------------------------
-    Replace sub-string with constant characters ...
---------------------------------------------------------------------------------*/
+/*---------------------------------------------*/
+/* Replace sub-string with constant characters */
+/*---------------------------------------------*/
 
 _PUBLIC _BOOLEAN strepch(char *s1, const char *s2, const char rep_ch)
 
@@ -4987,16 +5174,15 @@ _PUBLIC _BOOLEAN strepch(char *s1, const char *s2, const char rep_ch)
     return(-1);
 }
 
-
     
 
 
-/*-----------------------------------------------------------------------------
-    Replace all occurences of string s3 within string s1 with string s4
-    returning result in string s2...
------------------------------------------------------------------------------*/
+/*-------------------------------------------------------------------------*/
+/* Globally eplace all occurences of string s3 in string s1 with string s4 */
+/* returning result in string s2                                           */
+/*-------------------------------------------------------------------------*/
 
-_PUBLIC int strep(const char *s1, char *s2, const char *s3, const char *s4)
+_PUBLIC int32_t strep(const char *s1, char *s2, const char *s3, const char *s4)
 
 {   size_t i,
            j,
@@ -5072,12 +5258,12 @@ _PUBLIC int strep(const char *s1, char *s2, const char *s3, const char *s4)
 
 
 
-/*-----------------------------------------------------------------------------
-    Replace all token demarcated occurences of string s3 within string
-    s1 with string s4 returning result in string s2 ...
------------------------------------------------------------------------------*/
+/*------------------------------------------------------------------------*/
+/* Globally eplace all token demarcated occurences of string s3 in string */
+/* s1 with string s4 returning result in string s2                        */
+/*------------------------------------------------------------------------*/
 
-_PUBLIC int streptok(const char *s1, char *s2, const char *s3, const char *s4, const char *dm_chars)
+_PUBLIC int32_t streptok(const char *s1, char *s2, const char *s3, const char *s4, const char *dm_chars)
 
 {   size_t i,
            j,
@@ -5087,7 +5273,6 @@ _PUBLIC int streptok(const char *s1, char *s2, const char *s3, const char *s4, c
            dm_chars_size,
            cmp_size,
            rep_size;
-           //chk_limit;
 
     char dm_char_l = '\0',
          dm_char_r = '\0';
@@ -5195,11 +5380,11 @@ _PUBLIC int streptok(const char *s1, char *s2, const char *s3, const char *s4, c
 
 
 
-/*-----------------------------------------------------------------------------
-    Truncate string at demarcation character starting at tail of string ...
------------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------------------------*/
+/* Reverse truncate string at demarcation character (c_cnt instance from end of string) */
+/*--------------------------------------------------------------------------------------*/
 
-_PUBLIC _BOOLEAN strtrnc(char *s, const char trunc_c, int c_cnt)
+_PUBLIC _BOOLEAN strtrnc(char *s, const char trunc_c, size_t c_cnt)
 
 {   size_t f_cnt   = 0,
            s_index = 0;
@@ -5224,7 +5409,7 @@ _PUBLIC _BOOLEAN strtrnc(char *s, const char trunc_c, int c_cnt)
        /*--------------------------------------------*/
 
        pups_set_errno(OK);
-       while(s_index > 0) // Was >= 0
+       while(s_index > 0)
        {  if(s[s_index] == trunc_c)
              ++f_cnt;
 
@@ -5251,11 +5436,12 @@ _PUBLIC _BOOLEAN strtrnc(char *s, const char trunc_c, int c_cnt)
 
 
 
-/*-----------------------------------------------------------------------------
-    Truncate string at demarcation character starting at head of string ...
------------------------------------------------------------------------------*/
 
-_PUBLIC _BOOLEAN strtrnch(char *s, const char trunc_c, int c_cnt)
+/*--------------------------------------------------------------------------------*/
+/* Truncate string at demarcation character (c_cnt instance from start of string) */
+/*--------------------------------------------------------------------------------*/
+
+_PUBLIC _BOOLEAN strtrnch(char *s, const char trunc_c, size_t c_cnt)
 
 {   size_t size,
            f_cnt   = 0,
@@ -5308,12 +5494,11 @@ _PUBLIC _BOOLEAN strtrnch(char *s, const char trunc_c, int c_cnt)
 
 
 
+/*--------------------------------------------------*/
+/* Extract string starting at demarcation character */
+/*--------------------------------------------------*/
 
-/*-----------------------------------------------------------------------------
-    Start string from demarcation character returning result in string s2 ...
------------------------------------------------------------------------------*/
-
-_PUBLIC _BOOLEAN strfrm(const char *s1, const char start_c, const int c_cnt, char *s2)
+_PUBLIC _BOOLEAN strfrm(const char *s1, const char start_c, const int32_t c_cnt, char *s2)
 
 {   size_t size_1,
            f_cnt   = 0,
@@ -5359,10 +5544,9 @@ _PUBLIC _BOOLEAN strfrm(const char *s1, const char start_c, const int c_cnt, cha
 
 
 
-/*-----------------------------------------------------------------------------
-    Strip trailing characters from string starting analysis at tail of
-    string ...
------------------------------------------------------------------------------*/
+/*----------------------------------------------------*/
+/* Strip trailing characters to demarcation character */
+/*----------------------------------------------------*/
 
 _PUBLIC _BOOLEAN strail(char *s, const char c)
 
@@ -5414,14 +5598,14 @@ _PUBLIC _BOOLEAN strail(char *s, const char c)
 
 
 
-/*-----------------------------------------------------------------------------
-    Extract leaf from pathname ...
------------------------------------------------------------------------------*/
+/*-------------------------------------------*/
+/* Extract leaf from pathname (/branch/leaf) */
+/*-------------------------------------------*/
 
 _PUBLIC _BOOLEAN strleaf(const char *pathname, char *leaf)
 
-{   unsigned int i;
-    _BOOLEAN     ret = FALSE;
+{   size_t   i;
+    _BOOLEAN ret = FALSE;
 
     if(pathname == (char *)NULL || leaf == (char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -5458,14 +5642,14 @@ _PUBLIC _BOOLEAN strleaf(const char *pathname, char *leaf)
 
 
 
-/*-----------------------------------------------------------------------------
-    Extract branch from pathname ...
------------------------------------------------------------------------------*/
+/*---------------------------------------------*/
+/* Extract branch from pathname (/branch/leaf) */
+/*---------------------------------------------*/
 
 _PUBLIC _BOOLEAN strbranch(const char *pathname, char *branch)
 
-{   unsigned int i;
-    _BOOLEAN     ret = FALSE;
+{   size_t   i;
+    _BOOLEAN ret = FALSE;
 
     if(pathname == (char *)NULL || branch == (char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -5505,9 +5689,9 @@ _PUBLIC _BOOLEAN strbranch(const char *pathname, char *branch)
 
 
 
-/*-----------------------------------------------------------------------------
-   Strip first digit in string (and all characters after it) ...
------------------------:------------------------------------------------------*/
+/*-----------------------------------------------------------*/
+/* Strip first digit in string (and all characters after it) */
+/*-----------------------------------------------------------*/
 
 _PUBLIC _BOOLEAN strdigit(char *s)
 
@@ -5546,9 +5730,9 @@ _PUBLIC _BOOLEAN strdigit(char *s)
 
 
 
-/*-----------------------------------------------------------------------------
-    Strip leading characters from string ...
------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------*/
+/* Strip leading characters from string (before demarcation character) */ 
+/*---------------------------------------------------------------------*/
 
 _PUBLIC char *strlead(char *s, const char c)
 
@@ -5587,16 +5771,15 @@ _PUBLIC char *strlead(char *s, const char c)
 
 
 
-/*-----------------------------------------------------------------------------
-    Count number of occurences of character in string ...
------------------------------------------------------------------------------*/
+/*---------------------------------------------------*/
+/* Count number of occurences of character in string */
+/*---------------------------------------------------*/
 
-_PUBLIC int strchcnt(const char c, const char *s)
+_PUBLIC ssize_t strchcnt(const char c, const char *s)
 
 {   size_t i,
-           size;
-
-    int    cnt = 0;
+           size,
+           cnt = 0;
 
     if(s == (const char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -5629,16 +5812,16 @@ _PUBLIC int strchcnt(const char c, const char *s)
 
 
 
-/*-----------------------------------------------------------------------------
-    Strip numeric characters from string (including '#' and '^' which are
-    used to demarcate checksums in file names) ...
------------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------------*/
+/* Strip numeric characters from string (including '#' and '^' which are */
+/* used to demarcate checksums in file names)                            */
+/*-----------------------------------------------------------------------*/
 
 _PUBLIC _BOOLEAN strpdigit(const char *s, char *stripped)
 
 {   size_t i,
            size,
-           cnt      = (-1);
+           cnt  = (-1);
 
     if(s == (const char *)NULL || stripped == (char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -5685,9 +5868,9 @@ _PUBLIC _BOOLEAN strpdigit(const char *s, char *stripped)
 
 
 
-/*-----------------------------------------------------------------------------
-    Strip character from string (starting at tail) ...
------------------------------------------------------------------------------*/
+/*------------------------------------------------*/
+/* Strip character from string (starting at tail) */
+/*------------------------------------------------*/
 
 _PUBLIC char *strpch(const char token, char *s)
 
@@ -5727,7 +5910,7 @@ _PUBLIC char *strpch(const char token, char *s)
 
             if(i == 0)
             {  pups_set_errno(ESRCH);
-               return(-1);
+               return((char *)NULL);
             }
        }   
 
@@ -5763,18 +5946,18 @@ _PUBLIC char *strpch(const char token, char *s)
 
 
 
-/*-----------------------------------------------------------------------------
-    Replace multiple chracters in string with given character ...
------------------------------------------------------------------------------*/
+/*-----------------------------------------------------*/
+/* Replace multiple chracters in string with character */
+/*-----------------------------------------------------*/
 
-_PUBLIC int mchrep(const char rep_ch, const char *ch_to_rep, char *s1)
+_PUBLIC int32_t mchrep(const char rep_ch, const char *ch_to_rep, char *s1)
 
-{   size_t i,
-           j,
-           size,
-           rep_size;
+{   size_t   i,
+             j,
+             size,
+             rep_size;
 
-    int cnt  = 0;
+    uint32_t cnt  = 0;
 
     if(s1 == (char *)NULL || ch_to_rep == (const char *)NULL )
     {  pups_set_errno(EINVAL);
@@ -5811,9 +5994,9 @@ _PUBLIC int mchrep(const char rep_ch, const char *ch_to_rep, char *s1)
 
 
 
-/*-----------------------------------------------------------------------------
-    Copy string checking for NULL or invalid argument string ...
------------------------------------------------------------------------------*/
+/*----------------------------------------------------------*/
+/* Copy string checking for NULL or invalid argument string */
+/*----------------------------------------------------------*/
 
 _PUBLIC char *strccpy(char *s1, const char *s2)
 
@@ -5852,12 +6035,12 @@ _PUBLIC char *strccpy(char *s1, const char *s2)
 
 
 
-/*-----------------------------------------------------------------------------
-    Routine to return the position of the nth occurence of nominated
-    character within string relative to head ...
------------------------------------------------------------------------------*/
+/*-----------------------------------------*/
+/* Return the position of nth occurence of */
+/* character in string (relative to start) */
+/*-----------------------------------------*/
 
-_PUBLIC long int ch_index(const char *s, const char ch)
+_PUBLIC ssize_t ch_index(const char *s, const char ch)
 
 {   size_t i,
            size;
@@ -5879,7 +6062,7 @@ _PUBLIC long int ch_index(const char *s, const char ch)
 
        for(i=0; i<size; ++i)
        {  if(s[i] == ch)
-             return(i);
+             return((int32_t)i);
        }
 
        return(-1);
@@ -5891,12 +6074,13 @@ _PUBLIC long int ch_index(const char *s, const char ch)
 
 
 
-/*-----------------------------------------------------------------------------
-    Routine to return the position of the nth occurence of nominated
-    character within string relative to tail ...
------------------------------------------------------------------------------*/
 
-_PUBLIC long int rch_index(const char *s, const char ch)
+/*-----------------------------------------*/
+/* Return the position of nth occurence of */
+/* character in string (relative to end) */
+/*-----------------------------------------*/
+
+_PUBLIC ssize_t rch_index(const char *s, const char ch)
 
 {   size_t i,
            size;
@@ -5918,7 +6102,7 @@ _PUBLIC long int rch_index(const char *s, const char ch)
 
        for(i=size; i>= 0; --i)
        {  if(s[i] == ch)
-             return(i);
+             return((int32_t)i);
        }
 
        return(-1);
@@ -5931,9 +6115,9 @@ _PUBLIC long int rch_index(const char *s, const char ch)
 
 
 
-/*-----------------------------------------------------------------------------
-   Routine to test if nominated character is the first one in string ...
----------------------------------------------------------------------------*/
+/*-----------------------------------*/
+/* Is character first one in string? */
+/*-----------------------------------*/
 
 _PUBLIC _BOOLEAN ch_is_first(const char *s, const char ch)
 
@@ -5967,9 +6151,9 @@ _PUBLIC _BOOLEAN ch_is_first(const char *s, const char ch)
 
 
 
-/*-----------------------------------------------------------------------------
-   Routine to test if nominated character is the last one in string ...
----------------------------------------------------------------------------*/
+/*----------------------------------*/
+/* Is character last one in string? */
+/*----------------------------------*/
 
 _PUBLIC _BOOLEAN ch_is_last(const char *s, const char ch)
 
@@ -6001,18 +6185,18 @@ _PUBLIC _BOOLEAN ch_is_last(const char *s, const char ch)
 
 
 
-/*-----------------------------------------------------------------------------
-    Locate a given switch in the command tail ...
------------------------------------------------------------------------------*/
+/*-------------------------------------*/
+/* Locate argument in the command tail */
+/*-------------------------------------*/
 
-_PUBLIC int pups_locate(_BOOLEAN *init, const char *swtch, int *cnt, const char *args[], int nchars)
+_PUBLIC int32_t pups_locate(_BOOLEAN *init, const char *swtch, uint32_t *cnt, char *args[], uint32_t nchars)
 
-{     int  j;
-      char ctail_alias_file_name[SSIZE] = "";
+{     uint32_t j;
+      char     ctail_alias_file_name[SSIZE] = "";
 
       if(init  == (_BOOLEAN *)      NULL  ||
          swtch == (const char *)    NULL  ||
-         cnt   == (int *)           NULL  ||
+         cnt   == (int32_t *)       NULL  ||
          args  == (const char **)   NULL   )
       {  pups_set_errno(EINVAL);
          return(-1);
@@ -6031,11 +6215,11 @@ _PUBLIC int pups_locate(_BOOLEAN *init, const char *swtch, int *cnt, const char 
       if(access(ctail_alias_file_name,F_OK) == 0)
       {  FILE *ctail_alias_stream = (FILE *)NULL;
 
-         int  eof = 0;
+          int32_t eof = 0;
 
-         char next_alias[SSIZE]  = "",
-              alias[SSIZE]       = "",
-              substitute[SSIZE]  = "";
+         char     next_alias[SSIZE]  = "",
+                  alias[SSIZE]       = "",
+                  substitute[SSIZE]  = "";
 
          if((ctail_alias_stream = fopen(ctail_alias_file_name,"r")) == (FILE *)NULL)
             pups_error("[pups_locate] cannot open alias file");
@@ -6074,7 +6258,7 @@ _PUBLIC int pups_locate(_BOOLEAN *init, const char *swtch, int *cnt, const char 
 aliased:
 
       if(*cnt == 0)
-         return((int)NOT_FOUND);
+         return((int32_t)NOT_FOUND);
 
       for(j=0; j<=t_args; ++j)
       {     if(args[j]    != (char *)NULL      &&
@@ -6082,28 +6266,28 @@ aliased:
                strcmp(swtch,&args[j][1]) == 0   )
               {  (*cnt)--;
                  argd[j] = TRUE;
-                 return((int)j);
+                 return((int32_t)j);
               }
       }
 
       pups_set_errno(ERANGE);
-      return((int)NOT_FOUND);
+      return((int32_t)NOT_FOUND);
 }
 
 
 
 
-/*-----------------------------------------------------------------------------
-    Function to decode an integer from a command tail argument ...
------------------------------------------------------------------------------*/
+/*----------------------------------------*/
+/* Get integer from command tail argument */
+/*----------------------------------------*/
 
-_PUBLIC int pups_i_dec(int *ptr, int *argc, const char *argv[])
+_PUBLIC int32_t pups_i_dec(int32_t *ptr, uint32_t *argc, char *argv[])
 
-{   int ret;
+{    int32_t ret;
 
-    if(ptr  == (int         *)NULL  ||
-       argc == (const int   *)NULL  ||
-       argv == (const char **)NULL   ) 
+    if(ptr  == (int32_t  *)NULL  ||
+       argc == (int32_t  *)NULL  ||
+       argv == (char     **)NULL   ) 
     {  pups_set_errno(EINVAL);
        return(-1);
     }
@@ -6130,17 +6314,17 @@ _PUBLIC int pups_i_dec(int *ptr, int *argc, const char *argv[])
 
 
 
-/*-----------------------------------------------------------------------------
-    Function to decode a real from a command tail argument ...
------------------------------------------------------------------------------*/
+/*---------------------------------------------*/
+/* Get float/double from command tail argument */
+/*---------------------------------------------*/
 
-_PUBLIC FTYPE pups_fp_dec(int *ptr, int *argc, const char *argv[])
+_PUBLIC FTYPE pups_fp_dec(int32_t *ptr, uint32_t *argc, char *argv[])
 
 {   FTYPE ret;
 
-    if(ptr  == (int         *)NULL  ||
-       argc == (const int   *)NULL  ||
-       argv == (const char **)NULL   ) 
+    if(ptr  == (int32_t   *)NULL  ||
+       argc == (int32_t   *)NULL  ||
+       argv == (char     **)NULL   ) 
     {  pups_set_errno(EINVAL);
        return(-1);
     }
@@ -6167,19 +6351,19 @@ _PUBLIC FTYPE pups_fp_dec(int *ptr, int *argc, const char *argv[])
 
 
 
-/*-----------------------------------------------------------------------------
-    Function to decode a string from the command tail ...
------------------------------------------------------------------------------*/
+/*-------------------------------------------*/
+/* Get string from the command tail argument */
+/*-------------------------------------------*/
 
-_PUBLIC char *pups_str_dec(int *ptr, int *argc, const char *argv[])
+_PUBLIC char *pups_str_dec(int32_t *ptr, uint32_t *argc, char *argv[])
 
 {   _IMMORTAL char aggregate_str[SSIZE] = ""; 
 
-    if(ptr  == (int         *)NULL  ||
-       argc == (const int   *)NULL  ||
-       argv == (const char **)NULL   ) 
+    if(ptr  == (int32_t  *)NULL  ||
+       argc == (int32_t  *)NULL  ||
+       argv == (char    **)NULL   ) 
     {  pups_set_errno(EINVAL);
-       return((unsigned char *)INVALID_ARG);
+       return((char *)INVALID_ARG);
     }
     else
        pups_set_errno(OK);
@@ -6189,7 +6373,7 @@ _PUBLIC char *pups_str_dec(int *ptr, int *argc, const char *argv[])
 
     ++(*ptr);
     if(argv[(*ptr)] == (char *)NULL || argv[(*ptr)][0] == '-' || strlen(argv[(*ptr)]) == 0)
-       return((char *)((unsigned char *)INVALID_ARG));
+       return((char *)((char *)INVALID_ARG));
     else
     {  if(argv[(*ptr)][0] != '"') 
        {  (*argc)--;
@@ -6218,15 +6402,15 @@ _PUBLIC char *pups_str_dec(int *ptr, int *argc, const char *argv[])
 
 
 
-/*-----------------------------------------------------------------------------
-    Function to decode character from command tail ...
------------------------------------------------------------------------------*/
+/*---------------------------------*/
+/* Get character from command tail */
+/*---------------------------------*/
 
-_PUBLIC char pups_ch_dec(int *ptr, int *argc, const char *argv[])
+_PUBLIC char pups_ch_dec(int32_t *ptr, uint32_t *argc, char *argv[])
 
-{   if(ptr  == (int         *)NULL  ||
-       argc == (const int   *)NULL  ||
-       argv == (const char **)NULL   ) 
+{   if(ptr  == (int32_t  *)NULL  ||
+       argc == (int32_t  *)NULL  ||
+       argv == (char    **)NULL   ) 
     {  pups_set_errno(EINVAL);
        return(-1);
     }
@@ -6249,37 +6433,35 @@ _PUBLIC char pups_ch_dec(int *ptr, int *argc, const char *argv[])
 
 
 
-/*-----------------------------------------------------------------------------
-    Decode command argument tail file ...
------------------------------------------------------------------------------*/
+/*--------------------------------*/
+/* Load argument vector from file */
+/*--------------------------------*/
 
-_PUBLIC void pups_argfile(int ptr, int *argc, const char *argv[], _BOOLEAN argd[])
+_PUBLIC void pups_argfile(int32_t ptr, uint32_t *argc, char *argv[], _BOOLEAN argd[])
 
-{   int i,
-        n_args,
-        c_index;
+{    int32_t i,
+             n_args;
+
+    size_t c_index;
 
     _BOOLEAN looper          = TRUE,
              quoted          = FALSE,
              default_argfile = FALSE;
 
-    char *tmp_f_name = (char *)NULL,
-         *next_token = (char *)NULL;
+    char tmp_f_name[SSIZE]   = "",
+         next_token[SSIZE]   = "";
 
     FILE *arg_file = (FILE *)NULL,
          *tmp_file = (FILE *)NULL;
 
-     if(ptr  == (int         *)NULL  ||
-        argc == (const   int *)NULL  ||
-        argv == (const char **)NULL  ||
-        argd == (char       **)NULL   ) 
-     {  pups_set_errno(EINVAL);
-        return(-1);
-     }
+    if(ptr  == (int32_t  *)NULL  ||
+       argc == (int32_t  *)NULL  ||
+       argv == (char    **)NULL  ||
+       argd == (char    **)NULL   ) 
+    {  pups_set_errno(EINVAL);
+       return;
+    }
 
-    arg_f_name = (char *)pups_malloc(SSIZE);
-    tmp_f_name = (char *)pups_malloc(SSIZE);
-    next_token = (char *)pups_malloc(SSIZE);
 
     if(ptr >= (*argc) || strccpy(arg_f_name,pups_str_dec(&ptr,argc,argv)) == (char *)NULL)
     {  (void)snprintf(arg_f_name,SSIZE,"%s.agf",appl_name);
@@ -6305,10 +6487,10 @@ _PUBLIC void pups_argfile(int ptr, int *argc, const char *argv[], _BOOLEAN argd[
      #endif /* UTILIB_DEBUG */
 
 
-/*-----------------------------------------------------------------------------
-   Shift all existing arguments left and then add arguments read from
-   the argument file to the end of the secondary argument vectors ...
------------------------------------------------------------------------------*/
+    /*--------------------------------------------------------------------*/
+    /* Shift all existing arguments left and then add arguments read from */
+    /* the argument file to the end of the secondary argument vectors     */ 
+    /*--------------------------------------------------------------------*/
 
     if(default_argfile == FALSE)
     {  ptr -= 2;
@@ -6321,17 +6503,19 @@ _PUBLIC void pups_argfile(int ptr, int *argc, const char *argv[], _BOOLEAN argd[
        pups_error(errstr);
     }
 
-/*------------------------------------------------------------------------------
-   Strip all comments from the argument file. Arguments are prefixed by a
-   '#' character ...
-------------------------------------------------------------------------------*/
+
+    /*------------------------------------------------------------------------*/
+    /* Strip all comments from the argument file. Arguments are prefixed by a */
+    /* '#' character                                                          */
+    /*------------------------------------------------------------------------*/
 
     (void)snprintf(tmp_f_name,SSIZE,"/tmp/stripc.dat.%s.%d",appl_host,appl_pid);
     tmp_file = (FILE *)pups_strp_commnts('#',arg_file,tmp_f_name);
 
-/*-----------------------------------------------------------------------------
-   Allocate sufficient space for the replacement argument vector ...
------------------------------------------------------------------------------*/
+
+    /*---------------------------------------------------------------*/
+    /* Allocate sufficient space for the replacement argument vector */
+    /*---------------------------------------------------------------*/
 
     t_args = ptr;
     do {  n_args = fscanf(tmp_file,"%s",next_token);
@@ -6344,10 +6528,10 @@ _PUBLIC void pups_argfile(int ptr, int *argc, const char *argv[], _BOOLEAN argd[
                 argd[t_args] = FALSE;
              }
 
-/*-----------------------------------------------------------------------------
-    Test to see if string is '"' or contains '"' - if it does catenate
-    all items read until anoth '"' is found ...
------------------------------------------------------------------------------*/
+             /*--------------------------------------------------------------------*/
+             /* Test to see if string is '"' or contains '"' - if it does catenate */
+             /*  all items read until anoth '"' is found                           */
+             /*--------------------------------------------------------------------*/
 
              if((c_index = ch_index(next_token,'"')) != -1)
              {  if(quoted == TRUE)
@@ -6378,9 +6562,10 @@ _PUBLIC void pups_argfile(int ptr, int *argc, const char *argv[], _BOOLEAN argd[
            }
         } while(looper == TRUE);
 
-/*-----------------------------------------------------------------------------
-    Adjust the argument count ...
------------------------------------------------------------------------------*/
+
+    /*---------------------------*/
+    /* Adjust the argument count */
+    /*---------------------------*/
 
 exit:
 
@@ -6403,21 +6588,19 @@ exit:
 
     (void)fclose(tmp_file);
     (void)unlink(tmp_f_name);
-    (void)pups_free((char *)tmp_f_name);
-    (void)pups_free((char *)next_token);
 
     pups_set_errno(OK);
 }
 
 
 
-/*-----------------------------------------------------------------------------
-    Generate effective command line from secondary argument vector ...
------------------------------------------------------------------------------*/
+/*----------------------------------------------------------------*/
+/* Generate effective command line from secondary argument vector */
+/*----------------------------------------------------------------*/
 
 _PUBLIC void pups_argtline(char *cmd_tail)
 
-{   int i;
+{   uint32_t i;
 
     if(cmd_tail == (char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -6495,9 +6678,9 @@ _PUBLIC void pups_argtline(char *cmd_tail)
 
 
 
-/*-----------------------------------------------------------------------------
-    Signal to catch really bad errors ...
------------------------------------------------------------------------------*/
+/*-----------------------------------*/
+/* Signal to catch really bad errors */
+/*-----------------------------------*/
 
 _PRIVATE void catch_sigsegv(void)
 
@@ -6508,16 +6691,16 @@ _PRIVATE void catch_sigsegv(void)
 
 
 
-/*--------------------------------------------------------------------------------------------------------------
-    Do we have resources required for operation? ...
---------------------------------------------------------------------------------------------------------------*/
+/*--------------------------------*/
+/* Do we have resources required? */
+/*--------------------------------*/
 
-_PUBLIC _BOOLEAN pups_have_resources(const FTYPE proc_loading, const int mem_required)
+_PUBLIC _BOOLEAN pups_have_resources(const FTYPE proc_loading, const int32_t mem_required)
 
-{   FTYPE current_proc_loading;
-    int   mem_free;
+{   FTYPE    current_proc_loading;
+     int32_t mem_free;
 
-    if(pups_get_resource_loading(FALSE,&current_proc_loading,&mem_free) == (-1))
+    if(pups_get_resource_loading(&current_proc_loading,&mem_free) == (-1))
        return(-1);
 
     if(current_proc_loading > proc_loading || mem_free < mem_required)
@@ -6532,29 +6715,29 @@ _PUBLIC _BOOLEAN pups_have_resources(const FTYPE proc_loading, const int mem_req
 
 
 
-/*-----------------------------------------------------------------------------
-    Copy command tail from system argument vector to process vector ...
------------------------------------------------------------------------------*/
+/*-------------------------------------*/
+/* Make copy of command line arguments */
+/*-------------------------------------*/
 
-_PUBLIC void pups_copytail(int *argc, const char *args[], char *argv[])
+_PUBLIC void pups_copytail(int *argc, char *args[], const char *argv[])
 
-{   int i,
-        start = 1,
-        cnt   = 0;
+{   uint32_t i,
+             start                  = 1,
+             cnt                    = 0;
 
-    char ssh_remote_port[SSIZE] = "",
-         ssh_remote_host[SSIZE] = "",
-         ssh_remote_user[SSIZE] = "",
-         ssh_remote_cmd[SSIZE]  = "";
+    char     ssh_remote_port[SSIZE] = "",
+             ssh_remote_host[SSIZE] = "",
+             ssh_remote_user[SSIZE] = "",
+             ssh_remote_cmd[SSIZE]  = "";
 
-    _BOOLEAN do_bg            = FALSE,
-             do_remote_exec   = FALSE;
+    _BOOLEAN do_bg                  = FALSE,
+             do_remote_exec         = FALSE;
 
     if(argc == (int *)  NULL  ||
        args == (char **)NULL  ||
        argv == (char **)NULL   ) 
     {  pups_set_errno(EINVAL);
-       return(-1);
+       return;
     }
     else
        pups_set_errno(OK);
@@ -6629,7 +6812,6 @@ _PUBLIC void pups_copytail(int *argc, const char *args[], char *argv[])
                 (void)fprintf(stderr,"UTILIB COPYTAIL SSH_PORT: %s\n",ssh_remote_cmd);
                 (void)fflush(stderr);
                 #endif /* UTILIB_DEBUG */
-
              }
 
 
@@ -6704,7 +6886,7 @@ _PUBLIC void pups_copytail(int *argc, const char *args[], char *argv[])
        /* Build argument vector for remote command */
        /*------------------------------------------*/
 
-       args[0] = (char *)pups_malloc(255*sizeof(_BYTE));
+       args[0] = (char *)pups_malloc(256*sizeof(_BYTE));
        (void)strlcpy(args[cnt],"ssh",SSIZE);
        ++cnt;
 
@@ -6713,7 +6895,7 @@ _PUBLIC void pups_copytail(int *argc, const char *args[], char *argv[])
        /*--------------------------------------------*/
 
        if(do_bg == FALSE && isatty(0) == 1)
-       {   args[cnt] = (char *)pups_malloc(255*sizeof(_BYTE));
+       {   args[cnt] = (char *)pups_malloc(256*sizeof(_BYTE));
            (void)strlcpy(args[cnt],"-t",SSIZE);
            ++cnt;
        }
@@ -6724,7 +6906,7 @@ _PUBLIC void pups_copytail(int *argc, const char *args[], char *argv[])
        /*-------------------------------*/
 
        if(ssh_compression == TRUE)
-       {   args[cnt] = (char *)pups_malloc(255*sizeof(_BYTE));
+       {   args[cnt] = (char *)pups_malloc(256*sizeof(_BYTE));
            (void)strlcpy(args[cnt],"-C",SSIZE);
            ++cnt;
        }
@@ -6735,7 +6917,7 @@ _PUBLIC void pups_copytail(int *argc, const char *args[], char *argv[])
        /*---------------------------------*/
 
        if(strcmp(ssh_remote_port,"") != 0)
-       {   args[cnt] = (char *)pups_malloc(255*sizeof(_BYTE));
+       {   args[cnt] = (char *)pups_malloc(256*sizeof(_BYTE));
            (void)strlcpy(args[cnt],ssh_remote_port,SSIZE);
            ++cnt;
        }
@@ -6746,7 +6928,7 @@ _PUBLIC void pups_copytail(int *argc, const char *args[], char *argv[])
        /*-------------*/
        
        if(strcmp(ssh_remote_user,"") != 0)
-       {   args[cnt] = (char *)pups_malloc(255*sizeof(_BYTE));
+       {   args[cnt] = (char *)pups_malloc(256*sizeof(_BYTE));
            (void)strlcpy(args[cnt],ssh_remote_user,SSIZE);
            ++cnt;
        }
@@ -6756,7 +6938,7 @@ _PUBLIC void pups_copytail(int *argc, const char *args[], char *argv[])
        /* Remote host */
        /*-------------*/
 
-       args[cnt] = (char *)pups_malloc(255*sizeof(_BYTE));
+       args[cnt] = (char *)pups_malloc(256*sizeof(_BYTE));
        (void)strlcpy(args[cnt],ssh_remote_host,SSIZE);
        ++cnt;
 
@@ -6765,7 +6947,7 @@ _PUBLIC void pups_copytail(int *argc, const char *args[], char *argv[])
        /* Remote command */
        /*----------------*/
 
-       args[cnt] = (char *)pups_malloc(255*sizeof(_BYTE));
+       args[cnt] = (char *)pups_malloc(256*sizeof(_BYTE));
        (void)strlcpy(args[cnt],ssh_remote_cmd,SSIZE);
 
 
@@ -6845,20 +7027,21 @@ _PUBLIC void pups_copytail(int *argc, const char *args[], char *argv[])
 
 
 
-/*-----------------------------------------------------------------------------
-    Routine to search for standard arguments in the command tail ...
------------------------------------------------------------------------------*/
+
+/*--------------------------------*/
+/* Initialise PUPS/P3 environment */
+/*--------------------------------*/
                                                   /*--------------------------------------*/
 _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted open source  */
-                           int            *argc,  /* Argument count                       */
+                           int32_t        *argc,  /* Argument count                       */
                            char         *v_name,  /* Version of filter                    */
                            char        *au_name,  /* Author name                          */
                            char       *app_name,  /* Application name                     */
                            char         *d_made,  /* Revision date                        */
-                           char         *argv[])  /* Secondary argument vector            */
+                           const char   *argv[])  /* Secondary argument vector            */
                                                   /*--------------------------------------*/
            
-{   int  i;
+{    int32_t i;
 
     sigset_t blocked_set;
 
@@ -6885,6 +7068,37 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     #endif /* Criu support */
 
 
+    /*----------------------------*/
+    /* Get PID and  process group */
+    /*----------------------------*/
+
+    appl_pid      = getpid();
+    appl_sid      = getpgrp();
+
+
+    /*----------------------------------*/
+    /* Standard error stream is stderr. */
+    /*----------------------------------*/
+
+    err_stream = stderr;
+
+
+    /*-------------------------------------------------*/
+    /* Get owner of this application (and its parent). */
+    /*-------------------------------------------------*/
+
+    appl_uid      = getuid();
+    appl_gid      = getgid();
+    appl_ppid     = getppid();
+
+
+    /*----------------------------------------------------*/
+    /* Get the name of the host running this application. */
+    /*----------------------------------------------------*/
+ 
+    (void)gethostname(appl_host,SSIZE);
+
+
     /*---------*/
     /* Softdog */
     /*---------*/
@@ -6902,14 +7116,14 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     if(pupsthread_is_root_thread() == FALSE)
        pups_error("[pups_std_init] attempt by non root thread to perform PUPS/P3 global utility operation");
 
-    if(argc     == (int *)  NULL  ||
-       v_name   == (char *) NULL  ||
-       au_name  == (char *) NULL  ||
-       app_name == (char *) NULL  ||
-       d_made   == (char *) NULL  ||
-       argv     == (char **)NULL   ) 
+    if(argc     == (int32_t *)NULL  ||
+       v_name   == (char    *)NULL  ||
+       au_name  == (char    *)NULL  ||
+       app_name == (char    *)NULL  ||
+       d_made   == (char    *)NULL  ||
+       argv     == (char   **)NULL   ) 
     {  pups_set_errno(EINVAL);
-       return(-1);
+       return;
     }
 
 
@@ -6918,7 +7132,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     /*----------------------------------------------------------------------*/
 
     appl_psrp = TRUE;
-    for(i=1; i<-MAX_SIGS; ++i)
+    for(i=1; i<MAX_SIGS; ++i)
        pupsighold_cnt[i] = 0;
     (void)pupshold(PSRP_SIGS);
 
@@ -6928,7 +7142,6 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     /* will be none-NULL                                        */
     /*----------------------------------------------------------*/
 
-    appl_home = pups_malloc(SSIZE);
     if(getenv("HOME") == (char *)NULL)
        (void)strlcpy(appl_home,"homeless",SSIZE);
     else
@@ -6956,7 +7169,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
 
     /*--------------------------------------------------------------------------*/
     /* Are we a foreground process - if not arrange for all TERMINAL O/P to be  */
-    /* sent to the data sink (/dev/null) ...                                    */
+    /* sent to the data sink (/dev/null)                                        */
     /*--------------------------------------------------------------------------*/
 
     (void)pups_sighandle(SIGTTIN,"fgio_handler",(void *)&fgio_handler,(sigset_t *)NULL);
@@ -6967,7 +7180,6 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     /* Get name of controlling tty for this application */
     /*--------------------------------------------------*/
 
-    appl_ttyname = (char *)pups_malloc(SSIZE);
     appl_tty = open("/dev/tty",2);
 
     if(appl_tty != (-1))
@@ -7000,83 +7212,46 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
        appl_fgnd = FALSE;
 
 
-    /*-------------------------------------------------*/
-    /* Get owner of this application (and its parent). */
-    /*-------------------------------------------------*/
-
-    appl_uid      = getuid();
-    appl_gid      = getgid();
-    appl_ppid     = getppid();
-
-
     /*------------------------------------------------------------*/
     /* Get unique i.d. for host machine running owner application */
     /*------------------------------------------------------------*/
 
     if(access("/etc/machine-id",F_OK | R_OK) == (-1))
-       error("[pups_std_init] cannot get (unique) machine i.d.");
+       pups_error("[pups_std_init] cannot get (unique) machine i.d.");
     else
-    {  int fdes = (-1);
+    {  des_t fdes = (-1);
 
        fdes = open("/etc/machine-id",O_RDONLY);
        (void)read(fdes,appl_machid,32);
        (void)close(fdes);
     }
 
+    #ifndef SINGLE_THREAD
     #ifdef _OPENMP
     appl_omp_threads = omp_get_max_threads();
-    #endif /* _OPENMP */
+    #endif /* _OPENMP       */
+    #endif /* SINGLE_THREAD */
 
     #ifdef PTHREAD_SUPPORT
-    appl_root_thread = pthread_self();
+    appl_root_tid = pthread_self();
     #endif /* PTHREAD_SUPPORT */
 
-    pwent         = getpwuid(appl_uid);
-    appl_owner    = (char *)pups_malloc(SSIZE);
-
+    pwent = getpwuid(appl_uid);
     if(pwent != (struct passwd *)NULL)
        (void)strlcpy(appl_owner,pwent->pw_name,SSIZE);
     else
        (void)snprintf(appl_owner,SSIZE,"uid%d",appl_uid);
 
-    appl_password = (char *)pups_malloc(SSIZE);
     (void)strlcpy(appl_password,"notset",SSIZE);
-
-
-    /*----------------------------*/
-    /* Get PID and process group. */
-    /*----------------------------*/
-
-    appl_pid       = getpid();
-    appl_sid       = getpgrp();
-
-    appl_state     = pups_malloc(SSIZE);
-
-
-    /*----------------------------------*/
-    /* Standard error stream is stderr. */
-    /*----------------------------------*/
-
-    err_stream = stderr;
-
-
-    /*----------------------------------------------------*/
-    /* Get the name of the host running this application. */
-    /*----------------------------------------------------*/
- 
-    appl_host = (char *)pups_malloc(SSIZE);
-    (void)gethostname(appl_host,SSIZE);
 
 
     /*----------------------------------*/
     /* Get user shell from environment. */
     /*----------------------------------*/
  
-    shell = (char *)pups_malloc(SSIZE);
     if(strccpy(shell,(char *)getenv("EXEC_SHELL")) == (char *)NULL)
        (void)strlcpy(shell,"/bin/sh",SSIZE);
 
-    appl_fifo_dir = (char *)pups_malloc(SSIZE);
 
     if(strccpy(appl_fifo_dir,(char *)getenv("FIFO_PATCHBOARD")) == (char *)NULL)
     {  char tmp_fifos[SSIZE] = "";
@@ -7101,16 +7276,6 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     slot_manager_init();
 
 
-    /*---------------------------------*/
-    /* Create storage for global data. */
-    /*---------------------------------*/
-
-    version         = (char *)pups_malloc(SSIZE);
-    author          = (char *)pups_malloc(SSIZE);
-    appl_name       = (char *)pups_malloc(SSIZE);
-    appl_bin_name   = (char *)pups_malloc(SSIZE);
-
-
     /*----------------------------------*/
     /* Make a copy of the command tail. */
     /*----------------------------------*/
@@ -7118,16 +7283,12 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     pups_copytail(argc,args,argv);
 
 
-    appl_err        = (char *)pups_malloc(SSIZE);
-    revdate         = (char *)pups_malloc(SSIZE);
-    
-
     /*--------------------------------------------*/
     /* Copy application data to global variables. */
     /*--------------------------------------------*/
 
-    (void)strlcpy(version,v_name,SSIZE);
-    (void)strlcpy(author,au_name,SSIZE);
+    (void)strlcpy(version,v_name, SSIZE);
+    (void)strlcpy(author, au_name,SSIZE);
 
     if(strrextr(argv[0],appl_name,'/') == FALSE)
     {  (void)strlcpy(appl_name,    argv[0],SSIZE); 
@@ -7144,15 +7305,6 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     /*----------------------------------*/
 
     tinit();
-
-
-    #ifdef SECURE
-    /*----------------*/
-    /* Check license. */
-    /*----------------*/
-
-    (void)pups_securicor((char *)NULL);
-    #endif /* SECURE */
 
 
     /*-----------------------------------------*/
@@ -7178,7 +7330,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     /*------------------*/
 
     if(appl_enable_resident == TRUE && (ptr = pups_locate(&init,"resident",argc,args,0)) != NOT_FOUND)
-    {  if(strccpy(appl_argfifo,pups_str_dec(&ptr,&argc,args)) == (char *)INVALID_ARG)
+    {  if(strccpy(appl_argfifo,pups_str_dec(&ptr,/*&*/argc,args)) == (char *)INVALID_ARG)
           pups_error("[resident process] expecting name of command parameter FIFO");
 
 
@@ -7237,7 +7389,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     /*------------------------------*/
 
     else
-    {  (void)srand48((long int)appl_pid);
+    {  (void)srand48((int64_t)appl_pid);
 
        if(appl_verbose == TRUE)
        {  (void)strdate(date);
@@ -7253,14 +7405,14 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     /*-------------------------------------------------------*/
 
     if((ptr = pups_locate(&init,"mra",argc,args,0)) != NOT_FOUND)
-    {  FTYPE mincpu;
+    {  FTYPE    mincpu;
 
-       int    ret,
-              minmem;
+        int32_t ret,
+                minmem;
 
-       time_t tdum,
-              timeout,
-              start_time;
+       time_t   tdum,
+                timeout,
+                start_time;
 
        if((ptr = pups_locate(&init,"cpu",argc,args,0)) != NOT_FOUND)
        {  if((mincpu = pups_fp_dec(&ptr,argc,args)) == (FTYPE)INVALID_ARG)
@@ -7270,14 +7422,14 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
           mincpu = PUPS_DEFAULT_MIN_CPU;
 
        if((ptr = pups_locate(&init,"mem",argc,args,0)) != NOT_FOUND)
-       {  if((minmem = pups_i_dec(&ptr,argc,args)) == (int)INVALID_ARG)
+       {  if((minmem = pups_i_dec(&ptr,argc,args)) == (int32_t)INVALID_ARG)
              minmem = PUPS_DEFAULT_MIN_MEM;
        }
        else
            minmem = PUPS_IGNORE_MIN_MEM;
 
        if((ptr = pups_locate(&init,"timeout",argc,args,0)) != NOT_FOUND)
-       {  if((timeout = pups_i_dec(&ptr,argc,args)) == (int)INVALID_ARG)
+       {  if((timeout = pups_i_dec(&ptr,argc,args)) == (int32_t)INVALID_ARG)
              timeout = PUPS_DEFAULT_RESOURCE_WAIT;
        }
        else
@@ -7411,7 +7563,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
           if(appl_verbose == TRUE)
           {  (void)strdate(date);
              (void)fprintf(stderr,"%s %s (%d@%s:%s): secure application mode %s\n",
-                     date,appl_name,appl_pid,appl_host,appl_owner,appl_password);
+                           date,appl_name,appl_pid,appl_host,appl_owner,appl_password);
              (void)fflush(stderr);
           }
        }
@@ -7422,12 +7574,12 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
           /* Prompt for password */
           /*---------------------*/
 
-          int  cnt                  = 0,
-               max_trys             = 3;
+           int32_t  cnt = 0,
+               max_trys = 3;
 
-          char password_banner[SSIZE] = "";
+          char password_banner[SSIZE]  = "";
 
-          do {    int verify_cnt = 0;
+          do {    int32_t verify_cnt   = 0;
 
                   char tmp_pw_1[SSIZE] = "",
                        tmp_pw_2[SSIZE] = "";
@@ -7471,7 +7623,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
        }
     }
 
-
+    #ifndef SINGLE_THREAD
     #ifdef _OPENMP
     /*-----------------------------------------------------*/
     /* Set number of OMP threads avaialble to application. */
@@ -7491,7 +7643,8 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
            }
        }
     }
-    #endif /* _OPENMP */
+    #endif /* _OPENMP       */
+    #endif /* SINGLE_THREAD */
 
 
     /*---------------------------------------------------------------------------*/
@@ -7501,10 +7654,10 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     /*---------------------------------------------------------------------------*/
 
     if((ptr = pups_locate(&init,"parent",argc,args,0)) != NOT_FOUND)
-    {  int  i_tmp;
-       char pname[SSIZE] = "";
+    {  pid_t i_tmp;
+       char  pname[SSIZE] = "";
 
-       if((i_tmp = pups_i_dec(&ptr,argc,args)) == (int)INVALID_ARG)
+       if((i_tmp = pups_i_dec(&ptr,argc,args)) == (int32_t)INVALID_ARG)
        {  --ptr; 
           if(strccpy(pname,pups_str_dec(&ptr,argc,args)) == (char *)NULL)
              pups_error("[pups_std_init] expecting effective parent PID or process name");
@@ -7526,10 +7679,9 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
        if(appl_verbose == TRUE)
        {  (void)strdate(date);
           (void)fprintf(stderr,"%s %s (%d@%s:%s): effective parent is %d (%s@%s)\n",
-                  date,appl_name,appl_pid,appl_host,appl_owner,appl_ppid,pname,appl_host);
+                        date,appl_name,appl_pid,appl_host,appl_owner,appl_ppid,pname,appl_host);
           (void)fflush(stderr);
        }
-
     }
 
 
@@ -7577,9 +7729,8 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
        /* We need to set path to (tunnel) binary and context */
        /*----------------------------------------------------*/
 
-       appl_tunnel_path = (char *)pups_malloc(SSIZE);
        if(strccpy(appl_tunnel_path,pups_str_dec(&ptr,argc,args)) == (char *)NULL)
-          (void)snprintf(appl_tunnel_path,SSIZE,"/tmp/tunnel.%d.tmp",appl_pid);
+                  (void)snprintf(appl_tunnel_path,SSIZE,"/tmp/tunnel.%d.tmp",appl_pid);
 
 
        /*-----------------------------------------------------------*/
@@ -7638,8 +7789,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     /*----------------------------------------*/
 
     if((ptr = pups_locate(&init,"log",argc,args,0)) != NOT_FOUND)
-    {  appl_logfile = (char *)pups_malloc(SSIZE);
-       if(strccpy(appl_logfile,pups_str_dec(&ptr,argc,args)) == (char *)NULL)
+    {  if(strccpy(appl_logfile,pups_str_dec(&ptr,argc,args)) == (char *)NULL)
           pups_error("[pups_std_init] expecting name of error/log file");
 
        (void)fclose(stderr);
@@ -7651,14 +7801,12 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     /*---------------------------------------------*/
     /* Set ssh parameters (for remote connection). */
     /*---------------------------------------------*/
-
-
     /*----------*/
     /* Set port */
     /*----------*/
 
     if((ptr = pups_locate(&init,"ssh_port",argc,args,0)) != NOT_FOUND)
-    {  int idum;
+    {  int32_t idum;
 
        if(strccpy(ssh_remote_port,pups_str_dec(&ptr,argc,args)) == (char *)INVALID_ARG)
           pups_error("[pups_std_init] expecting (remote ssh) port name"); 
@@ -7792,18 +7940,11 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     /*-------------------------------------------------------------------------*/
 
     appl_mail_handler = (void *)NULL;
-    appl_mdir         = (char *)pups_malloc(SSIZE);
-    appl_mh_folder    = (char *)pups_malloc(SSIZE);
-    appl_mime_dir     = (char *)pups_malloc(SSIZE);
-    appl_mime_type    = (char *)pups_malloc(SSIZE);
-    appl_replyto      = (char *)pups_malloc(SSIZE);
-
 
     (void)strlcpy(appl_mdir,     "notset",SSIZE);
     (void)strlcpy(appl_mh_folder,"notset",SSIZE);
     (void)strlcpy(appl_mime_dir,"notset",SSIZE);
     (void)strlcpy(appl_mime_type,"all",SSIZE);
-
 
     if((ptr = pups_locate(&init,"mail_dir",argc,args,0)) != NOT_FOUND)
     {  (void)snprintf(appl_mdir,SSIZE,     "%s/Mail/%s.%d.pinbox",appl_home,appl_name,appl_pid);
@@ -7837,9 +7978,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     /*-------------------------------------------------------------*/
 
     if(pups_locate(&init,"pam",argc,args,0) != NOT_FOUND)
-    {  appl_pam_name = (char *)pups_malloc(SSIZE);
-
-       if(strccpy(appl_pam_name,pups_str_dec(&ptr,argc,args)) == (char *)NULL)
+    {  if(strccpy(appl_pam_name,pups_str_dec(&ptr,argc,args)) == (char *)NULL)
           pups_error("[pups_std_init] expecting PSRP server authentication module name");
     }
 
@@ -7849,10 +7988,10 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     /*-------------------------------*/
 
     if((ptr = pups_locate(&init,"chtab",argc,args,0)) != NOT_FOUND)
-    {  if((appl_max_child = pups_i_dec(&ptr,argc,args)) == (int)INVALID_ARG)
+    {  if((appl_max_child = pups_i_dec(&ptr,argc,args)) == (int32_t)INVALID_ARG)
        {  (void)strdate(date);
           (void)fprintf(stderr,"%s %s (%d@%s:%s): expecting number of [PUPS] child table slots\n",
-                                              date,appl_name,appl_pid,appl_host,appl_owner);
+                                                     date,appl_name,appl_pid,appl_host,appl_owner);
           (void)fflush(stderr);
 
           exit(255);
@@ -7871,7 +8010,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     if(appl_verbose == TRUE)
     {  (void)strdate(date);
        (void)fprintf(stderr,"%s %s (%d@%s:%s): %d slots in PUPS child table\n",
-                 date,appl_name,appl_pid,appl_host,appl_owner,appl_max_child);
+                     date,appl_name,appl_pid,appl_host,appl_owner,appl_max_child);
        (void)fflush(stderr);
     }
 
@@ -7882,10 +8021,10 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
 
     #ifdef DLL_SUPPORT
     if((ptr = pups_locate(&init,"ortab",argc,args,0)) != NOT_FOUND)
-    {  if((appl_max_orifices = pups_i_dec(&ptr,argc,args)) == (int)INVALID_ARG)
+    {  if((appl_max_orifices = pups_i_dec(&ptr,argc,args)) == (int32_t)INVALID_ARG)
        {  (void)strdate(date);
           (void)fprintf(stderr,"%s %s (%d@%s:%s): expecting number of [PUPS] DLL orifice table slots\n",
-                                                     date,appl_name,appl_pid,appl_host,appl_owner);
+                                                           date,appl_name,appl_pid,appl_host,appl_owner);
           (void)fflush(stderr);
 
           exit(255);
@@ -7904,7 +8043,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     if(appl_verbose == TRUE)
     {  (void)strdate(date);
        (void)fprintf(stderr,"%s %s (%d@%s:%s): %d slots in PUPS DLL orifice table\n",
-                 date,appl_name,appl_pid,appl_host,appl_owner,appl_max_orifices);
+                      date,appl_name,appl_pid,appl_host,appl_owner,appl_max_orifices);
        (void)fflush(stderr);
     }
     #endif /* DLL_SUPPORT */
@@ -7915,7 +8054,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     /*---------------------*/
 
     if((ptr = pups_locate(&init,"vitab",argc,args,0)) != NOT_FOUND)
-    {  if((appl_max_vtimers = pups_i_dec(&ptr,argc,args)) == (int)INVALID_ARG)
+    {  if((appl_max_vtimers = pups_i_dec(&ptr,argc,args)) == (int32_t)INVALID_ARG)
        {  (void)strdate(date);
           (void)fprintf(stderr,"%s %s (%d@%s:%s): expecting number of [PUPS] virtual timer table slots\n",
                                                              date,appl_name,appl_pid,appl_host,appl_owner);
@@ -7955,7 +8094,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
         /*-------------------------------------*/
 
         if((ptr = pups_locate(&init,"sppoll",argc,args,0)) != NOT_FOUND)
-        {  int itmp;
+        {   int32_t itmp;
 
 
             /*-------------------------------------*/
@@ -8000,7 +8139,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     /*----------------------------------*/
 
     (void)pups_sighandle(SIGCHECK,"ssave_handler",(void *)ssave_handler,(sigset_t *)NULL);
-    #endif /* CRIU_SUPPORT
+    #endif /* CRIU_SUPPORT */
 
 
     /*-------------------------*/
@@ -8015,7 +8154,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
         /*----------------------*/
 
         if((ptr = pups_locate(&init,"timeout",argc,args,0)) != NOT_FOUND)
-        {  int itmp;
+        {   int32_t itmp;
 
 
             /*-------------------------------------*/
@@ -8039,7 +8178,6 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
            (void)fflush(stderr);
         }
     }
-
 
 
     /*------------------------------------*/
@@ -8092,7 +8230,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     {  if((appl_max_files = pups_i_dec(&ptr,argc,args)) == (int)INVALID_ARG)
        {  (void)strdate(date);
           (void)fprintf(stderr,"%s %s (%d@%s:%s): expecting number of (PUPS) file table slots\n",
-                                              date,appl_name,appl_pid,appl_host,appl_owner);
+                                                    date,appl_name,appl_pid,appl_host,appl_owner);
           (void)fflush(stderr);
 
           exit(255);
@@ -8110,7 +8248,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     if(appl_verbose == TRUE)
     {  (void)strdate(date);
        (void)fprintf(stderr,"%s %s (%d@%s:%s): %d slots in PUPS file table\n",
-                 date,appl_name,appl_pid,appl_host,appl_owner,appl_max_files);
+                     date,appl_name,appl_pid,appl_host,appl_owner,appl_max_files);
        (void)fflush(stderr);
     }
 
@@ -8125,7 +8263,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
        if(appl_verbose == TRUE)
        {  (void)strdate(date);
           (void)fprintf(stderr,"%s %s (%d@%s:%s): VT services disabled\n",
-                       date,appl_name,appl_pid,appl_host,appl_owner);
+                             date,appl_name,appl_pid,appl_host,appl_owner);
           (void)fflush(stderr);
        }
     }
@@ -8166,8 +8304,8 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
        if(pups_locate(&init,"bg",argc,args,0) != NOT_FOUND)
           do_bg = TRUE;
 
-       //if(strcmp(appl_host,r_host) != 0)
-       {  if(psrp_remote_start(r_host,do_bg,*argc,args) == (-1))
+       if(strcmp(appl_host,r_host) != 0)
+       {  if(psrp_cmd_on_host(r_host,do_bg,*argc,args) == (-1))
              pups_error("[pups_std_init] remote start failed");
        }
     }
@@ -8248,8 +8386,8 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     /*-----------------------------------------------------------*/
 
     if((ptr = pups_locate(&init,"version",argc,args,0)) != NOT_FOUND)
-    {  int i,
-           pos;
+    {  ssize_t i,
+               pos;
 
        char up_appl_name[SSIZE] = "";
 
@@ -8268,31 +8406,23 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
 
        if(appl_bin_name != (char *)NULL)
           (void)fprintf(stderr,
-                  "    %s [PEN %s] version %s [build %.5d (built %s %s)] (C) %s\n",up_appl_name,
-                                                                                      appl_name,
-                                                                                        version,
-                                                                                      appl_vtag,
-                                                                                      appl_build_time,
-                                                                                      appl_build_date,
-                                                                                               author);
+                  "    %s [PEN %s] version %s [build %.5d (gcc %s: built %s %s)] (C) %s\n",up_appl_name,
+                                                                                              appl_name,
+                                                                                              version,
+                                                                                              appl_vtag,
+                                                                                              __VERSION__,
+                                                                                              appl_build_time,
+                                                                                              appl_build_date,
+                                                                                                       author);
        else
           (void)fprintf(stderr,
-                        "    %s version %s [build %.5d (built %s %s)] (C) %s\n",up_appl_name,
-                                                                                     version,
-                                                                                   appl_vtag,
-                                                                                   appl_build_time,
-                                                                                   appl_build_date,
-                                                                                            author);
-
-       #ifdef SECURE
-       #ifdef SINGLE_HOST_LICENSE
-       (void)fprintf(stderr,"    Single copy single host licence\n");
-       #else
-       (void)fprintf(stderr,"    Single copy multi host licence\n");
-       #endif /* SINGLE_HOST_LICENSE */
-       #else
-       (void)fprintf(stderr,"    Multi copy multi host (unrestricted) licence\n");
-       #endif /* SECURE */
+                        "    %s version %s [build %.5d (gcc %s: built %s %s)] (C) %s\n",up_appl_name,
+                                                                                        version,
+                                                                                        appl_vtag,
+                                                                                        __VERSION__,
+                                                                                        appl_build_time,
+                                                                                        appl_build_date,
+                                                                                                 author);
 
        #ifdef FLOAT
        (void)fprintf(stderr,"    Floating point representation is single precision (%d bytes)\n",sizeof(FTYPE));
@@ -8300,9 +8430,13 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
        (void)fprintf(stderr,"    Floating point representation is double precision (%d bytes)\n",sizeof(FTYPE));
        #endif /* FLOAT */
 
+       #ifndef SINGLE_THREADED
        #ifdef _OPENMP
        (void)fprintf(stderr,"    %d parallel (OMP) threads available\n",appl_omp_threads);
-       #endif /* _OPENMP */
+       #else
+       (void)fprintf(stderr,"    OMP disabled\n");
+       #endif /* _OPENMP       */
+       #endif /* SINGLE_THREAD */
 
        (void)fprintf(stderr,"\n");
 
@@ -8348,7 +8482,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
 
        if(appl_proprietary) 
        {  (void)fprintf(stderr,"\n%s (C) Tumbling Dice\n",up_appl_name);
-          (void)fprintf(stderr,"All rights reserved 2023\n\n");
+          (void)fprintf(stderr,"All rights reserved 2025\n\n");
        }
        else
        {  (void)fprintf(stderr,"\n%s is free software, covered by the GNU General Public License, and you are\n",up_appl_name);
@@ -8373,18 +8507,20 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     /*--------------------------------*/
 
     if((ptr = pups_locate(&init,"usage",argc,args,0)) != NOT_FOUND)
-    {  int  i;
+    {   int32_t  i;
        char up_appl_name[SSIZE] = "";
 
        (void)fprintf(stderr,
-                     "\n\n%s version %s (C) %s, %s\n",appl_name,
-                                                        version,
-                                                         author,
-                                                           date);
+                     "\n\n%s version %s (C) %s (gcc %s: built %s %s)\n",appl_name,
+                                                                        version,
+                                                                        author,
+                                                                        __VERSION__,
+                                                                        __TIME__,
+                                                                        __DATE__);
 
        if(open_source == TRUE)
        {  if(appl_bin_name != (char *)NULL && strcmp(appl_bin_name,"") != 0)
-          {  int pos;
+          {  int32_t pos;
 
              pos = strlen(appl_bin_name);
              do {    --pos;
@@ -8492,7 +8628,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
        {  (void)strdate(date);
 
           (void)fprintf(stderr,"%s %s (%d@%s:%s): version control disabled (vtag: %d)\n",
-                            date,appl_name,appl_pid,appl_host,appl_owner,appl_vtag);
+                                  date,appl_name,appl_pid,appl_host,appl_owner,appl_vtag);
           (void)fflush(stderr);
        }
     }
@@ -8537,7 +8673,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     /*------------------------------------------------------*/
 
     if((ptr = pups_locate(&init,"pgrp",argc,args,0)) != NOT_FOUND)
-    {  int pg_leaders_pid;
+    {  pid_t pg_leaders_pid;
 
        if((pg_leaders_pid = pups_i_dec(&ptr,argc,args)) == (int)INVALID_ARG)
           pups_error("[pups_std_init] expecting pid of process group leader");
@@ -8551,8 +8687,6 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     /* Set application name -- makes sure that channel names for PSRP  */
     /* servers remain conistent.                                       */
     /*-----------------------------------------------------------------*/
-
-    appl_ch_name = (char *)pups_malloc(SSIZE);
 
     if(appl_psrp == TRUE)
     {  if((ptr = pups_locate(&init,"channel_name",argc,args,0)) != NOT_FOUND)
@@ -8571,7 +8705,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
        {  (void)strdate(date);
 
           (void)fprintf(stderr,"%s %s (%d@%s:%s): application channel name (PSRP) is %s\n",
-                           date,appl_name,appl_pid,appl_host,appl_owner,appl_ch_name);
+                                 date,appl_name,appl_pid,appl_host,appl_owner,appl_ch_name);
           (void)fflush(stderr);
        }
     }
@@ -8580,7 +8714,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
        {  (void)strdate(date);
 
           (void)fprintf(stderr,"%s %s (%d@%s:%s): this application is not PSRP enabled\n",
-                                       date,appl_name,appl_pid,appl_host,appl_owner);
+                                             date,appl_name,appl_pid,appl_host,appl_owner);
           (void)fflush(stderr);
        }
     }
@@ -8606,7 +8740,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
        if(appl_verbose == TRUE) 
        {  (void)strdate(date);
           (void)fprintf(stderr,"%s %s (%d@%s:%s): Reactivating PSRP clients (segment %d)\n",
-                  date,appl_name,appl_pid,appl_host,appl_owner,psrp_client_pid[c_client],psrp_seg_cnt);
+                        date,appl_name,appl_pid,appl_host,appl_owner,psrp_client_pid[c_client],psrp_seg_cnt);
           (void)fflush(stderr);
        }
     }
@@ -8629,12 +8763,9 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     }
 
 
-
-    /*--------------------------------------------------------------------------*/
-    /* Are we going to be a leader of processes? If we are then set up handlers */
-    /* to control our subordinates! If we are a foreground process we can never */
-    /* assume this exaulted position as the shell has pre-empted us!            */
-    /*--------------------------------------------------------------------------*/
+    /*-------------*/
+    /* Signal mask */
+    /*-------------*/
 
     (void)sigemptyset(&blocked_set);
     (void)sigaddset(&blocked_set,SIGTSTP);
@@ -8654,6 +8785,13 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
        }
     }
  
+
+    /*--------------------------------------------------------------------------*/
+    /* Are we going to be a leader of processes? If we are then set up handlers */
+    /* to control our subordinates! If we are a foreground process we can never */
+    /* assume this exaulted position as the shell has pre-empted us!            */
+    /*--------------------------------------------------------------------------*/
+
     if(pups_locate(&init,"pg_leader",argc,args,0) != NOT_FOUND)
     {  if(appl_fgnd == FALSE)
        {  (void)setsid();
@@ -8668,7 +8806,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
           if(appl_verbose == TRUE)
           {  (void)strdate(date);
              (void)fprintf(stderr,"%s %s (%d@%s:%s): process group leader\n",
-                          date,appl_name,appl_pid,appl_host,appl_owner);
+                                date,appl_name,appl_pid,appl_host,appl_owner);
              (void)fflush(stderr);
           }
           appl_pg_leader = TRUE;
@@ -8686,7 +8824,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
           if(appl_verbose == TRUE)
           {  (void)strdate(date);
              (void)fprintf(stderr,"%s %s (%d@%s:%s): session (process group) leader\n",
-                                    date,appl_name,appl_pid,appl_host,appl_owner);
+                                          date,appl_name,appl_pid,appl_host,appl_owner);
              (void)fflush(stderr);
           }
           appl_pg_leader = TRUE;
@@ -8696,10 +8834,10 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
        (void)pups_sighandle(SIGTERM,"pups_exit_handler",(void *)pups_exit_handler, (sigset_t *)&blocked_set);
 
 
-    (void)pups_sighandle(SIGINT, "pups_exit_handler",(void *)pups_exit_handler, (sigset_t *)&blocked_set);
-    (void)pups_sighandle(SIGQUIT,"pups_exit_handler",(void *)pups_exit_handler, (sigset_t *)&blocked_set);
-    (void)pups_sighandle(SIGPIPE,"default",          SIG_DFL,                   (sigset_t *)NULL);
-    (void)pups_sighandle(SIGALIVE,"ignore",          SIG_IGN,                   (sigset_t *)NULL);
+    (void)pups_sighandle(SIGINT,  "pups_exit_handler",(void *)pups_exit_handler, (sigset_t *)&blocked_set);
+    (void)pups_sighandle(SIGQUIT, "pups_exit_handler",(void *)pups_exit_handler, (sigset_t *)&blocked_set);
+    (void)pups_sighandle(SIGPIPE, "default",          SIG_DFL,                   (sigset_t *)NULL);
+    (void)pups_sighandle(SIGALIVE,"ignore",           SIG_IGN,                   (sigset_t *)NULL);
 
     #ifdef CRIU_SUPPORT
     (void)pups_sighandle(SIGCHECK,  "ignore",SIG_IGN, (sigset_t *)NULL);
@@ -8711,7 +8849,6 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     /* Set working directory. */
     /*------------------------*/
 
-    appl_cwd = (char *)pups_malloc(SSIZE);
     if((ptr = pups_locate(&init,"cwd",argc,args,0)) != NOT_FOUND)
     {  char cwd[SSIZE]     = "",
             cwdpath[SSIZE] = "",
@@ -8753,7 +8890,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
              if(appl_verbose == TRUE)
              {  (void)strdate(date);
                 (void)fprintf(stderr,"%s %s (%d@%s:%s): current working directory is \"%s\" (could not change it to \"%s\")\n",
-                                                               date,appl_name,appl_pid,appl_owner,appl_host,appl_cwd,cwd);
+                                                                     date,appl_name,appl_pid,appl_owner,appl_host,appl_cwd,cwd);
                 (void)fflush(stderr);
              }    
           }
@@ -8765,7 +8902,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
        if(appl_verbose == TRUE)
        {  (void)strdate(date);
           (void)fprintf(stderr,"%s %s (%d@%s:%s): current working directory is \"%s\" (default)\n",
-                                       date,appl_name,appl_pid,appl_owner,appl_host,appl_cwd);
+                                             date,appl_name,appl_pid,appl_owner,appl_host,appl_cwd);
           (void)fflush(stderr);
        }    
     }
@@ -8778,8 +8915,6 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     /* reconfigurable pipeline). Note standard UNIX shells sh,csh etc are      */
     /* not clever enough to redirect to FIFO's or sockets.                     */
     /*-------------------------------------------------------------------------*/
-
-
     /*----------------------------*/
     /* Redirect stdin (from file) */
     /*----------------------------*/
@@ -8793,8 +8928,8 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
 
 
     if(in_state == LIVE || in_state == DEAD)
-    {  int  in_des,
-            f_index;
+    {   int32_t in_des,
+                f_index;
 
        char     in_name[SSIZE] = "";
        _BOOLEAN file_creator = FALSE;
@@ -8855,8 +8990,8 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     /*----------------------------*/
 
     if(pin_state == LIVE || pin_state == DEAD)
-    {  int in_des,
-           f_index; 
+    {   int32_t in_des,
+                f_index; 
  
        char     in_name[SSIZE] = "";
        _BOOLEAN fifo_creator   = FALSE;
@@ -8895,7 +9030,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
        if(appl_verbose == TRUE)
        {  (void)strdate(date);
           (void)fprintf(stderr,"%s %s (%d@%s:%s): stdin (%d) redirected to %s\n",
-                     date,appl_name,appl_pid,appl_host,appl_owner,in_des,in_name);
+                        date,appl_name,appl_pid,appl_host,appl_owner,in_des,in_name);
           (void)fflush(stderr);
        }
     }
@@ -8913,8 +9048,8 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     } 
  
     if(out_state == LIVE || out_state == DEAD)
-    {  int  out_des,
-            f_index;
+    {   int32_t out_des,
+                f_index;
 
        char out_name[SSIZE]  = "";
 
@@ -8971,8 +9106,8 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     } 
  
     if(pout_state == LIVE || pout_state == DEAD)
-    {  int  out_des,
-            f_index;
+    {   int32_t out_des,
+                f_index;
  
        char     out_name[SSIZE] = "";
        _BOOLEAN fifo_creator    = FALSE;
@@ -9029,8 +9164,8 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     } 
  
     if(err_state == LIVE || err_state == DEAD)
-    {  int  err_des,
-            f_index;
+    {   int32_t err_des,
+                f_index;
 
        char err_name[SSIZE]  = "";
 
@@ -9069,7 +9204,7 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
        if(appl_verbose == TRUE)
        {  (void)strdate(date);
           (void)fprintf(stderr,"%s %s (%d@%s:%s): stderr (%d) redirected to %s\n",
-                    date,appl_name,appl_pid,appl_host,appl_owner,err_des,err_name);
+                        date,appl_name,appl_pid,appl_host,appl_owner,err_des,err_name);
           (void)fflush(stderr);
        }   
     }
@@ -9088,8 +9223,8 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     } 
  
     if(perr_state == LIVE || perr_state == DEAD)
-    {  int  err_des,
-            f_index;
+    {   int32_t err_des,
+                f_index;
 
        char     err_name[SSIZE] = "";
        _BOOLEAN fifo_creator    = FALSE;
@@ -9138,10 +9273,8 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     /* Generate command string. */
     /*--------------------------*/
 
-    appl_cmd_str = (char *)pups_malloc(SSIZE);
-
     (void)strlcpy(appl_cmd_str,appl_name,SSIZE);
-    (void)strlcat(appl_cmd_str," ",SSIZE);
+    (void)strlcat(appl_cmd_str," ",      SSIZE);
 
     for(i=0; i<(*argc) - 1; ++i)
     {  (void)strlcat(appl_cmd_str,args[i],SSIZE);
@@ -9159,18 +9292,17 @@ _PUBLIC void pups_std_init(_BOOLEAN open_source,  /* TRUE if GPL copyrighted ope
     }
 
     (void)nice(appl_nice_lvl);
-
     pups_set_errno(OK);
 }
 
 
 
 
-/*------------------------------------------------------------------------------
-    Set array allocation options ...
-------------------------------------------------------------------------------*/
+/*----------------------------------------*/
+/* Set memory allocate (extended) options */
+/*----------------------------------------*/
 
-_PUBLIC void pups_set_alloc_opt(const int alloc_opt)
+_PUBLIC void pups_set_alloc_opt(const int32_t alloc_opt)
 
 {
     /*----------------------------------*/
@@ -9188,10 +9320,9 @@ _PUBLIC void pups_set_alloc_opt(const int alloc_opt)
 
 
 
-/*------------------------------------------------------------------------------
-    Routine to malloc memory checking for error. If not memory could be
-    allocated print error message and exit ...
-------------------------------------------------------------------------------*/
+/*--------------------------------*/
+/* Extended error checking malloc */
+/*--------------------------------*/
 
 _PUBLIC void *pups_malloc(const psize_t size)
 
@@ -9233,17 +9364,16 @@ _PUBLIC void *pups_malloc(const psize_t size)
 
 
 
-/*------------------------------------------------------------------------------
-    Routine to realloc memory checking for error. If reallocation fails,
-    print error message and exit ...
-------------------------------------------------------------------------------*/
+/*---------------------------------*/
+/* Extended error checking realloc */
+/*---------------------------------*/
 
 _PUBLIC void *pups_realloc(void *ptr, const psize_t size)
 
 {   pups_set_errno(OK);
     
     if(ptr == (void *)NULL && size != 0)
-    {  ptr = (void *)pups_malloc((unsigned)size);
+    {  ptr = (void *)pups_malloc(size);
        return(ptr);
     }
     else if(ptr != NULL && size == 0)
@@ -9279,10 +9409,9 @@ _PUBLIC void *pups_realloc(void *ptr, const psize_t size)
 
 
 
-/*------------------------------------------------------------------------------
-    Routine to calloc memory, checking for error. If reallocation fails,
-    print error message and exit ...
-------------------------------------------------------------------------------*/
+/*--------------------------------*/
+/* Extended error checking calloc */
+/*--------------------------------*/
 
 _PUBLIC void *pups_calloc(const pindex_t nel, const psize_t size)
 
@@ -9324,9 +9453,9 @@ _PUBLIC void *pups_calloc(const pindex_t nel, const psize_t size)
 
 
 
-/*------------------------------------------------------------------------------
-    Routine to free a pointer, first checking if it is already free ...
-------------------------------------------------------------------------------*/
+/*------------------------------*/
+/* Extended error checking free */
+/*------------------------------*/
 
 _PUBLIC void *pups_free(const void *ptr)
 
@@ -9345,12 +9474,11 @@ _PUBLIC void *pups_free(const void *ptr)
 
 
 
-/*------------------------------------------------------------------------------
-   Routine to read n bytes from stream, checking that N bytes are in
-   fact actually read ...
-------------------------------------------------------------------------------*/
+/*------------------------------*/
+/* Extended error checking read */
+/*------------------------------*/
 
-_PUBLIC int pups_read(const des_t f_id, _BYTE *buf, const psize_t n_bytes)
+_PUBLIC int32_t pups_read(const des_t f_id, void *buf, const psize_t n_bytes)
 
 {   
     if(buf == (const _BYTE *)NULL || n_bytes <= 0)
@@ -9368,13 +9496,11 @@ _PUBLIC int pups_read(const des_t f_id, _BYTE *buf, const psize_t n_bytes)
 
 
 
+/*------------------------------*/
+/* Extended eror checking write */
+/*------------------------------*/
 
-/*------------------------------------------------------------------------------
-   Routine to write n bytes to a stream, checking that N bytes are in
-   fact actually written ...
-------------------------------------------------------------------------------*/
-
-_PUBLIC int pups_write(const des_t fd, const _BYTE *buf, const psize_t n_bytes)
+_PUBLIC int32_t pups_write(const des_t fd, const void *buf, const psize_t n_bytes)
 
 {   psize_t written       = 0L,
             total_written = 0L;
@@ -9408,17 +9534,17 @@ _PUBLIC int pups_write(const des_t fd, const _BYTE *buf, const psize_t n_bytes)
 
 
 
-/*-----------------------------------------------------------------------------
-    Execls - routine to overlay and execute a command string ...
------------------------------------------------------------------------------*/
+/*------------------------*/
+/* Execute command string */ 
+/*------------------------*/
 
-_PUBLIC int pups_execls(const char *command)
+_PUBLIC int32_t pups_execls(const char *command)
 
-{   int ret,
-          j,
-          i = 0;
+{    int32_t ret,
+             j,
+             i = 0;
 
-    char     *cmd_list[256] = { [0 ... 255] = (char *)NULL };  // List of command arguments 
+    char     *cmd_list[ARGS] = { [0 ... ARGS-1] = (char *)NULL };  // List of command arguments 
     _BOOLEAN looper;
 
     if(command == (const char *)NULL)
@@ -9491,37 +9617,38 @@ _PUBLIC int pups_execls(const char *command)
 
 
 
-/*----------------------------------------------------------------------
-    Routine to set a discretionary lock. This routine assumes that
-    the process of making a link to a file is atomic. This means
-    that only one process can make a link to a file at any
-    time ...
-
-    This routine blocks the caller until lock is acquired. If the
-    lock cannot be acquired after a reasonable number of attempts
-    the calling process is exited ...
-----------------------------------------------------------------------*/
+/*------------------------------------------------------------------*/
+/*    Set  discretionary lock. This routine assumes that            */
+/*    making a link to a file is atomic. This means                 */
+/*    that only one process can make a link to a file at any        */
+/*    time.                                                         */
+/*                                                                  */
+/*    This routine blocks the caller until lock is acquired. If the */
+/*    lock cannot be acquired after a reasonable number of attempts */
+/*    the calling process is exited                                 */
+/*------------------------------------------------------------------*/
 
 
 /*------------------------------*/
 /* Lock names,types` and counts */
 /*------------------------------*/
 
-_PRIVATE int             lock_cnt      [PUPS_MAX_LOCKS]        = { [0 ... PUPS_MAX_LOCKS-1] = 0 };
+_PRIVATE int32_t         lock_cnt      [PUPS_MAX_LOCKS]        = { [0 ... PUPS_MAX_LOCKS-1] = 0 };
 _PRIVATE char            lock_name_list[PUPS_MAX_LOCKS][SSIZE] = { [0 ... PUPS_MAX_LOCKS-1] = { "notset"}};
 _PRIVATE char            lock_type_list[PUPS_MAX_LOCKS][SSIZE] = { [0 ... PUPS_MAX_LOCKS-1] = { "notset"}};
 _PRIVATE _BOOLEAN        locks_active                          = FALSE;
 
 
 
-/*------------------------------------------------------------------------------
-    Get next free (link) lock index ...
-------------------------------------------------------------------------------*/
+/*---------------------------------*/
+/* Get next free (link) lock index */
+/*---------------------------------*/
 
-_PRIVATE int get_lock_index(char *name)
+_PRIVATE int32_t get_lock_index(char *name)
 
-{   int i,
-        free_index = 0;
+{   uint32_t i;
+             int32_t  free_index = 0;
+
 
     /*---------------------------------------*/
     /* Initialise lock list if this is first */
@@ -9551,7 +9678,7 @@ _PRIVATE int get_lock_index(char *name)
           (void)pthread_mutex_unlock(&lock_mutex);
           #endif /* PTHREAD_SUPPORT */
 
-          return(i);
+          return((int32_t)i);
        }
        else if(strcmp(lock_name_list[i],"notset") != 0)
           ++free_index;
@@ -9567,14 +9694,14 @@ _PRIVATE int get_lock_index(char *name)
 
 
 
-/*------------------------------------------------------------------------------
-    Show (link) locks which are currently in use ...
-------------------------------------------------------------------------------*/
+/*------------------------------------*/
+/* Show (link) locks currently in use */
+/*------------------------------------*/
 
-_PUBLIC int pups_show_link_file_locks(const FILE *stream)
+_PUBLIC int32_t pups_show_link_file_locks(const FILE *stream)
 
-{   int i,
-        locks = 0;
+{   uint32_t i,
+             locks = 0;
 
     if(stream == (const FILE *)NULL)
     {  pups_set_errno(EINVAL);
@@ -9646,29 +9773,30 @@ _PUBLIC int pups_show_link_file_locks(const FILE *stream)
 
 
 
-/*-------------------------------------------------------------------------------------
-    Set a read or write link file lock ...
--------------------------------------------------------------------------------------*/
+/*----------------------------------*/
+/* Set read or write link file lock */
+/*----------------------------------*/
 
-_PUBLIC int pups_get_rdwr_link_file_lock(const int lock_type, const int max_trys, const char *file_name)
+_PUBLIC int32_t pups_get_rdwr_link_file_lock(const int32_t lock_type, const int32_t max_trys, const char *file_name)
 
-{   int  ret,
-         owner_pid,
-         lock_index,
-         trys = 0;
+{    int32_t ret,
+             lock_index,
+             trys = 0;
 
-    char lock_name[SSIZE]      = "",
-         rd_lock_name[SSIZE]   = "",
-         lock_id[SSIZE]        = "",
-         strdum[SSIZE]         = "",
+    pid_t owner_pid;
 
-         #ifdef SSH_SUPPORT
-         owner_host[SSIZE]     = "",
-         owner_ssh_port[SSIZE] = "",
-         #endif /* SSH_SUPPORT */
+    char  lock_name[SSIZE]      = "",
+          rd_lock_name[SSIZE]   = "",
+          lock_id[SSIZE]        = "",
+          strdum[SSIZE]         = "",
 
-         lock_owner[SSIZE]     = "",
-         lid_name[SSIZE]       = "";
+          #ifdef SSH_SUPPORT
+          owner_host[SSIZE]     = "",
+          owner_ssh_port[SSIZE] = "",
+          #endif /* SSH_SUPPORT */
+
+          lock_owner[SSIZE]     = "",
+          lid_name[SSIZE]       = "";
 
     struct stat buf;
 
@@ -9732,7 +9860,7 @@ _PUBLIC int pups_get_rdwr_link_file_lock(const int lock_type, const int max_trys
     {  if(appl_verbose == TRUE)
        {  (void)strdate(date);
           (void)fprintf(stderr,"%s %s (%d@%s:%s): file \"%s\" lock count incremented to %d\n",
-                              date,appl_name,appl_pid,appl_host,appl_owner,file_name,lock_cnt[lock_index]);
+                        date,appl_name,appl_pid,appl_host,appl_owner,file_name,lock_cnt[lock_index]);
           (void)fflush(stderr);
        }
 
@@ -9774,7 +9902,6 @@ _PUBLIC int pups_get_rdwr_link_file_lock(const int lock_type, const int max_trys
            /* Strip file i.d. information from lock i.d. */
            /*--------------------------------------------*/
 
-           // MAO (void)strccpy(lock_owner,strin2(next_item->d_name,".lid")); 
            (void)strccpy(lock_owner,next_item->d_name);
            (void)mchrep(' ',".",lock_owner);
 
@@ -9941,12 +10068,15 @@ _PUBLIC int pups_get_rdwr_link_file_lock(const int lock_type, const int max_trys
           }
        }
     }
+
+
+    /*------------------*/
+    /* Protect the lock */
+    /*------------------*/
+
     else
     {
 
-       /*------------------*/
-       /* Protect the lock */
-       /*------------------*/
 
        if(lock_type == RDLOCK)
        {  if(link(file_name,rd_lock_name) == (-1)) 
@@ -9966,12 +10096,14 @@ _PUBLIC int pups_get_rdwr_link_file_lock(const int lock_type, const int max_trys
 	     return(-1);
           }
        }
+
+
+       /*------------------------------------------------------------------------*/
+       /* We need to check if we still have readers before releasing a read lock */ 
+       /*------------------------------------------------------------------------*/
+
        else
        {  
-
-          /*------------------------------------------------------------------------*/
-          /* We need to check if we still have readers before releasing a read lock */ 
-          /*------------------------------------------------------------------------*/
 
           if(access(rd_lock_name,F_OK | R_OK | W_OK) != (-1) || link(file_name,lock_name) == (-1))
           {  
@@ -10047,13 +10179,13 @@ _PUBLIC int pups_get_rdwr_link_file_lock(const int lock_type, const int max_trys
 
 
 
-/*-------------------------------------------------------------------------------------
-    Set a write (exclusive) link file lock ...
--------------------------------------------------------------------------------------*/
+/*----------------------------------------*/
+/* Set a write (exclusive) link file lock */
+/*----------------------------------------*/
 
-_PUBLIC int pups_get_link_file_lock(const unsigned int max_trys, const char *file_name)
+_PUBLIC int32_t pups_get_link_file_lock(const uint32_t max_trys, const char *file_name)
 
-{   int ret;
+{    int32_t ret;
 
     if(max_trys == 0 || file_name == (const char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -10067,16 +10199,16 @@ _PUBLIC int pups_get_link_file_lock(const unsigned int max_trys, const char *fil
 
 
 
-/*-------------------------------------------------------------------------------------
-    Release file lock (set by get_file_lock()) ...
--------------------------------------------------------------------------------------*/
+/*------------------------*/
+/* Release link file lock */
+/*------------------------*/
 
-_PUBLIC int pups_release_link_file_lock(const char *file_name)
+_PUBLIC int32_t pups_release_link_file_lock(const char *file_name)
 
 {   char lock_name[SSIZE] = "",
          lock_id[SSIZE]   = "";
 
-    int lock_index;
+     int32_t lock_index;
 
     if(file_name == (const char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -10194,14 +10326,14 @@ _PUBLIC int pups_release_link_file_lock(const char *file_name)
 
 
 
-/*-----------------------------------------------------------------------------
-    Release all link file locks ...
------------------------------------------------------------------------------*/
+/*-----------------------------*/
+/* Release all link file locks */
+/*-----------------------------*/
 
-_PUBLIC int pups_release_all_link_file_locks(void)
+_PUBLIC int32_t pups_release_all_link_file_locks(void)
 
-{   int i,
-        removed = 0;
+{   uint32_t i;
+    int32_t  removed         = 0;
 
     char next_lock_id[SSIZE] = "",
          next_lock[SSIZE]    = "";
@@ -10293,14 +10425,14 @@ _PUBLIC int pups_release_all_link_file_locks(void)
 
 
 
-/*-----------------------------------------------------------------------------
-    Enable obituary for pipestream (child) process ...
------------------------------------------------------------------------------*/
+/*------------------------------------------------*/
+/* Enable obituary for pipestream (child) process */
+/*------------------------------------------------*/
 
-_PUBLIC int pups_pipestream_obituary_enable(const int fdes)
+_PUBLIC  int32_t pups_pipestream_obituary_enable(const des_t fdes)
 
-{   int i,
-        f_index;
+{   uint32_t i;
+     int32_t f_index;
 
     f_index = pups_get_ftab_index(fdes);
 
@@ -10344,14 +10476,14 @@ _PUBLIC int pups_pipestream_obituary_enable(const int fdes)
 
 
 
-/*----------------------------------------------------------------------------- 
-    Disable obituary for pipestream (child) process ... 
------------------------------------------------------------------------------*/ 
+/*-------------------------------------------------*/ 
+/* Disable obituary for pipestream (child) process */
+/*-------------------------------------------------*/ 
  
-_PUBLIC int pups_pipestream_obituary_disable(const int fdes) 
+_PUBLIC int32_t pups_pipestream_obituary_disable(const des_t fdes) 
  
-{   int i,
-        f_index;
+{   uint32_t i;
+    int32_t  f_index;
  
     f_index = pups_get_ftab_index(fdes);
 
@@ -10394,14 +10526,14 @@ _PUBLIC int pups_pipestream_obituary_disable(const int fdes)
 
 
 
-/*-----------------------------------------------------------------------------
-    Extended fork routine which remembers forked children ...
------------------------------------------------------------------------------*/
+/*-----------------------------------------------*/
+/* Extended fork (which records forked children) */
+/*-----------------------------------------------*/
 
-_PUBLIC int pups_fork(const _BOOLEAN fork_wait, const _BOOLEAN obituary)
+_PUBLIC pid_t pups_fork(const _BOOLEAN fork_wait, const _BOOLEAN obituary)
 
-{   int i,
-        pid;
+{   uint32_t i;
+    pid_t    pid;
 
     if((fork_wait != FALSE && fork_wait != TRUE) ||
        (obituary  != FALSE && obituary  != TRUE)  )
@@ -10481,13 +10613,13 @@ _PUBLIC int pups_fork(const _BOOLEAN fork_wait, const _BOOLEAN obituary)
 
 
 
-/*------------------------------------------------------------------------------
-    Initialise table of children ...
-------------------------------------------------------------------------------*/
+/*------------------------*/
+/* Initialise child table */
+/*------------------------*/
 
-_PUBLIC void pups_init_child_table(const int max_children)
+_PUBLIC void pups_init_child_table(const uint32_t max_children)
 
-{   int i;
+{   uint32_t i;
 
 
     /*----------------------------------*/
@@ -10502,11 +10634,11 @@ _PUBLIC void pups_init_child_table(const int max_children)
     (void)pthread_mutex_lock(&chtab_mutex);
     #endif /* PTHREAD_SUPPORT */
 
-    chtab = (chtab_type *)pups_realloc((void *)NULL,max_children*sizeof(chtab_type));
+    chtab = (chtab_type *)pups_realloc((void *)chtab,max_children*sizeof(chtab_type));
     for(i=0; i<max_children; ++i)
     {  chtab[i].pid      = (-1);
        chtab[i].obituary = FALSE;
-       chtab[i].name     = (char *)NULL;
+       (void)strlcpy(chtab[i].name,"",SSIZE);
     }
 
     (void)pups_sighandle(SIGCHLD,"child_handler",(void *)&chld_handler, (sigset_t *)NULL);
@@ -10519,11 +10651,11 @@ _PUBLIC void pups_init_child_table(const int max_children)
 
 
 
-/*------------------------------------------------------------------------------
-    Clear a child table slot ...
-------------------------------------------------------------------------------*/
+/*------------------------*/
+/* Clear child table slot */
+/*------------------------*/
 
-_PUBLIC int pups_clear_chtab_slot(const _BOOLEAN destroy, const unsigned int chld_index)
+_PUBLIC int32_t pups_clear_chtab_slot(const _BOOLEAN destroy, const uint32_t chld_index)
 
 {   if(chld_index >= appl_max_child || (destroy != FALSE && destroy != TRUE))
     {  pups_set_errno(EINVAL);
@@ -10538,9 +10670,9 @@ _PUBLIC int pups_clear_chtab_slot(const _BOOLEAN destroy, const unsigned int chl
     chtab[chld_index].obituary = FALSE;
 
     if(destroy == FALSE)
-       chtab[chld_index].name = (char *)NULL;
+       (void)strlcpy(chtab[chld_index].name,"",SSIZE);
     else
-       chtab[chld_index].name = (char *)pups_free((void *)chtab[chld_index].name);
+       (void)strlcpy(chtab[chld_index].name,"",SSIZE);
 
     #ifdef PTHREAD_SUPPORT
     (void)pthread_mutex_unlock(&chtab_mutex);
@@ -10553,14 +10685,14 @@ _PUBLIC int pups_clear_chtab_slot(const _BOOLEAN destroy, const unsigned int chl
 
 
 
-/*------------------------------------------------------------------------------
-    Show child table ...
-------------------------------------------------------------------------------*/
+/*---------------------*/
+/* Display child table */
+/*---------------------*/
 
 _PUBLIC void pups_show_children(const FILE *stream)
 
-{   int i,
-        children = 0;
+{   uint32_t i,
+             children = 0;
 
     if(stream == (const FILE *)NULL)
     {  pups_set_errno(EINVAL);
@@ -10585,9 +10717,9 @@ _PUBLIC void pups_show_children(const FILE *stream)
     #endif /* PTHREAD_SUPPORT */
 
     for(i=0; i<appl_max_child; ++i)
-    {  if(chtab[i].pid != (-1))    /*----------------------------------------------------------*/
-       {  char name[4096] = "";    /* Could be a pipeline so we need to reserve space for this */
-                                   /*----------------------------------------------------------*/
+    {  if(chtab[i].pid != (-1))     /*----------------------------------------------------------*/
+       {  char name[SSIZE] = "";    /* Could be a pipeline so we need to reserve space for this */
+                                    /*----------------------------------------------------------*/
 
           if(chtab[i].name == (char *)NULL)
              (void)strlcpy(name,"<unnamed>",SSIZE);
@@ -10623,13 +10755,13 @@ _PUBLIC void pups_show_children(const FILE *stream)
 
 
 
-/*------------------------------------------------------------------------------
-    Set child process name ...
-------------------------------------------------------------------------------*/
+/*----------------*/
+/* Set child name */
+/*----------------*/
 
-_PUBLIC _BOOLEAN pups_set_child_name(const int pid, const char *name)
+_PUBLIC _BOOLEAN pups_set_child_name(const pid_t pid, const char *name)
 
-{   int i;
+{   uint32_t i;
 
     if(pid <= 0 || name == (const char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -10644,10 +10776,7 @@ _PUBLIC _BOOLEAN pups_set_child_name(const int pid, const char *name)
 
     for(i=0; i<MAX_CHILDREN; ++i)
     {  if(chtab[i].pid == pid)
-       {  if(chtab[i].name == (char *)NULL)
-             chtab[i].name = (char *)pups_malloc(SSIZE); 
-
-          (void)strlcpy(chtab[i].name,name,SSIZE);
+       {  (void)strlcpy(chtab[i].name,name,SSIZE);
      
           #ifdef PTHREAD_SUPPORT
           (void)pthread_mutex_unlock(&pups_fork_mutex);
@@ -10668,16 +10797,15 @@ _PUBLIC _BOOLEAN pups_set_child_name(const int pid, const char *name)
 
 
 
-/*------------------------------------------------------------------------------
-    Routine to handle SIGCHLD - removes child pid from table of child
-    processes ...
-------------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------*/
+/* Routine to handle SIGCHLD (removes child info from child table) */
+/*-----------------------------------------------------------------*/
 
-_PRIVATE void chld_handler(int sig)
+_PRIVATE void chld_handler(const int32_t signum)
 
-{   int i,
-        pid,
-        status;
+{   uint32_t i;
+    pid_t    pid;
+    int32_t  status;
 
     while((pid = waitpid((-1),&status,WNOHANG)) > 0)
     {    
@@ -10704,9 +10832,7 @@ _PRIVATE void chld_handler(int sig)
                }
 
                chtab[i].pid = (-1);
-
-               if(chtab[i].name != (char *)NULL)
-                  chtab[i].name = (char *)pups_free(chtab[i].name);
+               (void)strlcpy(chtab[i].name,"",SSIZE);
 
                --n_children;
                i = MAX_CHILDREN + 1;
@@ -10724,9 +10850,9 @@ _PRIVATE void chld_handler(int sig)
 
 
 
-/*------------------------------------------------------------------------------
-    Install handler for PUPS automatic child management ...
-------------------------------------------------------------------------------*/
+/*-----------------------------------------------------*/
+/* Install handler for PUPS automatic child management */
+/*-----------------------------------------------------*/
 
 _PUBLIC void pups_auto_child(void)
 
@@ -10736,9 +10862,9 @@ _PUBLIC void pups_auto_child(void)
 
 
 
-/*------------------------------------------------------------------------------
-    Remove handler for PUPS automatic child managment ...
-------------------------------------------------------------------------------*/
+/*---------------------------------------------------*/
+/* Remove handler for PUPS automatic child managment */
+/*---------------------------------------------------*/
 
 _PUBLIC void pups_noauto_child(void)
 
@@ -10748,21 +10874,21 @@ _PUBLIC void pups_noauto_child(void)
 
 
 
-/*------------------------------------------------------------------------------
-    Wait function compatable with PUPS child managment ...
-------------------------------------------------------------------------------*/
+/*----------------------------------------------------*/
+/* Wait function compatable with PUPS child managment */
+/*----------------------------------------------------*/
 
-_PUBLIC int pupswait(_BOOLEAN wait_verbose, int *status)
+_PUBLIC int32_t pupswait(_BOOLEAN wait_verbose, int32_t *status)
 
-{   int i,
-        pid;
+{   uint32_t i;
+    pid_t    pid;
 
 
     /*--------------*/
     /* Sanity check */
     /*--------------*/
 
-    if(status == (int *)NULL)
+    if(status == (int32_t *)NULL)
     {  pups_set_errno(EINVAL);
        return(-1);
     }
@@ -10814,9 +10940,7 @@ _PUBLIC int pupswait(_BOOLEAN wait_verbose, int *status)
 
            chtab[i].pid = (-1);
 
-           if(chtab[i].name != (char *)NULL)
-              chtab[i].name = (char *)pups_free(chtab[i].name);
-
+           (void)strlcpy(chtab[i].name,"",SSIZE);
            --n_children;
 
            pups_auto_child();
@@ -10843,22 +10967,21 @@ _PUBLIC int pupswait(_BOOLEAN wait_verbose, int *status)
 
 
 
+/*-------------------------------------------------------*/
+/* Waitpid function compatable with PUPS child managment */
+/*-------------------------------------------------------*/
 
-/*------------------------------------------------------------------------------
-    Waitpid function compatable with PUPS child managment ...
-------------------------------------------------------------------------------*/
+_PUBLIC int32_t pupswaitpid(const _BOOLEAN waitpid_verbose, const pid_t wait_pid, int32_t *status)
 
-_PUBLIC int pupswaitpid(_BOOLEAN waitpid_verbose, int wait_pid, int *status)
-
-{   int i,
-        pid;
+{   uint32_t i;
+    pid_t    pid;
 
 
     /*--------------*/
     /* Sanity check */
     /*--------------*/
 
-    if(wait_pid <= 0 || status == (int *)NULL)
+    if(wait_pid <= 0 || status == (int32_t *)NULL)
     {  pups_set_errno(EINVAL);
        return(-1);
     }
@@ -10907,9 +11030,7 @@ _PUBLIC int pupswaitpid(_BOOLEAN waitpid_verbose, int wait_pid, int *status)
           }
 
           chtab[i].pid = (-1);
-
-          if(chtab[i].name != (char *)NULL)
-             chtab[i].name = (char *)pups_free(chtab[i].name);
+          (void)strlcpy(chtab[i].name,"",SSIZE);
 
           --n_children;
 
@@ -10937,238 +11058,15 @@ _PUBLIC int pupswaitpid(_BOOLEAN waitpid_verbose, int wait_pid, int *status)
 
 
 
-#ifdef SECURE
-
-/*-----------------------------------------------------------------------------
-    Send mail to vendor informing of licensing violation ...
------------------------------------------------------------------------------*/
-
-#ifdef VENDOR_MAIL_ADDRESS
-
-_PRIVATE void mail_license_violation(void)
-
-{   int i;
-
-    char mail_cmd[SSIZE]            = "",
-         vendor_domain[SSIZE]       = "",
-         vendor_mail_address[SSIZE] = "";
-
-    _BOOLEAN remote_domain = FALSE;
-    FILE *pstream          = (FILE *)NULL;
-
-    (void)strlcpy(vendor_mail_address,VENDOR_MAIL_ADDRESS,SSIZE);
-
-
-    /*------------------------------*/
-    /* Can we actually send a mail? */
-    /*------------------------------*/
-
-    for(i=0; i<strlen(vendor_mail_address); ++i)
-    {  if(vendor_mail_address[i] == '@')
-       {  remote_domain = TRUE;
-          break;
-       }
-    }
-
-    #ifdef PING_REMOTE
-    if(remote_domain == TRUE)
-    {  char line[SSIZE]     = "",
-            ping_cmd[SSIZE] = "";
-
-       (void)strlcpy(vendor_domain,&vendor_mail_address[i+1],SSIZE);   
-       (void)snprintf(ping_cmd,SSIZE,"bash -c \"ping -c 1 %s | cat\"",vendor_domain);
-
-       if((pstream = popen(ping_cmd,"r")) == (FILE *)NULL)
-          return;
-
-       (void)fgets(line,SSIZE,pstream);
-       (void)fgets(line,SSIZE,pstream);
-       (void)pclose(pstream);
-
-       if(strin(line,"Net Unreach") == TRUE || strin(line,"unknown host") == TRUE)
-          return;
-    }
-    #endif /* PING_REMOTE */
-       
-    (void)snprintf(mail_cmd,SSIZE,"cat | mail -s \"license abuse (securicor)\" %s",vendor_mail_address);
-
-    if((pstream = popen(mail_cmd,"w")) == (FILE *)NULL)
-       return;
-
-    (void)fprintf(pstream,"\n%s@%s has abused license conditions for application \"%s\"\n.\n",
-                                                           appl_owner,appl_host,appl_bin_name);
-    (void)fflush(pstream);
-    (void)pclose(pstream); 
-}
-#endif /* VENDOR_MAIL_ADDRESS */
-
-
-
-/*-----------------------------------------------------------------------------
-    Only run application if serial number on disk matches that hard-wired
-    into code ...
------------------------------------------------------------------------------*/
-
-_PUBLIC void pups_securicor(char *exec_path)
-
-{   int  ddes                    = (-1);
-
-    char disk_serial[SSIZE]      = "",
-         appl_serial[SSIZE]      = "",
-         hd_device[SSIZE]        = "",
-         appl_dongle_file[SSIZE] = "",
-         appl_dongle[SSIZE]      = "";
-
-    FILE *stream                 = (FILE *)NULL;
-
-    struct hd_driveid disk_info;
-
-    if(exec-path == (char *)NULL)
-    {  pups_set_errno(EINVAL);
-       return;
-    }
-    else
-       pups_set_errno(OK);
-
-    #ifndef DISK_SERIAL
-    pups_error("[securicor] license has not been installed properly");
-    #else /* DISK_SERIAL */
-
-    if(strcmp(HD_DEVICE,"/dev/dummy") != 0)
-    {  
-
-
-       /*-------------------------------------------------------------------------*/
-       /* Check hard disk serial number. If this does not match the serial number */
-       /* expected by the application this is illegal so abort run.               */
-       /*-------------------------------------------------------------------------*/
-
-       (void)strlcpy(hd_device,HD_DEVICE,SSIZE);
-
-       if((ddes = open(hd_device,0)) == (-1))
-       {  char errstr[SSIZE] = "";
-
-          (void)snprintf(errstr,SSIZE,"[securicor] cannot open \"%s\" to authorise application",hd_device);
-          pups_error(errstr);
-       }
-
-       (void)ioctl(ddes,HDIO_GET_IDENTITY,(void *)&disk_info);
-       (void)close(ddes);
-       (void)strlcpy(appl_serial,DISK_SERIAL,SSIZE);
-       (void)ecryptstr(SEQUENCE_SEED,TRUE,disk_info.serial_no,disk_serial);
-    }
-    else
-    {  struct stat stat_buf;
-
-       if(getenv("USE_SOFT_DONGLE") == (char *)NULL)
-       {  char errstr[SSIZE] = "";
-
-
-          /*-----------------------------------------------------*/
-          /* Default location of soft dongle authentication file */
-          /*-----------------------------------------------------*/
-
-          (void)snprintf(appl_dongle_file,SSIZE,"%s/.sdongles/pups.dongle",appl_home);
-          if(access(appl_dongle_file,F_OK | R_OK | W_OK) == (-1))
-          {  (void)snprintf(errstr,SSIZE,"[securicor] cannot open (soft dongle) to authorise application");
-             pups_error(errstr);
-          }
-
-          if((ddes = open(appl_dongle_file,0)) == (-1))
-          {  char errstr[SSIZE] = "";
-
-             (void)snprintf(errstr,SSIZE,"[securicor] cannot open (soft dongle)  \"%s\" to authorise application",appl_dongle_file);
-             pups_error(errstr);
-          }
-       }
-       else
-       {  (void)strlcpy(appl_dongle_file,getenv("USE_SOFT_DONGLE"),SSIZE);
-          if((ddes = open(appl_dongle_file,0)) == (-1))
-          {  char errstr[SSIZE] = "";
-
-             (void)snprintf(errstr,SSIZE,"[securicor] cannot open (soft dongle)  \"%s\" to authorise application",appl_dongle_file);
-             pups_error(errstr);
-          }
-       }
-
-       (void)fstat(ddes,&stat_buf);
-       (void)snprintf(disk_serial,SSIZE,"%x",stat_buf.st_ino);
-       (void)close(ddes);
-       (void)strlcpy(appl_serial,DISK_SERIAL,SSIZE);
-    }
-
-    if(strcmp(disk_serial,appl_serial) != 0)
-    {  char errstr[SSIZE] = "";
-
-
-       /*-------------------------------------------------*/
-       /* Send mail to vendor noting licence infringement */
-       /*-------------------------------------------------*/
-
-       (void)mail_license_violation();
-
-       (void)snprintf(errstr,SSIZE,"[securicor] this is an unathorised copy of \"%s\" -- aborting",appl_name);
-       pups_error(errstr);
-    }
-
-    if(exec_path != (char *)NULL)
-    {  
-
-       /*-------------------------------------------------------*/
-       /* Check to see if binary is on NFS filesystem. If it is */
-       /* then this is illegal so run must be aborted.          */
-       /*-------------------------------------------------------*/
-
-       if(pups_is_on_nfs(exec_path) == TRUE)
-       {  char errstr[SSIZE] = "";
-
-
-          /*-------------------------------------------------*/
-          /* Send mail to vendor noting licence infringement */
-          /*-------------------------------------------------*/
-
-          (void)mail_license_violation();
-
-          (void)snprintf(errstr,SSIZE,"[securicor] \"%s\" is running on an unauthorised processor -- aborting",appl_name);
-          pups_error(errstr);
-       }
-    }
-    #endif /* DISK_SERIAL */
-
-    if(appl_verbose == TRUE)
-    {  (void)strdate(date);
-       if(strcmp(HD_DEVICE,"/dev/dummy") == 0)
-          (void)fprintf(stderr,"%s %s (%d@%s:%s): using soft dongle (for license authentication)\n",
-                                                       date,appl_name,appl_pid,appl_host,appl_owner);
-       else
-          (void)fprintf(stderr,"%s %s (%d@%s:%s): using disk serial number (for license authentication)\n",
-                                                              date,appl_name,appl_pid,appl_host,appl_owner);
-
-
-       if(exec_path == (char *)NULL)
-          (void)fprintf(stderr,"%s %s (%d@%s:%s): single host, single user license [securicor]\n",
-                                                     date,appl_name,appl_pid,appl_host,appl_owner);
-       else
-          (void)fprintf(stderr,"%s %s (%d@%s:%s): single host, multiple user license [securicor]\n",
-                                                       date,appl_name,appl_pid,appl_host,appl_owner);
-    }
-}
-#endif /* SECURE */
- 
-
-
-
-
-/*------------------------------------------------------------------------------
-    Routine to allocate a dynamic array - this is based on T.K.W Chau's
-    allocation scheme ...
-------------------------------------------------------------------------------*/
+/*---------------------------*/
+/* Allocate dynamic 2D array */
+/*---------------------------*/
 
 _PUBLIC void **pups_aalloc(pindex_t rows, pindex_t cols, psize_t size)
 
-{   int   i;
+{   uint32_t i;
 
-    void *array_mem = (void *)NULL;
+    void *array_mem = (void *) NULL;
     void **array    = (void **)NULL;    
 
 
@@ -11192,7 +11090,7 @@ _PUBLIC void **pups_aalloc(pindex_t rows, pindex_t cols, psize_t size)
 
     for(i=0; i<rows; ++i)
     {  array[i]  = (void *)array_mem;
-       array_mem = (void *)((unsigned long int)array_mem + (unsigned long int)(cols*size));
+       array_mem = (void *)((uint64_t)array_mem + (uint64_t)(cols*size));
     } 
 
     return(array);
@@ -11201,15 +11099,13 @@ _PUBLIC void **pups_aalloc(pindex_t rows, pindex_t cols, psize_t size)
 
 
 
-/*------------------------------------------------------------------------------
-    Routine to free memory occupied by a dynamically allocated array ...
-------------------------------------------------------------------------------*/
+/*-----------------------*/
+/* Free dynamic 2D array */
+/*-----------------------*/
 
 _PUBLIC void **pups_afree(pindex_t rows, void **array)
 
-{    int i;
-
-     if(array != (void **)NULL)
+{    if(array != (void **)NULL)
         (void)pups_free((void *)array[0]);
 
      return(pups_free((void *)array));
@@ -11217,22 +11113,19 @@ _PUBLIC void **pups_afree(pindex_t rows, void **array)
 
 
 
+/*--------------------------------------------------------*/
+/*  Sort an array of floating point values using heapsort */
+/*--------------------------------------------------------*/
 
-/*-----------------------------------------------------------------------------
-    Routine to sort an array of floating point values using the heapsort
-    algorithm - this routine is derived from one given in Press et al,
-    Numerical Recipes in C ...
------------------------------------------------------------------------------*/
+_PUBLIC void pups_sort(int32_t n, FTYPE ra[], FTYPE rb[])
 
-_PUBLIC void sort2(int n, FTYPE ra[], FTYPE rb[])
+{   int32_t l,
+            j,
+            ir,
+            i;
 
-{   int l,
-        j,
-        ir,
-         i;
-
-    FTYPE rrb,
-          rra;
+    FTYPE   rrb,
+            rra;
 
     l = (n >> 1) + 1;
 
@@ -11278,10 +11171,9 @@ _PUBLIC void sort2(int n, FTYPE ra[], FTYPE rb[])
 
 
 
-
-/*------------------------------------------------------------------------------
-    Check descriptor redirections ...
-------------------------------------------------------------------------------*/
+/*------------------------------------*/
+/* Check stdio descriptor redirection */
+/*------------------------------------*/
 
 _PUBLIC void pups_check_redirection(const des_t des)
 
@@ -11297,12 +11189,13 @@ _PUBLIC void pups_check_redirection(const des_t des)
         }
      }
 }
+ 
 
 
 
-/*-------------------------------------------------------------------------------
-   Set process state ..
--------------------------------------------------------------------------------*/
+/*-------------------*/
+/* Set process state */
+/*-------------------*/
 
 _PUBLIC void pups_set_state(const char *state)
 
@@ -11319,9 +11212,9 @@ _PUBLIC void pups_set_state(const char *state)
 
 
 
-/*-------------------------------------------------------------------------------
-   Get process state ,,,
--------------------------------------------------------------------------------*/
+/*-------------------*/
+/* Get process state */
+/*-------------------*/
 
 _PUBLIC void pups_get_state(const char *state)
 
@@ -11338,12 +11231,9 @@ _PUBLIC void pups_get_state(const char *state)
 
 
 
-/*-------------------------------------------------------------------------------
-    Routine to display the state of the current process - this is
-    normally called in response to a SIGUSR signal. In addition the
-    originator of the signal must specify an I/O terminal for this
-    transaction in /tmp/<pid>.info.tmp ...
--------------------------------------------------------------------------------*/
+/*-----------------------*/
+/* Display process state */
+/*-----------------------*/
 
 _PUBLIC void pups_show_state(void)
 
@@ -11388,23 +11278,23 @@ _PUBLIC void pups_show_state(void)
 
 
 
-/*-------------------------------------------------------------------------------
-    Register a PUPS entrance function (and its argument string) ...
--------------------------------------------------------------------------------*/
+/*------------------------------------*/
+/* Register process entrance function */
+/*------------------------------------*/
 
-_PUBLIC int max_entrance_funcs     = MAX_FUNCS;
-_PUBLIC int n_entrance_funcs       = 0;
-_PUBLIC int n_entrance_funcs_alloc = 0;
+_PUBLIC int32_t max_entrance_funcs     = MAX_FUNCS;
+_PUBLIC int32_t n_entrance_funcs       = 0;
+_PUBLIC int32_t n_entrance_funcs_alloc = 0;
 
 _PUBLIC char *pups_entrance_f_name[MAX_FUNCS];
 _PUBLIC char *pups_entrance_arg[MAX_FUNCS];
 _PUBLIC void (*pups_entrance_f[MAX_FUNCS])(char *);
 
-_PUBLIC int pups_register_entrance_f(const char *f_name, 
-                                     const void *entrance_f, 
-                                     const char *arg_str)
+_PUBLIC int32_t pups_register_entrance_f(const char *f_name, 
+                                         const void *entrance_f, 
+                                         const char *arg_str)
 
-{   int  i;
+{   uint32_t i;
 
 
     /*----------------------------------*/
@@ -11492,8 +11382,8 @@ _PUBLIC int pups_register_entrance_f(const char *f_name,
                                                                                                                appl_host,
                                                                                                               appl_owner,
                                                                             pups_entrance_f_name[n_entrance_funcs_alloc], 
-                                                              (unsigned long int)pups_entrance_f[n_entrance_funcs_alloc],
-                                                                                                  n_entrance_funcs_alloc);
+                                                                       (uint64_t)pups_entrance_f[n_entrance_funcs_alloc],
+                                                                                              n_entrance_funcs_alloc + 1);
        (void)fflush(stderr);
     }
 
@@ -11506,13 +11396,13 @@ _PUBLIC int pups_register_entrance_f(const char *f_name,
 
 
 
-/*-------------------------------------------------------------------------------
-    Deregister a PUPS exit function (and its argument string) ...
--------------------------------------------------------------------------------*/
+/*--------------------------------------*/
+/* Deregister process entrance function */
+/*--------------------------------------*/
 
-_PUBLIC int pups_deregister_entrance_f(const void *func)
+_PUBLIC int32_t pups_deregister_entrance_f(const void *func)
 
-{   int i;
+{   uint32_t i;
 
 
     /*----------------------------------*/
@@ -11564,13 +11454,13 @@ _PUBLIC int pups_deregister_entrance_f(const void *func)
 
 
 
-/*-------------------------------------------------------------------------------
-    Show PUPS entrance functions ...
--------------------------------------------------------------------------------*/
+/*------------------------------------*/
+/* Display process entrance functions */
+/*------------------------------------*/
 
 _PUBLIC void pups_show_entrance_f(const FILE *stream)
 
-{   int i;
+{   uint32_t i;
 
 
     /*----------------------------------*/
@@ -11598,7 +11488,7 @@ _PUBLIC void pups_show_entrance_f(const FILE *stream)
        {  if((void *)pups_entrance_f[i] != (void *)NULL)
           {  (void)fprintf(stream,"    %04d: \"%-32s\" (at %016lx virtual)\n",i,
                                                         pups_entrance_f_name[i],
-                                          (unsigned long int)pups_entrance_f[i]);
+                                                   (uint64_t)pups_entrance_f[i]);
              (void)fflush(stream);
           }
        }
@@ -11617,15 +11507,14 @@ _PUBLIC void pups_show_entrance_f(const FILE *stream)
 
 
 
-/*------------------------------------------------------------------------------
-    Display any remaining portions of the command line which could not
-    be parsed ...
-------------------------------------------------------------------------------*/
+/*--------------------------------------*/
+/* Flag unparsed command line arguments */
+/*--------------------------------------*/
 
 _PUBLIC void pups_t_arg_errs(const _BOOLEAN argd[], const char *args[])
 
-{   int      i;
-    _BOOLEAN parse_failed = FALSE;
+{    uint32_t i;
+    _BOOLEAN  parse_failed = FALSE;
 
 
     /*----------------------------------*/
@@ -11655,7 +11544,7 @@ _PUBLIC void pups_t_arg_errs(const _BOOLEAN argd[], const char *args[])
                                                                              date,appl_name,appl_pid,appl_host,appl_owner,
                                                                                                   pups_entrance_f_name[i],
                                                                                                                         i,
-                                                                                    (unsigned long int)pups_entrance_f[i]);
+                                                                                            (uint64_t)pups_entrance_f[i]);
              (void)fflush(stderr);
           }
 
@@ -11671,8 +11560,8 @@ _PUBLIC void pups_t_arg_errs(const _BOOLEAN argd[], const char *args[])
            }
 
            (void)strdate(date);
-           (void)fprintf(stderr,"%s %s (%d@%s:%s): ERROR failed to parse: %s[%d]\n",
-                             date,appl_name,appl_pid,appl_host,appl_owner,args[i],i);
+           (void)fprintf(stderr,"%s %s (%d@%s:%s): %sERROR%s failed to parse: %s[%d]\n",
+                         date,appl_name,appl_pid,appl_host,appl_owner,boldOn,boldOff,args[i],i);
            (void)fflush(stderr);
         }
     }
@@ -11689,23 +11578,23 @@ _PUBLIC void pups_t_arg_errs(const _BOOLEAN argd[], const char *args[])
 
 
 
-/*-------------------------------------------------------------------------------
-    Register a PUPS exit function (and its argument string) ...
--------------------------------------------------------------------------------*/
+/*--------------------------------*/
+/* Register process exit function */
+/*--------------------------------*/
 
-_PUBLIC int max_exit_funcs     = MAX_FUNCS;
-_PUBLIC int n_exit_funcs       = 0;
-_PUBLIC int n_exit_funcs_alloc = 0;
+_PUBLIC int32_t max_exit_funcs     = MAX_FUNCS;
+_PUBLIC int32_t n_exit_funcs       = 0;
+_PUBLIC int32_t n_exit_funcs_alloc = 0;
 
 _PUBLIC char *pups_exit_f_name[MAX_FUNCS];
 _PUBLIC char *pups_exit_arg[MAX_FUNCS];
 _PUBLIC void (*pups_exit_f[MAX_FUNCS])(char *);
 
-_PUBLIC int pups_register_exit_f(const char *f_name, 
-                                 const void *exit_f, 
-                                 const char *arg_str)
+_PUBLIC int32_t pups_register_exit_f(const char *f_name, 
+                                     const void *exit_f, 
+                                     const char *arg_str)
 
-{   int  i;
+{   uint32_t i;
 
 
     /*----------------------------------*/
@@ -11791,8 +11680,8 @@ _PUBLIC int pups_register_exit_f(const char *f_name,
                                                                                                   appl_host,
                                                                                                  appl_owner,
                                                                        pups_exit_f_name[n_exit_funcs_alloc], 
-                                                         (unsigned long int)pups_exit_f[n_exit_funcs_alloc],
-                                                                                         n_exit_funcs_alloc);
+                                                                  (uint64_t)pups_exit_f[n_exit_funcs_alloc],
+                                                                                     n_exit_funcs_alloc + 1);
        (void)fflush(stderr);
     }
 
@@ -11805,13 +11694,13 @@ _PUBLIC int pups_register_exit_f(const char *f_name,
 
 
 
-/*-------------------------------------------------------------------------------
-    Register a PUPS exit function (and its argument string) ...
--------------------------------------------------------------------------------*/
+/*----------------------------------*/
+/* Deregister process exit function */
+/*----------------------------------*/
 
-_PUBLIC int pups_deregister_exit_f(const void *func)
+_PUBLIC int32_t pups_deregister_exit_f(const void *func)
 
-{   int i;
+{   uint32_t i;
 
 
     /*----------------------------------*/
@@ -11838,7 +11727,7 @@ _PUBLIC int pups_deregister_exit_f(const void *func)
                                                                                                                        appl_host,
                                                                                                                       appl_owner,
                                                                                                              pups_exit_f_name[i],
-                                                                                               (unsigned long int)pups_exit_f[i],
+                                                                                                        (uint64_t)pups_exit_f[i],
                                                                                                                                i);
              (void)fflush(stderr);
           }
@@ -11863,13 +11752,13 @@ _PUBLIC int pups_deregister_exit_f(const void *func)
 
 
 
-/*-------------------------------------------------------------------------------
-    Show PUPS exit functions ...
--------------------------------------------------------------------------------*/
+/*--------------------------------*/
+/* Display process exit functions */
+/*--------------------------------*/
 
 _PUBLIC void pups_show_exit_f(const FILE *stream)
 
-{   int i;
+{   uint32_t i;
 
 
     /*----------------------------------*/
@@ -11905,7 +11794,7 @@ _PUBLIC void pups_show_exit_f(const FILE *stream)
        {  if((void *)pups_exit_f[i] != (void *)NULL)
           {  (void)fprintf(stream,"    %04d: \"%-32s\" (at %016lx virtual)\n",i,
                                                             pups_exit_f_name[i],
-                                              (unsigned long int)pups_exit_f[i]);
+                                                       (uint64_t)pups_exit_f[i]);
              (void)fflush(stream);
           }
        }
@@ -11924,24 +11813,24 @@ _PUBLIC void pups_show_exit_f(const FILE *stream)
 
 
 
-/*-------------------------------------------------------------------------------
-    Register a PUPS abort function (and its argument string) ...
--------------------------------------------------------------------------------*/
+/*---------------------------------*/
+/* Register process abort function */
+/*---------------------------------*/
 
-_PUBLIC int max_abort_funcs     = MAX_FUNCS;
-_PUBLIC int n_abort_funcs       = 0;
-_PUBLIC int n_abort_funcs_alloc = 0;
+_PUBLIC int32_t max_abort_funcs     = MAX_FUNCS;
+_PUBLIC int32_t n_abort_funcs       = 0;
+_PUBLIC int32_t n_abort_funcs_alloc = 0;
 
 _PUBLIC void (*pups_abort_f[MAX_FUNCS])(char *);
 _PUBLIC char *pups_abort_f_name[MAX_FUNCS];
 _PUBLIC char *pups_abort_arg[MAX_FUNCS];
 
 
-_PUBLIC int pups_register_abort_f(const char *f_name,
-                                  const void  *abort_f,
-                                  const char *arg_str)
+_PUBLIC int32_t pups_register_abort_f(const char *f_name,
+                                      const void  *abort_f,
+                                      const char *arg_str)
 
-{   int i;
+{   uint32_t i;
 
 
     /*----------------------------------*/
@@ -12023,8 +11912,8 @@ _PUBLIC int pups_register_abort_f(const char *f_name,
        (void)fprintf(stderr,"%s %s (%d@%s:%s): PUPS abort function \"%-32s\" (at %016lx virtual) registered at slot %d\n",
                                                                              date,appl_name,appl_pid,appl_host,appl_owner,
                                                                                    pups_abort_f_name[n_abort_funcs_alloc],
-                                                                     (unsigned long int)pups_abort_f[n_abort_funcs_alloc],
-                                                                                                      n_abort_funcs_alloc);
+                                                                              (uint64_t)pups_abort_f[n_abort_funcs_alloc],
+                                                                                                  n_abort_funcs_alloc + 1);
        (void)fflush(stderr);
     }
 
@@ -12038,13 +11927,14 @@ _PUBLIC int pups_register_abort_f(const char *f_name,
 
 
 
-/*-------------------------------------------------------------------------------
-    Deregister a PUPS abort function (and its argument string) ...
--------------------------------------------------------------------------------*/
+/*-----------------------------------*/
+/* Deregister process abort function */
+/*-----------------------------------*/
 
-_PUBLIC int pups_deregister_abort_f(const void *func)
+_PUBLIC  int32_t pups_deregister_abort_f(const void *func)
 
-{   int i;
+{   uint32_t i;
+
 
     /*----------------------------------*/
     /* Only the root thread can process */
@@ -12070,7 +11960,7 @@ _PUBLIC int pups_deregister_abort_f(const void *func)
                                                                                                                        appl_host,
                                                                                                                       appl_owner,
                                                                                                             pups_abort_f_name[i],
-                                                                                              (unsigned long int)pups_abort_f[i],
+                                                                                                       (uint64_t)pups_abort_f[i],
                                                                                                                                i);
              (void)fflush(stderr);
           }
@@ -12094,13 +11984,14 @@ _PUBLIC int pups_deregister_abort_f(const void *func)
 
 
 
-/*-------------------------------------------------------------------------------
-    Show PUPS abort functions ...
--------------------------------------------------------------------------------*/
+
+/*---------------------------------*/
+/* Display process abort functions */
+/*---------------------------------*/
 
 _PUBLIC void pups_show_abort_f(const FILE *stream)
 
-{   int i;
+{   uint32_t i;
 
 
     /*----------------------------------*/
@@ -12127,7 +12018,7 @@ _PUBLIC void pups_show_abort_f(const FILE *stream)
        {  if((void *)pups_abort_f[i] != (void *)NULL)
           {  (void)fprintf(stream,"    %04d: \"%-32s\" (at %016lx virtual)\n",i,
                                                            pups_abort_f_name[i],
-                                             (unsigned long int)pups_abort_f[i]);
+                                                      (uint64_t)pups_abort_f[i]);
              (void)fflush(stream);
           }
        }
@@ -12145,114 +12036,40 @@ _PUBLIC void pups_show_abort_f(const FILE *stream)
 
 
 
+/*--------------------*/
+/* PUPS exit function */
+/*--------------------*/
 
-/*-------------------------------------------------------------------------------
-    Free application information string ...
--------------------------------------------------------------------------------*/
+_PUBLIC  int32_t pups_exit(const int32_t exit_code)
 
-_PRIVATE void pups_free_appl_strings(void)
+{   uint32_t i;
+    int32_t  lfl_cnt                   = 0;
 
-{   int i;
+    char     tunnel_f_name   [SSIZE]       = "",
+             psrp_channel_lockname[SSIZE]  = "";
 
-    if(version != (char *)NULL)
-       (void)pups_free((char *)version);
-
-    if(appl_owner != (char *)NULL)
-       (void)pups_free((void *)appl_owner);
-
-    if(appl_password != (char *)NULL)
-       (void)pups_free((void *)appl_password);
-
-    if(appl_crypted != (char *)NULL)
-       (void)pups_free((void *)appl_crypted);
-
-    if(appl_name != (char *)NULL)
-       (void)pups_free((void *)appl_name);
-
-    if(appl_remote_host != (char *)NULL)
-       (void)pups_free((void *)appl_remote_host);
-
-    if(appl_fifo_dir != (char *)NULL)
-       (void)pups_free((void *)appl_fifo_dir);
-
-    if(appl_ch_name != (char *)NULL)
-       (void)pups_free((void *)appl_ch_name);
-
-    if(appl_logfile != (char *)NULL)
-       (void)pups_free((void *)appl_logfile);
-
-    #ifdef MAIL_SUPPORT
-    if(appl_mdir != (char *)NULL)
-       (void)pups_free((void *)appl_mdir);
-
-    if(appl_mh_folder != (char *)NULL)
-       (void)pups_free((void *)appl_mh_folder);
-
-    if(appl_mime_dir != (char *)NULL)
-       (void)pups_free((void *)appl_mime_dir);
-
-    if(appl_replyto != (char *)NULL)
-       (void)pups_free((void *)appl_replyto);
-    #endif /* MAIL_SUPPORT */
-
-    if(appl_tunnel_path != (char *)NULL)
-       (void)pups_free((void *)appl_tunnel_path);
-
-    if(appl_bin_name != (char *)NULL)
-       (void)pups_free((void *)appl_bin_name);
-
-    if(appl_ttyname != (char *)NULL)
-       (void)pups_free((void *)appl_ttyname);
-
-    if(appl_pam_name != (char *)NULL)
-       (void)pups_free((void *)appl_pam_name);
-
-    if(author != (char *)NULL)
-       (void)pups_free((void *)revdate);
-
-    if(arg_f_name != (char *)NULL)
-       (void)pups_free((void *)arg_f_name);
-
-    for(i=0; i<255; ++i)
-    {  if(args[i] != (char *)NULL)
-          (void)pups_free((void *)args[i]);
-    }
-
-    if(appl_home != (char *)NULL)
-       (void)pups_free((void *)appl_home);
-
-    if(appl_cwd != (char *)NULL)
-       (void)pups_free((void *)appl_cwd);
-
-    if(appl_host != (char *)NULL)
-       (void)pups_free((void *)appl_host);
-
-    if(appl_state != (char *)NULL)
-       (void)pups_free((void *)appl_state);
-
-    if(appl_err != (char *)NULL)
-       (void)pups_free((void *)appl_err);
-}
+    sigset_t set,
+             old_set;;
 
 
+    /*--------------------------------------------*/
+    /* Disable signal handling via hold/relse API */
+    /*--------------------------------------------*/
+
+    in_pups_exit = TRUE;
 
 
+    /*---------------------------------------*/
+    /* Clear alarm for virtual timer systems */
+    /* and block signals                     */
+    /*---------------------------------------*/
 
-/*-------------------------------------------------------------------------------
-    PUPS exit function ...
--------------------------------------------------------------------------------*/
-
-_PUBLIC int pups_exit(const int exit_code)
-
-{   int  i,
-         lfl_cnt;
-
-    char tunnel_f_name   [SSIZE] = "",
-         symlink_pathname[SSIZE] = "";
+    sigfillset(&set);
+    (void)pups_sigprocmask(SIG_BLOCK,&set,&old_set);
 
 
     #ifdef PTHREAD_SUPPORT
-    int retval;
+    int32_t retval;
 
 
     /*------------------------------------*/
@@ -12270,12 +12087,11 @@ _PUBLIC int pups_exit(const int exit_code)
           (void)pupsthread_tid2tfuncname(tid,tfuncname);
           (void)strdate(date);
 
-          (void)fprintf(stderr,"%s %s (%d@%s:%s): thead %016lx (%s) exiting\n",
-                                  date,appl_name,appl_pid,appl_host,appl_owner,
-                                              (unsigned long int)tid,tfuncname);
+          (void)fprintf(stderr,"%s %s (%d@%s:%s): thread %016lx (%s) exiting\n",
+                                    date,appl_name,appl_pid,appl_host,appl_owner,
+                                                         (uint64_t)tid,tfuncname);
           (void)fflush(stderr);
        }
-
        (void)pupsthread_exit(&retval);
     }
     else
@@ -12294,23 +12110,6 @@ _PUBLIC int pups_exit(const int exit_code)
        (void)fprintf(stderr,"\n%s %s (%d@%s:%s): softdog terminated\n\n",date,appl_name,appl_pid,appl_host,appl_owner);
        (void)fflush(stderr);
     }
-
-
-    /*---------------------------------------*/
-    /* CLear alarm for virtual timer systems */
-    /* and block signals                     */
-    /*---------------------------------------*/
-
-    (void)pups_malarm(0);
-    (void)pupshold(ALL_PUPS_SIGS);
-
-
-    /*-----------------------------*/
-    /* Remove pen symlink (if any) */
-    /*-----------------------------*/
-
-    (void)snprintf(symlink_pathname,SSIZE,"/tmp/%s",appl_name);
-    (void)unlink(symlink_pathname);
 
 
     #ifdef CRIU_SUPPORT
@@ -12338,7 +12137,7 @@ _PUBLIC int pups_exit(const int exit_code)
                                                                                                            appl_owner,
                                                                                                   pups_exit_f_name[i],
                                                                                                                     i,
-                                                                                    (unsigned long int)pups_exit_f[i]);
+                                                                                             (uint64_t)pups_exit_f[i]);
              (void)fflush(stderr);
           }
 
@@ -12350,17 +12149,20 @@ _PUBLIC int pups_exit(const int exit_code)
     /*---------------------------------------*/
     /* If we are in PSRP mode clear channels */
     /*---------------------------------------*/
-
-    if(psrp_mode == TRUE)
-       psrp_exit();
-
-
     /*--------------------------------------------------------------*/
     /* Workaround bug in RedHat 6.0/egcs-1.1.2 which cause problems */
     /* with data transmission down FIFOS's                          */
     /*--------------------------------------------------------------*/
 
     (void)pups_usleep(100);
+
+
+    /*-------------------------*/
+    /* Clear psrp channel lock */
+    /*-------------------------*/
+
+    (void)snprintf(psrp_channel_lockname,SSIZE,"/tmp/psrp.%d.lock",appl_pid);
+    (void)unlink(psrp_channel_lockname);
 
 
     /*----------------------------------*/
@@ -12402,9 +12204,9 @@ _PUBLIC int pups_exit(const int exit_code)
     #endif /* PERSISTENT_HEAP_SUPPORT */
 
 
-    /*-----------------*/
-    /* Close all files */
-    /*-----------------*/
+    /*-----------------------------*/
+    /* Close all (non stdio) files */
+    /*-----------------------------*/
 
     (void)pups_closeall();
 
@@ -12425,10 +12227,9 @@ _PUBLIC int pups_exit(const int exit_code)
     }
 
 
-    /*--------------------------------------*/
-    /* Deal with stdio                      */
-    /* Deal with the rest of the file table */
-    /*--------------------------------------*/
+    /*-------------------------------*/
+    /* Remove shadow files and links */
+    /*-------------------------------*/
 
     for(i=0; i<appl_max_files; ++i)
     {
@@ -12437,6 +12238,7 @@ _PUBLIC int pups_exit(const int exit_code)
        /* Only remove files we have actually created */
        /*--------------------------------------------*/
 
+
        if(i < 3 || ftab[i].creator == TRUE)
        {  struct stat buf;
 
@@ -12444,6 +12246,7 @@ _PUBLIC int pups_exit(const int exit_code)
           /*-------------------------------*/
           /* Is this a named file or FIFO? */
           /*-------------------------------*/
+
 
           if(i < 3 || ftab[i].named == TRUE)
           {
@@ -12461,40 +12264,35 @@ _PUBLIC int pups_exit(const int exit_code)
 
                 if(appl_verbose == TRUE )
                 {  (void)strdate(date);
+
+
+                   /*----------------------------*/
+                   /* File is a lockpost symlink */
+                   /*----------------------------*/
+
                    if(strcmp(ftab[i].fshadow,"/dev/tty") == 0)
-
-                      /*----------------------------*/
-                      /* File is a lockpost symlink */
-                      /*----------------------------*/
-
                       (void)fprintf(stderr,"%s %s (%d@%s:%s): removing lockpost TTY symlink (%s)\n",
                                                  date,appl_name,appl_pid,appl_host,appl_owner,fname);
+
+
+                   /*---------------*/
+                   /* File is a PTY */
+                   /*---------------*/
+
                    else if(isatty(ftab[i].fdes) == 1)
                       (void)fprintf(stderr,"%s %s (%d@%s:%s): removing PTY (%s)\n",
                                     date,appl_name,appl_pid,appl_host,appl_owner,fname);
+
+
+                   /*----------------*/ 
+                   /* File is a FIFO */
+                   /*----------------*/ 
+
                    else
-
-                      /*----------------*/ 
-                      /* File is a FIFO */
-                      /*----------------*/ 
-
                       (void)fprintf(stderr,"%s %s (%d@%s:%s): removing FIFO (%s)\n",
                                     date,appl_name,appl_pid,appl_host,appl_owner,fname);
 
                    (void)fflush(stderr);
-                }
-
-
-                /*-------------------------------------------------*/
-                /* Make sure that we do not remove /dev/tty        */
-                /* this is possible if application is runnning as  */
-                /* suid root and we do not protect /dev/tty with   */
-                /* a guard link                                    */
-                /*-------------------------------------------------*/
-
-                if(getuid() == 0)
-                {  if(strcmp(ftab[i].fshadow,"/dev/tty") == 0)
-                      (void)link("/dev/tty","/dev/ttyprot");
                 }
 
 
@@ -12510,11 +12308,28 @@ _PUBLIC int pups_exit(const int exit_code)
                 /*--------------------*/
 
                 (void)unlink(ftab[i].fshadow);
+             }
 
-                if(getuid() == 0)
-                {  if(strcmp(ftab[i].fshadow,"/dev/tty") == 0)
-                      (void)rename("/dev/ttyprot","/dev/tty");
-                }
+
+             /*--------------*/
+             /* Regular file */
+             /*--------------*/
+
+             else
+             {
+
+                /*-----------------*/
+                /* Remove the file */
+                /*-----------------*/
+
+                (void)unlink(ftab[i].fname);
+
+
+                /*--------------------*/
+                /* Remove shadow file */
+                /*--------------------*/
+
+                (void)unlink(ftab[i].fshadow);
              }
           }
        }
@@ -12568,7 +12383,7 @@ _PUBLIC int pups_exit(const int exit_code)
     /* the pipeline unless connected to a terminal                  */
     /*--------------------------------------------------------------*/
 
-    if(appl_kill_pg == TRUE && exit_code < 0 && (isatty(0) == 0 || isatty(1) == 0))
+    if(appl_kill_pg == TRUE && exit_code != 0 && (isatty(0) == 0 || isatty(1) == 0))
     {   if(appl_verbose == TRUE)
         {  (void)strdate(date);
            (void)fprintf(stderr,"%s %s (%d@%s:%s): pipeline %d terminated (exit code %d for filter %s)\n",
@@ -12579,7 +12394,12 @@ _PUBLIC int pups_exit(const int exit_code)
         (void)kill(0,SIGTERM);
     }
 
-    if(exit_code == PIPESTREAM_DETACH)
+
+    /*---------------------------------------*/
+    /* Overlay xact command to seal pipeline */
+    /*---------------------------------------*/
+
+    if(exit_code == PUPS_PIPE_DETACH)
     {  if(appl_verbose == TRUE)
        {  (void)strdate(date);
           (void)fprintf(stderr,"%sd %s (%d@%s:%s): overlaying process with xcat filter (to seal pipeline)\n",
@@ -12625,11 +12445,12 @@ _PUBLIC int pups_exit(const int exit_code)
     }
 
 
-    /*------------------------------------------*/
-    /* Free information strings for this server */
-    /*------------------------------------------*/
+    /*------------------------------*/
+    /* Restore controlling terminal */
+    /*------------------------------*/
 
-    pups_free_appl_strings();
+    if(getuid() == 0)
+      (void)system("mktty");
 
 
     /*-----------------------------------*/
@@ -12640,13 +12461,16 @@ _PUBLIC int pups_exit(const int exit_code)
        longjmp(appl_resident_restart,1);
 
 
+
     /*--------------------------------------*/
     /* Restore signal handlers if deferred) */
     /*--------------------------------------*/
 
     else if(exit_code == PUPS_DEFER_EXIT)
-    {  (void)pupsrelse(ALL_PUPS_SIGS);
+    {  (void)pups_sigprocmask(SIG_SETMASK,&old_set,(sigset_t *)NULL);
        (void)pups_malarm(vitimer_quantum);
+
+       return(0);
     }
 
 
@@ -12662,14 +12486,14 @@ _PUBLIC int pups_exit(const int exit_code)
 
 
 
-/*-------------------------------------------------------------------------------------
-    Build a table of entries in the current directory ...
--------------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------------*/
+/* Build a table of filesystem objects in the current directory matching key */
+/*---------------------------------------------------------------------------*/
 
 _PUBLIC char **pups_get_directory_entries(const char *dir_name,
                                           const char *key,
-                                          int        *key_entries,
-                                          int        *max_entries)
+                                          int32_t    *key_entries,
+                                          int32_t    *max_entries)
 
 {   DIR           *dirp      = (DIR *)NULL;
     struct dirent *next_item = (struct dirent *)NULL;
@@ -12678,8 +12502,8 @@ _PUBLIC char **pups_get_directory_entries(const char *dir_name,
 
     if(dir_name    == (const char *)NULL  ||
        key         == (const char *)NULL  ||
-       key_entries == (int *)       NULL  ||
-       max_entries == (int *)       NULL   )
+       key_entries == (int32_t    *)NULL  ||
+       max_entries == (int32_t    *)NULL   )
     {  pups_set_errno(EINVAL);
        return((char **)NULL);
     }
@@ -12731,13 +12555,13 @@ _PUBLIC char **pups_get_directory_entries(const char *dir_name,
 
 
 
-/*-------------------------------------------------------------------------------------
-    Build a table of entries in the current driectory ...
--------------------------------------------------------------------------------------*/
+/*------------------------------------------------------------------------------------*/
+/* Build a table of filesystem object in the current driectory matching multiple keys */
+/*------------------------------------------------------------------------------------*/
 
-_PRIVATE _BOOLEAN multimatch(char *target, int keylist, char **keys)
+_PRIVATE _BOOLEAN multimatch(char *target, int32_t keylist, const char **keys)
 
-{   int i;
+{   uint32_t i;
 
     if(target == (char *)NULL || keylist <= 0 || keys == (char **)NULL)
     {  pups_set_errno(EINVAL);
@@ -12755,21 +12579,21 @@ _PRIVATE _BOOLEAN multimatch(char *target, int keylist, char **keys)
 }
 
 
-_PUBLIC char **pups_get_multikeyed_directory_entries(const char *dir_name,
-                                                     const int  keys,
-                                                     const char **keylist,
-                                                     int        *key_entries,
-                                                     int        *max_entries)
+_PUBLIC char **pups_get_multikeyed_directory_entries(const char      *dir_name,
+                                                     const  int32_t  keys,
+                                                     const char      **keylist,
+                                                     int32_t         *key_entries,
+                                                     int32_t         *max_entries)
 
 {   DIR           *dirp      = (DIR *)NULL;
     struct dirent *next_item = (struct dirent *)NULL;
     struct stat   buf;
     char          ** entries = (char **)NULL;
 
-    if(dir_name    == (const char *) NULL   ||
+    if(dir_name    == (const char  *)NULL   ||
        keylist     == (const char **)NULL   ||
-       key_entries == (int *)        NULL   ||
-       max_entries == (int *)        NULL    )
+       key_entries == (int32_t     *)NULL   ||
+       max_entries == (int32_t     *)NULL    )
     {  pups_set_errno(EINVAL);
        return((char **)NULL);
     }
@@ -12820,16 +12644,16 @@ _PUBLIC char **pups_get_multikeyed_directory_entries(const char *dir_name,
 
 
 
-/*-----------------------------------------------------------------------------
-    Extended read is automatically restarted after interrupted system
-    call ...
------------------------------------------------------------------------------*/
+/*-----------------------------------------------------------*/
+/* Extended read which restarts after interrupted system call */
+/*------------------------------------------------------------*/
 
-_PUBLIC unsigned long int pups_sread(const int fildes, char *data, const unsigned long int size)
+_PUBLIC ssize_t pups_sread(const des_t fildes, char *data, const size_t size)
 
-{   unsigned long int ret,
-                      eff_size,
-                      bytes_read = 0;
+{   int32_t ret;
+
+    ssize_t eff_size,
+            bytes_read = 0;
 
     if(data == (char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -12853,17 +12677,16 @@ _PUBLIC unsigned long int pups_sread(const int fildes, char *data, const unsigne
 
 
 
-
-/*-----------------------------------------------------------------------------
-    Extended read is automatically restarted after interrupted system
-    call ...
------------------------------------------------------------------------------*/
+/*-------------------------------------------------------*/
+/* Extended which restarts after interrupted system call */
+/*-------------------------------------------------------*/
     
-_PUBLIC unsigned long int pups_swrite(const int fildes, const char *data, const unsigned long int size)
+_PUBLIC ssize_t pups_swrite(const des_t fildes, const char *data, const size_t size)
  
-{   unsigned long int ret,
-                      eff_size,
-                      bytes_written = 0;
+{   int32_t ret;
+
+    size_t  eff_size,
+            bytes_written = 0;
  
     if(data == (const char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -12887,11 +12710,11 @@ _PUBLIC unsigned long int pups_swrite(const int fildes, const char *data, const 
 
 
 
-/*------------------------------------------------------------------------------
-    Broadcast TERM signal to process group ...
-------------------------------------------------------------------------------*/
+/*-------------------------------------------*/
+/* Broadcast SIGTERM signal to process group */
+/*-------------------------------------------*/
 
-_PRIVATE int pg_leaders_term_handler(const int sig)
+_PRIVATE int32_t pg_leaders_term_handler(const int32_t signum)
  
 {   _IMMORTAL _BOOLEAN entered = FALSE;
 
@@ -12914,7 +12737,7 @@ _PRIVATE int pg_leaders_term_handler(const int sig)
        /* of which we are (the leading!) member                        */
        /*--------------------------------------------------------------*/
 
-       _exit(-sig);
+       _exit(255 + signum);
  
     (void)kill(0,SIGTERM);
 
@@ -12928,23 +12751,23 @@ _PRIVATE int pg_leaders_term_handler(const int sig)
        (void)unlink(appl_argfifo);
     }
 
-    pups_exit(-sig);
+    pups_exit(255 + signum);
 }
  
     
  
-/*------------------------------------------------------------------------------
-    Broadcast STOP signal to process group ...
-------------------------------------------------------------------------------*/
+/*-------------------------------------------*/
+/* Broadcast SIGSTOP signal to process group */
+/*-------------------------------------------*/
 
-_PRIVATE int pg_leaders_stop_handler(int sig)
+_PRIVATE int32_t pg_leaders_stop_handler(const  int32_t signum)
 
 {   _IMMORTAL _BOOLEAN entered = FALSE; 
 
     if(appl_verbose == TRUE)
     {  (void)strdate(date);
        (void)fprintf(stderr,"%s %s (%d@%s:%s): process group stopped\n",
-                     date,appl_name,appl_pid,appl_host,appl_owner);
+                           date,appl_name,appl_pid,appl_host,appl_owner);
        (void)fflush(stderr);
     }
                  
@@ -12981,11 +12804,11 @@ _PRIVATE int pg_leaders_stop_handler(int sig)
 
 
 
-/*------------------------------------------------------------------------------
-    Broadcast CONT signal to process group ...
-------------------------------------------------------------------------------*/
+/*-------------------------------------------*/
+/* Broadcast SIGCONT signal to process group */
+/*-------------------------------------------*/
     
-_PRIVATE int pg_leaders_cont_handler(int signum)                                              
+_PRIVATE int32_t pg_leaders_cont_handler(const int32_t signum)                                              
 
 {   _IMMORTAL _BOOLEAN continuing = FALSE;   
 
@@ -13017,11 +12840,11 @@ _PRIVATE int pg_leaders_cont_handler(int signum)
 
 
 
-/*-----------------------------------------------------------------------------
-    Handler for SIGCONT (for processes other than process group leader) ...
------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------*/
+/* Handler for SIGCONT (for processes other than process group leader) */
+/*---------------------------------------------------------------------*/
 
-_PRIVATE int pups_cont_handler(int signum)
+_PRIVATE int32_t pups_cont_handler(const int32_t signum)
 
 {   appl_wait  = FALSE;
     return(psrp_cont_handler(signum));
@@ -13030,20 +12853,13 @@ _PRIVATE int pups_cont_handler(int signum)
 
 
 
-/*-----------------------------------------------------------------------------
-    Process SIGTERM ...
------------------------------------------------------------------------------*/
+/*-----------------*/
+/* Process SIGTERM */
+/*-----------------*/
 
-_PRIVATE int pups_exit_handler(int sig)
+_PRIVATE int32_t pups_exit_handler(const int32_t signum)
 
-{   _IMMORTAL _BOOLEAN pups_exit_handler_entered = FALSE;
-
-    if(pups_exit_handler_entered == TRUE)
-       return(-1);
-    else
-       pups_exit_handler_entered = TRUE;
- 
-    if(appl_verbose == TRUE)
+{   if(appl_verbose == TRUE)
     {  (void)strdate(date);
        (void)fprintf(stderr, "%s %s (%d@%s:%s): in exit handler\n",
                       date,appl_name,appl_pid,appl_host,appl_owner); 
@@ -13060,20 +12876,20 @@ _PRIVATE int pups_exit_handler(int sig)
        (void)unlink(appl_argfifo);
     }
 
-    pups_exit(-sig);
+    pups_exit(signum);
 }
 
 
 
 
-/*------------------------------------------------------------------------------
-    Mark re-entry point for SIGRESTART ...
-------------------------------------------------------------------------------*/
+/*-----------------------------------*/
+/* Set re-entry point for SIGRESTART */
+/*-----------------------------------*/
 
 
-_PUBLIC int pups_restart_enable(void)
+_PUBLIC int32_t pups_restart_enable(void)
 
-{   int ret;
+{   int32_t ret;
 
     if(pups_abort_restart == FALSE)
     {  pups_abort_restart = TRUE;
@@ -13087,11 +12903,11 @@ _PUBLIC int pups_restart_enable(void)
 
 
 
-/*------------------------------------------------------------------------------
-    Disable abort restart ...
-------------------------------------------------------------------------------*/
+/*-------------------------------------*/
+/* Reset re-entry point for SIGRESTART */
+/*-------------------------------------*/
 
-_PUBLIC int pups_restart_disable(void)
+_PUBLIC int32_t pups_restart_disable(void)
 
 {   pups_set_errno(OK);
 
@@ -13109,12 +12925,11 @@ _PUBLIC int pups_restart_disable(void)
 
 
 
-/*------------------------------------------------------------------------------
-    Process SIGRESTART -- if signal recived siglongjmp to a "known" re-entry
-    point ...
-------------------------------------------------------------------------------*/
+/*------------------------*/
+/* Handler for SIGRESTART */
+/*------------------------*/
 
-_PRIVATE int pups_restart_handler(int sig)
+_PRIVATE int32_t pups_restart_handler(const int32_t signum)
 
 {   siglongjmp(pups_restart_buf,1);
 }
@@ -13122,13 +12937,13 @@ _PRIVATE int pups_restart_handler(int sig)
 
 
 
-/*------------------------------------------------------------------------------
-    Search path directories for a given command ...
-------------------------------------------------------------------------------*/
+/*------------------------------------------*/
+/* Search (shell) path directories for item */
+/*------------------------------------------*/
 
 _PUBLIC char *pups_search_path(const char *pathtype, const char *item)
 
-{   int ret;
+{   int32_t ret;
 
     char cwd[SSIZE]       = "",
          next_path[SSIZE] = "",
@@ -13241,14 +13056,14 @@ _PUBLIC char *pups_search_path(const char *pathtype, const char *item)
 
 
 
-/*--------------------------------------------------------------------------------
-    Make a local link to an executable and then run it - this causes a process
-    to change its name in the process table ...
---------------------------------------------------------------------------------*/
+/*------------------------------------------------------*/
+/* Set process execution name (in kernel process table) */ 
+/*------------------------------------------------------*/
 
-_PUBLIC void pups_set_pen(const char *argv[], const char *ben_name, const char *pen_name)
+_PUBLIC void pups_set_pen(char *argv[], const char *ben_name, const char *pen_name)
 
-{   int  pid;
+{   pid_t   pid;
+    int32_t trys = 0;
 
     char exec_pathname   [SSIZE] = "",
          symlink_pathname[SSIZE] = "";
@@ -13261,22 +13076,12 @@ _PUBLIC void pups_set_pen(const char *argv[], const char *ben_name, const char *
     }
 
 
-    /*------------------------------------------------------*/
-    /* Check to see if command already has an absolute path */
-    /*------------------------------------------------------*/
+    /*-------------------*/
+    /* Get absolute path */
+    /*-------------------*/
 
-    if(strncmp(ben_name,"..",2) != 0 && strncmp(ben_name,".",1) != 0 && ben_name[0] != '/')
-    {  if(strccpy(exec_pathname,pups_search_path("PATH",ben_name)) == (char *)NULL)
-          pups_error("[set_pen] failed to resolve ben path");
-    }
-
-
-    /*---------------*/
-    /* Absolute path */
-    /*---------------*/
-
-    else
-       (void)strlcpy(exec_pathname,ben_name,SSIZE);
+    if(strccpy(exec_pathname,pups_search_path("PATH",ben_name)) == (char *)NULL)
+       pups_error("[set_pen] failed to resolve ben path");
 
 
     /*-------------------------------------------*/
@@ -13286,13 +13091,27 @@ _PUBLIC void pups_set_pen(const char *argv[], const char *ben_name, const char *
 
 
     (void)snprintf(symlink_pathname,SSIZE,"/tmp/%s",pen_name);
-    (void)symlink(exec_pathname,symlink_pathname);
+
+
+    /*------------------*/
+    /* Try to make link */
+    /*------------------*/
+
+    while (symlink(exec_pathname,symlink_pathname) == (-1))
+    {   if (trys == MAX_TRYS)
+           pups_error("[pups_set_pen] symlink failed");
+        else
+        {  ++trys;
+           (void)pups_usleep(100);
+        }
+    }
+
 
     #ifdef UTILIB_DEBUG
     (void)fprintf(stderr,"UTILIB PEN EXEC PATH %s\n",exec_pathname);
     (void)fflush(stderr);
 
-    int i;
+    uint32_t i;
     for(i=0; i<255; ++i)
     {  if(argv[i] == (char *)NULL)
           break;
@@ -13303,6 +13122,31 @@ _PUBLIC void pups_set_pen(const char *argv[], const char *ben_name, const char *
     }
     #endif /* UTILIB_DEBUG */
 
+
+    /*--------------------------------------*/
+    /* Child side of fork wait for a second */
+    /* and then remove (pen) symlink        */
+    /*--------------------------------------*/
+
+    if (fork() == 0)
+    {
+       /*-------------------------------*/
+       /* Wait for parent to change its */
+       /* name then delete symlink      */
+       /*-------------------------------*/
+
+       while(psrp_pname_to_pid(pen_name) != getppid())
+	    pups_usleep(1000);
+
+       (void)unlink(symlink_pathname);
+       _exit(0);
+    }
+
+
+    /*----------------------------------*/
+    /* Re-exec PRSP server woth new pen */
+    /*----------------------------------*/
+
     (void)execv(symlink_pathname,argv);
     pups_error("[pups_set_pen] exec failed");
 }
@@ -13310,28 +13154,14 @@ _PUBLIC void pups_set_pen(const char *argv[], const char *ben_name, const char *
 
 
 
-/*------------------------------------------------------------------------------
-    Pread routine - blocks correctly on pipe ...
-          
-    Copyright (C) 1982 Michael Landy, Yoav Cohen, and George Sperling
-          
-    Disclaimer:  No guarantees of performance accompany this software,          
-    nor is any responsibility assumed on the part of the authors.  All the      
-    software has been tested extensively and every effort has been made to
-    insure its reliability.
+/*----------------------------------------------------------*/
+/* Pread (pipe read) routine which blocks correctly on pipe */
+/*----------------------------------------------------------*/
 
-    * pipe_read.c - read subroutine which waits for its input count or EOF
-    *              
-    * For use with pipes, which return on read with that which is available      
-    * rather than that which is requested.
-    *                                                                            
-    * Michael Landy - 4/30/82
-------------------------------------------------------------------------------*/
-    
-_PUBLIC unsigned long int pups_pipe_read(const int fd, void *buf, const unsigned long int count)
+_PUBLIC ssize_t pups_pipe_read(const des_t fd, void *buf, const size_t count)
        
-{   int cnt,
-        r;                                         
+{   size_t cnt,
+           r;                                         
 
     if(buf == (void *)NULL || fd < 0 || count <= 0)
     {  pups_set_errno(EINVAL);
@@ -13356,42 +13186,35 @@ _PUBLIC unsigned long int pups_pipe_read(const int fd, void *buf, const unsigned
 
 
 
-/*--------------------------------------------------------------------------------
-   Routine to block specified signal ...
---------------------------------------------------------------------------------*/
-
+/*-------------------------------*/
+/* Block signal (PUPS compliant) */
+/*-------------------------------*/
 
 _PRIVATE _BOOLEAN in_pupshold = FALSE;
 
 _PRIVATE sigset_t set,
                   old_set;
 
-_PUBLIC int pupsighold(const int signum, const _BOOLEAN defer)
+_PUBLIC int32_t pupsighold(const int32_t signum, const _BOOLEAN defer)
 
-{   sigset_t  set;
-
-    if(signum < 1 || signum > MAX_SIGS || (defer != FALSE && defer != TRUE))
+{   if(signum < 1 || signum > MAX_SIGS || (defer != FALSE && defer != TRUE))
     {  pups_set_errno(EINVAL);
        return(-1);
     }
 
 
-    /*-----------------------------------------------------------*/ 
-    /* If we are handling a virtual timer event blocking signals */
-    /* is irrelevant as we are already in the signal handler     */
-    /* Make sure we only suspend the signal the first time the   */
-    /* routine is (recursively) called                           */
-    /*-----------------------------------------------------------*/
+    /*-------------------------------------------------------------*/ 
+    /* Signal handling is disabled if called from within pups_exit */
+    /* psrp_handler or chan handler                                */
+    /*-------------------------------------------------------------*/ 
 
-    if(in_vt_handler == TRUE || in_psrp_handler == TRUE || in_chan_handler == TRUE)
+    if(in_pups_exit == TRUE || in_vt_handler == TRUE || in_psrp_handler == TRUE || in_chan_handler == TRUE)
     {  pups_set_errno(OK);
        return(0);
     }
 
     if(in_pupshold == FALSE)
-    {  (void)sigfillset(&set);
-       (void)pups_sigprocmask(SIG_SETMASK,&set,&old_set);
-    }
+       (void)sigfillset(&set);
 
     #ifdef PTHREAD_SUPPORT
     (void)pthread_mutex_lock(&sigtab_mutex);
@@ -13402,9 +13225,7 @@ _PUBLIC int pupsighold(const int signum, const _BOOLEAN defer)
 
     if(pupsighold_cnt[signum] > 0)
     {  ++pupsighold_cnt[signum];
-
-       if(in_pupshold == FALSE)
-         (void)pups_sigprocmask(SIG_SETMASK,&old_set,(sigset_t *)NULL);
+       (void)pups_sigprocmask(SIG_SETMASK,&old_set,(sigset_t *)NULL);
 
        #ifdef PTHREAD_SUPPORT
        (void)pthread_mutex_unlock(&sigtab_mutex);
@@ -13417,7 +13238,9 @@ _PUBLIC int pupsighold(const int signum, const _BOOLEAN defer)
        pupsighold_cnt[signum] = 1;
 
     if(defer == FALSE)
-    {  (void)sigpending(&set);
+    {  sigset_t pending_set;
+
+       (void)sigpending(&set);
 
 
        /*-----------------------------------------------------------------*/
@@ -13425,7 +13248,7 @@ _PUBLIC int pupsighold(const int signum, const _BOOLEAN defer)
        /* sighold exits                                                   */
        /*-----------------------------------------------------------------*/
 
-       if(defer == FALSE && sigismember(&set,signum) && sigtab[signum - 1].haddr != (unsigned long int)SIG_IGN)
+       if(defer == FALSE && sigismember(&set,signum) && sigtab[signum - 1].haddr != (uint64_t)SIG_IGN)
        {  
 
           /*----------------------------------------------------------------*/
@@ -13437,13 +13260,7 @@ _PUBLIC int pupsighold(const int signum, const _BOOLEAN defer)
           /* PSRP clients to test if the PSRP server is alive               */
           /*----------------------------------------------------------------*/
 
-          (void)sigemptyset(&set);
-          (void)sigfillset (&set);
           (void)sigdelset  (&set,signum);
-          (void)sigdelset  (&set,SIGALRM);
-          (void)sigdelset  (&set,SIGTERM);
-          (void)sigdelset  (&set,SIGABRT);
-          (void)sigdelset  (&set,SIGCONT);
 
           if(appl_verbose == TRUE)
           {  (void)strdate(date);
@@ -13474,17 +13291,15 @@ _PUBLIC int pupsighold(const int signum, const _BOOLEAN defer)
     /* sigsuspend is executed                               */
     /*------------------------------------------------------*/
 
-    if(in_pupshold == FALSE)
-    {  (void)sigaddset(&old_set,signum);
-       (void)pups_sigprocmask(SIG_SETMASK,&old_set,(sigset_t *)NULL);
-    }
+    (void)sigdelset(&set,signum); 
+    (void)pups_sigprocmask(SIG_SETMASK,&set,(sigset_t *)NULL);
 
 
     /*---------------------------------------*/
     /* Make sure that PUPS sigtab is updated */
     /*---------------------------------------*/
 
-    (void)sigaddset(&sigtab[signum].sa_mask,signum);
+    (void)sigdelset(&sigtab[signum].sa_mask,signum); 
 
     #ifdef PTHREAD_SUPPORT
     (void)pthread_mutex_unlock(&sigtab_mutex);
@@ -13497,28 +13312,26 @@ _PUBLIC int pupsighold(const int signum, const _BOOLEAN defer)
 
 
 
-/*---------------------------------------------------------------------------------
-    Block PUPS signals - this is usually called before entering a critical
-    section of code to postpone PSRP transactions until we are through the
-    critical section ...
----------------------------------------------------------------------------------*/
+/*-----------------------------------*/
+/* Block signal set (PUPS compliant) */
+/*-----------------------------------*/
 
-_PUBLIC void pupshold(const int sigs_to_hold)
+_PUBLIC void pupshold(const int32_t sigs_to_hold)
 
 {   sigset_t set;
 
-    if(sigs_to_hold != PSRP_SIGS && sigs_to_hold != ALL_PUPS_SIGS)
+    if(sigs_to_hold != PSRP_SIGS && sigs_to_hold != ALL_PUPS_SIGS && sigs_to_hold != ALL_SIGS)
     {  pups_set_errno(EINVAL);
        return;
     }
 
 
-    /*----------------------------------------------------------------*/ 
-    /* If we handling a virtual timer or pupsighold() has been called */
-    /* recursively and pupsighold_cnt > 0  don't unblock signal       */
-    /*----------------------------------------------------------------*/ 
+    /*-------------------------------------------------------------*/ 
+    /* Signal handling is disabled if called from within pups_exit */
+    /* psrp_handler or chan handler                                */
+    /*-------------------------------------------------------------*/ 
 
-    if(in_vt_handler == TRUE || in_psrp_handler == TRUE || in_chan_handler == TRUE)
+    if(in_pups_exit == TRUE || in_vt_handler == TRUE || in_psrp_handler == TRUE || in_chan_handler == TRUE)
     {  pups_set_errno(OK);
        return; 
     }
@@ -13551,25 +13364,30 @@ _PUBLIC void pupshold(const int sigs_to_hold)
 
     (void)pups_sigprocmask(SIG_SETMASK,&old_set,(sigset_t *)NULL);
 
+
+    /*---------------------*/
+    /* All PUPS/P3 signals */
+    /*---------------------*/
+
     if(sigs_to_hold == ALL_PUPS_SIGS)
-    { 
-
-       /*-------------------------------------------------------*/
-       /* Note we must defer SIGALRM before any other signal or */
-       /* it may be caught within a signal handler for another  */
-       /* signal which could be fatal.                          */
-       /*-------------------------------------------------------*/
-
-       (void)pupsighold(SIGALRM,  TRUE);
+    {  (void)pupsighold(SIGALRM,  TRUE);
        (void)pupsighold(SIGCHLD,  TRUE);
+       (void)pupsighold(SIGINIT,  TRUE);
+       (void)pupsighold(SIGCHAN,  TRUE);
+       (void)pupsighold(SIGPSRP,  TRUE);
+       (void)pupsighold(SIGCLIENT,TRUE);
     }
 
-    if(sigs_to_hold == ALL_PUPS_SIGS || ignore_pups_signals == TRUE)
+
+    /*-----------------------*/
+    /* PSRP protocol signals */
+    /*-----------------------*/
+
+    else if(sigs_to_hold == PSRP_SIGS || ignore_pups_signals == TRUE)
     {  (void)pupsighold(SIGINIT,  TRUE);
        (void)pupsighold(SIGCHAN,  TRUE);
        (void)pupsighold(SIGPSRP,  TRUE);
        (void)pupsighold(SIGCLIENT,TRUE);
-       (void)pupsighold(SIGALIVE, TRUE);
     }
 
     in_pupshold = FALSE;
@@ -13584,11 +13402,11 @@ _PUBLIC void pupshold(const int sigs_to_hold)
 
 
 
-/*---------------------------------------------------------------------------------
-    Release blocked PUPS signals ...
----------------------------------------------------------------------------------*/
+/*-------------------------------------*/
+/* unblock signal set (PUPS compliant) */
+/*-------------------------------------*/
 
-_PUBLIC void pupsrelse(const int sigs_to_relse)
+_PUBLIC void pupsrelse(const int32_t sigs_to_relse)
 
 {   sigset_t set;
 
@@ -13603,7 +13421,7 @@ _PUBLIC void pupsrelse(const int sigs_to_relse)
     /* recursively and pupsighold_cnt > 0  don't unblock signal       */
     /*----------------------------------------------------------------*/
 
-    if(in_vt_handler == TRUE || in_psrp_handler == TRUE || in_chan_handler == TRUE)
+    if(in_pups_exit == TRUE || in_vt_handler == TRUE || in_psrp_handler == TRUE || in_chan_handler == TRUE)
     {  pups_set_errno(OK);
        return;
     }
@@ -13637,7 +13455,6 @@ _PUBLIC void pupsrelse(const int sigs_to_relse)
     {  (void)pupsigrelse(SIGINIT);
        (void)pupsigrelse(SIGCHAN);
        (void)pupsigrelse(SIGPSRP);
-       (void)pupsigrelse(SIGALIVE);
        (void)pupsigrelse(SIGCLIENT);
     }
 
@@ -13656,27 +13473,26 @@ _PUBLIC void pupsrelse(const int sigs_to_relse)
 
 
 
-/*--------------------------------------------------------------------------------
-   Routine to release specified signal (previously blocked with sighold) ...
---------------------------------------------------------------------------------*/
+/*---------------------------------*/
+/* Unblock signal (PUPS compliant) */
+/*---------------------------------*/
 
-_PUBLIC int pupsigrelse(const int signum)
+_PUBLIC int32_t pupsigrelse(const int32_t signum)
 
 {   sigset_t set;
 
-
     if(signum < 1 || signum > MAX_SIGS)
     {  pups_set_errno(EINVAL);
-       return;
+       return(-1);
     }
 
 
-    /*----------------------------------------------------------------*/
-    /* If we handling a virtual timer or pupsighold() has been called */
-    /* recursively and pupsighold_cnt > 0  don't unblock signal       */
-    /*----------------------------------------------------------------*/
+    /*-------------------------------------------------------------*/ 
+    /* Signal handling is disabled if called from within pups_exit */
+    /* psrp_handler or chan handler                                */
+    /*-------------------------------------------------------------*/ 
 
-    if(in_vt_handler == TRUE || in_psrp_handler == TRUE || in_chan_handler == TRUE)
+    if(in_pups_exit == TRUE || in_vt_handler == TRUE || in_psrp_handler == TRUE || in_chan_handler == TRUE)
     {  pups_set_errno(OK);
        return(0);
     }
@@ -13735,24 +13551,20 @@ _PUBLIC int pupsigrelse(const int signum)
 
 
 
+/*-------------------------------------*/
+/* PUPS compliant POSIX signal handler */
+/*-------------------------------------*/
 
+_PUBLIC int32_t pups_sighandle(const int32_t signum, const char *handler_name, const void *handler, const sigset_t *handler_mask)
 
-/*--------------------------------------------------------------------------------
-    PUPS signal handling facilties: reinstalls signal handler automatically on
-    call, blocks all signals during call, and restarts slow system calls if
-    handler called while they are running ...
---------------------------------------------------------------------------------*/
-
-_PUBLIC int pups_sighandle(const int signum, const char *handler_name, const void *handler, const sigset_t *handler_mask)
-
-{   int    ret;
-    struct sigaction action;
+{   int32_t ret;
+    struct  sigaction action;
 
     if(signum       <  1                       ||
        signum       >  MAX_SIGS                ||
        handler_name == (const char *)    NULL   ) 
     {  pups_set_errno(EINVAL);
-       return;
+       return(-1);
     }
 
     #ifdef PTHREAD_SUPPORT
@@ -13764,10 +13576,10 @@ _PUBLIC int pups_sighandle(const int signum, const char *handler_name, const voi
     else
        action.sa_mask = *handler_mask;
 
-    action.sa_handler         = handler;
-    action.sa_flags           = SA_RESTART;
+    action.sa_handler       = handler;
+    action.sa_flags         = 0; //SA_RESTART;
 
-    sigtab[signum].haddr    = (unsigned long int)handler;
+    sigtab[signum].haddr    = (uint64_t)handler;
     sigtab[signum].sa_mask  = action.sa_mask;
     sigtab[signum].sa_flags = action.sa_flags;
 
@@ -13786,11 +13598,11 @@ _PUBLIC int pups_sighandle(const int signum, const char *handler_name, const voi
 
 
 
-/*--------------------------------------------------------------------------------
-    Save a PUPS signal table entry ...
---------------------------------------------------------------------------------*/
+/*------------------------------*/
+/* Save PUPS signal table entry */
+/*------------------------------*/
 
-_PUBLIC void pups_sigtabsave(const int signum, sigtab_type *sigtab_entry)
+_PUBLIC void pups_sigtabsave(const int32_t signum, sigtab_type *sigtab_entry)
 
 {   
     if(signum < 1 || signum > MAX_SIGS || sigtab_entry == (const sigtab_type *)NULL)
@@ -13814,11 +13626,11 @@ _PUBLIC void pups_sigtabsave(const int signum, sigtab_type *sigtab_entry)
 
 
 
-/*--------------------------------------------------------------------------------
-    Restore a PUPS signal table entry (and re-install handler) ...
---------------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------*/
+/* Restore PUPS signal table entry (and re-install signal handler) */
+/*-----------------------------------------------------------------*/
 
-_PUBLIC void pups_sigtabrestore(const int signum, const sigtab_type *sigtab_entry)
+_PUBLIC void pups_sigtabrestore(const int32_t signum, const sigtab_type *sigtab_entry)
 
 {   if(signum < 1 || signum > MAX_SIGS || sigtab_entry == (const sigtab_type *)NULL)
     {  pups_set_errno(EINVAL);
@@ -13842,21 +13654,27 @@ _PUBLIC void pups_sigtabrestore(const int signum, const sigtab_type *sigtab_entr
 
 
 
-/*--------------------------------------------------------------------------------
-    Suspend process until specified signal recieved ...
---------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------*/
+/* PUPS compliant process suspension (until specified signal recieved) */
+/*---------------------------------------------------------------------*/
 
-_PUBLIC int pups_signalpause(const int signum)
+_PUBLIC int32_t pups_signalpause(const int32_t signum)
 
-{   int      ret;
+{   int32_t  ret;
     sigset_t set;
 
     if(signum < 1 || signum > MAX_SIGS)
     {  pups_set_errno(EINVAL);
-       return;
+       return(-1);
     }
 
     (void)sigfillset(&set);
+
+
+    /*---------------------*/
+    /* Signalm to wait for */
+    /*---------------------*/
+
     (void)sigdelset(&set,signum);
 
 
@@ -13864,6 +13682,7 @@ _PUBLIC int pups_signalpause(const int signum)
     /* Make sure standard PUPS signals are not blocked */
     /*-------------------------------------------------*/
 
+    (void)sigdelset(&set,SIGINT);
     (void)sigdelset(&set,SIGTERM);
     (void)sigdelset(&set,SIGALIVE);
     (void)sigdelset(&set,SIGALRM);
@@ -13881,17 +13700,17 @@ _PUBLIC int pups_signalpause(const int signum)
 
 
 
-/*---------------------------------------------------------------------------------
-    Check to see if given signal is pending ...
----------------------------------------------------------------------------------*/
+/*---------------------------*/
+/* PUPS compliant sigpending */
+/*---------------------------*/
 
-_PUBLIC _BOOLEAN pups_signalpending(const int signum)
+_PUBLIC _BOOLEAN pups_signalpending(const int32_t signum)
 
 {   sigset_t set;
 
     if(signum < 1 || signum > MAX_SIGS)
     {  pups_set_errno(EINVAL);
-       return;
+       return(-1);
     }
     else
        pups_set_errno(OK);
@@ -13906,20 +13725,19 @@ _PUBLIC _BOOLEAN pups_signalpending(const int signum)
 
 
 
-/*--------------------------------------------------------------------------------
-    Initialise signal status ...
---------------------------------------------------------------------------------*/
+/*---------------------------------*/
+/* Initialise process signal table */
+/*---------------------------------*/
 
 _PRIVATE void initsigstatus(void)
 
-{   int i;
-
+{   uint32_t i;
 
     #ifdef PTHREAD_SUPPORT
     (void)pthread_mutex_lock(&sigtab_mutex);
     #endif /* PTHREAD_SUPPORT */
 
-    for(i=1; i<=MAX_SIGS; ++i)
+    for(i=1; i<MAX_SIGS; ++i)
     {  if(i+1 == SIGTTIN   ||
           i+1 == SIGTTOU   ||
           i+1 == SIGIO     ||
@@ -13927,11 +13745,11 @@ _PRIVATE void initsigstatus(void)
           i+1 == SIGURG    ||
           i+1 == SIGCONT   ||
           i+1 == SIGCHLD    )
-       {  sigtab[i].haddr    = (unsigned long int)SIG_IGN;
+       {  sigtab[i].haddr    = (uint64_t)SIG_IGN;
           (void)strlcpy(sigtab[i].hname,"ignored",SSIZE);
        }
        else
-       {  sigtab[i].haddr    = (unsigned long int)SIG_DFL;
+       {  sigtab[i].haddr    = (uint64_t)SIG_DFL;
           (void)strlcpy(sigtab[i].hname,"default",SSIZE);
        }
 
@@ -13946,14 +13764,14 @@ _PRIVATE void initsigstatus(void)
 
 
 
-/*--------------------------------------------------------------------------------
-     Status of signals ...
---------------------------------------------------------------------------------*/
+/*------------------------------*/
+/* Display process signal table */
+/*------------------------------*/
 
 _PUBLIC void pups_show_sigstatus(const FILE *stream)
 
-{   int i,
-        handlers_installed = 0;
+{   uint32_t i,
+             handlers_installed = 0;
 
 
     /*----------------------------------*/
@@ -13978,17 +13796,17 @@ _PUBLIC void pups_show_sigstatus(const FILE *stream)
     (void)fflush(stream);
 
     for(i=1; i<=MAX_SIGS; ++i)
-    {  if(sigtab[i].haddr == (unsigned long int)SIG_IGN)
+    {  if(sigtab[i].haddr == (uint64_t)SIG_IGN)
        {  (void)fprintf(stream,"    %-16s (%02d): ignored\n",signame[i],i);
           (void)fflush(stream);
 
           ++handlers_installed;
        }
        else
-       {  if(sigtab[i].haddr != (unsigned long int)SIG_DFL)
+       {  if(sigtab[i].haddr != (uint64_t)SIG_DFL)
           {  (void)fprintf(stream,
                      "    %-16s (%02d): re-entrant handler at %016lx virtual",
-                              signame[i],i,(unsigned long int)sigtab[i].haddr);
+                              signame[i],i,(uint64_t)sigtab[i].haddr);
 
              if(sigtab[i].hname != (char *)NULL)
                 (void)fprintf(stream," (%s)\n",sigtab[i].hname);
@@ -14020,15 +13838,15 @@ _PUBLIC void pups_show_sigstatus(const FILE *stream)
 
 
 
-/*--------------------------------------------------------------------------------
-    Display state of signal mask (and signals pending) ...
---------------------------------------------------------------------------------*/
+/*------------------------------------------------------------*/
+/* Display state of process signal mask (and signals pending) */
+/*------------------------------------------------------------*/
 
 _PUBLIC void pups_show_sigmaskstatus(const FILE *stream)
 
-{   int i,
-        b_cnt = 0,
-        p_cnt = 0; 
+{   uint32_t i,
+             b_cnt = 0,
+             p_cnt = 0; 
 
     char blockstatus[SSIZE] = "",
          pendstatus[SSIZE]  = "";
@@ -14097,14 +13915,14 @@ _PUBLIC void pups_show_sigmaskstatus(const FILE *stream)
 
 
 
-/*--------------------------------------------------------------------------------
-     Convert signal name to signal number ...
---------------------------------------------------------------------------------*/
+/*--------------------------------------*/
+/* Convert signal name to signal number */
+/*--------------------------------------*/
 
-_PUBLIC int pups_signametosigno(const char *name)
+_PUBLIC int32_t pups_signametosigno(const char *name)
 
-{   int i;
-    char tmpstr[SSIZE] = "";
+{   uint32_t i;
+    char     tmpstr[SSIZE] = "";
 
     if(name == (const char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -14130,7 +13948,7 @@ _PUBLIC int pups_signametosigno(const char *name)
              #endif /* PTHREAD_SUPPORT */
 
              pups_set_errno(OK);
-             return(i);
+             return((int32_t)i);
           }
        }
        else
@@ -14142,7 +13960,7 @@ _PUBLIC int pups_signametosigno(const char *name)
              #endif /* PTHREAD_SUPPORT */
 
              pups_set_errno(OK);
-             return(i);
+             return((int32_t)i);
           }
        }
     }
@@ -14158,11 +13976,11 @@ _PUBLIC int pups_signametosigno(const char *name)
 
 
 
-/*--------------------------------------------------------------------------------
-     Convert signal number to name ...
---------------------------------------------------------------------------------*/
+/*--------------------------------------*/
+/* Convert signal number to signal name */
+/*--------------------------------------*/
 
-_PUBLIC char *pups_signotosigname(const int signum, char *name)
+_PUBLIC char *pups_signotosigname(const int32_t signum, char *name)
 
 {    if(name == (char *)NULL || signum < 1 || signum >MAX_SIGS)
      {  pups_set_errno(EINVAL);
@@ -14186,13 +14004,13 @@ _PUBLIC char *pups_signotosigname(const int signum, char *name)
 
 
 
-/*--------------------------------------------------------------------------------
-     Show detailed state of specified signal ...
---------------------------------------------------------------------------------*/
+/*----------------------------------*/
+/* Display detailed state of signal */
+/*----------------------------------*/
 
-_PUBLIC int pups_show_siglstatus(const int signum, const FILE *stream)
+_PUBLIC int32_t pups_show_siglstatus(const int32_t signum, const FILE *stream)
 
-{   int      i;
+{   int32_t  i;
     _BOOLEAN maskbits_set = FALSE;
 
 
@@ -14214,7 +14032,7 @@ _PUBLIC int pups_show_siglstatus(const int signum, const FILE *stream)
     (void)pthread_mutex_lock(&sigtab_mutex);
     #endif /* PTHREAD_SUPPORT */
 
-    if(sigtab[signum].haddr == (unsigned long int)SIG_DFL)
+    if(sigtab[signum].haddr == (uint64_t)SIG_DFL)
     {  (void)fprintf(stream,"\n    %-16s [%04d]: default action\n\n",signame[signum],signum);
        (void)fflush(stream);
 
@@ -14226,7 +14044,7 @@ _PUBLIC int pups_show_siglstatus(const int signum, const FILE *stream)
        return(0);
     }
     else
-    {  if(sigtab[signum-1].haddr == (unsigned long int)SIG_IGN)
+    {  if(sigtab[signum-1].haddr == (uint64_t)SIG_IGN)
        {  (void)fprintf(stream,"\n    %-16s [%04d]: ignored\n\n",signame[signum],signum);
           (void)fflush(stream);
 
@@ -14243,13 +14061,13 @@ _PUBLIC int pups_show_siglstatus(const int signum, const FILE *stream)
     (void)fflush(stream);
 
     (void)fprintf(stream,"    Handler \"%-32s\" installed at %016lx virtual\n",sigtab[signum].hname,
-                                                            (unsigned long int)sigtab[signum].haddr);
+                                                                     (uint64_t)sigtab[signum].haddr);
     (void)fflush(stream);
 
     if(sigtab[signum].sa_flags & SA_RESTART)
-       (void)fprintf(stream,"    Handler will restart interrupted system calls on exit\n");
+       (void)fprintf(stream,"    Handler will restart interrupted system calls on exit (BSD semantics)\n");
     else
-       (void)fprintf(stream,"    Handler will NOT restart interrupted system calls on exit\n");
+       (void)fprintf(stream,"    Handler will NOT restart interrupted system calls on exit (POSIX semantics)\n");
     (void)fflush(stream);
  
     if(sigtab[signum].sa_flags & SA_RESETHAND)
@@ -14289,11 +14107,11 @@ _PUBLIC int pups_show_siglstatus(const int signum, const FILE *stream)
 
 
 
-/*-----------------------------------------------------------------------------------
-    Routine to execute non-local goto (as exit from a signal handler) ...
------------------------------------------------------------------------------------*/
+/*--------------------------------------------------------*/
+/* Execute non-local goto (as exit from a signal handler) */
+/*--------------------------------------------------------*/
 
-_PUBLIC int pups_sigvector(const int signum, const sigjmp_buf *vector)
+_PUBLIC int32_t pups_sigvector(const int32_t signum, const sigjmp_buf *vector)
 
 {   if(signum > 0 && signum <= MAX_SIGS && vector != (sigjmp_buf *)NULL && jump_vector == TRUE)
     {  
@@ -14315,11 +14133,11 @@ _PUBLIC int pups_sigvector(const int signum, const sigjmp_buf *vector)
 
 
 
-/*------------------------------------------------------------------------------------
-    Check descriptor for data and/or exceptions ... 
-------------------------------------------------------------------------------------*/
+/*----------------------------------------------------------*/
+/* Check descriptor for data and/or exceptions using select */
+/*----------------------------------------------------------*/
 
-_PUBLIC int pups_monitor(const int fdes, int secs, const int usecs)
+_PUBLIC int32_t pups_monitor(const des_t fdes, int32_t secs, const int32_t usecs)
 
 {   fd_set read_set,
            write_set,
@@ -14344,7 +14162,7 @@ _PUBLIC int pups_monitor(const int fdes, int secs, const int usecs)
     timeout.tv_usec = usecs;
 
     if(select(MAX_SIGS,&read_set,&write_set,&excep_set,&timeout) == (-1))
-       return;
+       return(-1);
 
     pups_set_errno(OK);
     if(FD_ISSET(fdes,&read_set))
@@ -14362,9 +14180,9 @@ _PUBLIC int pups_monitor(const int fdes, int secs, const int usecs)
 
 
 
-/*-------------------------------------------------------------------------------------
-    Return current date (thread safe) ...
--------------------------------------------------------------------------------------*/
+/*----------------------------*/
+/* Return current date string */
+/*----------------------------*/
 
 _PUBLIC void strdate(char *date)
 
@@ -14397,18 +14215,16 @@ _PUBLIC void strdate(char *date)
 
 
 
-/*-------------------------------------------------------------------------------------
-    Handler for vitual interval timer timeout ...
--------------------------------------------------------------------------------------*/
-
-
+/*-------------------------------------------*/
+/* Handler for vitual interval timer timeout */
+/*-------------------------------------------*/
 /*-----------------------------------*/
 /* Initialise PUPS virtual timer set */
 /*-----------------------------------*/
 
-_PRIVATE void initvitimers(int appl_max_vtimers)
+_PRIVATE void initvitimers(int32_t appl_max_vtimers)
 
-{   int i;
+{   uint32_t i;
 
 
     /*------------------------------------*/
@@ -14422,14 +14238,15 @@ _PRIVATE void initvitimers(int appl_max_vtimers)
        vttab[i].mode            = VT_NONE;
        vttab[i].prescaler       = 0;
        vttab[i].interval_time   = 0;
-       vttab[i].name            = (char *)NULL;
-       vttab[i].handler_args    = (char *)NULL;
        vttab[i].handler         = NULL;
+
+       (void)strlcpy(vttab[i].name,        "",SSIZE);
+       (void)strlcpy(vttab[i].handler_args,"",SSIZE);
     }
 
     if(appl_verbose == TRUE)
     {  (void)strdate(date);
-       (void)fprintf(stderr,"%s %s (%d@%s:%s): PUPS virtual timer system intialised (%d timers available)\n",
+       (void)fprintf(stderr,"%s %s (%d@%s:%s): PUPS virtual timer system  int32_tialised (%d timers available)\n",
                                                date,appl_name,appl_pid,appl_host,appl_owner,appl_max_vtimers);
        (void)fflush(stderr);
     }
@@ -14444,10 +14261,10 @@ _PRIVATE void initvitimers(int appl_max_vtimers)
 /* further clock cycle before they are serviced                                              */
 /*-------------------------------------------------------------------------------------------*/
 
-_PUBLIC int pups_vt_handler(const int signum)
+_PRIVATE int32_t pups_vt_handler(const int32_t signum)
 
 {   sigset_t   set;
-    int        i;
+    int32_t    i;
     time_t     tdum;
     char       handler_args[SSIZE];
     void       (*handler)(void *, char *args) = NULL;
@@ -14489,10 +14306,11 @@ _PUBLIC int pups_vt_handler(const int signum)
                 if(vttab[i].handler_args != (char *)NULL)
                    (void)strlcpy(handler_args,vttab[i].handler_args,SSIZE);
 
-                vttab[i].handler_args    = (char *)pups_free((void *)vttab[i].handler_args);
-                vttab[i].name            = (char *)pups_free((void *)vttab[i].name);
                 handler                  = vttab[i].handler;
                 vttab[i].handler         = NULL;
+
+                (void)strlcpy(vttab[i].name,        "",SSIZE); 
+                (void)strlcpy(vttab[i].handler_args,"",SSIZE);
              }
              else
              {  if(vttab[i].handler_args != (char *)NULL)
@@ -14531,11 +14349,11 @@ _PUBLIC int pups_vt_handler(const int signum)
 
 
 
-/*-------------------------------------------------------------------------------------
-    Sort function for virtual interval timer priority ...
--------------------------------------------------------------------------------------*/
+/*---------------------------------------------------*/
+/* Sort function for virtual interval timer priority */
+/*---------------------------------------------------*/
 
-_PRIVATE int sort_priority(vttab_type *el_1, vttab_type *el_2)
+_PRIVATE int32_t sort_priority(vttab_type *el_1, vttab_type *el_2)
 
 {   if(el_1->priority > el_2->priority)
        return(-1);
@@ -14549,13 +14367,13 @@ _PRIVATE int sort_priority(vttab_type *el_1, vttab_type *el_2)
 
 
 
-/*---------------------------------------------------------------------------------
-    Restart virtual timer system (this routine is usually called as a precaution
-    after using dubious library functions e.g. CURSES which may silently reset
-    signal handlers in an undocumented fashion) ...
----------------------------------------------------------------------------------*/
+/*------------------------------------------------------------------------------*/
+/* Restart virtual timer system (this routine is usually called as a precaution */
+/* after using dubious library functions e.g. CURSES which may silently reset   */
+/* signal handlers in an undocumented fashion)                                  */
+/* -----------------------------------------------------------------------------*/
 
-_PUBLIC int pups_vitrestart(void)
+_PUBLIC int32_t pups_vitrestart(void)
 
 {
 
@@ -14580,10 +14398,12 @@ _PUBLIC int pups_vitrestart(void)
        /*------------------------------------------------*/
 
        (void)sigfillset(&vt_set);
+
        (void)sigdelset(&vt_set,SIGALRM);
-       (void)sigdelset(&vt_set,SIGTERM);
        (void)sigdelset(&vt_set,SIGINT);
+       (void)sigdelset(&vt_set,SIGTERM);
        (void)sigdelset(&vt_set,SIGCONT);
+
        (void)pups_sighandle(SIGALRM,"vt_handler",(void *)pups_vt_handler, &vt_set);
 
        in_vt_handler = FALSE;
@@ -14600,18 +14420,19 @@ _PUBLIC int pups_vitrestart(void)
 
 
 
-/*-------------------------------------------------------------------------------------
-    Set up a virtual interval timer ...
--------------------------------------------------------------------------------------*/
+/*----------------------------*/
+/* Set virtual interval timer */
+/*----------------------------*/
+                                                              /*---------------------------------*/
+_PUBLIC int32_t pups_setvitimer(const char     *tname      ,  /* Timer payload name              */
+                                const  int32_t priority    ,  /* Priority of handler             */
+                                const  int32_t mode        ,  /* Mode of timer                   */
+                                const time_t  interval     ,  /* Timeout interval (microseconds) */
+                                const char    *handler_args,  /* Handler arguments               */
+                                const void    *handler     )  /* Handler called on timeout       */
+                                                              /*---------------------------------*/
 
-_PUBLIC int pups_setvitimer(const char   *tname,        /* Timer payload name              */
-                            const int    priority,      /* Priority of handler             */
-                            const int    mode,          /* Mode of timer                   */
-                            const time_t interval,      /* Timeout interval (microseconds) */
-                            const char   *handler_args, /* Handler arguments               */
-                            const void   *handler)      /* Handler called on timeout       */
-
-{   int      i,
+{   int32_t  i,
              t_index;
 
     time_t   tdum;
@@ -14729,7 +14550,7 @@ free_timer:
     /*-------------------------------------------------------------*/
 
     if(interval > 0 && mode == VT_CONTINUOUS)
-       vttab[t_index].prescaler   = interval;
+       vttab[t_index].prescaler   =  interval;
     else if(mode != VT_CONTINUOUS)
     {  (void)pups_sigprocmask(SIG_UNBLOCK,&set,(sigset_t *)NULL);
        (void)pups_malarm(vitimer_quantum);
@@ -14738,18 +14559,13 @@ free_timer:
        return(-1);
     }
 
-    vttab[t_index].interval_time  = interval;
+    vttab[t_index].interval_time  =  interval;
     vttab[t_index].mode           = mode;
     vttab[t_index].handler        = handler;
 
     if(handler_args != (char *)NULL)
-    {  if(vttab[t_index].handler_args == (char *)NULL)
-          vttab[t_index].handler_args = (char *)pups_malloc(SSIZE);
-
        (void)strlcpy(vttab[t_index].handler_args,handler_args,SSIZE);
-    }
 
-    vttab[t_index].name = (char *)pups_malloc(SSIZE);
     (void)strlcpy(vttab[t_index].name,tname,SSIZE);
 
 
@@ -14803,14 +14619,13 @@ free_timer:
 
 
 
-/*-------------------------------------------------------------------------------------
-    Clear virtual interval timer ...
--------------------------------------------------------------------------------------*/
+/*------------------------------*/
+/* Clear virtual interval timer */
+/*------------------------------*/
 
+_PUBLIC int32_t pups_clearvitimer(const char *tname)
 
-_PUBLIC int pups_clearvitimer(const char *tname)
-
-{   int      i;
+{   uint32_t i;
     sigset_t set;
 
 
@@ -14838,8 +14653,14 @@ _PUBLIC int pups_clearvitimer(const char *tname)
           {  char date[SSIZE] = "";
 
              (void)strdate(date);
-             (void)fprintf(stderr,"%s %s (%d@%s:%s): PUPS virtual timer %d (%s) cleared\n",
+
+             if (strcmp(vttab[i].name,"") == 0)
+                (void)fprintf(stderr,"%s %s (%d@%s:%s): PUPS virtual timer %d cleared\n",
                               date,appl_name,appl_pid,appl_host,appl_owner,i,vttab[i].name);
+             else
+                (void)fprintf(stderr,"%s %s (%d@%s:%s): PUPS virtual timer %d (%s) cleared\n",
+                                 date,appl_name,appl_pid,appl_host,appl_owner,i,vttab[i].name);
+
              (void)fflush(stderr);
           }
 
@@ -14848,9 +14669,10 @@ _PUBLIC int pups_clearvitimer(const char *tname)
           vttab[i].priority        = 0;
           vttab[i].prescaler       = 0;
           vttab[i].interval_time   = 0;
-          vttab[i].handler_args    = (char *)pups_free((void *)vttab[i].handler_args);
-          vttab[i].name            = (char *)pups_free((void *)vttab[i].name);
           vttab[i].handler         = NULL;
+
+          (void)strlcpy(vttab[i].name,        "",SSIZE);
+          (void)strlcpy(vttab[i].handler_args,"",SSIZE);
 
           --active_v_timers;
 
@@ -14898,13 +14720,13 @@ _PUBLIC int pups_clearvitimer(const char *tname)
  
 
 
-/*---------------------------------------------------------------------------------
-    Show PUPS virtual timer status ...                      
----------------------------------------------------------------------------------*/
+/*--------------------------------------*/
+/* Display virtual interval timer table */                      
+/*--------------------------------------*/
 
 _PUBLIC void pups_show_vitimers(const FILE *stream)
 
-{   int i;
+{   uint32_t i;
 
 
     /*----------------------------------*/
@@ -14917,7 +14739,7 @@ _PUBLIC void pups_show_vitimers(const FILE *stream)
 
     if(stream == (const FILE *)NULL)
     {  pups_set_errno(EINVAL);
-       return(-1);
+       return;
     }
 
     if(active_v_timers == 0)
@@ -14939,7 +14761,7 @@ _PUBLIC void pups_show_vitimers(const FILE *stream)
                                                                                                                                              vttab[i].priority,
                                                                                                                         (FTYPE)vttab[i].interval_time / 1000.0,
                                                                                                                                             vttab[i].prescaler,
-                                                                                                                           (unsigned long int)vttab[i].handler);
+                                                                                                                                    (uint64_t)vttab[i].handler);
               else
                 (void)fprintf(stream,
                               "    %04d: \"%-48s\" priority %02d, oneshot mode, interval time %7.4F secs, prescaler %04d, (handler at %016lx virtual)\n",i,
@@ -14947,7 +14769,7 @@ _PUBLIC void pups_show_vitimers(const FILE *stream)
                                                                                                                                          vttab[i].priority,
 			                                                                                            (FTYPE)vttab[i].interval_time / 1000.0,
                                                                                                                                         vttab[i].prescaler,
-                                                                                                                       (unsigned long int)vttab[i].handler);
+                                                                                                                                (uint64_t)vttab[i].handler);
               (void)fflush(stream);
            }
         }
@@ -14968,13 +14790,13 @@ _PUBLIC void pups_show_vitimers(const FILE *stream)
 
 
 
-/*-------------------------------------------------------------------------------------
-    Routine to get (or test) write lock on a FIFO ...
--------------------------------------------------------------------------------------*/
+/*-------------------------------------------------------------*/
+/* Routine to get (or test) write lock on open file descriptor */
+/*-------------------------------------------------------------*/
 
-_PUBLIC _BOOLEAN pups_get_fd_lock(const int fdes, const int mode)
+_PUBLIC _BOOLEAN pups_get_fd_lock(const des_t fdes, const int32_t mode)
 
-{   int f_index;
+{   int32_t f_index;
 
     if(fdes < 0 || fdes >= appl_max_files || mode != GETLOCK && mode != TSTLOCK)
     {  pups_set_errno(EINVAL);
@@ -15018,13 +14840,13 @@ _PUBLIC _BOOLEAN pups_get_fd_lock(const int fdes, const int mode)
 
 
 
-/*-------------------------------------------------------------------------------------
-    Routine to release a write lock on a FIFO ...
--------------------------------------------------------------------------------------*/
+/*--------------------------------------------*/
+/* Release write lock on open file descriptor */ 
+/*--------------------------------------------*/
 
-_PUBLIC int pups_release_fd_lock(const int fd)
+_PUBLIC int32_t pups_release_fd_lock(const des_t fd)
 
-{   int f_index;
+{   int32_t f_index;
 
     if((f_index = pups_get_ftab_index(fd)) == (-1))
     {  pups_set_errno(EBADF);
@@ -15050,13 +14872,13 @@ _PUBLIC int pups_release_fd_lock(const int fd)
 
 
 
-/*-------------------------------------------------------------------------------------
-    Routine to acquire lock on a named file ...
--------------------------------------------------------------------------------------*/
+/*------------------------------*/
+/* Acquire lock on (named) file */
+/*------------------------------*/
 
-_PUBLIC _BOOLEAN pups_get_lock(const char *name, const int mode)
+_PUBLIC _BOOLEAN pups_get_lock(const char *name, const int32_t mode)
 
-{   int      fdes = (-1);
+{   des_t    fdes = (-1);
     _BOOLEAN ret;
 
     if(name == (const char *)NULL || (mode !=  GETLOCK && mode != TSTLOCK))
@@ -15077,13 +14899,13 @@ _PUBLIC _BOOLEAN pups_get_lock(const char *name, const int mode)
 
 
 
-/*-------------------------------------------------------------------------------------
-    Routine to release lock on a named file ...
--------------------------------------------------------------------------------------*/
+/*------------------------------*/
+/* Release lock on a named file */
+/*------------------------------*/
 
 _PUBLIC _BOOLEAN pups_release_lock(const char *name)
 
-{   int      fdes = (-1);
+{   des_t    fdes = (-1);
     _BOOLEAN ret;
 
     if(name == (const char *)NULL)
@@ -15103,13 +14925,13 @@ _PUBLIC _BOOLEAN pups_release_lock(const char *name)
 
 
 
-/*-------------------------------------------------------------------------------------
-    Attach homeostat to a file table entry ...
--------------------------------------------------------------------------------------*/
+/*----------------------------------------*/
+/* Attach homeostat to a file table entry */
+/*----------------------------------------*/
 
-_PUBLIC int pups_attach_homeostat(const int fd, const void *homeostat)
+_PUBLIC int32_t pups_attach_homeostat(const des_t fd, const void *homeostat)
 
-{   int f_index;
+{   int32_t f_index;
 
     if(homeostat == (const void *)NULL)
     {  pups_set_errno(EINVAL);
@@ -15146,13 +14968,13 @@ _PUBLIC int pups_attach_homeostat(const int fd, const void *homeostat)
 
 
 
-/*-------------------------------------------------------------------------------------
-    Detach homeostat function from file table entry  ...
-------------------------------------------------------------------------------------*/
+/*-------------------------------------------------*/
+/* Detach homeostat function from file table entry */
+/*-------------------------------------------------*/
 
-_PUBLIC int pups_detach_homeostat(const int fd)
+_PUBLIC  int32_t pups_detach_homeostat(const des_t fd)
 
-{   int f_index;
+{    int32_t f_index;
 
 
     /*----------------------------------*/
@@ -15191,14 +15013,13 @@ _PUBLIC int pups_detach_homeostat(const int fd)
 
 
 
-/*-------------------------------------------------------------------------------------
-    Routine to check a file system - similar to the "fsw" PUPS service filter in its
-    operation ...
--------------------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------*/
+/* Check for space of filesystem associated with open file descriptor */
+/*--------------------------------------------------------------------*/
 
-_PUBLIC _BOOLEAN pups_check_fs_space(const int fd)
+_PUBLIC _BOOLEAN pups_check_fs_space(const des_t fd)
 
-{   int                f_index;
+{   int32_t            f_index;
     struct    statfs   fs_state;
     _IMMORTAL _BOOLEAN entered = FALSE;
 
@@ -15258,13 +15079,13 @@ _PUBLIC _BOOLEAN pups_check_fs_space(const int fd)
 
 
 
-/*-------------------------------------------------------------------------------------
-    Set parameters for homeostatic file system space monitoring ...
--------------------------------------------------------------------------------------*/
+/*-------------------------------------------------------------*/
+/* Set parameters for homeostatic file system space monitoring */
+/*-------------------------------------------------------------*/
 
-_PUBLIC int pups_set_fs_hsm_parameters(const int fd, const int fs_blocks, const char *fs_name)
+_PUBLIC int32_t pups_set_fs_hsm_parameters(const des_t fd, const int32_t fs_blocks, const char *fs_name)
 
-{   int f_index;
+{   int32_t f_index;
 
 
     /*----------------------------------*/
@@ -15307,23 +15128,24 @@ _PUBLIC int pups_set_fs_hsm_parameters(const int fd, const int fs_blocks, const 
 
 
 
-/*------------------------------------------------------------------------------------
-    Homeostatic write check - default action is to wait until file system has space
-    available. If mfunc is non-null this is executed (and implements a file
-    migration scheme) ...
-------------------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------------------------*/
+/* Homeostatic write check the default action is to wait until file system has space */
+/* available. If mfunc is non-null this is executed (and implements a file           */
+/*  migration scheme)                                                                */
+/* ----------------------------------------------------------------------------------*/
                                                     /*------------------------------*/
 _PUBLIC _BOOLEAN fs_write_blocked = FALSE;          /* If TRUE filesystem full      */
                                                     /*------------------------------*/
 
-_PUBLIC int pups_write_homeostat(const int fdes, int (*mfunc)(int))
+_PUBLIC int32_t pups_write_homeostat(const des_t fdes, int32_t (*mfunc)(int32_t))
 
 {      
 
-    int iter = 0, 
-        f_index;
+    int32_t iter = 0, 
+            f_index;
 
     struct statfs  fs_buf;
+
 
     /*----------------------------------*/
     /* Only the root thread can process */
@@ -15356,7 +15178,7 @@ _PUBLIC int pups_write_homeostat(const int fdes, int (*mfunc)(int))
     /*------------------------------------------------------------*/
 
     if(fs_buf.f_bavail < ftab[f_index].fs_blocks && (void *)mfunc != (void *)NULL)
-    {  int new_fdes;
+    {  int32_t new_fdes;
 
        fs_write_blocked = TRUE;
        new_fdes         = (*mfunc)(fdes);
@@ -15441,13 +15263,13 @@ _PUBLIC int pups_write_homeostat(const int fdes, int (*mfunc)(int))
 
 
 
-/*----------------------------------------------------------------------------------------
-    PUPS compliant sleep call (does not interact wih SIGALRM) ...
-----------------------------------------------------------------------------------------*/
+/*---------------------------*/
+/* PUPS compliant sleep call */
+/*---------------------------*/
 
-_PUBLIC int pups_sleep(const int secs)
+_PUBLIC int32_t pups_sleep(const int32_t secs)
 
-{   int i;
+{   uint32_t i;
 
     if(secs <= 0)
     {  pups_set_errno(EINVAL);
@@ -15469,15 +15291,15 @@ _PUBLIC int pups_sleep(const int secs)
 
 
 
-/*----------------------------------------------------------------------------------------
-    Alarm function which works in microseconds - raises SIGALRM on timeout ...
-----------------------------------------------------------------------------------------*/
+/*--------------------------------------------------------*/
+/* Microsecond alarm function (raises SIGALRM on timeout) */
+/*--------------------------------------------------------*/
 
-_PUBLIC int pups_malarm(const unsigned long int usecs)
+_PUBLIC int32_t pups_malarm(const uint64_t usecs)
 
 {   struct   itimerval itimer;
     sigset_t set;
-    int      ret;
+    int32_t  ret;
 
     #ifdef PTHREAD_SUPPORT
     (void)pthread_mutex_lock(&malarm_mutex);
@@ -15500,11 +15322,11 @@ _PUBLIC int pups_malarm(const unsigned long int usecs)
 
 
 
-/*----------------------------------------------------------------------------------------
-    Unhide the branch part of a file pathname (and its shadow) ...
-----------------------------------------------------------------------------------------*/
+/*------------------------------------------------------------*/
+/* Unhide the branch part of a file pathname (and its shadow) */
+/*------------------------------------------------------------*/
 
-_PRIVATE _BOOLEAN pups_unhide_pathnames(vttab_type *t_info, char *fname, char *fshadow)
+_PRIVATE _BOOLEAN pups_unhide_pathnames(vttab_type *t_info, const char *fname, const char *fshadow)
 
 {   char new_fname[SSIZE] = "";
 
@@ -15529,14 +15351,14 @@ _PRIVATE _BOOLEAN pups_unhide_pathnames(vttab_type *t_info, char *fname, char *f
        /* Update file homeostat */
        /*-----------------------*/
 
-       (void)strlcpy((vttab_type *)t_info->name,new_fname,SSIZE);
+       (void)strlcpy((char *)t_info->name,new_fname,SSIZE);
 
 
        /*-----------------*/
        /* Update filename */
        /*-----------------*/
 
-       (void)strncpy(fname,new_fname,SSIZE);
+       (void)strlcpy(fname,new_fname,SSIZE);
 
 
        /*-------------------------*/
@@ -15554,7 +15376,7 @@ _PRIVATE _BOOLEAN pups_unhide_pathnames(vttab_type *t_info, char *fname, char *f
        }
 
        (void)rename (fshadow,new_fshadow);
-       (void)strncpy(fshadow,new_fshadow,SSIZE);
+       (void)strlcpy(fshadow,new_fshadow,SSIZE);
 
 
 
@@ -15567,21 +15389,21 @@ _PRIVATE _BOOLEAN pups_unhide_pathnames(vttab_type *t_info, char *fname, char *f
 
 
 
-/*----------------------------------------------------------------------------------------
-    Homeostat for stdio (FIFO) redirection ...
-----------------------------------------------------------------------------------------*/
+/*----------------------------*/
+/* Homeostat for (open) files */
+/*----------------------------*/
 
 _PUBLIC _BOOLEAN default_fd_homeostat_action = FALSE;
 
-_PUBLIC int pups_default_fd_homeostat(void *t_info, const char *args)
+_PUBLIC int32_t pups_default_fd_homeostat(void *t_info, const char *args)
 
-{   int  f_index;
+{   int32_t f_index;
 
-    char fname[SSIZE]            = "",
-         object_type[SSIZE]      = "",
-         current_hostname[SSIZE] = "";
+    char    fname[SSIZE]            = "",
+            object_type[SSIZE]      = "",
+            current_hostname[SSIZE] = "";
 
-    struct stat buf;
+    struct  stat buf;
 
 
     /*----------------------------------*/
@@ -15619,7 +15441,7 @@ _PUBLIC int pups_default_fd_homeostat(void *t_info, const char *args)
     {  
 
        /*---------------------------------------------------------*/
-       /* Is this application about to go into the background?    */ 
+       /* Is this application about to go  int32_to the background?    */ 
        /* If so all unredirected stdio streams must be redirected */
        /* to the data sink                                        */
        /*---------------------------------------------------------*/
@@ -15895,7 +15717,7 @@ _PUBLIC int pups_default_fd_homeostat(void *t_info, const char *args)
        /*-----------------------------------------------------------------------------------*/
 
        if(ftab[f_index].mode != 0 && S_ISREG(buf.st_mode) && pups_check_fs_space(ftab[f_index].fdes) == FALSE)
-       {  int iter = 0;
+       {  int32_t iter = 0;
 
 
           /*--------------------------------*/
@@ -16138,7 +15960,7 @@ _PUBLIC int pups_default_fd_homeostat(void *t_info, const char *args)
           (void)fflush(stderr);
        }
 
-       (void)pups_system("mktty",shell,PUPS_ERROR_EXIT,(int *)NULL);
+       (void)pups_system("mktty",shell,PUPS_ERROR_EXIT,(int32_t *)NULL);
     }
 
 
@@ -16154,13 +15976,13 @@ _PUBLIC int pups_default_fd_homeostat(void *t_info, const char *args)
 
 
 
-/*-------------------------------------------------------------------------------------------
-    Return file descriptor which corresponds to filename ...
--------------------------------------------------------------------------------------------*/
+/*-----------------------------------*/
+/* Get file descriptor from filename */
+/*-----------------------------------*/
 
-_PUBLIC int pups_fname2fdes(const char *fname)
+_PUBLIC int32_t pups_fname2fdes(const char *fname)
 
-{   int  i;
+{   uint32_t i;
 
     if(fname == (const char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -16195,13 +16017,13 @@ _PUBLIC int pups_fname2fdes(const char *fname)
 
 
 
-/*-------------------------------------------------------------------------------------------
-    Return stream which corresponds to filename ...
--------------------------------------------------------------------------------------------*/
+/*-------------------------------*/
+/* Get file stream from filename */
+/*-------------------------------*/
 
 _PUBLIC FILE *pups_fname2fstream(const char *fname)
 
-{   int  i;
+{   uint32_t i;
 
     if(fname == (const char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -16236,13 +16058,13 @@ _PUBLIC FILE *pups_fname2fstream(const char *fname)
 
 
 
-/*--------------------------------------------------------------------------------------------
-    Return file table index for file "fname" ...
---------------------------------------------------------------------------------------------*/
+/*-------------------------------------*/
+/* Get file table index from file name */
+/*-------------------------------------*/
 
-_PUBLIC int pups_fname2index(const char *fname)
+_PUBLIC int32_t pups_fname2index(const char *fname)
 
-{   int  i;
+{   uint32_t i;
 
     if(fname == (const char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -16262,7 +16084,7 @@ _PUBLIC int pups_fname2index(const char *fname)
           #endif /* PTHREAD_SUPPORT */
 
           pups_set_errno(OK);
-          return(i);
+          return((int32_t)i);
        }
     }
 
@@ -16277,13 +16099,13 @@ _PUBLIC int pups_fname2index(const char *fname)
 
 
 
-/*--------------------------------------------------------------------------------------------
-    Return file table index for file associated with descriptor "fdes" ...
---------------------------------------------------------------------------------------------*/
+/*-------------------------------------------*/
+/* Get file table index from file descriptor */
+/*-------------------------------------------*/
 
-_PUBLIC int pups_fdes2index(const int fdes)
+_PUBLIC int32_t pups_fdes2index(const des_t fdes)
 
-{   int  i;
+{   uint32_t i;
 
     if(fdes < 0 || fdes >= appl_max_files)
     {  pups_set_errno(EINVAL);
@@ -16303,7 +16125,7 @@ _PUBLIC int pups_fdes2index(const int fdes)
           #endif /* PTHREAD_SUPPORT */
 
           pups_set_errno(OK);
-          return(i);
+          return((int32_t)i);
        }
     }
 
@@ -16318,13 +16140,13 @@ _PUBLIC int pups_fdes2index(const int fdes)
 
 
 
-/*-------------------------------------------------------------------------------------------
-    Extended creat command (which simply creates file without opening it) ...
--------------------------------------------------------------------------------------------*/
+/*--------------------------------*/
+/* Create file without opening it */
+/*--------------------------------*/
 
-_PUBLIC int pups_creat(const char *name, const int mode)
+_PUBLIC int32_t pups_creat(const char *name, const int32_t mode)
 
-{  int ret;
+{  int32_t ret;
 
    if(mode < 0 || name == (const char *)NULL)
    {  pups_set_errno(EINVAL);
@@ -16353,7 +16175,7 @@ _PUBLIC int pups_creat(const char *name, const int mode)
    /*--------------------------*/
  
    while(close(ret) < 0)
-       pups_usleep(100);
+        (void)pups_usleep(100);
 
    pups_set_errno(OK);
    return(0);
@@ -16362,14 +16184,14 @@ _PUBLIC int pups_creat(const char *name, const int mode)
 
 
 
-/*--------------------------------------------------------------------------------------------
-    Extended chmod which updates ftab contents ...
---------------------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------------*/
+/* Change mode of file associated with open descriptor and update file table */
+/*---------------------------------------------------------------------------*/
 
-_PUBLIC int pups_fchmod(const int des, const int mode)
+_PUBLIC int32_t pups_fchmod(const des_t fdes, const int32_t mode)
 
-{   int ret,
-        f_index;
+{   int32_t ret,
+            f_index;
 
     if(mode < 0)
     {  pups_set_errno(EINVAL);
@@ -16380,7 +16202,7 @@ _PUBLIC int pups_fchmod(const int des, const int mode)
     (void)pthread_mutex_lock(&ftab_mutex);
     #endif /* PTHREAD_SUPPORT */
 
-    if((f_index = pups_get_ftab_index(des)) == (-1))
+    if((f_index = pups_get_ftab_index(fdes)) == (-1))
     {
 
        #ifdef PTHREAD_SUPPORT
@@ -16391,8 +16213,8 @@ _PUBLIC int pups_fchmod(const int des, const int mode)
        return(-1);
     }
 
-    ftab[f_index].st_mode = mode; // (int) 
-    ret                   = fchmod(des,mode);
+    ftab[f_index].st_mode = mode; 
+    ret                   = fchmod(fdes,mode);
 
     #ifdef PTHREAD_SUPPORT
     (void)pthread_mutex_unlock(&ftab_mutex);
@@ -16405,11 +16227,11 @@ _PUBLIC int pups_fchmod(const int des, const int mode)
 
 
 
-/*-------------------------------------------------------------------------------------------
-    Extended strlen command ...
--------------------------------------------------------------------------------------------*/
+/*-------------------------------------------------*/
+/* Return string size (including terminating NULL) */
+/*-------------------------------------------------*/
 
-_PUBLIC int pups_strlen(const char *s)
+_PUBLIC int32_t pups_strlen(const char *s)
 
 {    if(s != (const char *)NULL)
         return(strlen(s) + 1);
@@ -16421,9 +16243,9 @@ _PUBLIC int pups_strlen(const char *s)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Initialise tracked object system ...
-------------------------------------------------------------------------------------------*/
+/*----------------------------------*/
+/* Initialise tracked object system */
+/*----------------------------------*/
 /*-------------------------*/
 /* Memory allocation table */
 /*-------------------------*/
@@ -16456,14 +16278,14 @@ _PRIVATE void tinit(void)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Memory block tracking extended malloc routine ...
-------------------------------------------------------------------------------------------*/
+/*------------------------------*/
+/* Memory block tracking malloc */
+/*------------------------------*/
 
-_PUBLIC void *pups_tmalloc(const unsigned long int size, const char *object_name, const char *object_type)
+_PUBLIC void *pups_tmalloc(const size_t size, const char *object_name, const char *object_type)
 
-{   int  i,
-         j;
+{   uint32_t i,
+             j;
 
     void *ptr = (void *)NULL;
 
@@ -16478,14 +16300,17 @@ _PUBLIC void *pups_tmalloc(const unsigned long int size, const char *object_name
     (void)pthread_mutex_lock(&matab_mutex);
     #endif /* PTHREAD_SUPPPORT */
 
+
+    /*----------------------*/
+    /* Re-use existing slot */
+    /*----------------------*/
+
     for(i=0; i<matab.allocated; ++i)
     {  if(matab.object[i] == (matab_object_type *)NULL)
        {  ptr                   = pups_malloc(size); 
           matab.object[i]       = (matab_object_type *)pups_malloc(sizeof(matab_object_type));
           matab.object[i]->ptr  = ptr;
           matab.object[i]->size = size;
-          matab.object[i]->name = (char *)pups_malloc(SSIZE);
-          matab.object[i]->type = (char *)pups_malloc(SSIZE);
 
           (void)strlcpy(matab.object[i]->name,object_name,SSIZE);  
           (void)strlcpy(matab.object[i]->type,object_type,SSIZE);
@@ -16498,6 +16323,11 @@ _PUBLIC void *pups_tmalloc(const unsigned long int size, const char *object_name
           return(ptr);
        }
     }
+
+
+    /*--------------*/
+    /* Extend table */
+    /*--------------*/
 
     i               =  matab.allocated;
     matab.allocated += ALLOC_QUANTUM;
@@ -16515,8 +16345,6 @@ _PUBLIC void *pups_tmalloc(const unsigned long int size, const char *object_name
     matab.object[i]       = (matab_object_type *)pups_malloc(sizeof(matab_object_type));
     matab.object[i]->ptr  = ptr;
     matab.object[i]->size = size;
-    matab.object[i]->name = (char *)pups_malloc(SSIZE);
-    matab.object[i]->type = (char *)pups_malloc(SSIZE);
 
     (void)strlcpy(matab.object[i]->name,object_name,SSIZE);    
     (void)strlcpy(matab.object[i]->type,object_type,SSIZE);
@@ -16532,14 +16360,14 @@ _PUBLIC void *pups_tmalloc(const unsigned long int size, const char *object_name
 
 
 
-/*------------------------------------------------------------------------------------------
-    Memory block tracking extended calloc routine ...
-------------------------------------------------------------------------------------------*/
+/*------------------------------*/
+/* Memory block tracking calloc */
+/*------------------------------*/
 
-_PUBLIC void *pups_tcalloc(const int n_el, const unsigned long int size, const char *object_name, const char *object_type)
+_PUBLIC void *pups_tcalloc(const int32_t n_el, const size_t size, const char *object_name, const char *object_type)
 
-{   int  i,
-         j;
+{   int32_t i,
+            j;
 
     void *ptr = (void *)NULL;
 
@@ -16562,8 +16390,6 @@ _PUBLIC void *pups_tcalloc(const int n_el, const unsigned long int size, const c
           matab.object[i]->ptr  = ptr;
           matab.object[i]->size = size;
           matab.object[i]->n_el = n_el;
-          matab.object[i]->name = (char *)pups_malloc(SSIZE);
-          matab.object[i]->type = (char *)pups_malloc(SSIZE);
 
           (void)strlcpy(matab.object[i]->name,object_name,SSIZE);    
           (void)strlcpy(matab.object[i]->type,object_type,SSIZE);
@@ -16593,8 +16419,6 @@ _PUBLIC void *pups_tcalloc(const int n_el, const unsigned long int size, const c
     matab.object[i]       = (matab_object_type *)pups_malloc(sizeof(matab_object_type));
     matab.object[i]->ptr  = ptr;
     matab.object[i]->size = size;
-    matab.object[i]->name = (char *)pups_malloc(SSIZE);
-    matab.object[i]->type = (char *)pups_malloc(SSIZE);
 
     (void)strlcpy(matab.object[i]->name,object_name,SSIZE);
     (void)strlcpy(matab.object[i]->type,object_type,SSIZE);
@@ -16610,13 +16434,13 @@ _PUBLIC void *pups_tcalloc(const int n_el, const unsigned long int size, const c
 
 
 
-/*------------------------------------------------------------------------------------------
-    Memory block tracking extended realloc routine ...
-------------------------------------------------------------------------------------------*/
+/*-------------------------------*/
+/* Memory block tracking realloc */
+/*-------------------------------*/
 
-_PUBLIC void *pups_trealloc(void *ptr, const unsigned long int size)
+_PUBLIC void *pups_trealloc(void *ptr, const size_t size)
 
-{   int  i;
+{    int32_t i;
 
 
     /*--------------------------------------------------------------*/
@@ -16663,14 +16487,13 @@ _PUBLIC void *pups_trealloc(void *ptr, const unsigned long int size)
 
 
 
-/*---------------------------------------------------------------------------------------
-    Routine to allocate a tracked dynamic array - this is based on T.K.W Chau's
-    allocation scheme ...
----------------------------------------------------------------------------------------*/
+/*---------------------------*/
+/* Allocate 2D tracked array */
+/*---------------------------*/
 
 _PUBLIC void **pups_taalloc(const pindex_t rows, const pindex_t cols, const psize_t size, const char *name, const char *type_name)
 
-{   int   i;
+{   uint32_t i;
 
     char mem_name[SSIZE] = "";
     void *array_mem      = (void *)NULL;
@@ -16707,7 +16530,7 @@ _PUBLIC void **pups_taalloc(const pindex_t rows, const pindex_t cols, const psiz
 
     for(i=0; i<rows; ++i)
     {  array[i]  = (void *)array_mem;
-       array_mem = (void *)((unsigned long int)array_mem + (unsigned long int)(cols*size));
+       array_mem = (void *)((uint64_t)array_mem + (uint64_t)(cols*size));
     }
 
     pups_set_errno(OK);
@@ -16717,9 +16540,9 @@ _PUBLIC void **pups_taalloc(const pindex_t rows, const pindex_t cols, const psiz
 
 
 
-/*---------------------------------------------------------------------------------------
-    Routine to free memory occupied by a dynamically allocated tracked array ...
----------------------------------------------------------------------------------------*/
+/*-----------------------*/
+/* Free 2D tracked array */
+/*-----------------------*/
 
 _PUBLIC void **pups_tafree(const void **array)
 
@@ -16750,13 +16573,13 @@ _PUBLIC void **pups_tafree(const void **array)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Convert a tracked heap object name to heap address ...
-------------------------------------------------------------------------------------------*/
+/*----------------------------------------------------------*/
+/* Get tracked object heap address from tracked object name */
+/*----------------------------------------------------------*/
 
 _PUBLIC void *pups_tnametoptr(const char *name)
 
-{   int i;
+{   uint32_t i;
 
     if(name == (const char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -16791,14 +16614,13 @@ _PUBLIC void *pups_tnametoptr(const char *name)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Convert next instance of partial name to pointer ...
-------------------------------------------------------------------------------------------*/
+/*----------------------------------------------*/
+/* Get pointer from partial tracked object name */
+/*----------------------------------------------*/
 
-_PUBLIC void *pups_tpartnametoptr(const char *pname)
+_PUBLIC void *pups_tpartnametoptr(uint32_t *pos, const char *pname)
 
-{   int           i;
-    _IMMORTAL int pos = 0;
+{   uint32_t i;
 
     if(pname == (const char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -16809,20 +16631,9 @@ _PUBLIC void *pups_tpartnametoptr(const char *pname)
     (void)pthread_mutex_lock(&matab_mutex);
     #endif /* PTHREAD_SUPPPORT */
 
-    if(strcmp(pname,"RESET") == 0 || pos >= matab.allocated)
-    {  pos = 0;
-
-         #ifdef PTHREAD_SUPPPORT
-         (void)pthread_mutex_unlock(&matab_mutex);
-         #endif /* PTHREAD_SUPPPORT */
-
-       pups_set_errno(OK);
-       return((void *)NULL);
-    }
-
-    for(i=pos; i<matab.allocated; ++i)
+    for(i=(*pos); i<matab.allocated; ++i)
     {  if(matab.object[i] != (matab_object_type *)NULL && strin(matab.object[i]->name,pname) == TRUE)
-       {  pos = i + 1;
+       {  (*pos) = i + 1;
 
           #ifdef PTHREAD_SUPPPORT
           (void)pthread_mutex_unlock(&matab_mutex);
@@ -16832,8 +16643,6 @@ _PUBLIC void *pups_tpartnametoptr(const char *pname)
           return(matab.object[i]->ptr);
        }
     }
-
-    pos = 0;
 
     #ifdef PTHREAD_SUPPPORT
     (void)pthread_mutex_unlock(&matab_mutex);
@@ -16846,14 +16655,13 @@ _PUBLIC void *pups_tpartnametoptr(const char *pname)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Convert type to pointer ...
-------------------------------------------------------------------------------------------*/
+/*-------------------------------*/
+/* Get pointer from tracked type */
+/*-------------------------------*/
 
-_PUBLIC void *pups_ttypetoptr(const char *type)
+_PUBLIC void *pups_ttypetoptr(uint32_t *pos, const char *type)
 
-{   int           i;
-    _IMMORTAL int pos = 0;
+{   uint32_t i;
 
     if(type == (const char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -16864,20 +16672,9 @@ _PUBLIC void *pups_ttypetoptr(const char *type)
     (void)pthread_mutex_lock(&matab_mutex);
     #endif /* PTHREAD_SUPPPORT */
 
-    if(strcmp(type,"RESET") == 0)
-    {  pos = 0;
-
-       #ifdef PTHREAD_SUPPPORT
-       (void)pthread_mutex_unlock(&matab_mutex);
-       #endif /* PTHREAD_SUPPPORT */
-
-       pups_set_errno(OK);
-       return((void *)NULL);
-    }
-
-    for(i=pos; i<matab.allocated; ++i)
+    for(i=(*pos); i<matab.allocated; ++i)
     {  if(matab.object[i] != (matab_object_type *)NULL && strcmp(matab.object[i]->type,type) == 0)
-       {  pos = i + 1;
+       {  (*pos) = i + 1;
 
           #ifdef PTHREAD_SUPPPORT
           (void)pthread_mutex_unlock(&matab_mutex);
@@ -16887,8 +16684,6 @@ _PUBLIC void *pups_ttypetoptr(const char *type)
           return(matab.object[i]->ptr);
        }
     }
-
-    pos = 0;
 
     #ifdef PTHREAD_SUPPPORT
     (void)pthread_mutex_unlock(&matab_mutex);
@@ -16902,14 +16697,13 @@ _PUBLIC void *pups_ttypetoptr(const char *type)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Extended dynamic memory freeing routine - which keeps track of blocks freed by the
-    malloc family of dynamic memory allocators ...
-------------------------------------------------------------------------------------------*/
+/*----------------------------*/
+/* Memory block tracking free */
+/*----------------------------*/
 
 _PUBLIC void *pups_tfree(const void *ptr)
 
-{   int i;
+{   uint32_t i;
 
 
     /*------------------------------------------------------*/
@@ -16948,8 +16742,9 @@ _PUBLIC void *pups_tfree(const void *ptr)
           matab.object[i]->ptr  = (void *)NULL;
           matab.object[i]->size = 0;
           matab.object[i]->n_el = 0;
-          matab.object[i]->name = (char *)pups_free((void *)matab.object[i]->name);
-          matab.object[i]->type = (char *)pups_free((void *)matab.object[i]->type);
+
+          (void)strlcpy(matab.object[i]->name,"",SSIZE);
+          (void)strlcpy(matab.object[i]->type,"",SSIZE);
 
 
           /*------------------------------------------------------------------*/
@@ -16979,13 +16774,13 @@ _PUBLIC void *pups_tfree(const void *ptr)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Display currently allocated dynamic memory object ...
-------------------------------------------------------------------------------------------*/
+/*-------------------------*/
+/* Display tracked objects */
+/*-------------------------*/
 
-_PUBLIC int pups_tshowobject(const FILE *stream, const void *ptr)
+_PUBLIC int32_t pups_tshowobject(const FILE *stream, const void *ptr)
 
-{   int i;
+{   uint32_t i;
 
 
     /*----------------------------------*/
@@ -17015,7 +16810,7 @@ _PUBLIC int pups_tshowobject(const FILE *stream, const void *ptr)
        {  (void)fprintf(stream,"    Object %-32s (type %-32s) size %016lx (at %016lx virtual)\n",matab.object[i]->name,
                                                                                                  matab.object[i]->type,
                                                                                                  matab.object[i]->size,
-                                                                               (unsigned long int)matab.object[i]->ptr); 
+                                                                               (uint64_t         )matab.object[i]->ptr); 
           (void)fflush(stream);
 
 
@@ -17039,11 +16834,14 @@ _PUBLIC int pups_tshowobject(const FILE *stream, const void *ptr)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Display all currently allocated dynamic memory objects ...
-------------------------------------------------------------------------------------------*/
+/*------------------------------------*/
+/* Display all dynamic memory objects */
+/*------------------------------------*/
+/*--------------*/
+/* Sort by size */
+/*--------------*/
 
-_PRIVATE int compare_objects(matab_object_type **el_1, matab_object_type **el_2)
+_PRIVATE int32_t compare_objects(matab_object_type **el_1, matab_object_type **el_2)
 
 
 {   if(*el_1 == (matab_object_type *)NULL && *el_2 == (matab_object_type *)NULL) 
@@ -17067,16 +16865,16 @@ _PRIVATE int compare_objects(matab_object_type **el_1, matab_object_type **el_2)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Display N biggest currently allocated dynamic memory objects ...
-------------------------------------------------------------------------------------------*/
+/*------------------------------*/
+/* Display tracked object table */
+/*------------------------------*/
 
-_PUBLIC int pups_tshowobjects(const FILE *stream, int *display_objects)
+_PUBLIC int32_t pups_tshowobjects(const FILE *stream, int32_t *display_objects)
 
-{   int i,
-        t_cnt = 0;
+{   uint32_t          i,
+                      t_cnt = 0;
 
-    unsigned long int heap_used        = 0;
+    uint64_t          heap_used        = 0;
     matab_object_type **ordered_object = (matab_object_type **)NULL;
 
 
@@ -17132,7 +16930,7 @@ _PUBLIC int pups_tshowobjects(const FILE *stream, int *display_objects)
     (void)fprintf(stream,"\n\n    Heap objects for %s (%d@%s)\n\n",appl_name,getpid(),appl_host);
     (void)fflush(stream);
 
-    if(*display_objects > t_cnt && display_objects != (int *)NULL)
+    if(*display_objects > t_cnt && display_objects != (int32_t *)NULL)
        *display_objects = t_cnt;
 
     for(i=0; i<display_objects; ++i)
@@ -17140,7 +16938,7 @@ _PUBLIC int pups_tshowobjects(const FILE *stream, int *display_objects)
                                                                               ordered_object[i]->name,
                                                                               ordered_object[i]->type,
                                                                               ordered_object[i]->size,
-                                                            (unsigned long int)ordered_object[i]->ptr); 
+                                                            (uint64_t         )ordered_object[i]->ptr); 
        (void)fflush(stream);
 
        heap_used += ordered_object[i]->size;
@@ -17164,15 +16962,15 @@ _PUBLIC int pups_tshowobjects(const FILE *stream, int *display_objects)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Extended fgets function ...
-------------------------------------------------------------------------------------------*/
+/*---------------------*/
+/* PUPS fgets function */
+/*---------------------*/
 
-_PUBLIC char *pups_fgets(char *s, const unsigned long int size, const FILE *stream)
+_PUBLIC char *pups_fgets(char *s, const size_t size, const FILE *stream)
 
 
-{   int  c_index;
-    char *ret = (char *)NULL;
+{   size_t c_index;
+    char   *ret = (char *)NULL;
 
     ret = fgets(s,size,stream);
     if((c_index = ch_pos(s,'\n')) != (-1))
@@ -17184,10 +16982,9 @@ _PUBLIC char *pups_fgets(char *s, const unsigned long int size, const FILE *stre
 
 
 
-/*-------------------------------------------------------------------------------------------
-    Test to see if line is a comment line (first non-space char is '#') or
-    empty ...
--------------------------------------------------------------------------------------------*/
+/*-------------------------------------------------------------------------------*/
+/* Check to see if line is a comment line (first non-space char is '#') or empty */
+/*-------------------------------------------------------------------------------*/
 
 _PUBLIC _BOOLEAN strcomment(const char *s)
 
@@ -17228,17 +17025,17 @@ _PUBLIC _BOOLEAN strcomment(const char *s)
 
 
 
-/*-------------------------------------------------------------------------------------------
-    Clear a string - set all characters to NULL '\0' ...
--------------------------------------------------------------------------------------------*/
+/*---------------------------------------------*/
+/* Set all characters in string to NULL ('\0') */
+/*---------------------------------------------*/
 
 _PUBLIC void strclr(char *s)
 
-{   int i;
+{   size_t i;
 
     if(s == (char *)NULL)
     {  pups_set_errno(EINVAL);
-       return(-1);
+       return;
     }
 
     for(i=0; i<strlen(s); ++i)
@@ -17250,34 +17047,24 @@ _PUBLIC void strclr(char *s)
 
 
 
-/*-------------------------------------------------------------------------------------------
-    Set errno ...
--------------------------------------------------------------------------------------------*/
+/*-----------*/
+/* Set errno */
+/*-----------*/
 
-_PUBLIC void pups_set_errno(int pups_errno)
+_PUBLIC void pups_set_errno(const int32_t pups_errno)
 
-{  
-
-    #ifdef PTHREAD_SUPPORT
-    //if(appl_root_thread != 0 && pupsthread_is_root_thread() == FALSE)
-    //   pupsthread_set_errno(errno);
-    //else
-       errno = pups_errno;
-    #else
-      errno = pups_errno;
-    #endif /* PTHREAD_SUPPORT */
-
+{   errno = pups_errno;
 }
 
 
 
 
 
-/*-------------------------------------------------------------------------------------------
-    Get errno ...
--------------------------------------------------------------------------------------------*/
+/*-----------*/
+/* Get errno */
+/*-----------*/
 
-_PUBLIC int pups_get_errno(void)
+_PUBLIC int32_t pups_get_errno(void)
  
 {   return(errno);
 }
@@ -17285,15 +17072,14 @@ _PUBLIC int pups_get_errno(void)
 
 
 
-/*-------------------------------------------------------------------------------------------
-    Handler for SIGTTIN/SIGTTOU (automatically re-directs stdio to datasink if application
-    moved into background interactively from a shell) ...
--------------------------------------------------------------------------------------------*/
+/*----------------------------------------------------------------------------------------*/
+/* Handler for SIGTTIN/SIGTTOU (automatically re-directs stdio to datasink if application */
+/* moved into background interactively from a shell)                                      */
+/*----------------------------------------------------------------------------------------*/
 
-_PRIVATE int fgio_handler(int signum)
+_PRIVATE int32_t fgio_handler(const int32_t signum)
 
 {   
-
     if(signum < 1 || signum > MAX_SIGS)
     {  pups_set_errno(EINVAL);
        return(-1);
@@ -17335,24 +17121,24 @@ _PRIVATE int fgio_handler(int signum)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Turn tty echoing off ...
-
-    It is desirable to use this bit on systems that have it.
-    The only bit of terminal state we want to twiddle is echoing, which is
-    done in software; there is no need to change the state of the terminal
-    hardware ...
-------------------------------------------------------------------------------------------*/
+/*-------------------------------------------------------------------------*/
+/*  Turn tty echoing off                                                   */
+/*                                                                         */
+/*  It is desirable to use this bit on systems that have it.               */
+/*  The only bit of terminal state we want to twiddle is echoing, which is */
+/*  done in software; there is no need to change the state of the terminal */
+/*  hardware                                                               */
+/*-------------------------------------------------------------------------*/
 
 #ifndef TCSASOFT
 #define TCSASOFT 0
 #endif /* TCSASOFT */
 
 
-_PUBLIC int pups_tty_echoing_off(FILE *in, struct termios *s)
+_PUBLIC int32_t pups_tty_echoing_off(FILE *in, struct termios *s)
 
-{   int    tty_changed;
-    struct termios t;
+{   int32_t tty_changed;
+    struct  termios t;
 
 
     /*-----------------------------------*/
@@ -17385,11 +17171,11 @@ _PUBLIC int pups_tty_echoing_off(FILE *in, struct termios *s)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Turn tty echoing on ...
-------------------------------------------------------------------------------------------*/
+/*---------------------*/
+/* Turn tty echoing on */
+/*---------------------*/
 
-_PUBLIC void pups_tty_echoing_on(FILE *in, int tty_changed, struct termios s)
+_PUBLIC void pups_tty_echoing_on(FILE *in, int32_t tty_changed, struct termios s)
 
 {   
 
@@ -17405,17 +17191,17 @@ _PUBLIC void pups_tty_echoing_on(FILE *in, int tty_changed, struct termios s)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Execute command on local host ...
-------------------------------------------------------------------------------------------*/
+/*-------------------------------*.
+/* Execute command on local host */
+/*-------------------------------*/
+                                                  /*--------------------------*/
+_PUBLIC pid_t pups_lexec(const char      *shell,  /* Shell to execute comamnd */
+                         const char    *command,  /* Command to be executed   */
+                         const  int32_t    wait)  /* Wait action flag         */
+                                                  /*--------------------------*/
 
-_PUBLIC int pups_lexec(char   *shell,    /* Shell to execute comamnd                      */
-                       char *command,    /* Command to be executed                        */
-                       int      wait)    /* Wait action flag                              */
-
-{   int i,
-        pid,
-        status;
+{   pid_t   pid;
+    int32_t status;
 
     _BOOLEAN obituary = FALSE;
 
@@ -17432,13 +17218,12 @@ _PUBLIC int pups_lexec(char   *shell,    /* Shell to execute comamnd            
     if(wait & PUPS_OBITUARY)
        obituary = TRUE;
 
+    /*--------------------*/
+    /* Child side of fork */
+    /*--------------------*/
+
     if((pid = pups_fork(TRUE, obituary)) == 0)
-    {  int i;
-
-
-       /*--------------------*/
-       /* Child side of fork */
-       /*--------------------*/
+    {  uint32_t i;
 
 
        /*-----------------------------------*/
@@ -17472,13 +17257,15 @@ _PUBLIC int pups_lexec(char   *shell,    /* Shell to execute comamnd            
           return(-1);
        }
     }
+
+
+    /*----------------------------------------------------------------------------*/
+    /* Parent side of fork - return childs pid if we are not going to wait for it */
+    /* otherwise return the child's exit status.                                  */
+    /*----------------------------------------------------------------------------*/
+
     else
     {
-
-       /*----------------------------------------------------------------------------*/
-       /* Parent side of fork - return childs pid if we are not going to wait for it */
-       /* otherwise return the child's exit status.                                  */
-       /*----------------------------------------------------------------------------*/
 
        (void)pups_set_child_name(pid,command);
 
@@ -17511,11 +17298,11 @@ _PUBLIC int pups_lexec(char   *shell,    /* Shell to execute comamnd            
 
 
 #ifdef PSRP_AUTHENTICATE
-/*-------------------------------------------------------------------------------------------
-    Check supplied secure application password ...
--------------------------------------------------------------------------------------------*/
+/*-------------------------------*/
+/* Check secure service password */
+/*-------------------------------*/
 
-_PUBLIC _BOOLEAN pups_check_appl_password(char *password)
+_PUBLIC _BOOLEAN pups_check_appl_password(const char *password)
 
 {
 
@@ -17532,9 +17319,9 @@ _PUBLIC _BOOLEAN pups_check_appl_password(char *password)
        return(-1);
     }
 
-    /*--------------------------------------------------*/
-    /* Check arguments -- if any are NULL simply return */
-    /*--------------------------------------------------*/
+    /*-----------------------------------------------*/
+    /* Check arguments if any are NULL simply return */
+    /*-----------------------------------------------*/
 
     if(strcmp(appl_password,"notset") == 0)
     {  pups_set_errno(OK);
@@ -17553,11 +17340,11 @@ _PUBLIC _BOOLEAN pups_check_appl_password(char *password)
 
 
 
-/*-------------------------------------------------------------------------------------------
-    Check to see if remote user is permitted to run this service ...
--------------------------------------------------------------------------------------------*/
+/*-------------------*/
+/* Authenticate user */
+/*-------------------*/
 
-_PUBLIC _BOOLEAN pups_checkuser(char *username, char *password)
+_PUBLIC _BOOLEAN pups_checkuser(const char *username, const char *password)
 
 {   struct passwd  *pwent = (struct passwd *)NULL;
 
@@ -17612,9 +17399,9 @@ _PUBLIC _BOOLEAN pups_checkuser(char *username, char *password)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Check to see if we have an authentication token set ...
-------------------------------------------------------------------------------------------*/
+/*-----------------------------------------*/
+/* Check that application has password set */
+/*-----------------------------------------*/
 
 _PUBLIC _BOOLEAN pups_check_pass_set(void)
 
@@ -17638,13 +17425,11 @@ _PUBLIC _BOOLEAN pups_check_pass_set(void)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Get authentication token -- Firstly we search /tmp to see if we have a auth file for
-    our application owner, if that fails, we see if we can reach a controlling tty for
-    manual password by the user. If we cannot reach a controlling tty -- abort ...
-------------------------------------------------------------------------------------------*/
+/*---------------------*/
+/* Authenticate a user */
+/*---------------------*/
 
-_PUBLIC _BOOLEAN pups_getpass(char *password_banner)
+_PUBLIC _BOOLEAN pups_getpass(const char *password_banner)
 
 {   char pwd_file_name[SSIZE]         = "",
          pups_password_banner[SSIZE]  = "";
@@ -17688,7 +17473,7 @@ _PUBLIC _BOOLEAN pups_getpass(char *password_banner)
        /*------------------------------------------------------*/
 
        if((isatty(0) == 1 || isatty(1) == 1 || isatty(2) == 1) && access(pwd_file_name,F_OK | R_OK | W_OK) == (-1))
-       {  int indes = (-1);
+       {  int32_t indes = (-1);
 
 
           /*-----------------------------------------------------------------*/
@@ -17697,7 +17482,7 @@ _PUBLIC _BOOLEAN pups_getpass(char *password_banner)
           /*-----------------------------------------------------------------*/
 
           if(isatty(0) == 0)
-          {  int ttydes = (-1);
+          {  int32_t ttydes = (-1);
 
              #ifdef UTILIB_DEBUG
              (void)fprintf(stderr,"pups_getpass [%d@%s] duplicating stdin (and saving intial descriptor)\n",getpid(),appl_host);
@@ -17786,13 +17571,13 @@ _PUBLIC _BOOLEAN pups_getpass(char *password_banner)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Handler for SIGSEGV, SIGBUS and SIGFPE ...
-------------------------------------------------------------------------------------------*/
+/*----------------------------------------*/
+/* Handler for SIGSEGV, SIGBUS and SIGFPE */
+/*----------------------------------------*/
 
-_PRIVATE int segbusfpe_handler(int signum)
+_PRIVATE int32_t segbusfpe_handler(const int32_t signum)
 
-{    int i;
+{    uint32_t i;
 
      if(signum < 1 || signum > MAX_SIGS)
      {  pups_set_errno(EINVAL);
@@ -17821,10 +17606,16 @@ _PRIVATE int segbusfpe_handler(int signum)
      #endif /* PTHREAD_SUPPORT */
 
      (void)strdate(date);
-
      if(appl_verbose == TRUE)
-     {  switch(signum)
+     {
+        switch(signum)
         {    case SIGSEGV:  (void)fprintf(stderr,"%s %s (%d@%s:%s): SIGSEGV\n",date,appl_name,appl_pid,appl_host,appl_owner);
+
+                            #ifdef SANITISE
+                            (void)fprintf(stderr,"%s %s (%d@%s:%s): have you specified -fsanitize and not linked against debug PUPS/P3 libraries?\n");
+                            (void)fflush(stderr);
+                            #endif /* SANITIZE */
+
                             break;
 
              case SIGFPE:   (void)fprintf(stderr,"%s %s (%d@%s:%s): SIGFPE\n",date,appl_name,appl_pid,appl_host,appl_owner);
@@ -17834,6 +17625,7 @@ _PRIVATE int segbusfpe_handler(int signum)
                             break;
 
              default:       break;
+
         }
     }
 
@@ -17853,10 +17645,11 @@ _PRIVATE int segbusfpe_handler(int signum)
        /*----------------------------------------------------------*/
 
        (void)sigfillset(&set);
-       (void)sigdelset(&set,SIGTERM);
-       (void)sigdelset(&set,SIGINT);
 
-       (void)pups_sigprocmask(SIG_SETMASK,&old_set,(sigset_t *)NULL);
+       (void)sigdelset(&set,SIGINT);
+       (void)sigdelset(&set,SIGTERM);
+
+       (void)pups_sigprocmask(SIG_SETMASK,&set,(sigset_t *)NULL);
 
        while(1)
             (void)pups_usleep(100);
@@ -17868,19 +17661,19 @@ _PRIVATE int segbusfpe_handler(int signum)
 
 
 
-/*-------------------------------------------------------------------------------------------
-    PUPS kill function which notes state of signalled process - processes which are
-    terminated or stopped return appropriate error condition ...
--------------------------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------------------*/
+/* PUPS kill function which notes state of signalled process. Processes which are */
+/* terminated or stopped return appropriate error condition                       */
+/*--------------------------------------------------------------------------------*/
 
-_PUBLIC int pups_statkill(const int pid, const int signum)
+_PUBLIC int32_t pups_statkill(const pid_t pid, const int32_t signum)
 
-{   int  next_pid;
+{   pid_t next_pid;
 
-    char line[SSIZE]       = "",
-         procstatus[SSIZE] = "";
+    char  line[SSIZE]       = "",
+          procstatus[SSIZE] = "";
 
-    FILE *procstream = (FILE *)NULL;
+    FILE  *procstream = (FILE *)NULL;
 
     if(pid <= 0 || signum < 1 || signum > MAX_SIGS)
     {  pups_set_errno(EINVAL);
@@ -17926,13 +17719,13 @@ _PUBLIC int pups_statkill(const int pid, const int signum)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Extended lockf ...
-------------------------------------------------------------------------------------------*/
+/*--------------------------*/
+/* Apply extended file lock */
+/*--------------------------*/
 
-_PUBLIC int pups_lockf(const int fdes, const int cmd, const unsigned long int size)
+_PUBLIC int32_t pups_lockf(const des_t fdes, const int32_t cmd, const off_t size)
 
-{   int    ret = 0;
+{   int32_t      ret = 0;
     struct flock lock;
 
 
@@ -18003,18 +17796,17 @@ _PUBLIC int pups_lockf(const int fdes, const int cmd, const unsigned long int si
     /*--------------*/
 
     ret = fcntl(fdes,F_SETLK,&lock);
-
     return(ret);
 }
 
 
 
 
-/*------------------------------------------------------------------------------------------
-    Get load average for localhost ...
-------------------------------------------------------------------------------------------*/
+/*--------------------------------*/
+/* Get load average for localhost */
+/*--------------------------------*/
 
-_PUBLIC FTYPE pups_get_load_average(const int which_load_average)
+_PUBLIC FTYPE pups_get_load_average(const int32_t which_load_average)
 
 {   FILE *stream = (FILE *)NULL;
 
@@ -18050,11 +17842,11 @@ _PUBLIC FTYPE pups_get_load_average(const int which_load_average)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Test whether fdes is associated with a seekable device ...
-------------------------------------------------------------------------------------------*/
+/*---------------------------------------------------*/
+/* Test if fdes is associated with a seekable device */
+/*---------------------------------------------------*/
 
-_PUBLIC _BOOLEAN pups_is_seekable(const int fdes)
+_PUBLIC _BOOLEAN pups_is_seekable(const des_t fdes)
 
 {   if(pups_lseek(fdes,0,SEEK_CUR) == (-1))
        return(FALSE);
@@ -18072,11 +17864,11 @@ _PUBLIC _BOOLEAN pups_is_seekable(const int fdes)
 
 #define SSAVETAG    20
 
-/*------------------------------------------------------------------------------------------
-    Handler for SIGCHECK -- service an asynchronous checkpoint ...
-------------------------------------------------------------------------------------------*/
+/*------------------------------------------------------------*/
+/* Handler for SIGCHECK -- service an asynchronous checkpoint */
+/*------------------------------------------------------------*/
 
-_PRIVATE int ssave_handler(int signum)
+_PRIVATE int32_t ssave_handler(const int32_t signum)
 
 {    char buildStr[SSIZE]  = "",
           buildpath[SSIZE] = "",
@@ -18186,14 +17978,14 @@ _PRIVATE int ssave_handler(int signum)
 
 
 
-/*--------------------------------------------------------------------------------------
-    Relay data between master and slave using FIFOS. 
---------------------------------------------------------------------------------------*/
+/*---------------------------------------------------*/
+/* Relay data to slaved process via a pair of FIFO's */
+/*---------------------------------------------------*/
 
-_PUBLIC int pups_fifo_relay(const int slave_pid, const int in_fifo, const int out_fifo)
+_PUBLIC int32_t pups_fifo_relay(const pid_t slave_pid, const int32_t in_fifo, const int32_t out_fifo)
 
-{   unsigned long int in_bytes_read,
-                      out_bytes_read;
+{   ssize_t in_bytes_read,
+            out_bytes_read;
 
     _BYTE buf[512] = "";
 
@@ -18237,23 +18029,24 @@ _PUBLIC int pups_fifo_relay(const int slave_pid, const int in_fifo, const int ou
 
 
 
-/*---------------------------------------------------------------------------------------
-    Detect window resize data (embedded in a buffer of data). If resizing data is found
-    extract it and return it as a struct winsize ...
----------------------------------------------------------------------------------------*/
-
-_PRIVATE _BOOLEAN ws_extract(int                fdes,          /* File descriptor for ibuf    */
+/*-------------------------------------------------------------------------------------*/
+/* Detect window resize data (embedded in a buffer of data). If resizing data is found */
+/* extract it and return it as a struct winsize                                        */
+/*-------------------------------------------------------------------------------------*/
+                                                               /*-----------------------------*/
+_PRIVATE _BOOLEAN ws_extract(des_t              fdes,          /* File descriptor for ibuf    */
                              _BYTE              *buf,          /* Input buffer                */
-                             unsigned long int  bytes_read,    /* Bytes in input buffer       */
+                             size_t             *bytes_read,   /* Bytes in input buffer       */
                              _BYTE              *obuf_1,       /* Pre resize buffer           */
-                             unsigned long int  *bytes_out_1,  /* Number of pre resize bytes  */
+                             size_t             *bytes_out_1,  /* Number of pre resize bytes  */
                              _BYTE              *obuf_2,       /* Post resize buffer          */
-                             unsigned long int  *bytes_out_2,  /* Number of post resize bytes */
+                             size_t             *bytes_out_2,  /* Number of post resize bytes */
                              struct winsize     *ws)           /* Winsize structure           */
+                                                               /*-----------------------------*/
 
-{   int i,
-        j,
-        cnt = 0;
+{   uint32_t i,
+             j,
+             cnt = 0;
 
     _BYTE row_bytes[2] = "",
           col_bytes[2] = "";
@@ -18330,13 +18123,14 @@ _PRIVATE _BOOLEAN ws_extract(int                fdes,          /* File descripto
 
 
 
-/*--------------------------------------------------------------------------------------
-    Wait for file to be unlinked before returning to caller ...
---------------------------------------------------------------------------------------*/
 
-_PUBLIC int pups_unlink(const char *linkname)
+/*---------------------------------------------------------*/
+/* Wait for file to be unlinked before returning to caller */
+/*---------------------------------------------------------*/
 
-{   if(linkname == (unsigned char *)NULL || unlink(linkname) == (-1))
+_PUBLIC int32_t pups_unlink(const char *linkname)
+
+{   if(linkname == (char *)NULL || unlink(linkname) == (-1))
     {  pups_set_errno(EINVAL);
        return(-1);
     }
@@ -18351,11 +18145,11 @@ _PUBLIC int pups_unlink(const char *linkname)
 
 
 
-/*--------------------------------------------------------------------------------------
-    Clear a virtual timer datastructure ...
---------------------------------------------------------------------------------------*/
+/*-----------------------------------*/
+/* Clear virtual timer datastructure */
+/*-----------------------------------*/
 
-_PUBLIC int pups_clear_vitimer(const _BOOLEAN destroy, const unsigned int t_index)
+_PUBLIC int32_t pups_clear_vitimer(const uint32_t t_index)
 
 {  
 
@@ -18379,14 +18173,8 @@ _PUBLIC int pups_clear_vitimer(const _BOOLEAN destroy, const unsigned int t_inde
     vttab[t_index].interval_time   = 0;
     vttab[t_index].handler         = NULL;
 
-    if(destroy == FALSE)
-    {  vttab[t_index].name         = (char *)NULL;
-       vttab[t_index].handler_args = (char *)NULL;
-    }
-    else
-    {  vttab[t_index].name         = (char *)pups_free((void *)vttab[t_index].name);
-       vttab[t_index].handler_args = (char *)pups_free((void *)vttab[t_index].handler_args);
-    }
+    (void)strlcpy(vttab[t_index].name,        "",SSIZE);
+    (void)strlcpy(vttab[t_index].handler_args,"",SSIZE);
 
     pups_set_errno(OK);
     return(0);
@@ -18395,13 +18183,13 @@ _PUBLIC int pups_clear_vitimer(const _BOOLEAN destroy, const unsigned int t_inde
 
 
 
-/*---------------------------------------------------------------------------------------
-    Container for nanosleep function ...
----------------------------------------------------------------------------------------*/
+/*-------------*/
+/* PUPS usleep */
+/*-------------*/
 
-_PUBLIC int pups_usleep(const unsigned long int useconds)
+_PUBLIC int32_t pups_usleep(const uint64_t useconds)
 
-{   int i;
+{   uint32_t i;
 
     struct timespec req,
                     rem;
@@ -18428,7 +18216,11 @@ _PUBLIC int pups_usleep(const unsigned long int useconds)
          /*-------------*/
  
          else
-            req = rem;
+         {  req.tv_sec  = 0;
+            req.tv_nsec = rem.tv_nsec;
+            rem.tv_sec  = 0;
+            rem.tv_nsec = 0;
+         }
     }
 
     pups_set_errno(OK);
@@ -18438,9 +18230,9 @@ _PUBLIC int pups_usleep(const unsigned long int useconds)
 
 
 
-/*---------------------------------------------------------------------------------------
-    Is current file on a CDFS filesystem? ...
----------------------------------------------------------------------------------------*/
+/*--------------------------------*/
+/* Is file on a ISOfs filesystem? */
+/*--------------------------------*/
 
 _PUBLIC _BOOLEAN pups_is_on_isofs(const char *f_name)
 
@@ -18467,11 +18259,11 @@ _PUBLIC _BOOLEAN pups_is_on_isofs(const char *f_name)
 
 
 
-/*---------------------------------------------------------------------------------------
-    Is current file descriptor connected to a CDFS filesystem?  ...
----------------------------------------------------------------------------------------*/
+/*------------------------------------------------------*/
+/* Is open file descriptor associated ISOfs filesystem? */
+/*------------------------------------------------------*/
 
-_PUBLIC _BOOLEAN pups_is_on_fisofs(const int fdes)
+_PUBLIC _BOOLEAN pups_is_on_fisofs(const des_t fdes)
 
 {   struct statfs buf;
 
@@ -18490,9 +18282,9 @@ _PUBLIC _BOOLEAN pups_is_on_fisofs(const int fdes)
 
 
 
-/*---------------------------------------------------------------------------------------
-    Is current file on an NFS filesystem? ...
----------------------------------------------------------------------------------------*/
+/*-------------------------------*/
+/* Is file on an NFS filesystem? */
+/*-------------------------------*/
 
 _PUBLIC _BOOLEAN pups_is_on_nfs(const char *f_name)
 
@@ -18523,11 +18315,11 @@ _PUBLIC _BOOLEAN pups_is_on_nfs(const char *f_name)
 
 
 
-/*---------------------------------------------------------------------------------------
-    Is current file on an NFS filesystem? ...
----------------------------------------------------------------------------------------*/
+/*-----------------------------------------------------------*/
+/* Is open file descriptor is associated with NFS filesystem */
+/*-----------------------------------------------------------*/
 
-_PUBLIC _BOOLEAN pups_is_on_fnfs(const int fdes)
+_PUBLIC _BOOLEAN pups_is_on_fnfs(const des_t fdes)
 
 {   struct statfs buf;
 
@@ -18552,17 +18344,17 @@ _PUBLIC _BOOLEAN pups_is_on_fnfs(const int fdes)
 
 
 
-/*---------------------------------------------------------------------------------------
-    Copy a file (by name) ...
----------------------------------------------------------------------------------------*/
+/*-----------------------*/
+/* Copy a file (by name) */
+/*-----------------------*/
 
-_PUBLIC int pups_cpfile(const char *from_path, const char *to_path, const int mode)
+_PUBLIC int32_t pups_cpfile(const char *from_path, const char *to_path, const int32_t mode)
 
-{   int ret,
-        fdes_from = (-1),
-        fdes_to   = (-1);
+{    int32_t ret,
+             fdes_from        = (-1),
+             fdes_to          = (-1);
 
-    char tmp_to_path[512] = "";
+    char     tmp_to_path[512] = "";
 
     if(from_path == (const char *)NULL || to_path == (const char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -18613,14 +18405,14 @@ _PUBLIC int pups_cpfile(const char *from_path, const char *to_path, const int mo
 
 
 
-/*---------------------------------------------------------------------------------------
-    Copy a file (by [open] descriptor) ...
----------------------------------------------------------------------------------------*/
+/*-----------------------------------*/
+/* Copy a file (by open descriptors) */
+/*-----------------------------------*/
 
-_PUBLIC int pups_fcpfile(const int fdes_from, const int fdes_to)
+_PUBLIC int32_t pups_fcpfile(const des_t fdes_from, const des_t fdes_to)
 
-{   int   bytes_read;
-    _BYTE buf[512]    = "";
+{   ssize_t bytes_read;
+    _BYTE   buf[512]    = "";
 
     do {    bytes_read = read(fdes_from,buf,512);
             if(bytes_read < 0)
@@ -18640,9 +18432,9 @@ _PUBLIC int pups_fcpfile(const int fdes_from, const int fdes_to)
 
 
 
-/*---------------------------------------------------------------------------------------
-    Test to see if a given command is running ...
----------------------------------------------------------------------------------------*/
+/*----------------------------*/
+/* Test if command is running */
+/*----------------------------*/
 
 _PUBLIC _BOOLEAN pups_cmd_running(void)
 
@@ -18653,12 +18445,12 @@ _PUBLIC _BOOLEAN pups_cmd_running(void)
     pups_set_errno(OK);
 
     while((next_item = readdir(dirp)) != (struct dirent *)NULL)
-    {   int  pid;
+    {   pid_t pid;
 
-        char procpidpath[SSIZE] = "",
-             cmd_line[SSIZE]    = "";
+        char  procpidpath[SSIZE] = "",
+              cmd_line[SSIZE]    = "";
 
-        FILE *stream = (FILE *)NULL;
+        FILE  *stream = (FILE *)NULL;
 
 
         /*------------------------------------*/
@@ -18666,7 +18458,7 @@ _PUBLIC _BOOLEAN pups_cmd_running(void)
         /*------------------------------------*/
 
         if(sscanf(next_item->d_name,"%d",&pid) == 1)
-        {  int i;
+        {  uint32_t i;
 
            (void)snprintf(procpidpath,SSIZE,"/proc/%d/cmdline",pid);
 
@@ -18689,11 +18481,11 @@ _PUBLIC _BOOLEAN pups_cmd_running(void)
 
 
 
-/*---------------------------------------------------------------------------------------
-    Test to see if I own a given process ...
----------------------------------------------------------------------------------------*/
+/*--------------------------------*/
+/* Check if I own a given process */
+/*--------------------------------*/
 
-_PUBLIC _BOOLEAN pups_i_own(const int pid)
+_PUBLIC _BOOLEAN pups_i_own(const pid_t pid)
 
 {   struct stat buf;
     char   procpidpath[SSIZE] = "";
@@ -18722,18 +18514,17 @@ _PUBLIC _BOOLEAN pups_i_own(const int pid)
 
 
 
-/*----------------------------------------------------------------------------------------
-    Monitor nominated parent and exit if it is terminated ...
-----------------------------------------------------------------------------------------*/
+/*-------------------------------------------------------*/
+/* Monitor effective parent and exit if it is terminated */
+/*-------------------------------------------------------*/
 
 _PUBLIC void pups_default_parent_homeostat(void *t_info, const char *args)
 
 {   
-
     if(t_info == (void *)      NULL  ||
        args   == (const char *)NULL   )
     {  pups_set_errno(EINVAL);
-       return(-1);
+       return;
     }
  
     /*----------------------------------*/
@@ -18761,14 +18552,14 @@ _PUBLIC void pups_default_parent_homeostat(void *t_info, const char *args)
 
 
 
-/*----------------------------------------------------------------------------------------
-    Enable process homeostat (set up a "support" child to grab the thread of execution if
-    the parent process is fatally damaged by a dangerous operation) ...
-----------------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------------------------*/
+/* Enable process homeostat (set up a "support" child to grab the thread of execution if */
+/* the parent process is fatally damaged by a dangerous operation)                       */
+/*---------------------------------------------------------------------------------------*/
 
-_PUBLIC int pups_process_homeostat_enable(const _BOOLEAN wait_if_damaged)
+_PUBLIC pid_t pups_process_homeostat_enable(const _BOOLEAN wait_if_damaged)
 
-{   int      child_pid;
+{   pid_t    child_pid;
 
     _BOOLEAN save_appl_verbose   = FALSE,
              pups_parent_damaged = FALSE;
@@ -18851,11 +18642,11 @@ _PUBLIC int pups_process_homeostat_enable(const _BOOLEAN wait_if_damaged)
 
 
 
-/*----------------------------------------------------------------------------------------
-    Disable process hoemostat (support child)  ...
-----------------------------------------------------------------------------------------*/
+/*------------------------------------------------------*/
+/* Cancel support child (at end of dangerous operation) */
+/*------------------------------------------------------*/
 
-_PUBLIC void pups_process_hoemostat_disable(const int child_pid)
+_PUBLIC void pups_process_hoemostat_disable(const pid_t child_pid)
 
 {   
 
@@ -18870,19 +18661,18 @@ _PUBLIC void pups_process_hoemostat_disable(const int child_pid)
 
 
 
-/*----------------------------------------------------------------------------------------
-    Extended PUPS getpwnam routine which searches static password table. If this
-    fails, the appropriate NIS map is then searched ...
-----------------------------------------------------------------------------------------*/
+/*------------------------------------------------------------------------------*/
+/* Extended PUPS getpwnam routine which searches static password table. If this */
+/* fails, the appropriate NIS map is then searched                              */
+/*------------------------------------------------------------------------------*/
 
 _PUBLIC struct passwd *pups_getpwnam(const char *username) 
 
 {   _IMMORTAL struct passwd *pwent = (struct passwd *)NULL; 
 
-
     if(username == (char *)NULL)
     {  pups_set_errno(EINVAL);
-       return(-1);
+       return((struct passwd *)NULL);
     }
 
 
@@ -18937,12 +18727,12 @@ _PUBLIC struct passwd *pups_getpwnam(const char *username)
 
 
 
-/*----------------------------------------------------------------------------------------
-    Extended PUPS getpwnam routine which searches static password table. If this
-    fails, the appropriate NIS map is then searched ...
-----------------------------------------------------------------------------------------*/
+/*------------------------------------------------------------------------------*/
+/* Extended PUPS getpwnam routine which searches static password table. If this */
+/* fails, the appropriate NIS map is then searched                              */
+/*------------------------------------------------------------------------------*/
 
-_PUBLIC struct passwd *pups_getpwuid(const int uid)
+_PUBLIC struct passwd *pups_getpwuid(const uid_t uid)
 
 {   _IMMORTAL struct passwd *pwent = (struct passwd *)NULL;
 
@@ -19000,13 +18790,13 @@ _PUBLIC struct passwd *pups_getpwuid(const int uid)
 
 
 
-/*----------------------------------------------------------------------------------------
-    Table initialisation function for icrc_16 ...
-----------------------------------------------------------------------------------------*/
+/*-------------------------------------------*/
+/* Table initialisation function for icrc_16 */
+/*-------------------------------------------*/
 
 _PRIVATE unsigned short icrc1(unsigned short crc, _BYTE onech)
 
-{   int i;
+{   uint32_t i;
     unsigned short ans = (crc ^ onech << 8);
 
 
@@ -19027,51 +18817,76 @@ _PRIVATE unsigned short icrc1(unsigned short crc, _BYTE onech)
 
 
 
-/*----------------------------------------------------------------------------------------
-    Compute 16 bit cyclic redundancy checksum ...
-----------------------------------------------------------------------------------------*/
-
-
-/*--------------------------------------*/
-/* Macros required by CRC functionality */
-/*--------------------------------------*/
+/*-------------------------------------------*/
+/* Compute 16 bit cyclic redundancy checksum */
+/*-------------------------------------------*/
+/*-------------------------------*/
+/* Macros required by 32 bit CRC */
+/*-------------------------------*/
 
 #define LOBYTE(x) ((_BYTE)((x) & 0xFF))
 #define HIBYTE(x) ((_BYTE)((x) >> 8))
 
-                                                            /*----------------------------------------------------*/
-_PRIVATE unsigned short icrc_16(unsigned short    crc,      /* Used to initialise input register if jrev negative */
-                                _BYTE             *bufptr,  /* Pointer to buffer we are computing checksum for    */
-                                size_t            len,      /* Lenght of the buffer                               */
-                                short int         jinit,    /* Initialistion                                      */
-                                int               jrev)     /* Compute reversed checksum                          */
-                                                            /*----------------------------------------------------*/
 
-{   unsigned short irc1(unsigned short int crc, _BYTE onech);
+/*-------------------------------------*/
+/* Global variables need by 32 bit CRC */
+/*-------------------------------------*/
 
-    _IMMORTAL unsigned short icrctb[256] = { [0 ... 255] = 0 },
-                             init        = 0;
-
-    _IMMORTAL _BYTE rchr[256] = "";
-
-    unsigned long  int i;
-    unsigned short int j,
-                       cword = crc;
+_PRIVATE _BOOLEAN       crc32_table_generated = FALSE;         
+_PRIVATE unsigned short icrctb[256]           = { [0 ... 255] = 0 };
+_PRIVATE _BYTE rchr[256]                      = "";
 
 
-    /*-------------------------*/
-    /* Table of 4 bit reverses */
-    /*-------------------------*/
+/*-------------------------*/
+/* Table of 4 bit reverses */
+/*-------------------------*/
 
-    _IMMORTAL _BYTE it[16] = { 0,8,4,12,2,10,6,14,1,9,5,13,3,11,7,15 };
+_PRIVATE _BYTE it[16] = { 0,8,4,12,2,10,6,14,1,9,5,13,3,11,7,15 };
+
+
+#ifdef PTHREAD_SUPPORT
+_PRIVATE pthread_mutex_t   crc32_init_mutex;
+#endif /* PTHREAD_SUPPORT */
+
+
+
+                                                    /*----------------------------------------------------*/
+_PRIVATE unsigned short icrc_16(uint16_t      crc,  /* Used to initialise input register if jrev negative */
+                                _BYTE     *bufptr,  /* Pointer to buffer we are computing checksum for    */
+                                size_t        len,  /* Lenght of the buffer                               */
+                                int16_t     jinit,  /* Initialistion                                      */
+                                int32_t      jrev)  /* Compute reversed checksum                          */
+                                                    /*----------------------------------------------------*/
+
+{   uint16_t irc1(uint16_t crc, _BYTE onech);
+
+    uint64_t i;
+    uint16_t j,
+             cword = crc;
 
 
     /*---------------------------------*/
     /* Do we need to intialise tables? */
     /*---------------------------------*/
 
-    if(!init)
-    {  init = 1;
+    if (crc32_table_generated == FALSE)
+    {  crc32_table_generated = TRUE;
+
+       #ifdef PTHREAD_SUPPORT
+       pthread_mutex_trylock(&crc32_init_mutex);
+
+
+       /*-------------------------------------------------------------*/
+       /* If someone has generated the table while we were waiting to */
+       /* out work is done                                            */
+       /*-------------------------------------------------------------*/
+
+       if(crc32_table_generated == TRUE)
+       {  pthread_mutex_unlock(&crc32_init_mutex);
+          return(0);
+       }
+       #endif /* pthread support */
+
        for(j=0; j<=255; ++j)
        {
 
@@ -19082,6 +18897,10 @@ _PRIVATE unsigned short icrc_16(unsigned short    crc,      /* Used to initialis
            icrctb[j] = icrc1(j << 8,(_BYTE)0);
            rchr[j]  = (_BYTE)(it[j & 0xF] << 4 | it[j >> 4]);
        }
+
+       #ifdef PTHREAD_SUPPORT
+       pthread_mutex_unlock(&crc32_init_mutex);
+       #endif /* PTHREAD_SUPPORT */
     }
 
     if(jinit >= 0)
@@ -19103,15 +18922,15 @@ _PRIVATE unsigned short icrc_16(unsigned short    crc,      /* Used to initialis
 
 
 
-/*----------------------------------------------------------------------------------------
-    Compute pseudo 32 bit cyclic redundancy checksum ...
-----------------------------------------------------------------------------------------*/
+/*----------------------------------------------------*/
+/* Compute (pseudo) 32 bit cyclic redundancy checksum */
+/*----------------------------------------------------*/
 
-_PUBLIC int pups_crc_p32(const size_t len, _BYTE *bufptr)
+_PUBLIC int32_t pups_crc_32(const size_t len, _BYTE *bufptr)
 
-{   int crc_p32,
-        low_16_bits,
-        high_16_bits;
+{   uint32_t crc32,
+             low_16_bits,
+             high_16_bits;
 
     if(len <= 0 || bufptr == (_BYTE *)NULL)
     {  pups_set_errno(EINVAL);
@@ -19123,13 +18942,13 @@ _PUBLIC int pups_crc_p32(const size_t len, _BYTE *bufptr)
     /* Geneate 16 bit CRC's */
     /*----------------------*/
 
-    low_16_bits  = (int)icrc_16(0,bufptr,len,0,1);
-    high_16_bits = (int)icrc_16(0,bufptr,len,0,(-1)) >> 16;
+    low_16_bits  = (int32_t)icrc_16(0,bufptr,len,0,1);
+    high_16_bits = (int32_t)icrc_16(0,bufptr,len,0,(-1)) >> 16;
    
-    crc_p32 = low_16_bits | high_16_bits;
+    crc32 = low_16_bits | high_16_bits;
 
     pups_set_errno(OK);
-    return(crc_p32);
+    return(crc32);
 }
 
 
@@ -19138,14 +18957,18 @@ _PUBLIC int pups_crc_p32(const size_t len, _BYTE *bufptr)
 /* Generate table for 64 bit CRC */
 /*-------------------------------*/
 
-_PRIVATE _BOOLEAN      crc64_table_generated        = FALSE;         
-_PRIVATE unsigned long int poly                     = 0xC96C5795D7870F42;
-_PRIVATE unsigned long int crc64_lookup_table[256]  = { [0 ... 255] = 0L };
-_PRIVATE pthread_mutex_t crc64_init_mutex;
+_PRIVATE _BOOLEAN  crc64_table_generated    = FALSE;         
+_PRIVATE uint64_t  poly                     = 0xC96C5795D7870F42;
+_PRIVATE uint64_t  crc64_lookup_table[256]  = { [0 ... 255] = 0L };
+
+#ifdef PTHREAD_SUPPORT
+_PRIVATE pthread_mutex_t   crc64_init_mutex;
+#endif /* PTHREAD_SUPPORT */
+
 
 _PRIVATE void generate_crc64_lookup_table(void)
-{   int i,
-        j;
+{   uint32_t i,
+             j;
 
 
     #ifdef PTHREAD_SUPPORT
@@ -19170,7 +18993,7 @@ _PRIVATE void generate_crc64_lookup_table(void)
 
     for(i=0; i<256; ++i)
     {
-       unsigned long int crc64 = i;
+       uint64_t crc64 = i;
        for(j=0; j<8; ++j)
        {
 
@@ -19211,7 +19034,6 @@ _PRIVATE void generate_crc64_lookup_table(void)
    #ifdef PTHREAD_SUPPORT
    pthread_mutex_unlock(&crc64_init_mutex);
    #endif /* PTHREAD_SUPPORT */
-
 }
 
 
@@ -19221,12 +19043,19 @@ _PRIVATE void generate_crc64_lookup_table(void)
 /* Generate 64 bit CRC */
 /*---------------------*/
 
-_PUBLIC unsigned long int pups_crc_64(const size_t len, _BYTE *bufptr)
-{   size_t            i;
-    unsigned long int crc64 = 0;
+_PUBLIC uint64_t pups_crc_64(const size_t len, _BYTE *bufptr)
+{   size_t   i;
+    uint64_t crc64 = 0;
+
+
+    if(len <= 0 || bufptr == (_BYTE *)NULL)
+    {  pups_set_errno(EINVAL);
+       return(-1);
+    }
 
 
     /*-------------------------------------------------*/
+
     /* Generate lookup table for 64 bit CRC if we need */
     /* to do so                                        */
     /*-------------------------------------------------*/
@@ -19236,8 +19065,8 @@ _PUBLIC unsigned long int pups_crc_64(const size_t len, _BYTE *bufptr)
        
 
     for(i=0; i<len; ++i)
-    {   unsigned long int lookup;
-        _BYTE             t_index;
+    {   uint64_t lookup;
+        _BYTE    t_index;
 
         t_index = bufptr[i] ^ crc64;
         lookup  = crc64_lookup_table[t_index];
@@ -19245,22 +19074,23 @@ _PUBLIC unsigned long int pups_crc_64(const size_t len, _BYTE *bufptr)
         crc64   ^=  lookup;
     }
 
+    pups_set_errno(OK);
     return(crc64);
 }
 
 
 
 
-/*-------------------------------------------------------------------------------------------------------------
-    Extract CRC (if any) from file name ...
--------------------------------------------------------------------------------------------------------------*/
+/*--------------------------------------*/
+/* Extract CRC signature from file name */
+/*--------------------------------------*/
 
-_PUBLIC unsigned long int pups_get_signature(const char *name, const char signer)
+_PUBLIC uint64_t pups_get_signature(const char *name, const char signer)
 
-{   int i,
-        cnt = 0;
+{   uint32_t i,
+             cnt = 0;
 
-    unsigned long int crc;
+    uint64_t crc;
 
     char     crc_signature[SSIZE]  = "";
     _BOOLEAN begin_crc_signature = FALSE;
@@ -19294,14 +19124,14 @@ _PUBLIC unsigned long int pups_get_signature(const char *name, const char signer
 
 
 
-/*-------------------------------------------------------------------------------------------------------------
-    If a checksum is present -- sign filename with it ...
--------------------------------------------------------------------------------------------------------------*/
+/*------------------------------------------------*/
+/* If a checksum is present sign filename with it */
+/*------------------------------------------------*/
 
-_PUBLIC int pups_sign(const unsigned long int crc, const char *name, char *signed_name, const char signer)
+_PUBLIC int32_t pups_sign(const uint64_t crc, const char *name, char *signed_name, const char signer)
 
-{  int  c_index;
-   char tmpstr[SSIZE] = "";
+{  ssize_t c_index;
+   char    tmpstr[SSIZE] = "";
 
    if(name == (char *)NULL || signed_name == (char *)NULL)
    {  pups_set_errno(EINVAL);
@@ -19340,20 +19170,22 @@ _PUBLIC int pups_sign(const unsigned long int crc, const char *name, char *signe
 
 
 
-/*-------------------------------------------------------------------------------------------------------------
-    PUPS lseek which is signal safe ...
--------------------------------------------------------------------------------------------------------------*/
+/*---------------------------------*/
+/* PUPS lseek which is signal safe */
+/*---------------------------------*/
 
-_PUBLIC int pups_lseek(const int fdes, const unsigned long int pos, const int whence)
+_PUBLIC off_t pups_lseek(const des_t fdes, const off_t pos, const int32_t whence)
 
-{   int ret;
+{    int32_t ret;
 
     sigset_t set,
              o_set;
 
     (void)sigfillset(&set);
-    (void)sigdelset (&set,SIGSEGV);
+
+    (void)sigdelset (&set,SIGINT);
     (void)sigdelset (&set,SIGTERM);
+    (void)sigdelset (&set,SIGSEGV);
 
     (void)pups_sigprocmask(SIG_SETMASK,&set,&o_set);
 
@@ -19367,13 +19199,13 @@ _PUBLIC int pups_lseek(const int fdes, const unsigned long int pos, const int wh
 
 
 
-/*-------------------------------------------------------------------------------------------------------------
-    Replace item in command tail ...
--------------------------------------------------------------------------------------------------------------*/
+/*------------------------------*/
+/* Replace item in command tail */
+/*------------------------------*/
 
 _PUBLIC _BOOLEAN pups_replace_cmd_tail_item(const char *flag, const char *item)
 
-{   int i;
+{   uint32_t i;
 
     if(flag == (const char *)NULL || item == (const char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -19401,12 +19233,12 @@ _PUBLIC _BOOLEAN pups_replace_cmd_tail_item(const char *flag, const char *item)
 
 
 
-/*-------------------------------------------------------------------------------------------------------------
-    Clear command tail ...
--------------------------------------------------------------------------------------------------------------*/
+/*--------------------*/
+/* Clear command tail */
+/*--------------------*/
 
-_PUBLIC int pups_clear_cmd_tail(void)
-{   int i;
+_PUBLIC int32_t pups_clear_cmd_tail(void)
+{   uint32_t i;
 
     if(appl_t_args <= 0)
     {  pups_set_errno(EINVAL);
@@ -19428,13 +19260,13 @@ _PUBLIC int pups_clear_cmd_tail(void)
 
 
 
-/*-------------------------------------------------------------------------------------------------------------
-    Insert item into command tail ...
--------------------------------------------------------------------------------------------------------------*/
+/*-------------------------------*/
+/* Insert item into command tail */
+/*-------------------------------*/
 
-_PUBLIC int pups_insert_cmd_tail_item(const char *flag, const char *item)
+_PUBLIC int32_t pups_insert_cmd_tail_item(const char *flag, const char *item)
 {  
-    if(appl_t_args > 253)
+    if(appl_t_args > MAX_CMD_ARGS)
     {  pups_set_errno(ENOSPC);
        return(-1);
     }
@@ -19466,36 +19298,40 @@ _PUBLIC int pups_insert_cmd_tail_item(const char *flag, const char *item)
 
 
 
-/*-------------------------------------------------------------------------------------
-    Backtrack to given point if a segmentation violation occurs -- this helps to 
-    protects a dynamic application from badly written code! ...
--------------------------------------------------------------------------------------*/
+/*-------------------------------------------------------------------------------*/
+/* Backtrack to given point if a segmentation violation occurs -- this partially */
+/* protects a dynamic application from badly written code!                       */
+/*-------------------------------------------------------------------------------*/
 
 _PRIVATE sigjmp_buf segv_backtrack;
 
 
-/*---------------------------------------*/
-/* Handler for pointer access violations */
-/*---------------------------------------*/
+/*---------------------------------------------------------------*/
+/* Handler for backtracking (when segmentation violation occurs) */
+/*---------------------------------------------------------------*/
 
-_PUBLIC int pups_segv_backtrack_handler(const int signum)
+_PRIVATE int32_t pups_segv_backtrack_handler(const int32_t signum)
 
-{   (void)usleep(100);
+{   (void)pups_usleep(100);
     (void)siglongjmp(segv_backtrack,1);
 }
 
 
+/*-----------------------------------------------------------*/
+/* Set a backtrack re-entry point (in process address space) */
+/*-----------------------------------------------------------*/
+
 _PUBLIC _BOOLEAN pups_backtrack(const _BOOLEAN set)
 
-{   if(set == TRUE)
-    {
+{
 
-       /*----------------------------------------------------------------*/
-       /* Enable backtracking -- SIGSEGV will cause process to backtrack */
-       /* to this point                                                  */
-       /*----------------------------------------------------------------*/
+    /*----------------------------------------------------------------*/
+    /* Enable backtracking -- SIGSEGV will cause process to backtrack */
+    /* to this point                                                  */
+    /*----------------------------------------------------------------*/
 
-       (void)pups_sighandle(SIGSEGV,"segv_backtrack_handler",(void *)&pups_segv_backtrack_handler,(sigset_t *)NULL);
+    if(set == TRUE)
+    {  (void)pups_sighandle(SIGSEGV,"segv_backtrack_handler",(void *)&pups_segv_backtrack_handler,(sigset_t *)NULL);
 
        if(sigsetjmp(segv_backtrack,1) == 1)
           return(PUPS_BACKTRACK);
@@ -19508,16 +19344,18 @@ _PUBLIC _BOOLEAN pups_backtrack(const _BOOLEAN set)
     /* Default handler - backtracking disabled */
     /*-----------------------------------------*/
 
-    (void)pups_sighandle(SIGSEGV,"segbusfpe_handler",(void *)&segbusfpe_handler,(sigset_t *)NULL);
+    else
+       (void)pups_sighandle(SIGSEGV,"segbusfpe_handler",(void *)&segbusfpe_handler,(sigset_t *)NULL);
+
     return(FALSE);
 }
 
 
 
 
-/*-------------------------------------------------------------------------------------
-    Has file be updated? ...
--------------------------------------------------------------------------------------*/
+/*------------------------*/
+/* Has file been updated? */
+/*------------------------*/
 
 _PUBLIC _BOOLEAN pups_file_updated(const char *filename)
 
@@ -19548,14 +19386,14 @@ _PUBLIC _BOOLEAN pups_file_updated(const char *filename)
 
 
 
-/*---------------------------------------------------------------------------------------
-    Set (round robin) scheduling priority ...
----------------------------------------------------------------------------------------*/
+/*---------------------------------------*/
+/* Set (round robin) scheduling priority */
+/*---------------------------------------*/
 
-_PUBLIC int pups_set_rt_sched(const int priority)
+_PUBLIC int32_t pups_set_rt_sched(const int32_t priority)
 
-{   int    ret;
-    struct sched_param p;
+{   int32_t ret;
+    struct  sched_param p;
 
     /*----------------------------------*/
     /* Only the root thread can process */
@@ -19580,14 +19418,14 @@ _PUBLIC int pups_set_rt_sched(const int priority)
 
 
 
-/*----------------------------------------------------------------------------------------
-    Switch to standard (time sharing) scheduler ...
-----------------------------------------------------------------------------------------*/
+/*---------------------------------------------*/
+/* Switch to standard (time sharing) scheduler */
+/*---------------------------------------------*/
 
-_PUBLIC int pups_set_tslice_sched(void)  
+_PUBLIC int32_t pups_set_tslice_sched(void)  
 
-{   int    ret;
-    struct sched_param p;
+{   int32_t ret;
+    struct  sched_param p;
 
 
     /*----------------------------------*/
@@ -19599,7 +19437,7 @@ _PUBLIC int pups_set_tslice_sched(void)
        pups_error("[pups_set_tslice_sched] attempt by non root thread to perform PUPS/P3 utility operation");
 
     p.sched_priority = 0;
-    ret = sched_setscheduler(appl_pid,SCHED_RR,&p);
+    ret = sched_setscheduler(appl_pid,SCHED_OTHER,&p);
 
     return(ret);
 }
@@ -19607,10 +19445,10 @@ _PUBLIC int pups_set_tslice_sched(void)
 
 
 
-/*----------------------------------------------------------------------------------------
-    Check to see if a given host is reachable. Note that ip_adr can be either an
-    IPBV4 or IPV6 address or a host name  ...
-----------------------------------------------------------------------------------------*/
+/*-------------------------------------------------------------*/
+/* Is host is reachable? Note that IP address can be either an */
+/* IPBV4 or IPV6 address or a host name                        */
+/*-------------------------------------------------------------*/
 
 _PUBLIC _BOOLEAN pups_host_reachable(const char *ip_addr)
 
@@ -19650,21 +19488,22 @@ _PUBLIC _BOOLEAN pups_host_reachable(const char *ip_addr)
 
 
 
-/*--------------------------------------------------------------------------------
-    Set a discretionary lock (note this type of lock is safe over network
-    filesystem such as NFS and MFS) ...
---------------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------------*/
+/* Set a discretionary lock (note this type of lock is safe over network */
+/* filesystem such as NFS                                                */
+/*-----------------------------------------------------------------------*/
 
-_PRIVATE int    lock_fdes [PUPS_MAX_FLOCKS] = { [0 ... PUPS_MAX_FLOCKS-1] = (-1) };
-_PRIVATE int    lock_type [PUPS_MAX_FLOCKS] = { [0 ... PUPS_MAX_FLOCKS-1] = (-1) };
-_PRIVATE off_t  lock_start[PUPS_MAX_FLOCKS] = { [0 ... PUPS_MAX_FLOCKS-1] = 0   };
-_PRIVATE off_t  lock_size [PUPS_MAX_FLOCKS] = { [0 ... PUPS_MAX_FLOCKS-1] = 0   };
+_PRIVATE int32_t lock_fdes [PUPS_MAX_FLOCKS] = { [0 ... PUPS_MAX_FLOCKS-1] = (-1) };
+_PRIVATE int32_t lock_type [PUPS_MAX_FLOCKS] = { [0 ... PUPS_MAX_FLOCKS-1] = (-1) };
+_PRIVATE off_t   lock_start[PUPS_MAX_FLOCKS] = { [0 ... PUPS_MAX_FLOCKS-1] = 0    };
+_PRIVATE off_t   lock_size [PUPS_MAX_FLOCKS] = { [0 ... PUPS_MAX_FLOCKS-1] = 0    };
 
-_PUBLIC int pups_flock(const int fdes, const int cmd, const off_t l_start, const off_t l_len, const _BOOLEAN wait)
+_PUBLIC int32_t pups_flock(const des_t fdes, const int32_t cmd, const off_t l_start, const off_t l_len, const _BOOLEAN wait)
 
-{   int i,
-        ret,
-        lock_index;
+{   uint32_t i,
+             lock_index;
+
+    int32_t ret;
 
     struct flock lock;
 
@@ -19787,19 +19626,20 @@ lock_found:
 
 
 
-/*--------------------------------------------------------------------------------
-    Set a discretionary lock for a named file. (note this type of lock is safe
-    over network filesystem such as NFS and MFS) ...
---------------------------------------------------------------------------------*/
+/*----------------------------------------------------------------------------*/
+/* Set a discretionary lock for a named file. (note this type of lock is safe */
+/* over network filesystem such as NFS                                        */
+/*----------------------------------------------------------------------------*/
 
 _PRIVATE char lock_name[PUPS_MAX_FLOCKS][SSIZE] = { [0 ... PUPS_MAX_FLOCKS-1] = {""}};
 
-_PUBLIC int pups_flockfile(const char *lock_file, const int cmd, const off_t l_start, const off_t l_len, const _BOOLEAN wait)
+_PUBLIC int32_t pups_flockfile(const char *lock_file, const int32_t cmd, const off_t l_start, const off_t l_len, const _BOOLEAN wait)
 
-{   int i,
-        ret,
-        min_index  = 0,
-        lock_index = 0;
+{   uint32_t i,
+             min_index  = 0,
+             lock_index = 0;
+
+    int32_t  ret;
 
     if(lock_file == (char *)NULL || l_start < 0 || l_len < 1)
     {  pups_set_errno(EINVAL);
@@ -19987,14 +19827,14 @@ lock_found:
 
 
 
-/*--------------------------------------------------------------------------------
-    Display list of flock locks currently held by caller process ...
---------------------------------------------------------------------------------*/
+/*----------------------------------*/
+/* Display process flock lock table */
+/*----------------------------------*/
 
-_PUBLIC int pups_show_flock_locks(const FILE *stream)
+_PUBLIC int32_t pups_show_flock_locks(const FILE *stream)
 
-{   int i,
-        flock_cnt = 0;
+{   uint32_t i,
+             flock_cnt = 0;
 
 
     /*----------------------------------*/
@@ -20049,13 +19889,13 @@ _PUBLIC int pups_show_flock_locks(const FILE *stream)
 
 
 
-/*--------------------------------------------------------------------------------------------------
-    Substitute string s3 for substring s2 in s1, returning result in string s4 ...
---------------------------------------------------------------------------------------------------*/
+/*----------------------------------------------------------------------------*/
+/* Substitute string s3 for substring s2 in s1, returning result in string s4 */
+/*----------------------------------------------------------------------------*/
 
-_PUBLIC int strsub(const char *s1, const char *s2, const char *s3, char *s4)
+_PUBLIC int32_t strsub(const char *s1, const char *s2, const char *s3, char *s4)
 
-{   int i;
+{   ssize_t i;
 
     if(s1 == (const char *)NULL  ||
        s2 == (const char *)NULL  ||
@@ -20067,7 +19907,7 @@ _PUBLIC int strsub(const char *s1, const char *s2, const char *s3, char *s4)
 
     for(i=0; i<strlen(s1); ++i)
     {  if(strncmp((char *)&s1[i],s2,strlen(s2)) == 0)
-       {  int s1_index;
+       {  int32_t s1_index;
 
           (void)strlcpy(s4,s1,SSIZE);
           s4[i] = '\0';
@@ -20088,10 +19928,9 @@ _PUBLIC int strsub(const char *s1, const char *s2, const char *s3, char *s4)
 
 
 
-/*--------------------------------------------------------------------------------------------------
-    Return the type of a given file (this is effectively a wrapper function for the "file"
-    command) ...
---------------------------------------------------------------------------------------------------*/
+/*------------------------------------------------------------*/
+/* Return file type (wrapper function for the "file" command) */
+/*------------------------------------------------------------*/
 
 _PUBLIC char *pups_get_file_type(const char *file_name)
 
@@ -20104,7 +19943,7 @@ _PUBLIC char *pups_get_file_type(const char *file_name)
 
     if(file_name == (const char *)NULL)
     {  pups_set_errno(EINVAL);
-       return(-1);
+       return((char *)NULL);
     }
     else
        (void)snprintf(file_cmd,SSIZE,"file %s",file_name);
@@ -20122,13 +19961,13 @@ _PUBLIC char *pups_get_file_type(const char *file_name)
 
 
 
-/*--------------------------------------------------------------------------------------------------
-    Convert a string to lower case ...
---------------------------------------------------------------------------------------------------*/
+/*--------------------------------*/
+/* Convert a string to lower case */
+/*--------------------------------*/
 
-_PUBLIC int downcase(char *s)
+_PUBLIC int32_t downcase(char *s)
 
-{   int i;
+{   size_t i;
 
     if(s == (char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -20144,13 +19983,13 @@ _PUBLIC int downcase(char *s)
 
 
 
-/*--------------------------------------------------------------------------------------------------
-    Convert a string to upper case ...
---------------------------------------------------------------------------------------------------*/
+/*------------------------------*/
+/* Convert string to upper case */
+/*------------------------------*/
 
-_PUBLIC int upcase(char *s)
+_PUBLIC int32_t upcase(char *s)
 
-{   int i;
+{   size_t i;
 
     if(s == (char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -20166,48 +20005,11 @@ _PUBLIC int upcase(char *s)
 
 
 
-/*--------------------------------------------------------------------------------------------------
-    Encrypt a string using a 256 rotor virtual enigma-like machine ...
---------------------------------------------------------------------------------------------------*/
+/*-------------------------------------*/
+/* Get name of host exporting NFS file */
+/*-------------------------------------*/
 
-_PUBLIC int ecryptstr(const int seed, const _BOOLEAN one_way, const char *plaintext, char *cipher)
-
-{   int i;
-
-    if(plaintext == (const char *)NULL || cipher == (char *)NULL)
-    {  pups_set_errno(EINVAL);
-       return(-1);
-    }
-
-
-    /*----------------*/
-    /* Encrypt string */
-    /*----------------*/
-
-    (void)srand(seed);
-    for(i=0; i<strlen(plaintext); ++i)
-    {   cipher[i] = (unsigned char)((int)plaintext[i] ^ rand());
-
-        if(one_way == TRUE)
-        {  while(cipher[i] < 60 || cipher[i] > 85)
-                 cipher[i] = (unsigned char)((int)cipher[i] ^ rand());
-        }
-    }
-
-    cipher[i] = '\0';
-
-    pups_set_errno(OK);
-    return(0);
-}
-
-
-
-
-/*-------------------------------------------------------------------------------------------------
-    Get exporting NFS hostname (from filepath) ...
--------------------------------------------------------------------------------------------------*/
-
-_PUBLIC int pups_get_nfs_host(const char *pathname, const char *host)
+_PUBLIC int32_t pups_get_nfs_host(const char *pathname, const char *host)
 
 {   char strdum[SSIZE]     = "",
          df_cmd[SSIZE]     = "",
@@ -20253,17 +20055,17 @@ _PUBLIC int pups_get_nfs_host(const char *pathname, const char *host)
 
 
 
-/*----------------------------------------------------------------------------------------------
-    Reflect endian ness of FTYPE ...
-----------------------------------------------------------------------------------------------*/
+/*-----------------------------*/
+/* Reflect endianness of FTYPE */
+/*-----------------------------*/
 
 _PUBLIC float fconv(const FTYPE fOld)
 {
     char *pcOrig = (char *)NULL,
          *pcNew  = (char *)NULL;
 
-    int i,
-        j;
+    int32_t i,
+            j;
 
     FTYPE fNew;
 
@@ -20282,24 +20084,24 @@ _PUBLIC float fconv(const FTYPE fOld)
 
 
 
-/*-------------------------------------------------------------------------------------------
-    Reflect endian ness of int ...
--------------------------------------------------------------------------------------------*/
+/*-------------------------------*/
+/* Reflect endianness of int32_t */
+/*-------------------------------*/
 
-_PUBLIC int iconv(const int iOld)
+_PUBLIC int32_t iconv(const int32_t iOld)
 {
     char *pcOrig = (char *)NULL,
          *pcNew  = (char *)NULL;
 
-    int i,
-        j,
-        iNew;
+     int32_t i,
+             j,
+             iNew;
 
     pcOrig = (char *)&iOld;
     pcNew  = (char *)&iNew;
 
-    j = sizeof(int)-1;
-    for(i = 0; i<sizeof(int); i++)
+    j = sizeof(int32_t)-1;
+    for(i = 0; i<sizeof(int32_t); i++)
     {   pcNew[j] = pcOrig[i];
         j--;
     }
@@ -20310,24 +20112,24 @@ _PUBLIC int iconv(const int iOld)
 
 
 
-/*-----------------------------------------------------------------------------------------
-    Reflect endian ness of short ...
------------------------------------------------------------------------------------------*/
+/*-----------------------------*/
+/* Reflect endianness of short */
+/*-----------------------------*/
 
-_PUBLIC short int sconv(const short int sOld)
+_PUBLIC int16_t sconv(const int16_t sOld)
 {
     char *pcOrig = (char *)NULL,
          * pcNew = (char *)NULL;
 
-    short int i,
-              j,
-              sNew;
+    int16_t i,
+            j,
+            sNew;
 
     pcOrig = (char *)&sOld;
     pcNew = (char *) &sNew;
 
-    j = sizeof(short int)-1;
-    for(i = 0; i<sizeof(short int); i++)
+    j = sizeof(int16_t)-1;
+    for(i = 0; i<sizeof(int16_t); i++)
     {   pcNew[j] = pcOrig[i];
         j--;
     }
@@ -20338,24 +20140,24 @@ _PUBLIC short int sconv(const short int sOld)
 
 
 
-/*-----------------------------------------------------------------------------------------
-    Reflect endian ness of long ...
------------------------------------------------------------------------------------------*/
+/*----------------------------*/
+/* Reflect endianness of long */
+/*----------------------------*/
 
-_PUBLIC long int lconv(const long int lOld)
+_PUBLIC int64_t lconv(const  int64_t lOld)
 {
     char  *pcOrig = (char *)NULL,
           *pcNew  = (char *)NULL;
 
-    long int i,
+     int64_t i,
              j,
              lNew;
 
     pcOrig = (char *)&lOld;
     pcNew  = (char *)&lNew;
 
-    j = sizeof(long int)-1;
-    for(i = 0; i<sizeof(long int); i++)
+    j = sizeof(int64_t )-1;
+    for(i = 0; i<sizeof(int64_t); i++)
     {   pcNew[j] = pcOrig[i];
         j--;
     }
@@ -20366,246 +20168,11 @@ _PUBLIC long int lconv(const long int lOld)
 
 
 
-/*-------------------------------------------------------------------------------------------
-    Encrypting formatted print ...
--------------------------------------------------------------------------------------------*/
-
-_PUBLIC int efprintf(FILE *stream, const char *format, ...)
-
-{   int ret;
-
-    char plaintext[4096] = "",
-         cipher[4096]    = "";
-
-    va_list ap;
-
-    if(stream == (FILE *)NULL || format == (char *)NULL)
-    {  pups_set_errno(EINVAL);
-       return(-1);
-    }
-
-
-    /*--------------------------------------------*/
-    /* Generate plaintext from formatted I/P list */
-    /*--------------------------------------------*/
-
-    va_start(ap,format);
-    if(vsnprintf(plaintext,SSIZE,format,ap) == (-1))
-    {  va_end(ap);
-       return(-1);
-    }
-    else
-       va_end(ap);
-
-
-    /*-------------------------*/
-    /* Enigma encode plaintext */
-    /*-------------------------*/
-
-    #ifdef ECRYPT_SUPPORT
-    (void)ecrypt(appl_uid,FALSE,plaintext,cipher);
-    #else
-    (void)strlcpy(cipher,plaintext,SSIZE);
-    #endif /* ECRYPT_SUPPORT */
-
-
-    /*--------------*/
-    /* write cipher */
-    /*--------------*/
-
-    ret = fputs(cipher,stream);
-
-    pups_set_errno(OK);
-    return(ret);
-}
-
-
-
-
-/*-------------------------------------------------------------------------------------------
-    Encrypting formatted fputs ...
--------------------------------------------------------------------------------------------*/
-
-_PUBLIC int efputs(const char *plaintext, const FILE *stream)
-
-{   int  ret;
-    char cipher[4096]    = "";
-
-    if(plaintext == (const char *)NULL || stream == (const FILE *)NULL)
-    {  pups_set_errno(EINVAL);
-       return(-1);
-    }
-
-
-    /*-------------------------*/
-    /* Enigma encode plaintext */
-    /*-------------------------*/
-
-    #ifdef ECRYPT_SUPPORT
-    (void)ecrypt(appl_uid,FALSE,plaintext,cipher);
-    #else
-    (void)strlcpy(cipher,plaintext,SSIZE);
-    #endif /* ECRYPT_SUPPORT */
-
-
-   /*--------------*/
-   /* write cipher */
-   /*--------------*/
-
-   ret = fputs(cipher,stream);
-
-   pups_set_errno(OK);
-   return(ret);
-}
-
-
-
-
-/*-------------------------------------------------------------------------------------------
-    Encrypting formatted scan ...
--------------------------------------------------------------------------------------------*/
-
-_PUBLIC int efscanf(FILE *stream, const char *format, ...)
-
-{   int ret;
-
-    char plaintext[4096] = "",
-         cipher[4096]    = "";
-
-    va_list ap;
-
-    if(stream == (FILE *)NULL || format == (char *)NULL)
-    {  pups_set_errno(EINVAL);
-       return(-1);
-    }
-
-
-    /*------------*/
-    /* Get cipher */
-    /*------------*/
-
-    (void)fgets(cipher,4096,stream);
-    if(strcmp(cipher,"") == 0)
-    {  pups_set_errno(EIO);
-       return(-1);
-    }
-
-
-    /*-------------------------*/
-    /* Enigma encode plaintext */
-    /*-------------------------*/
-
-    #ifdef ECRYPT_SUPPORT
-    (void)ecrypt(appl_uid,FALSE,cipher,plaintext);
-    #else
-    (void)strlcpy(plaintext,cipher,SSIZE);
-    #endif /* ECRYPT_SUPPORT */
-
-    va_start(ap,format);
-    ret = vsscanf(plaintext,format,ap);
-    va_end(ap);
-
-    pups_set_errno(OK);
-    return(ret);
-}
-
-
-
-
-/*-------------------------------------------------------------------------------------------
-    Encrypting formatted string scan ...
--------------------------------------------------------------------------------------------*/
-
-_PUBLIC int esscanf(char *cipher, const char *format, ...)
-
-{   int     ret;
-    char    plaintext[4096] = "";
-    va_list ap;
-
-    if(cipher == (char *)NULL || format == (char *)NULL)
-    {  pups_set_errno(EINVAL);
-       return(-1);
-    }
-
-
-    /*------------*/
-    /* Get cipher */
-    /*------------*/
-
-    if(strcmp(cipher,"") == 0)
-    {  pups_set_errno(EIO);
-       return(-1);
-    }
-
-
-    /*-------------------------*/
-    /* Enigma encode plaintext */
-    /*-------------------------*/
-
-    #ifdef ECRYPT_SUPPORT
-    (void)ecrypt(appl_uid,FALSE,cipher,plaintext);
-    #else
-    (void)strlcpy(plaintext,cipher,SSIZE);
-    #endif /* ECRYPT_SUPPORT */
-
-    va_start(ap,format);
-    ret = vsscanf(plaintext,format,ap);
-    va_end(ap);
-
-    pups_set_errno(OK);
-    return(ret);
-}
-
-
-
-
-/*-------------------------------------------------------------------------------------------
-    Encrypting formatted scan ...
--------------------------------------------------------------------------------------------*/
-
-_PUBLIC char *efgets(char *plaintext, const unsigned long int size, const FILE *stream)
-
-{   char cipher[4096] = "";
-
-    if(plaintext  == (char *)NULL || stream == (const FILE *)NULL)
-    {  pups_set_errno(EINVAL);
-       return((char *)NULL);
-    }
-
-
-    /*------------*/
-    /* Get cipher */
-    /*------------*/
-
-    (void)fgets(cipher,4096,stream);
-    if(strcmp(cipher,"") == 0)
-    {  pups_set_errno(EIO);
-       return((char *)NULL);
-    }
-
-
-    /*-------------------------*/
-    /* Enigma encode plaintext */
-    /*-------------------------*/
-
-    #ifdef ECRYPT_SUPPORT
-    (void)ecrypt(appl_uid,FALSE,cipher,plaintext);
-    #else
-    (void)strlcpy(plaintext,cipher,SSIZE);
-    #endif /* ECRYPT_SUPPORT */
-
-    pups_set_errno(OK);
-    return((char *)&plaintext[0]);
-}
-
-
-
-
-/*-----------------------------------------------------------------------------------
-    Mark context of non-local goto valid ...
------------------------------------------------------------------------------------*/
-
-_PUBLIC int pups_set_jump_vector(void)
+/*-------------------------------------*/
+/* Set context of non-local goto valid */
+/*-------------------------------------*/
+
+_PUBLIC int32_t pups_set_jump_vector(void)
 
 {   jump_vector = TRUE;
     return(0);
@@ -20614,11 +20181,11 @@ _PUBLIC int pups_set_jump_vector(void)
 
 
 
-/*-----------------------------------------------------------------------------------
-    Mark context of non-local goto invalid ...
------------------------------------------------------------------------------------*/
+/*---------------------------------------*/
+/* Set context of non-local goto invalid */
+/*---------------------------------------*/
 
-_PUBLIC int pups_reset_jump_vector(void)
+_PUBLIC int32_t pups_reset_jump_vector(void)
 
 {   jump_vector = FALSE;
     return(0);
@@ -20627,13 +20194,13 @@ _PUBLIC int pups_reset_jump_vector(void)
 
 
 
-/*-------------------------------------------------------------------------------------------------------------
-    Return TRUE if version information matches key ...
--------------------------------------------------------------------------------------------------------------*/
+/*------------------------------------------------------*/
+/* Return TRUE if Linux version information matches key */
+/*------------------------------------------------------*/
 
 _PUBLIC _BOOLEAN pups_is_linuxversion(const char *key)
 
-{   FILE *stream         = (FILE *)NULL;
+{   FILE *stream           = (FILE *)NULL;
     char versionstr[SSIZE] = "";
 
     if(key == (char *)NULL)
@@ -20654,70 +20221,29 @@ _PUBLIC _BOOLEAN pups_is_linuxversion(const char *key)
 
 
 
-/*--------------------------------------------------------------------------------------------------------------
-    How many CPU's does this machine have? ...
---------------------------------------------------------------------------------------------------------------*/
-
-_PUBLIC int pups_cpus(FTYPE *bogomips, char *processor)
-
-{  int      cpus   = 0;
-   _BOOLEAN looper = TRUE;
-
-   char  line[SSIZE]   = "",
-         strdum[SSIZE] = "";
-
-   FILE *stream = (FILE *)NULL;
-
-   if(bogomips == (FTYPE *)NULL || processor == (char *)NULL)
-   {  pups_set_errno(EINVAL);
-      return(-1);
-   }
- 
-   stream = fopen("/proc/cpuinfo","r");
-   do {    (void)fgets(line,SSIZE,stream);
-           if(feof(stream) > 0)
-              looper = FALSE;
-           else if(strncmp(line,"processor",9) == 0)
-              ++cpus;
-           else if(strncmp(line,"bogomips",8) == 0)
-              (void)sscanf(line,"%s%s%f",strdum,strdum,bogomips);
-           else if(strncmp(line,"model name",10) == 0)
-              (void)sscanf(line,"%s%s%s%s",strdum,strdum,strdum,processor);
-      } while(looper == TRUE);
-
-   (void)fclose(stream);
-
-   pups_set_errno(OK);
-   return(cpus);
-}
-
-
-
-
-/*--------------------------------------------------------------------------------------------------------------
-    Get current process loading (and memory statistics) for host ...
---------------------------------------------------------------------------------------------------------------*/
-
-_PUBLIC int pups_get_resource_loading(const _BOOLEAN weighted,     /* If TRUE return BogoMIP weighted CPU loading */
-                                      FTYPE          *cpu_loading, /* CPU loading                                 */
-                                      int            *free_mem)    /* Free (virtual) memory                       */
+/*--------------------------------------------------------------*/
+/* Get current process loading (and memory statistics) for host */
+/*--------------------------------------------------------------*/ 
+                                                                 /*---------------------------------------------*/
+_PUBLIC int32_t pups_get_resource_loading(FTYPE    *cpu_loading, /* CPU loading                                 */
+                                          uint32_t    *free_mem) /* Free (virtual) memory                       */
+                                                                 /*---------------------------------------------*/
 
 {   char line[SSIZE]   = "",
          strdum[SSIZE] = "",
          tmpstr[SSIZE] = "";
 
-    int i,
-        idum,
-        free,
-        next_mem,
-        cnt  = 3;
+    uint32_t i,
+             free,
+             next_mem,
+             cnt  = 3;
 
     FTYPE bogomips;
 
     _BOOLEAN looper  = TRUE;
     FILE     *stream = (FILE *)NULL;
 
-    if(cpu_loading == (FTYPE **)NULL || free_mem == (int *)NULL)
+    if(cpu_loading == (FTYPE **)NULL || free_mem == (int32_t *)NULL)
     {  pups_set_errno(EINVAL);
        return(-1);
     }
@@ -20726,11 +20252,7 @@ _PUBLIC int pups_get_resource_loading(const _BOOLEAN weighted,     /* If TRUE re
     (void)fscanf(stream,"%f",cpu_loading);
     (void)fclose(stream);
 
-    *cpu_loading /= (FTYPE)pups_cpus(&bogomips,strdum);
-    if(weighted == TRUE)
-    {  bogomips     /= BOGOMIP_SCALING;
-       *cpu_loading /= bogomips;
-    }
+    *cpu_loading /= (FTYPE)get_nprocs();
 
 
     /*--------------------------------------------------------------*/
@@ -20743,6 +20265,7 @@ _PUBLIC int pups_get_resource_loading(const _BOOLEAN weighted,     /* If TRUE re
     do {    (void)fscanf(stream,"%s%d",tmpstr,&next_mem);
             if(strcmp(tmpstr,"MemFree:") == 0)
                (*free_mem) += next_mem;
+
             else if(strcmp(tmpstr,"Cached:") == 0)
             {  (*free_mem) += next_mem;
                looper = FALSE;
@@ -20759,19 +20282,19 @@ _PUBLIC int pups_get_resource_loading(const _BOOLEAN weighted,     /* If TRUE re
 
 
 #ifdef SSH_SUPPORT
-/*-----------------------------------------------------------------------------------------------------------------
-    Peer mediated file transfer ...
------------------------------------------------------------------------------------------------------------------*/
+/*----------------------------*/
+/* Peer to peer file transfer */
+/*----------------------------*/
 
-_PUBLIC int pups_scp(const char *ssh_port, const char *to_filepath, const char *from_filepath)
+_PUBLIC int32_t pups_scp(const char *ssh_port, const char *to_filepath, const char *from_filepath)
 
-{   char line[SSIZE]     = "",
-         ssh_opts[SSIZE] = "";
+{   char    line[SSIZE]      = "",
+            ssh_opts[SSIZE]  = "";
 
-    int status,
-        ret            = 0,
-        scp_pid        = (-1);
+    int32_t status,
+            ret              = 0;
 
+    pid_t   scp_pid          = (-1);
 
     if(from_filepath == (const char *)NULL  ||
        to_filepath   == (const char *)NULL   )
@@ -20845,7 +20368,7 @@ _PUBLIC int pups_scp(const char *ssh_port, const char *to_filepath, const char *
        /* We should not get here -- if we do an error has occured */
        /*---------------------------------------------------------*/
 
-       _exit(01);
+       _exit(255);
     }
 
 
@@ -20902,11 +20425,11 @@ _PUBLIC int pups_scp(const char *ssh_port, const char *to_filepath, const char *
 
 
 
-/*-----------------------------------------------------------------------------------------------------------------
-    Is our process P3 aware ...
------------------------------------------------------------------------------------------------------------------*/
+/*----------------------*/
+/* Is process P3 aware? */
+/*----------------------*/
 
-_PRIVATE _BOOLEAN pups_p3_aware(const int pid)
+_PRIVATE _BOOLEAN pups_p3_aware(const pid_t pid)
 
 {   DIR           *dirp         = (DIR *)NULL;
     struct dirent *next_item    = (struct dirent *)NULL;
@@ -20936,16 +20459,16 @@ _PRIVATE _BOOLEAN pups_p3_aware(const int pid)
 
 
 
-/*-----------------------------------------------------------------------------------------------------------------
-    Extended popen() which works with file descriptors - popen() should be pfopen() actually!!
------------------------------------------------------------------------------------------------------------------*/
-                                               /*--------------------------------*/
-_PUBLIC int pups_popen(const char *shell,      /* Shell to run command           */
-                       const char *cmd,        /* Command to run                 */
-                       const int  rw_flags,    /* r/w flags                      */
-                       int        *child_pid)  /* PID of child (payload) command */
-                                               /*--------------------------------*/
-{   int fildes[2] = { [0 ... 1] = (-1) };
+/*--------------------------------------*/
+/* Open pipe stream returning child pid */
+/*--------------------------------------*/
+                                                    /*--------------------------------*/
+_PUBLIC des_t pups_popen(const char        *shell,  /* Shell to run command           */
+                         const char          *cmd,  /* Command to run                 */
+                         const int32_t   rw_flags,  /* r/w flags                      */
+                         pid_t         *child_pid)  /* PID of child (payload) command */
+                                                    /*--------------------------------*/
+{   des_t fildes[2] = { [0 ... 1] = (-1) };
 
     if(shell     == (const char *)NULL  ||
        cmd       == (const char *)NULL  ||
@@ -20953,6 +20476,7 @@ _PUBLIC int pups_popen(const char *shell,      /* Shell to run command          
     {  pups_set_errno(EINVAL);
        return(-1);
     }
+
 
     /*---------------*/
     /* Create a pipe */
@@ -20962,12 +20486,9 @@ _PUBLIC int pups_popen(const char *shell,      /* Shell to run command          
     if((*child_pid = fork()) == 0)
     {
 
-
        /*----------------------------*/ 
        /* Child on end 2 of the pipe */
        /*----------------------------*/
-
-
        /*-------------------------------------------------------*/
        /* Child operation must mirror that requested for parent */
        /*-------------------------------------------------------*/
@@ -21004,28 +20525,28 @@ _PUBLIC int pups_popen(const char *shell,      /* Shell to run command          
 
 
 
-/*-----------------------------------------------------------------------------------------------------------------
-    Open a buffered pipe stream ...
------------------------------------------------------------------------------------------------------------------*/
-                                                                               /*--------------------------------*/
-_PUBLIC FILE *pups_fpopen(const char *shell,                                   /* Shell to run command           */
-                          const char *cmd,                                     /* Command to run                 */
-                          const int  rw_flags,                                 /* r/w flags                      */
-                          int        *child_pid)                               /* PID of child (payload) command */
-                                                                               /*--------------------------------*/
+/*-----------------------------------------------*/
+/* Open buffered pipe stream retruning child pid */
+/*-----------------------------------------------*/
+                                                 /*--------------------------------*/
+_PUBLIC FILE *pups_fpopen(const char *shell,     /* Shell to run command           */
+                          const char *cmd,       /* Command to run                 */
+                          const char *rw_flags,  /* r/w flags                      */
+                          pid_t      *child_pid) /* PID of child (payload) command */
+                                                 /*--------------------------------*/
 
-{   int  pdes     = (-1);
-    FILE *pstream = (FILE *)NULL;
+{   des_t  pdes     = (-1);
+    FILE   *pstream = (FILE *)NULL;
 
     if(shell     == (const char *)NULL  ||
        cmd       == (const char *)NULL  ||
        rw_flags  == (const char *)NULL  ||
-       child_pid == (int        *)NULL   )
+       child_pid == (pid_t      *)NULL   )
     {  pups_set_errno(EINVAL);
        return((FILE *)NULL);
     }
 
-    if(strcmp(rw_flags,"r") == 0)
+    if(strcmp((char *)rw_flags,"r") == 0)
     {  if((pdes = pups_popen(shell,cmd, 0, child_pid)) == (-1))
        {  pups_set_errno(ECHILD);
           return((FILE *)NULL);
@@ -21051,13 +20572,13 @@ _PUBLIC FILE *pups_fpopen(const char *shell,                                   /
 
 
 
-/*-----------------------------------------------------------------------------------------------------------------
-    Close extended pipe stream...
------------------------------------------------------------------------------------------------------------------*/
+/*-------------------*/
+/* Close pipe stream */
+/*-------------------*/
 
-int pups_pclose(const int pdes, const int pid)
+_PUBLIC int32_t pups_pclose(const des_t pdes, const pid_t pid)
 
-{   int status;
+{   int32_t status;
 
     if(pdes <= 0 || pid <= 0)
     {   pups_set_errno(EINVAL);
@@ -21084,13 +20605,13 @@ int pups_pclose(const int pdes, const int pid)
 
 
 
-/*-----------------------------------------------------------------------------------------------------------------
-    Close extended buffered pipe stream ...
------------------------------------------------------------------------------------------------------------------*/
+/*----------------------------*/
+/* Close buffered pipe stream */
+/*----------------------------*/
 
-_PUBLIC int pups_fpclose(const FILE *pstream, const int pid)
+_PUBLIC int32_t pups_fpclose(const FILE *pstream, const pid_t pid)
 
-{   int pdes = (-1);
+{   des_t pdes = (-1);
 
     if(pstream == (const FILE *)NULL)
     {  pups_set_errno(EINVAL);
@@ -21108,9 +20629,9 @@ _PUBLIC int pups_fpclose(const FILE *pstream, const int pid)
 
 
 
-/*------------------------------------------------------------------------------------------------------------------
-  Test to see if process in foreground ...
-------------------------------------------------------------------------------------------------------------------*/
+/*--------------------------------*/
+/* Check if process in foreground */
+/*--------------------------------*/
 
 _PUBLIC _BOOLEAN pups_is_foreground(void)
 
@@ -21123,9 +20644,9 @@ _PUBLIC _BOOLEAN pups_is_foreground(void)
 
 
 
-/*------------------------------------------------------------------------------------------------------------------
- Test to see if process in background ... 
-------------------------------------------------------------------------------------------------------------------*/
+/*--------------------------------*/
+/* Check if process in background */ 
+/*--------------------------------*/
 
 _PUBLIC _BOOLEAN pups_is_background(void)
 
@@ -21138,9 +20659,9 @@ _PUBLIC _BOOLEAN pups_is_background(void)
 
 
 
-/*-------------------------------------------------------------------------------------
-    Is command installed on system ...
--------------------------------------------------------------------------------------*/
+/*---------------------------------*/
+/* Is command installed on system? */
+/*---------------------------------*/
 
 _PUBLIC _BOOLEAN pups_cmd_installed(const char *command)
 
@@ -21173,18 +20694,16 @@ _PUBLIC _BOOLEAN pups_cmd_installed(const char *command)
 
 
 
-/*-------------------------------------------------------------------------------------
-    Get utilisation of CPU cores on current host ...
--------------------------------------------------------------------------------------*/
+/*---------------------*/
+/* Get CPU utilisation */
+/*---------------------*/
 
 _PUBLIC FTYPE pups_cpu_utilisation(void)
 
-{    char line[SSIZE]        = "",
-          pstream_cmd[SSIZE] = "";
-
-     FILE  *pstream         = (FILE *)NULL;
-
-     FTYPE utilisation;
+{    char  line[SSIZE]         = "",
+           pstream_cmd[SSIZE]  = "";
+     FILE  *pstream            = (FILE *)NULL;
+     FTYPE utilisation         = 0.0;
 
      /*----------------------------------*/
      /* Is the mpstat command installed? */
@@ -21219,14 +20738,14 @@ _PUBLIC FTYPE pups_cpu_utilisation(void)
      {   pups_set_errno(EINVAL);
          return(-1.0);
      }
-     else
-     {
-        /*-----------------------------*/
-        /* Get occupied CPU percentage */
-        /*-----------------------------*/
 
+
+     /*-----------------------------*/
+     /* Get occupied CPU percentage */
+     /*-----------------------------*/
+
+     else
         utilisation = 100.0 - utilisation;
-     }
 
      pups_set_errno(OK);
      return(utilisation);    
@@ -21235,11 +20754,11 @@ _PUBLIC FTYPE pups_cpu_utilisation(void)
 
 
 
-/*-------------------------------------------------------------------------------------
-    Get prefix from string ...
--------------------------------------------------------------------------------------*/
+/*------------*/
+/* Get prefix */
+/*------------*/
 
-_PUBLIC int pups_prefix(const char dm_ch, const char *s, char *strPrefix)
+_PUBLIC int32_t pups_prefix(const char dm_ch, const char *s, char *strPrefix)
 
 {   size_t i,
            size;
@@ -21267,11 +20786,11 @@ _PUBLIC int pups_prefix(const char dm_ch, const char *s, char *strPrefix)
 
 
 
-/*-------------------------------------------------------------------------------------
- Get suffix from string ...
--------------------------------------------------------------------------------------*/
+/*------------*/
+/* Get suffix */
+/*------------*/
 
-_PUBLIC int pups_suffix(const char dm_ch, const char *s, char *strSuffix)
+_PUBLIC int32_t pups_suffix(const char dm_ch, const char *s, char *strSuffix)
 
 {   size_t i,
            size;
@@ -21298,14 +20817,14 @@ _PUBLIC int pups_suffix(const char dm_ch, const char *s, char *strSuffix)
 
 
 
-/*-------------------------------------------------------------------------------------
-    Get file size ...
--------------------------------------------------------------------------------------*/
+/*---------------*/
+/* Get file size */
+/*---------------*/
 
-_PUBLIC unsigned long int pups_get_fsize(const char *file_name)
+_PUBLIC ssize_t pups_get_fsize(const char *file_name)
 
-{   unsigned long int size;
-    struct stat       buf;
+{   ssize_t     size;
+    struct stat buf;
 
     if(file_name == (const char *)NULL || access(file_name,F_OK | R_OK) == (-1))
     {  pups_set_errno(EINVAL);
@@ -21313,7 +20832,7 @@ _PUBLIC unsigned long int pups_get_fsize(const char *file_name)
     }
 
     (void)stat(file_name,&buf);
-    size = (unsigned long int)buf.st_size;
+    size = (ssize_t)buf.st_size;
 
     pups_set_errno(OK);
     return(size);
@@ -21328,13 +20847,11 @@ _PUBLIC unsigned long int pups_get_fsize(const char *file_name)
 /* if we need to know exactly what is   */
 /* attached to a descriptor             */
 /*--------------------------------------*/
+/*-----------------------------------*/
+/* Descriptor associated with a pipe */
+/*-----------------------------------*/
 
-
-/*----------------------------------------------*/
-/* Is the descriptor attached to a pipe (FIFO)? */
-/*----------------------------------------------*/
-
-_PUBLIC int isapipe(const int fdes)
+_PUBLIC int32_t isapipe(const des_t fdes)
 
 {   struct stat buf;
 
@@ -21351,11 +20868,11 @@ _PUBLIC int isapipe(const int fdes)
 
 
 
-/*----------------------------------------------*/
-/* Is the descriptor attached to a file (REGF)? */
-/*----------------------------------------------*/
+/*-----------------------------------*/
+/* Descriptor associated with a file */
+/*-----------------------------------*/
 
-_PUBLIC int isafile(const int fdes)
+_PUBLIC int32_t isafile(const des_t fdes)
 
 {   struct stat buf;
 
@@ -21372,11 +20889,11 @@ _PUBLIC int isafile(const int fdes)
 
 
 
-/*------------------------------------------------*/
-/* Is the descriptor attached to a socket (SOCK)? */
-/*------------------------------------------------*/
+/*-------------------------------------*/
+/* Descriptor associated with a socket */
+/*-------------------------------------*/
 
-_PUBLIC int isasock(const int fdes)
+_PUBLIC int32_t isasock(const des_t fdes)
 
 {   struct stat buf;
 
@@ -21392,12 +20909,11 @@ _PUBLIC int isasock(const int fdes)
 
 
 
-/*----------------------------------------------*/
-/* Is the descriptor attached to a data source  */
-/* or sink?                                     */
-/*----------------------------------------------*/
+/*---------------------------------------------------------------------------*/
+/* Is the descriptor associated with a data conduit ((pipe, file or socket)) */
+/*---------------------------------------------------------------------------*/
 
-_PUBLIC int isaconduit(const int fdes)
+_PUBLIC int32_t isaconduit(const des_t fdes)
 
 {   if(isafile(fdes) == 1)
        return(1);
@@ -21417,15 +20933,28 @@ _PUBLIC int isaconduit(const int fdes)
 /* Get system information for current host */
 /*-----------------------------------------*/
 
-_PUBLIC int pups_sysinfo(char *hostname,         // Name of host
-                         char *ostype,           // OS running on host
-                         char *osversion,        // Version of OS running on host
-                         char *machtype)         // Host (CPU) hardware
+_PUBLIC int32_t pups_sysinfo(char *hostname,         // Name of host
+                             char *ostype,           // OS running on host
+                             char *osversion,        // Version of OS running on host
+                             char *machtype)         // Host (CPU) hardware
 
-{   FILE *pdes = (FILE *)NULL;
+{   FILE     *pstream = (FILE *)NULL;
 
-    char strdum[SSIZE]   = "",
-         line[SSIZE]     = "";
+    char     strdum[SSIZE]   = "",
+             line[SSIZE]     = "";
+
+    sigset_t set,
+             old_set;
+
+
+    /*---------------*/
+    /* Block signals */
+    /*---------------*/
+
+    (void)sigfillset(&set);
+    (void)sigdelset(&set,SIGINT);
+    (void)sigdelset(&set,SIGTERM);
+    (void)sigprocmask(SIG_BLOCK,&set,&old_set);
 
 
     /*---------*/
@@ -21433,13 +20962,14 @@ _PUBLIC int pups_sysinfo(char *hostname,         // Name of host
     /*---------*/
 
     if(machtype != (char *)NULL)
-    {  if((pdes = popen("uname --machine","r")) == (FILE *)NULL)
-       {  pups_set_errno(ENOEXEC);
+    {  if((pstream = popen("uname --machine","r")) == (FILE *)NULL)
+       {  (void)sigprocmask(SIG_SETMASK,&old_set,(sigset_t *)NULL);
+          pups_set_errno(ENOEXEC);
           return(-1);
        }
 
-       (void)fgets(line,SSIZE,pdes);
-       (void)pclose(pdes);
+       (void)fgets(line,SSIZE,pstream);
+       (void)pclose(pstream);
        (void)sscanf(line,"%s",machtype);
     }
 
@@ -21449,13 +20979,14 @@ _PUBLIC int pups_sysinfo(char *hostname,         // Name of host
     /*------------------*/
 
     if(ostype != (char *)NULL)
-    {  if((pdes = popen("uname --operating-system","r")) == (FILE *)NULL)
-       {  pups_set_errno(ENOEXEC);
+    {  if((pstream = popen("uname --operating-system","r")) == (FILE *)NULL)
+       {  (void)sigprocmask(SIG_SETMASK,&old_set,(sigset_t *)NULL);
+          pups_set_errno(ENOEXEC);
           return(-1);
        }
 
-       (void)fgets(line,SSIZE,pdes);
-       (void)pclose(pdes);
+       (void)fgets(line,SSIZE,pstream);
+       (void)pclose(pstream);
        (void)sscanf(line,"%s",ostype);
     }
 
@@ -21465,13 +20996,14 @@ _PUBLIC int pups_sysinfo(char *hostname,         // Name of host
     /*--------------------------*/
 
     if(osversion != (char *)NULL)
-    {  if((pdes = popen("uname --kernel-release","r")) == (FILE *)NULL)
-       {  pups_set_errno(ENOEXEC);
+    {  if((pstream = popen("uname --kernel-release","r")) == (FILE *)NULL)
+       {  (void)sigprocmask(SIG_SETMASK,&old_set,(sigset_t *)NULL);
+          pups_set_errno(ENOEXEC);
           return(-1);
        }
 
-       (void)fgets(line,SSIZE,pdes);
-       (void)pclose(pdes);
+       (void)fgets(line,SSIZE,pstream);
+       (void)pclose(pstream);
        (void)sscanf(line,"%s",osversion);
     }
 
@@ -21481,16 +21013,23 @@ _PUBLIC int pups_sysinfo(char *hostname,         // Name of host
     /*----------*/
 
     if(hostname != (char *)NULL)
-    {  if((pdes = popen("uname --nodename","r")) == (FILE *)NULL)
-       {  pups_set_errno(ENOEXEC);
+    {  if((pstream = popen("uname --nodename","r")) == (FILE *)NULL)
+       {  (void)sigprocmask(SIG_SETMASK,&old_set,(sigset_t *)NULL);
+          pups_set_errno(ENOEXEC);
           return(-1);
        }
 
-       (void)fgets(line,SSIZE,pdes);
-       (void)pclose(pdes);
+       (void)fgets(line,SSIZE,pstream);
+       (void)pclose(pstream);
        (void)sscanf(line,"%s",hostname);
     }
 
+
+    /*-----------------*/
+    /* Restore signals */
+    /*-----------------*/
+
+    (void)sigprocmask(SIG_SETMASK,&old_set,(sigset_t *)NULL);
     pups_set_errno(OK);
     return(0);
 } 
@@ -21505,10 +21044,23 @@ _PUBLIC int pups_sysinfo(char *hostname,         // Name of host
 
 _PUBLIC _BOOLEAN pups_os_is_virtual(char *vmType)
 
-{   char line[SSIZE] = "";
-    FILE *pstream    = (FILE *)NULL;
+{   char     line[SSIZE] = "";
+    FILE     *pstream    = (FILE *)NULL;
+
+    sigset_t set,
+             old_set;
 
     pups_set_errno(OK);
+
+
+    /*---------------*/
+    /* Block signals */
+    /*---------------*/
+
+    (void)sigfillset (&set);
+    (void)sigdelset  (&set,SIGINT);
+    (void)sigdelset  (&set,SIGTERM);
+    (void)sigprocmask(SIG_BLOCK,&set,&old_set);
 
 
     /*----------------------------------*/
@@ -21519,15 +21071,23 @@ _PUBLIC _BOOLEAN pups_os_is_virtual(char *vmType)
     /* ALL ALL=NOPASSWD: /sbin/virt-what            */
     /*----------------------------------------------*/
 
+    
     if((pstream = popen("sudo virt-what | head -1","r")) == (FILE *)NULL || vmType == (char *)NULL)
-    {  pups_set_errno(EINVAL);
+    {  (void)sigprocmask(SIG_SETMASK,&old_set,(sigset_t *)NULL);
+       pups_set_errno(EINVAL);
        return(-1);
     }
 
     (void)fgets(line,SSIZE,pstream);
     (void)sscanf(line,"%s",vmType);
-
     (void)fclose(pstream); 
+
+
+    /*-----------------*/
+    /* Restore signals */
+    /*-----------------*/
+
+    (void)sigprocmask(SIG_SETMASK,&old_set,(sigset_t *)NULL);
 
 
     /*-------------------------------*/
@@ -21549,14 +21109,14 @@ _PUBLIC _BOOLEAN pups_os_is_virtual(char *vmType)
 
 
 
-/*---------------------------------------*/
-/* Detect whether hardware is big endian */
-/*---------------------------------------*/
+/*-----------------------------*/
+/* Is architecture big endian? */
+/*-----------------------------*/
 
 _PUBLIC _BOOLEAN pups_bigendian(void) 
 {
-    unsigned int x  = 0x76543210;
-    char         *c = (char*) &x;
+    uint32_t x  = 0x76543210;
+    char     *c = (char*) &x;
  
   if(*c == 0x10)
      return(FALSE);
@@ -21572,9 +21132,9 @@ _PUBLIC _BOOLEAN pups_bigendian(void)
 /* Enable (Criu) state saving */
 /*----------------------------*/
 
-_PUBLIC int pups_ssave_enable(void)
+_PUBLIC int32_t pups_ssave_enable(void)
 {
-    int  t_index;
+     int32_t t_index;
 
 
     /*----------------------------------*/
@@ -21647,7 +21207,7 @@ _PUBLIC int pups_ssave_enable(void)
 /* Disable (Criu) state saving */
 /*-----------------------------*/
 
-_PUBLIC int pups_ssave_disable(void)
+_PUBLIC int32_t pups_ssave_disable(void)
 
 {   char rm_cmd[SSIZE]    = "";
 
@@ -21676,7 +21236,7 @@ _PUBLIC int pups_ssave_disable(void)
     (void)snprintf(rm_cmd,SSIZE,"rm -rf %s",appl_criu_ssave_dir);
     (void)system(rm_cmd);
 
-    appl_criu)ssave  = FALSE;
+    appl_criu_ssave  = FALSE;
     appl_criu_ssaves = 0;
 
     if(appl_verbose == TRUE)
@@ -21696,12 +21256,12 @@ _PUBLIC int pups_ssave_disable(void)
 /* Perioidically save state (via Criu) */
 /*-------------------------------------*/
 
-_PRIVATE int ssave_homeostat(void *t_info, char *args)
+_PRIVATE  int32_t ssave_homeostat(void *t_info, char *args)
 
 {   _IMMORTAL _BOOLEAN entered = FALSE;
 
-    _IMMORTAL time_t base_time,
-                     elapsed_time;
+    _IMMORTAL time_t   base_time,
+                       elapsed_time;
 
 
     struct timespec delay;
@@ -21749,8 +21309,6 @@ _PRIVATE int ssave_homeostat(void *t_info, char *args)
        /* is not included in the process tree */
        /* of the caller                       */
        /*-------------------------------------*/
-
-
        /*--------------------------------*/
        /* Kill server after saving state */
        /*--------------------------------*/
@@ -21812,16 +21370,16 @@ _PRIVATE int ssave_homeostat(void *t_info, char *args)
 /* Copy a file */
 /*-------------*/
 
-_PUBLIC int pups_copy_file(const int copy_op, const char *from, const char *to)
+_PUBLIC int32_t pups_copy_file(const int32_t copy_op, const char *from, const char *to)
 
-{   unsigned long int file_size,
-                      bytes_read,
-                      total_read = 0L;
+{   uint64_t file_size,
+             bytes_read,
+             total_read         = 0L;
 
-    _BYTE buf[COPY_BUF_SIZE] = "";
+    _BYTE    buf[COPY_BUF_SIZE] = "";
 
-    int to_des   = (-1),
-        from_des = (-1);
+     int32_t to_des             = (-1),
+             from_des           = (-1);
 
     struct stat stat_buf;
 
@@ -21896,8 +21454,8 @@ _PUBLIC int pups_copy_file(const int copy_op, const char *from, const char *to)
             total_read += bytes_read;
        } while(total_read < file_size);
 
-    (void)close(from);
-    (void)close(to);
+    (void)close(from_des);
+    (void)close(to_des);
 
 
     /*---------------------------*/
@@ -22042,7 +21600,7 @@ _PUBLIC void pups_enable_resident(void)
 /* Get size of directory in bytes */
 /*--------------------------------*/
 
-_PUBLIC off_t pups_dsize(const char *directory_name)
+_PUBLIC size_t pups_dsize(const char *directory_name)
 {
     off_t directory_size = 0;
     DIR   *pDir          = (DIR *)NULL;
@@ -22060,7 +21618,9 @@ _PUBLIC off_t pups_dsize(const char *directory_name)
             char   buffer[PATH_MAX + 1] = "";
             struct stat file_stat;
 
-            (void)strcat(strcat(strcpy(buffer, directory_name), "/"), pDirent->d_name);
+            (void)strlcpy(buffer, directory_name,SSIZE);
+            (void)strlcat(buffer, "/", SSIZE);
+            (void)strlcat(buffer,pDirent->d_name, SSIZE);
 
             if (stat(buffer, &file_stat) == 0)
                 directory_size += file_stat.st_blocks * S_BLKSIZE;
@@ -22101,7 +21661,7 @@ _PUBLIC off_t pups_dsize(const char *directory_name)
 /* Software watchdog status */
 /*--------------------------*/
 
-_PUBLIC int pups_show_softdogstatus(const FILE *stream)
+_PUBLIC int32_t pups_show_softdogstatus(const FILE *stream)
 
 {
 
@@ -22134,7 +21694,7 @@ _PUBLIC int pups_show_softdogstatus(const FILE *stream)
 /* Perioidically kick software watchdog */
 /*--------------------------------------*/
 
-_PRIVATE int softdog_homeostat(void *t_info, char *args)
+_PRIVATE int32_t softdog_homeostat(void *t_info, const char *args)
 
 {
 
@@ -22168,23 +21728,26 @@ _PRIVATE int softdog_homeostat(void *t_info, char *args)
 /* Start software watchdog */
 /*-------------------------*/
 
-_PUBLIC int pups_start_softdog(const unsigned int timeout)
+_PUBLIC int32_t pups_start_softdog(const uint32_t timeout)
 
-{    int           t_index            = (-1);
+{    int32_t t_index  = (-1);
 
 
      /*-------*/
      /* Child */
      /*-------*/
-     /*---------------------------------*/
-     /* Cancel timers so child does not */
-     /* get signalled                   */
-     /*---------------------------------*/
 
-     (void)pups_malarm(0);
      if ((appl_softdog_pid = pups_fork(FALSE,FALSE)) == 0)
-     {  unsigned char applpidstr[SSIZE]  = "",
+     {  char applpidstr[SSIZE]  = "",
                       timeoutstr[SSIZE]  = "";
+
+
+        /*---------------------------------*/
+        /* Cancel timers so child does not */
+        /* get signalled                   */
+        /*---------------------------------*/
+
+        (void)pups_malarm(0);
 
 
 	/*---------------------------------*/
@@ -22241,9 +21804,9 @@ _PUBLIC int pups_start_softdog(const unsigned int timeout)
 /* Stop software watchdog */
 /*------------------------*/
 
-_PUBLIC int pups_stop_softdog(void)
+_PUBLIC int32_t pups_stop_softdog(void)
 
-{   int ret = (-1);
+{   int32_t ret = (-1);
 
 
     /*-----------------------------*/
@@ -22270,5 +21833,57 @@ _PUBLIC int pups_stop_softdog(void)
    
     pups_set_errno(OK);
     return(0);
+}
+
+
+
+
+/*--------------------------------------*/
+/* Non-blocking poll of file descriptor */
+/*--------------------------------------*/
+
+_PUBLIC _BOOLEAN pups_fd_has_data(const des_t fildes)
+
+{  int32_t ret;
+   struct  pollfd fd;
+
+
+   fd.fd = fildes;
+
+                        /*-----------------------*/
+   fd.events = POLLIN;  /* Poll for data to read */
+                        /*-----------------------*/
+
+   fd.revents = 0;
+   ret = poll(&fd, 1, 0);
+
+
+   /*----------------*/
+   /* Data available */
+   /*----------------*/
+
+   if(ret > 0 && (fd.revents & POLLIN != 0))
+   {  pups_set_errno(OK);
+      return(TRUE);
+   }
+
+
+   /*--------------------------------------*/
+   /* Bad descriptor state                 */
+   /* read from wrtie only descriptor etc. */
+   /*--------------------------------------*/
+
+   if(ret == (-1))
+      pups_set_errno(EBADFD);
+
+
+   /*-------------------*/
+   /* No data available */
+   /*-------------------*/
+
+   else
+      pups_set_errno(OK);
+
+   return(FALSE);
 }
 

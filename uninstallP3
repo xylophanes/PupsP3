@@ -4,7 +4,7 @@
 #  Uninstall PUPS/P3 and support components
 #  $1 logfile
 #
-#  (C) M.A. O'Neill. Tumbling Dice 2000-2022
+#  (C) M.A. O'Neill. Tumbling Dice 2000-2024
 #-------------------------------------------
 
 pushd pupscore.src		>& /dev/null

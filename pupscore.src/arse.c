@@ -1,4 +1,4 @@
-/*-----------------------------------------------------------------------------------------------------
+/*-------------------------------------------------------------------------------------
      Purpose: creates an anus (arse hole) to which data from payload pipeline is cat'ed
 
      Author:  M.A. O'Neill
@@ -8,10 +8,10 @@
               NE3 4RT
               United Kingdom
 
-     Version: 2.02 
-     Dated:   24th May 2023 
+     Version: 2.03 
+     Dated:   10th Decemeber 2024 
      e-mail:  mao@tumblingdice.co.uk
------------------------------------------------------------------------------------------------------*/
+-------------------------------------------------------------------------------------*/
 
 #include <stdio.h>
 #include <string.h>
@@ -25,11 +25,9 @@
 #include <xtypes.h>
 
 
-
-
-/*------------------------------------------------------------------------------------------------------
-    Defines which are local to this application ...
-------------------------------------------------------------------------------------------------------*/
+/*---------------------------------------------*/
+/* Defines which are local to this application */
+/*---------------------------------------------*/
 /*-----------------*/
 /* Version of arse */
 /*-----------------*/
@@ -55,16 +53,16 @@
 
 
 
-/*------------------------------------------------------------------------------------------------------
-    Variables which are private to this application ...
-------------------------------------------------------------------------------------------------------*/
+/*-------------------------------------------------*/
+/* Variables which are private to this application */
+/*-------------------------------------------------*/
 
 _PRIVATE char hostname[SSIZE]       = "";
 _PRIVATE char pen[SSIZE]            = "";
 _PRIVATE char arse_fifo_name[SSIZE] = "";
-_PRIVATE int  delete_on_exit        = FALSE;
-_PRIVATE int  verbose               = FALSE;
-_PRIVATE int  outdes                = (-1);
+_PRIVATE  int32_t  delete_on_exit   = FALSE;
+_PRIVATE  int32_t  verbose          = FALSE;
+_PRIVATE  int32_t  outdes           = (-1);
 
 
 
@@ -73,7 +71,7 @@ _PRIVATE int  outdes                = (-1);
 /* Handle SIGTERM and SIGINT */
 /*---------------------------*/
 
-_PRIVATE int arse_exit(int signum)
+_PRIVATE int32_t arse_exit(int32_t signum)
 
 {   if(delete_on_exit == TRUE)
     {  (void)unlink(arse_fifo_name);
@@ -101,9 +99,9 @@ _PRIVATE int arse_exit(int signum)
 /* FIFO homeostat */
 /*----------------*/
 
-_PRIVATE int arse_fifo_homeostat(int signum)
+_PRIVATE int32_t arse_fifo_homeostat(int32_t signum)
 
-{   int           bytes_read = (-1);
+{    int32_t      bytes_read = (-1);
     unsigned char buf[SSIZE] = "";
 
     if(access(arse_fifo_name,F_OK | R_OK) == (-1))
@@ -159,17 +157,17 @@ _PRIVATE int arse_fifo_homeostat(int signum)
 
 
 
-/*------------------------------------------------------------------------------------------------------
-    Main entry point for application ...
-------------------------------------------------------------------------------------------------------*/
+/*-----------------------------------*/
+/* Main entry point for application  */
+/*-----------------------------------*/
 
-_PUBLIC int main(int argc, char *argv[])
+_PUBLIC int32_t main(int32_t argc, char *argv[])
 
-{   int  i,
-         bytes_read,
-         decoded       = 0,
-         do_sidebottom = FALSE,
-         end_of_data   = TRUE;
+{   uint32_t      i,
+                  bytes_read,
+                  decoded       = 0,
+                  do_sidebottom = FALSE,
+                  end_of_data   = TRUE;
 
     char          newstr[SSIZE] = "";
     unsigned char buf[SSIZE]    = "";
@@ -179,7 +177,7 @@ _PUBLIC int main(int argc, char *argv[])
     /* Get process execution name */
     /*----------------------------*/
 
-    (void)strncpy(pen,argv[0],SSIZE);
+    (void)strlcpy(pen,argv[0],SSIZE);
 
 
     /*----------------------*/
@@ -205,7 +203,7 @@ _PUBLIC int main(int argc, char *argv[])
 
     if(isatty(1) == 1)
     {  if(argc == 1 || strcmp(argv[1],"-usage") == 0 || strcmp(argv[1],"-help") == 0)
-       {  (void)fprintf(stderr,"\narse version %s, (C) Tumbling Dice 2005-2023 (built %s %s)\n\n",ARSE_VERSION,__TIME__,__DATE__);
+       {  (void)fprintf(stderr,"\narse version %s, (C) Tumbling Dice 2005-2024 (gcc %s: built %s %s)\n\n",ARSE_VERSION,__VERSION__,__TIME__,__DATE__);
           (void)fprintf(stderr,"ARSE is free software, covered by the GNU General Public License, and you are\n");
           (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
           (void)fprintf(stderr,"See the GPL and LGPL licences at www.gnu.org for further details\n");
@@ -222,8 +220,8 @@ _PUBLIC int main(int argc, char *argv[])
           verbose = TRUE;
        else if(strcmp(argv[i],"-pen") == 0)
        {  if(fork() == 0)
-          {  int  j,
-                  cnt = 1;
+          {   int32_t  j,
+                       cnt = 1;
 
              char args[32][SSIZE] = { "" },
                   *argptr[32]     = { NULL };

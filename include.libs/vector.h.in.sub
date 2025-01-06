@@ -1,0 +1,287 @@
+/*------------------------------------------------------------------------------
+    Header for vectorVDIM/matrixVDIM linear programming library ...
+
+    Author:  M.A. O'Neill
+             Tumbling Dice Ltd
+             Gosforth
+             Newcastle upon Tyne
+             NE3 4RT
+             United Kingdom
+
+     Version: 2.09 
+     Date:    22nd February 2024
+     E-mail:  mao@tumblingdice.co.uk
+------------------------------------------------------------------------------*/
+
+#ifndef VECTOR3_H
+#define VECTOR3_H
+
+
+/*------------------*/
+/* Keep c2man happy */
+/*------------------*/
+
+#include <c2man.h>
+
+
+/***********/
+/* Version */
+/***********/
+
+#define VEC3_VERSION    "2.09"
+
+
+/*-------------------------------*/
+/* Floating point representation */
+/*-------------------------------*/
+
+#include <ftype.h>
+
+
+/*-------------------------------------------*/
+/* Variables exported by the vectorVDIM library */
+/*-------------------------------------------*/
+
+#ifdef _NOT_LIB_SOURCE__
+
+_EXPORT _CONST int32_t ANNOT;
+_EXPORT _CONST int32_t N_ANNOT;
+
+#else
+#   undef  _EXPORT
+#   define _EXPORT
+#endif /* _NOT_LIB_SOURCE__ */
+
+
+/*-----------------------------------------*/
+/* Return types (for Gaussian elimination) */
+/*-----------------------------------------*/
+
+#define NOT_SINGULAR        0
+#define IS_SINGULAR         1
+#define EXIT_IF_SINGULAR    0
+#define DISCARD_IF_SINGULAR 1
+
+
+/*--------------------------------*/
+/* Definition of the vectorVDIM type */
+/*--------------------------------*/
+
+typedef struct {  FTYPE comp[3];                // Vector components
+               }  vectorVDIM;
+
+
+
+
+/*--------------------------------*/
+/* Definition of the matrixVDIM type */
+/*--------------------------------*/
+
+typedef struct {   FTYPE comp[3][3];            // Matrix components
+               } matrixVDIM;
+
+
+
+
+/*------------------------------------------------------------------------------
+    These are the functions which are associated with the type vectorVDIM ...
+------------------------------------------------------------------------------*/
+
+// Assign a vectorVDIM
+_PROTOTYPE _EXPORT void vVDIMass(vectorVDIM *, const FTYPE, const FTYPE, const FTYPE);
+
+// Write vectorVDIM to stream
+_PROTOTYPE _EXPORT void vVDIMwrite(const char *, const vectorVDIM *, const FILE *);
+
+// Read vectorVDIM from stream
+_PROTOTYPE _EXPORT int32_t vVDIMread(char *, vectorVDIM *, const FILE *);
+
+// Test whether vectorVDIMs parallel
+_PROTOTYPE _EXPORT _BOOLEAN vVDIMpar(const vectorVDIM *, const vectorVDIM *);
+
+// Test if two vectorVDIM's are equal
+_PROTOTYPE _EXPORT _BOOLEAN vVDIMeq(const vectorVDIM *, const vectorVDIM *);
+
+// Compute component sign hetrogeneity of a vectorVDIM
+_PROTOTYPE _EXPORT _BOOLEAN vVDIMhecs(const vectorVDIM *);
+
+// Get vectorVDIM magnitude
+_PROTOTYPE _EXPORT FTYPE vVDIMmag(const vectorVDIM *);
+
+// Vector3 scalar (dot) product of two vectorVDIM's
+_PROTOTYPE _EXPORT FTYPE vVDIMdot(const vectorVDIM *arg1, const vectorVDIM *arg2);
+
+// Get angle between two vectorVDIMs
+_PROTOTYPE _EXPORT FTYPE vVDIMang(const vectorVDIM *, const vectorVDIM*);
+
+// Get scalar distance between a point in 3 space and line
+_PROTOTYPE _EXPORT FTYPE vVDIMdpoints(const vectorVDIM *, const vectorVDIM *, const vectorVDIM *);
+
+// Compute the spatial entropy of a set of vectorVDIM's
+_PROTOTYPE _EXPORT FTYPE vVDIMlvsi(const int32_t, const vectorVDIM *);
+
+// Convert vectorVDIM to matrixVDIM column
+_PROTOTYPE _EXPORT void vVDIMtomatc(const uint32_t, matrixVDIM *, const vectorVDIM *);
+
+// Calculate the additive inverse of a vectorVDIM
+_PROTOTYPE _EXPORT vectorVDIM vVDIMinv(const vectorVDIM *);
+
+// Zero vectorVDIM
+_PROTOTYPE _EXPORT void vVDIMzero(vectorVDIM *);
+
+// Add two vectorVDIMs
+_PROTOTYPE _EXPORT vectorVDIM vVDIMadd(const vectorVDIM *, const vectorVDIM *);
+
+// Subtract vectorVDIM from vectorVDIM
+_PROTOTYPE _EXPORT vectorVDIM vVDIMsub(const vectorVDIM *, const vectorVDIM *);
+
+// Vector3 cross product of two vectorVDIM's
+_PROTOTYPE _EXPORT vectorVDIM vVDIMcross(const vectorVDIM *, const vectorVDIM *);
+
+// Find unit vectorVDIM in direction of argument vectorVDIM
+_PROTOTYPE _EXPORT vectorVDIM vVDIMunit(const vectorVDIM *);
+
+// Express vectorVDIM in given axis system
+_PROTOTYPE _EXPORT  vectorVDIM vVDIMaxtran(const vectorVDIM *,
+                                     const vectorVDIM *,
+                                     const vectorVDIM *,
+                                     const vectorVDIM *);
+
+// Get sign vectorVDIM of argument vectorVDIM 
+_PROTOTYPE _EXPORT vectorVDIM vVDIMsign(const vectorVDIM *);
+
+// Multiply vectorVDIM by scalar
+_PROTOTYPE _EXPORT vectorVDIM vVDIMscalm(const FTYPE, const vectorVDIM *);
+
+// Divide vectorVDIM by scalar
+_PROTOTYPE _EXPORT vectorVDIM vVDIMscald(const FTYPE, const vectorVDIM *);
+
+// Find vectorVDIM perpendicular to plane defined by #1 and #2
+_PROTOTYPE _EXPORT vectorVDIM vVDIMplanp(const vectorVDIM *, const vectorVDIM *);
+
+// Generate unit vectorVDIM pointing in random direction
+_PROTOTYPE _EXPORT vectorVDIM vVDIMurnd(void);
+
+// Generate unit vectorVDIM pointing in random direction of random size
+_PROTOTYPE _EXPORT vectorVDIM vVDIMrnd(const FTYPE);
+
+// Rotate vectorVDIM theta degrees about X axis
+_PROTOTYPE _EXPORT vectorVDIM vVDIMrotx(const vectorVDIM *, const FTYPE);
+
+// Rotate vectorVDIM theta degrees about Y axis
+_PROTOTYPE _EXPORT vectorVDIM vVDIMroty(const vectorVDIM *, const FTYPE);
+
+// Rotate vectorVDIM theta degrees about Z axis
+_PROTOTYPE _EXPORT vectorVDIM vVDIMrotz(const vectorVDIM *, const FTYPE);
+
+// Multiply vectorVDIM by matrixVDIM
+_PROTOTYPE _EXPORT vectorVDIM vVDIMmmult(const matrixVDIM *, const vectorVDIM *);
+
+// Calculate smallest vectorVDIM between line and point
+_PROTOTYPE _EXPORT vectorVDIM vVDIMdpointv(const vectorVDIM *, const vectorVDIM *, const vectorVDIM *);
+
+// Calculate smallest vectorVDIM between two skew lines
+_PROTOTYPE _EXPORT vectorVDIM vVDIMdlinesv(int             *,   // Singular
+                                     vectorVDIM         *,   // Ray-ray divergence vectorVDIM
+                                     const vectorVDIM   *,   // Vector to line 1
+                                     const vectorVDIM   *,   // Vector along line 1
+                                     const vectorVDIM   *,   // Vector to line 2
+                                     const vectorVDIM   *,   // Vector along line 2
+                                     vectorVDIM         *,   // Skew (intercept) vectorVDIM for line 1
+                                     vectorVDIM         *);  // Skew (intercept) vectorVDIM for line 2
+
+// Compute mean nearest approach vectorVDIM of set of skew lines
+_PROTOTYPE _EXPORT vectorVDIM vVDIMmlinesv(int *, int32_t, const vectorVDIM *, const vectorVDIM *, FTYPE *);
+
+// Compute planar distortion to vectorVDIM caused by rotation projection
+_PROTOTYPE _EXPORT vectorVDIM vVDIMdistort(const vectorVDIM *, const FTYPE, const FTYPE);
+
+
+/*-----------------------------*/
+/* Standard 3matrixVDIM functions */
+/*-----------------------------*/
+
+// Assign zero matrixVDIM 
+_PROTOTYPE _EXPORT void mVDIMzero(matrixVDIM *);
+
+// Assign matrixVDIM
+_PROTOTYPE _EXPORT void mVDIMass(matrixVDIM   *,
+                              const FTYPE, 
+                              const FTYPE,
+                              const FTYPE,
+                              const FTYPE,
+                              const FTYPE,
+                              const FTYPE,
+                              const FTYPE,
+                              const FTYPE,
+                              const FTYPE);
+
+// Assign identity matrixVDIM
+_PROTOTYPE _EXPORT void mVDIMident(matrixVDIM *);
+
+// Write matrixVDIM to stream
+_PROTOTYPE _EXPORT void mVDIMwrite(const FILE *, const char *, const matrixVDIM *);
+
+// Test if matrices are equal
+_PROTOTYPE _EXPORT _BOOLEAN mVDIMeq(const matrixVDIM *, const matrixVDIM *);
+
+// Add pair of matrixVDIM's
+_PROTOTYPE _EXPORT matrixVDIM mVDIMadd(const matrixVDIM *, const matrixVDIM *);
+
+// Subtract matrixVDIM from matrixVDIM
+_PROTOTYPE _EXPORT matrixVDIM mVDIMsub(const matrixVDIM *, const matrixVDIM *);
+
+// Multiply a pair of matrixVDIM's
+_PROTOTYPE _EXPORT matrixVDIM mVDIMmult(const matrixVDIM *, const matrixVDIM *);
+
+// Multiply matrixVDIM by scalar
+_PROTOTYPE _EXPORT matrixVDIM mVDIMscalm(const FTYPE, const matrixVDIM *);
+
+// Find the transpose of matrixVDIM */
+_PROTOTYPE _EXPORT matrixVDIM mVDIMtransp(const matrixVDIM *);
+
+// Multiply matrixVDIM by scalar
+_PROTOTYPE _EXPORT matrixVDIM mscalm(FTYPE, matrixVDIM *);
+
+
+/*################################################*/
+/* Euler matrices are only defined for 3D vectors */
+/*################################################*/
+#ifdef THREE_SPACE
+// Generate Euler rotation matrixVDIM
+_PROTOTYPE _EXPORT matrixVDIM mVDIMeuler(FTYPE, vectorVDIM *);
+
+// Form small angle Euler rotation matrixVDIM
+_PROTOTYPE _EXPORT matrixVDIM mVDIMseuler(FTYPE, vectorVDIM *);
+#endif /* THREE_SPACE */
+
+
+// Is matrixVDIM symmetric?
+_PROTOTYPE _EXPORT _BOOLEAN mVDIMsym(const matrixVDIM *arg);
+
+
+/*##########################################################*/
+/* Determinant computation is only defined for 3x3 matrices */
+/*##########################################################*/
+#ifdef THREE_SPACE
+// Computer determinant of matrixVDIM
+_PROTOTYPE _EXPORT FTYPE mVDIMdet(const matrixVDIM *arg);
+#endif /* THREE_SPACE */
+
+
+// Invert a matrixVDIM using LU decomposition
+_PROTOTYPE _EXPORT matrixVDIM mVDIMinv(matrixVDIM *);
+
+// Solve 3x3 simultaneous equations using Gaussian Elimination
+_PROTOTYPE _EXPORT _BOOLEAN mVDIMGE_solve(int *, const matrixVDIM *, const vectorVDIM *, vectorVDIM *);
+
+#ifdef _CPLUSPLUS
+#   undef  _EXPORT
+#   define _EXPORT extern C
+#else
+#   undef _EXPORT
+#   define _EXPORT extern
+#endif
+
+#endif /* VECTOR3_H */
+

@@ -1,16 +1,14 @@
 #!/bin/bash
 #
 #--------------------------------------------------------------------
-# Makefile generator script. M.A. O'Neill, Tumbling Dice, 2000-2022
+# Makefile generator script. M.A. O'Neill, Tumbling Dice, 2000-2024
 #
 # $1 is a configuration string of the form <OS>.<PUPS type>
 #
 # $2 is the name of the input Makefile from which the actual Makefile
 #    is generated
 #
-# if $3 is set to 'default', default all answer to security questions
-#
-# if $4 is set to debug build Makefile which will generate code which
+# if $3 is set to debug build Makefile which will generate code which
 # can be debugged using gdb
 #--------------------------------------------------------------------
 #------------
@@ -40,19 +38,19 @@ trap abort SIGQUIT SIGINT
 # Main script entry point
 #------------------------
 
-if [ $# -lt 2 ] || [ $# -gt 4 ] ||  [ "$1" = "usage" ] || [ "$1" = "help" ]  ||  [ "$3" != "" ] ; then
-	if [ "$3" != default ] && [ "$3" != nodefault ] && [ "$4" != "debug" ] ; then
+if [[ $# < 2 ]] || [[ $# > 3 ]] ||  [ "$1" = "usage" ] || [ "$1" = "help" ] ] ; then
+	if [ "$3" != "debug" ] ; then
 	        echo ""
-	        echo "    PUPSP3 (SUPUPS) Make template configuration tool (C) M.A. O'Neill, Tumbling Dice, 2002-2022"
+	        echo "    PUPSP3 (SUPUPS) Make template configuration tool (C) M.A. O'Neill, Tumbling Dice, 2002-2024"
         	echo ""
-		echo "    Usage: configure <PUPS architecture type> <PUPS Makefile (.in)> [default | nodefault] [debug]"
+		echo "    Usage: configure <PUPS architecture type> <PUPS Makefile (.in)> [debug]"
 		echo ""
 		exit 0
 	fi
 fi
 
 echo ""
-echo "    PUPSP3 (SUPUPS) Make template configuration tool (C) M.A. O'Neill, Tumbling Dice 2000-2022"
+echo "    PUPSP3 (SUPUPS) Make template configuration tool (C) M.A. O'Neill, Tumbling Dice 2000-2024"
 echo ""
 
 if [ ! -e $2 ] ;  then
@@ -141,127 +139,6 @@ if [ -e BUILDLOCK ] ; then
 fi
 tas BUILDLOCK
 
-
-
-#--------------------------------------
-# Are we in secure installation mode?
-#--------------------------------------
-
-ret=$(grep "\#-DSECURE" < $projectDir/$targarch)
-if [ "$4" = skip ] || [ "ret" != "" ] ; then
-        install_mode=insecure
-else
-        install_mode=secure
-fi
-
-method=default
-if [ $install_mode = secure ] ; then
-
-	if [ "$3" = default ] ; then
-		method=sdongle
-	else
-	        echo ""
-		echo "    ------------------------------------------------------------------------------------------"
-		echo "    You have specified secure binaries in your configuration file -- so you will need to"
-		echo "    specify a licencing method (sdongle or dserial) under $OSTYPE."
-		echo "    ------------------------------------------------------------------------------------------"
-		echo ""
-
-		method=$(ask "    Licensing method (sdongle or dserial) [default: sdongle]")
-		if [ $method == "q" ] || [ $method == "quit" ] || [ $method == "bye" ] ; then
-			exit 255 
-		fi
-	fi
-
-        if [ "$method" == dserial ] ; then
-                echo ""
-                echo "Licence method is disk serial"
-
-                default_hd_device=$(df | grep boot | awk '{print $1}' | striplc | sed s/"\/dev\/"//g)
-
-		if [ "$3" = default ] ; then
-			hd_device=$default_hd_device
-                        echo "Hard disk device is" $hd_device "(default)"
-		else
-                	hd_device=$(ask "hd_device [default $default_hd_device]")
-                	if [ $hd_device = "" ] || [ $hd_device = "default" ] ; then
-                        	hd_device=$default_hd_device
-                        	echo "Hard disk device is" $hd_device "(default)"
-                	elif [ "$hd_device" = "quit" ] || [ "$hd_device" = "bye" ] ; then
-				exit 255 
-                	fi
-		fi
-
-		if [ "$3" = default ] ; then
-			export USE_DISK_SERIAL=$dserial
-		else
-                	dserial=$(ask "disk serial [default use build disk serial]")
-                	if [ "$dserial" = "q" ] ||  [ "$dserial" = "quit" ] ||  [ "$dserial" = "bye" ] ; then
-                        	exit 255
-                	fi
-
-                	if [ "$dserial" != "" ] || [ $dserial = "default" ] ; then
-                        	export USE_DISK_SERIAL=$dserial
-			fi
-		fi
-
-		if [ "$3" = default ] ; then
-			seed=9999
-			echo "Encryption seed is" $seed "(default)"
-		else
-                	seed=$(ask "encryption seed [default 9999]")
-                	if [ "$seed" = "" ] ||  [ "$seed" = "default" ] ; then
-                        	seed=9999
-                        	echo "Encryption seed is" $seed "(default)"
-                	elif [ "$seed" = "quit" ] || [ "$seed" == "bye" ] ; then
-                        	exit 255 
-                	fi
-		fi
-
-                sed s/WHICH_DEVICE/$hd_device/g < $includeDir/securicor.h  | sed s/SVAL/$seed/g > $includeDir/sed_securicor.h
-
-        elif [ "$method" = "" ] ||  [ "$method" = sdongle]  || [ "$method" == default ] ; then
-                echo ""
-                echo "    Licence method is soft dongle (default)"
-
-                dongle_dir= $HOME/$(whoami)/.sdongles
-                if [ ! -e $dongle_dir ] ; then
-			echo "(Soft) dongle directory $dongle_dir does not exist"
-			exit 255 
-                fi
-
-		if [ "$3"  = default ] ; then
-			dongle_file_name=pups.dongle
-			echo "    Dongle file name is" $dongle_file_name "(default)"
-		else
-			dongle_file_name=$(ask "    dongle file name (default pups.dongle)")
-			if [ "$dongle_file_name" = "" ] ; then
-				dongle_file_name=pups.dongle
-                        	echo "    Dongle file name is" $dongle_file_name "(default)"
-			fi
-		fi
-
-		if(! -e $dongle_dir/$dongle_file_name) then
-			echo "(Soft) dongle file $dongle_dir/$dongle_file_name does not exist"
-			exit -1
-		fi
-
-		if [ "$3" == default ] ; then
-			seed=9999
-			echo "    Encryption seed is" $seed "(default)"
-		else
-                	seed=$(ask "    encryption seed [default 9999]")
-                	if [ "$seed" = "q" ] || [ "$seed"  = "quit" ] || [ "$seed" = "bye" ] ; then
-                        	exit 255 
-                	elif [ "$seed" = "" ] ; then
-                        	seed=9999
-                        	echo "    Encryption seed is" $seed "(default)"
-                	fi
-		fi
-
-                sed s/WHICH_DEVICE/dummy/g < $includeDir/securicor.h | sed s/SVAL/$seed/g > $includeDir/sed_securicor.h
-        fi
-fi
 
 
 #------------------------------------------------

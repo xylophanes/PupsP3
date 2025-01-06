@@ -1,5 +1,5 @@
-/*------------------------------------------------------------------------------
-    Purpose: Portable hash access library.
+/*---------------------------------------
+    Purpose: Portable hash access library
 
     Author:  M.A. O'Neill
              Tumbling Dice Ltd
@@ -9,9 +9,9 @@
              United Kingdom
 
     Version: 3.00 
-    Dated:   4th January 2023
+    Dated:   10th December 2024
     E-Mail:  mao@tumblingdice.co.uk
-------------------------------------------------------------------------------*/
+--------------------------------------*/
 
 #include <me.h>
 #include <utils.h>
@@ -19,11 +19,12 @@
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
+#include <bsd/bsd.h>
 
 
-/*------------------------------------------------------------------------------
-    Do not expand _EXTERN for this library ...
-------------------------------------------------------------------------------*/
+/*----------------------------------------*/
+/* Do not expand _EXTERN for this library */
+/*----------------------------------------*/
 
 #undef   __NOT_LIB_SOURCE__
 #include <hash.h>
@@ -31,22 +32,20 @@
 
 
 
-/*------------------------------------------------------------------------------
-    Slot and usage functions - used by slot manager ...
-------------------------------------------------------------------------------*/
-
-
+/*-------------------------------------------------*/
+/* Slot and usage functions - used by slot manager */
+/*-------------------------------------------------*/
 /*---------------------*/
 /* Slot usage function */
 /*---------------------*/
 
-_PRIVATE void hashlib_slot(int level)
+_PRIVATE void hashlib_slot(int32_t level)
 {   (void)fprintf(stderr,"lib hashlib %s: [ANSI C]\n",HASH_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 1995-2023 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 1995-2024 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
-       (void)fprintf(stderr,"PUPS/P3 hash storage library (built %s %s)\n\n",__TIME__,__DATE__);
+       (void)fprintf(stderr,"PUPS/P3 hash storage library (gcc %s: built %s %s)\n\n",__VERSION__,__TIME__,__DATE__);
     }
     else
        (void)fprintf(stderr,"\n");
@@ -78,27 +77,25 @@ pthread_mutex_t hash_table_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
 
 
 
-/*------------------------------------------------------------------------------
-    Prototypes of functions private to this library ...
-------------------------------------------------------------------------------*/
-
-
+/*-------------------------------------------------*/
+/* Prototypes of functions private to this library */
+/*-------------------------------------------------*/
 /*---------------------------------*/
 /* Routine to generate hashing key */
 /*---------------------------------*/
 
-_PROTOTYPE _PRIVATE int hash_key(int, hash_table_type *);
+_PROTOTYPE _PRIVATE int32_t hash_key(int32_t, hash_table_type *);
 
 
 
 
-/*------------------------------------------------------------------------------
-    Generate hash key ...
-------------------------------------------------------------------------------*/
+/*-------------------*/
+/* Generate hash key */
+/*-------------------*/
 
-_PRIVATE int hash_key(int h_index, hash_table_type *hash_table)
+_PRIVATE  int32_t hash_key(int32_t h_index, hash_table_type *hash_table)
 
-{   int w;
+{    int32_t w;
 
 
     /*-------------------------------------------------------------*/
@@ -120,14 +117,15 @@ _PRIVATE int hash_key(int h_index, hash_table_type *hash_table)
 
 
  
-/*------------------------------------------------------------------------------
-    Create a hash table object ...
-------------------------------------------------------------------------------*/
+/*----------------------------*/
+/* Create a hash table object */
+/*----------------------------*/
 
-_PUBLIC hash_table_type *hash_table_create(int size, char *name)
+_PUBLIC hash_table_type *hash_table_create(const uint32_t    size, const char *name)
 
-{   int i;
+{   uint32_t        i;
     hash_table_type *hash_table = (hash_table_type *)NULL;
+
 
     /*----------------------------------*/
     /* Only the root thread can process */
@@ -171,7 +169,6 @@ _PUBLIC hash_table_type *hash_table_create(int size, char *name)
     (void)pthread_mutex_unlock(&hash_table_mutex);
     #endif /* PTHREAD_SUPPORT */
 
-
     pups_set_errno(OK);
     return(hash_table);
 }
@@ -179,13 +176,14 @@ _PUBLIC hash_table_type *hash_table_create(int size, char *name)
 
 
 
-/*------------------------------------------------------------------------------
-    Destroy a hash table object ...
-------------------------------------------------------------------------------*/
+/*-----------------------------*/
+/* Destroy a hash table object */
+/*-----------------------------*/
 
 _PUBLIC hash_table_type *hash_table_destroy(hash_table_type *hash_table)
 
-{   int i;
+{   uint32_t i;
+
 
     /*----------------------------------*/
     /* Only the root thread can process */
@@ -227,14 +225,14 @@ _PUBLIC hash_table_type *hash_table_destroy(hash_table_type *hash_table)
 
 
 
-/*------------------------------------------------------------------------------
-    Return object at a given location ...
-------------------------------------------------------------------------------*/
+/*-----------------------------------*/
+/* Return object at a given location */
+/*-----------------------------------*/
 
-_PUBLIC int hash_get_object(int h_index, void *object, char *object_type, hash_table_type *hash_table)
+_PUBLIC int32_t hash_get_object(const uint32_t h_index, void *object, const char *object_type, hash_table_type *hash_table)
 
-{   int i,
-        hash_index;
+{   uint32_t  i;
+    int32_t   hash_index;
 
 
     /*------------------*/
@@ -253,8 +251,9 @@ _PUBLIC int hash_get_object(int h_index, void *object, char *object_type, hash_t
     (void)pthread_mutex_lock(&hash_table_mutex);
     #endif /* PTHREAD_SUPPORT */
 
+
     /*------------------------------------------*/
-    /* Get index into the tables of hashed data */
+    /* Get index  int32_to the tables of hashed data */
     /*------------------------------------------*/
 
     hash_index = hash_key(h_index,hash_table);
@@ -300,15 +299,15 @@ _PUBLIC int hash_get_object(int h_index, void *object, char *object_type, hash_t
 
 
 
-/*------------------------------------------------------------------------------
-    Put object in hash table ...
-------------------------------------------------------------------------------*/
+/*--------------------------*/
+/* Put object in hash table */
+/*--------------------------*/
 
-_PUBLIC int hash_put_object(int h_index, void *object, char *object_type, int object_size, hash_table_type *hash_table)       
+_PUBLIC int32_t hash_put_object(const uint32_t h_index, const void *object, const char *object_type, const size_t object_size, hash_table_type *hash_table)       
 
-{   int i,
-        hash_index,
-        chain_index;
+{   uint32_t i,
+             hash_index,
+             chain_index;
 
 
     /*------------------*/
@@ -327,6 +326,7 @@ _PUBLIC int hash_put_object(int h_index, void *object, char *object_type, int ob
     #ifdef PTHREAD_SUPPORT
     (void)pthread_mutex_lock(&hash_table_mutex);
     #endif /* PTHREAD_SUPPORT */
+
 
     /*------------------------*/
     /* Get hash key for index */
@@ -381,12 +381,11 @@ _PUBLIC int hash_put_object(int h_index, void *object, char *object_type, int ob
            pups_set_errno(OK);
            return(0);
        }
-
     } 
 
 
     /*----------------------------------------------------*/
-    /* Insert object into hash table extending hash chain */
+    /* Insert object  int32_to hash table extending hash chain */
     /* for the insertion location                         */
     /*----------------------------------------------------*/
 
@@ -406,15 +405,15 @@ _PUBLIC int hash_put_object(int h_index, void *object, char *object_type, int ob
        if(hash_table->hashentry[hash_index].object == (void **)NULL)
           pups_error("[hash_put_object] failed to extend hash chain (cannot reallocate memory [extend object array])");
 
-       hash_table->hashentry[hash_index].index = (int *)  pups_realloc((void *)hash_table->hashentry[hash_index].index,
-                                                                   hash_table->hashentry[hash_index].size*sizeof(int));
+       hash_table->hashentry[hash_index].index = (int32_t *)  pups_realloc((void *)hash_table->hashentry[hash_index].index,
+                                                                    hash_table->hashentry[hash_index].size*sizeof(int32_t));
 
-       if(hash_table->hashentry[hash_index].index == (int *)NULL)
+       if(hash_table->hashentry[hash_index].index == (int32_t *)NULL)
           pups_error("[hash_put_object] failed to extend hash chain (cannot allocate memory [extend index array])");
 
-       hash_table->hashentry[hash_index].object_size  = (int *)  pups_realloc((void *)hash_table->hashentry[hash_index].object_size,
-                                                                             hash_table->hashentry[hash_index].size*sizeof(int));
-       if(hash_table->hashentry[hash_index].object_size == (int *)NULL)
+       hash_table->hashentry[hash_index].object_size  = (size_t *)  pups_realloc((void *)hash_table->hashentry[hash_index].object_size,
+                                                                                hash_table->hashentry[hash_index].size*sizeof(int32_t));
+       if(hash_table->hashentry[hash_index].object_size == (size_t *)NULL)
           pups_error("[hash_put_object] failed to extend hash chain (cannot reallocate memory [extend object_size array])");
     }
 
@@ -449,14 +448,14 @@ _PUBLIC int hash_put_object(int h_index, void *object, char *object_type, int ob
 
 
 
-/*------------------------------------------------------------------------------
-    Routine to delete object from hash table ...
-------------------------------------------------------------------------------*/
+/*------------------------------------------*/
+/* Routine to delete object from hash table */
+/*------------------------------------------*/
 
-_PUBLIC int hash_delete_object(int h_index, hash_table_type *hash_table)
+_PUBLIC int32_t hash_delete_object(const uint32_t h_index, hash_table_type *hash_table)
 
-{   int i,
-        hash_index;
+{   uint32_t i,
+             hash_index;
 
 
     /*------------------*/
@@ -473,6 +472,7 @@ _PUBLIC int hash_delete_object(int h_index, hash_table_type *hash_table)
     #ifdef PTHREAD_SUPPORT
     (void)pthread_mutex_lock(&hash_table_mutex);
     #endif /* PTHREAD_SUPPORT */
+
 
     /*------------------------------------------*/ 
     /* Get index into the tables of hashed data */
@@ -508,17 +508,18 @@ _PUBLIC int hash_delete_object(int h_index, hash_table_type *hash_table)
 
 
 
-/*------------------------------------------------------------------------------
-    Return current hash statistics ...
-------------------------------------------------------------------------------*/
+/*----------------------*/
+/* Show hash statistics */
+/*----------------------*/
 
-_PUBLIC int hash_show_stats(FILE *stream, _BOOLEAN full_stats, hash_table_type *hash_table)
+_PUBLIC int32_t hash_show_stats(const FILE *stream, const _BOOLEAN full_stats, hash_table_type *hash_table)
 
-{   int i,
-        j,
-        cnt        = 0,
-        object_cnt = 0,
-        chain_sum  = 0;
+{   uint32_t i,
+             j,
+             cnt        = 0,
+             object_cnt = 0,
+             chain_sum  = 0;
+
 
     /*----------------------------------*/
     /* Only the root thread can process */
@@ -552,7 +553,6 @@ _PUBLIC int hash_show_stats(FILE *stream, _BOOLEAN full_stats, hash_table_type *
                 ++object_cnt;
           }
 
-          
           if(object_cnt > 1)
              (void)fprintf(stream," (%04d objects in chain)\n",object_cnt);
           else

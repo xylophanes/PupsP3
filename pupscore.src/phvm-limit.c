@@ -1,4 +1,4 @@
-/*-------------------------------------------------------------------------------
+/*----------------------------------------------------------------------------
      Functions for memory limit warnings.
      Copyright (C) 1990, 1992 Free Software Foundation, Inc.
 
@@ -21,8 +21,8 @@
      Cambridge, MA 02139, USA.
 
     Shared heap modifications by Mark O'Neill (mao@tuumblingdice.o.uk)
-    (C) 1998-2023 M.A. O'Neill, Tumbling Dice
--------------------------------------------------------------------------------*/
+    (C) 1998-2024 M.A. O'Neill, Tumbling Dice
+----------------------------------------------------------------------------*/
 
 #ifdef emacs
 #include <config.h>
@@ -38,6 +38,7 @@ typedef void *POINTER;
 
 #include <xtypes.h>
 #include "mem-limits.h"
+#include <stdint.h>
 
 
 /*---------------------------------------------------*/
@@ -48,7 +49,7 @@ typedef void *POINTER;
 /* 3 -- 95% warning issued; keep warning frequently. */
 /*---------------------------------------------------*/
 
-_PRIVATE int warnlevel;
+_PRIVATE int32_t warnlevel;
 
 
 /*--------------------------------------*/
@@ -56,7 +57,7 @@ _PRIVATE int warnlevel;
 /* 0 means don't issue them.            */
 /*--------------------------------------*/
 
-_PRIVATE void (*warn_function) ();
+_PRIVATE void (*warn_function) (void);
 
 
 /*----------------------------------------------------------*/
@@ -65,83 +66,83 @@ _PRIVATE void (*warn_function) ();
 
 _PRIVATE void check_memory_limits (void)
 {
-  extern POINTER (*__phmorecore) ();
+    extern POINTER (*__phmorecore) ();
 
-  POINTER  cp;
-  unsigned long five_percent;
-  unsigned long data_size;
+    POINTER  cp;
+    uint64_t five_percent;
+    uint64_t data_size;
 
-  if(lim_data == 0)
-     get_lim_data ();
-  five_percent = lim_data / 20;
+    if(lim_data == 0)
+       get_lim_data ();
+    five_percent = lim_data / 20;
 
 
-  /*------------------------------------------------------------------*/
-  /* Find current end of memory and issue warning if getting near max */
-  /*------------------------------------------------------------------*/
+    /*------------------------------------------------------------------*/
+    /* Find current end of memory and issue warning if getting near max */
+    /*------------------------------------------------------------------*/
 
-  cp        = (char *) (*__phmorecore) (0);
-  data_size = (char *) cp - (char *) data_space_start;
+    cp        = (char *) (*__phmorecore) (0);
+    data_size = (char *) cp - (char *) data_space_start;
 
-  if(warn_function)
-  {  switch (warnlevel)
-     {
-        case 0: 
-                if(data_size > five_percent * 15)
-                {  warnlevel++;
-	           (*warn_function) ("Warning: past 75% of memory limit");
-	        }
-	        break;
+    if(warn_function)
+    {  switch (warnlevel)
+       {
+              case 0: 
+                       if(data_size > five_percent * 15)
+                       {  warnlevel++;
+	                  (*warn_function) ("Warning: past 75% of memory limit");
+	               }
+	               break;
 
-        case 1: 
-                if(data_size > five_percent * 17)
-	        {   warnlevel++;
-	           (*warn_function) ("Warning: past 85% of memory limit");
-	        }
-                break;
+              case 1: 
+                       if(data_size > five_percent * 17)
+	               {   warnlevel++;
+	                   (*warn_function) ("Warning: past 85% of memory limit");
+	               }
+                       break;
 
-        case 2: 
-                if(data_size > five_percent * 19)
-                {   warnlevel++;
-	            (*warn_function) ("Warning: past 95% of memory limit");
-                }
-                break;
+              case 2: 
+                       if(data_size > five_percent * 19)
+                       {   warnlevel++;
+	                   (*warn_function) ("Warning: past 95% of memory limit");
+                       }
+                       break;
 
-        default:
-                (*warn_function) ("Warning: past acceptable memory limits");
-	        break;
+              default:
+                       (*warn_function) ("Warning: past acceptable memory limits");
+	               break;
+        }
     }
-  }
 
 
-  /*----------------------------------------------------------*/
-  /* If we go down below 70% full, issue another 75% warning  */
-  /* when we go up again.                                     */
-  /*----------------------------------------------------------*/
+    /*----------------------------------------------------------*/
+    /* If we go down below 70% full, issue another 75% warning  */
+    /* when we go up again.                                     */
+    /*----------------------------------------------------------*/
 
-  if (data_size < five_percent * 14)
-    warnlevel = 0;
-
-
-  /*----------------------------------------------------------*/
-  /* If we go down below 80% full, issue another 85% warning  */
-  /* when we go up again.                                     */
-  /*----------------------------------------------------------*/
-
-  else if (warnlevel > 1 && data_size < five_percent * 16)
-    warnlevel = 1;
+    if (data_size < five_percent * 14)
+       warnlevel = 0;
 
 
-  /*---------------------------------------------------------*/
-  /* If we go down below 90% full, issue another 95% warning */
-  /* when we go up again.                                    */
-  /*---------------------------------------------------------*/
+    /*----------------------------------------------------------*/
+    /* If we go down below 80% full, issue another 85% warning  */
+    /* when we go up again.                                     */
+    /*----------------------------------------------------------*/
 
-  else if (warnlevel > 2 && data_size < five_percent * 18)
-    warnlevel = 2;
+    else if (warnlevel > 1 && data_size < five_percent * 16)
+       warnlevel = 1;
 
-  if (EXCEEDS_LISP_PTR (cp))
-    (*warn_function) ("Warning: memory in use exceeds lisp pointer size");
+
+    /*---------------------------------------------------------*/
+    /* If we go down below 90% full, issue another 95% warning */
+    /* when we go up again.                                    */
+    /*---------------------------------------------------------*/
+
+    else if (warnlevel > 2 && data_size < five_percent * 18)
+       warnlevel = 2;
+
+    if (EXCEEDS_LISP_PTR (cp))
+       (*warn_function) ("Warning: memory in use exceeds lisp pointer size");
 }
 
 
@@ -153,15 +154,15 @@ _PRIVATE void check_memory_limits (void)
 _PUBLIC void memory_warnings (POINTER start, void (*warnfun)())
 
 
-                                                   /*----------------*/
-{  extern void (* __after_phmorecore_hook) ();     /* From gmalloc.c */
-                                                   /*----------------*/
+                                                    /*----------------*/
+{   extern void (* __after_phmorecore_hook) ();     /* From gmalloc.c */
+                                                    /*----------------*/
 
-   if(start)
-      data_space_start = start;
-   else
-      data_space_start = start_of_data ();
+    if(start)
+       data_space_start = start;
+    else
+       data_space_start = start_of_data ();
 
-   warn_function = warnfun;
-  __after_phmorecore_hook = check_memory_limits;
+    warn_function = warnfun;
+    __after_phmorecore_hook = check_memory_limits;
 }

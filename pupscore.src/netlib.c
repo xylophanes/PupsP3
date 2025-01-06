@@ -1,5 +1,5 @@
-/*------------------------------------------------------------------------------
-    Purpose: Distributed computing support library.
+/*------------------------------------------------
+    Purpose: Distributed computing support library
 
     Author:  M.A. O'Neill
              Tumbling Dice Ltd
@@ -9,9 +9,9 @@
              United Kingdom
 
     Version: 5.00 
-    Dated:   4th January 2023
+    Dated:   10th December 2024
     E-Mail:  mao@tumblingdice.co.uk
-------------------------------------------------------------------------------*/
+------------------------------------------------*/
 
 /*-------------------------------------------------------------*/
 /* If we have OpenMP support then we also have pthread support */
@@ -26,6 +26,7 @@
 #include <me.h>
 #include <utils.h>
 #include <psrp.h>
+#include <tad.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -44,6 +45,7 @@
 #include <sys/ioctl.h>
 #include <sched.h>
 #include <dirent.h>
+#include <bsd/bsd.h>
 
 #ifndef _XOPEN_SOURCE
 #define _XOPEN_SOURCE 
@@ -52,6 +54,9 @@
 #include <unistd.h>
 
 
+/*--------------------------------------*/
+/* Do not make library variables extern */
+/*--------------------------------------*/
 
 #undef   __NOT_LIB_SOURCE__
 #include <netlib.h>
@@ -61,19 +66,17 @@
 /*-------------------------------------------------*/
 /* Slot and usage functions - used by slot manager */
 /*-------------------------------------------------*/
-
-
 /*---------------------*/
 /* Slot usage function */
 /*---------------------*/
 
-_PRIVATE void netlib_slot(int level)
+_PRIVATE void netlib_slot(int32_t level)
 {   (void)fprintf(stderr,"lib netlib %s: [ANSI C]\n",NETLIB_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 1995-2023 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 1995-2024 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
-       (void)fprintf(stderr,"PUPS/P3 network support library (built %s %s)\n\n",__TIME__,__DATE__);
+       (void)fprintf(stderr,"PUPS/P3 network support library (gcc %s: built %s %s)\n\n",__VERSION__,__TIME__,__DATE__);
     }
     else
        (void)fprintf(stderr,"\n");
@@ -96,30 +99,29 @@ _EXTERN void (* SLOT )() __attribute__ ((aligned(16))) = netlib_slot;
 /*-------------------------------------------*/
 /* Public variables exported by this library */
 /*-------------------------------------------*/
-                                  /*---------------------*/
-_PUBLIC int rkill_pid = (-1);     /* Xkill child process */
-                                  /*---------------------*/
+                                   /*---------------------*/
+_PUBLIC int32_t rkill_pid = (-1);  /* Xkill child process */
+                                   /*---------------------*/
 
 
 
-/*------------------------------------------------------------------------------
-    Public variables exported by the extended system command processer ...
-------------------------------------------------------------------------------*/
+/*-----------------------------------*/
+/* Extended system command processer */
+/*-----------------------------------*/
 
-_PUBLIC int pups_system(const char        *command_str,  // Command string
-                        const char         *exec_shell,  // Shell used for execing
-                        const unsigned int exec_flags,   // Exec control flags
-                        int                *child_pid)   // PID of child process
+_PUBLIC int32_t pups_system(const char     *command_str,  // Command string
+                            const char      *exec_shell,  // Shell used for execing
+                            const uint32_t   exec_flags,  // Exec control flags
+                            pid_t            *child_pid)  // PID of child process
 
-{  int status,
-          pid,
-          io_pipe,                           // Input output pipe
-          flag_cnt = 0,
-          tty,                               // Generic control terminal
-          fildes[2];                         // Extra I/O pipe
+{   int32_t status,
+            io_pipe,                                      // Input output pipe
+            flag_cnt = 0;
 
-    int *istat        = (int *)NULL,
-        *qstat        = (int *)NULL;
+    des_t   tty,                                          // Generic control terminal
+            fildes[2];                                    // Extra I/O pipe
+
+    pid_t   pid;
 
     char *shell_flags = (char *)NULL;
     _BOOLEAN obituary = FALSE;
@@ -198,7 +200,7 @@ _PUBLIC int pups_system(const char        *command_str,  // Command string
        /* Child side of fork */
        /*--------------------*/
 
-       int i;
+       uint32_t i;
 
 
        /*-----------------------------------*/
@@ -240,8 +242,6 @@ _PUBLIC int pups_system(const char        *command_str,  // Command string
        /* Make stdin and stdout an implicit channel connecting the child */
        /* process to its parent.                                         */
        /*----------------------------------------------------------------*/
-
-
        /*-------------------------------------------*/
        /* Create an input pipe to the child process */
        /*-------------------------------------------*/
@@ -335,7 +335,7 @@ _PUBLIC int pups_system(const char        *command_str,  // Command string
     /* Return the PID of this child */
     /*------------------------------*/
 
-    if(child_pid != (int *)NULL)
+    if(child_pid != (pid_t *)NULL)
        *child_pid = pid;
 
     if(exec_flags & PUPS_STREAMS_DETACHED)
@@ -367,7 +367,7 @@ _PUBLIC int pups_system(const char        *command_str,  // Command string
     /*------------------------------------*/
 
     if(exec_flags & PUPS_WAIT_FOR_CHILD)
-    {  int ret = 0;
+    {   int32_t ret = 0;
 
 
        /*------------------------------------------------------------------*/
@@ -375,8 +375,8 @@ _PUBLIC int pups_system(const char        *command_str,  // Command string
        /* otherwise carry on while child is executing.                     */
        /*------------------------------------------------------------------*/
 
-       istat =  (int *)(signal(SIGINT, SIG_IGN));
-       qstat =  (int *)(signal(SIGQUIT,SIG_IGN));
+       //istat =  (int *)(signal(SIGINT, SIG_IGN));
+       //qstat =  (int *)(signal(SIGQUIT,SIG_IGN));
 
        while((ret = waitpid(pid,&status,WNOHANG)) != pid)
        {    if(ret == (-1))
@@ -392,8 +392,8 @@ _PUBLIC int pups_system(const char        *command_str,  // Command string
        /* Restore signal status. */
        /*------------------------*/
 
-       (void)signal(SIGINT, (void *)istat);
-       (void)signal(SIGQUIT,(void *)qstat);
+       //(void)signal(SIGINT, (void *)istat);
+       //(void)signal(SIGQUIT,(void *)qstat);
 
 
        /*----------------------------------------*/
@@ -422,17 +422,17 @@ _PUBLIC int pups_system(const char        *command_str,  // Command string
 
 
 
-/*------------------------------------------------------------------------------
-    Open a descriptor to a command pipeline ...
-------------------------------------------------------------------------------*/
+/*-----------------------------------------*/
+/* Open a descriptor to a command pipeline */
+/*-----------------------------------------*/
 
-_PUBLIC int pups_copen(const char *command_pipeline, const char *shell, const unsigned int mode)
+_PUBLIC des_t pups_copen(const char *command_pipeline, const char *shell, const uint32_t mode)
 
-{   int f_index,
-        fildes,
-        fifo_mode;
+{   int32_t f_index,
+            fildes,
+            fifo_mode;
 
-    char *fname = (char *)NULL;
+    char    *fname = (char *)NULL;
 
 
     /*--------------*/
@@ -528,11 +528,11 @@ _PUBLIC int pups_copen(const char *command_pipeline, const char *shell, const un
 
 
 
-/*-------------------------------------------------------------------------------
-    Close pipe descriptor waiting for associated processes to finish ...
--------------------------------------------------------------------------------*/
+/*------------------------------------------------------------------*/
+/* Close pipe descriptor waiting for associated processes to finish */
+/*------------------------------------------------------------------*/
 
-_PUBLIC int pups_cclose(const int pdes)
+_PUBLIC int32_t pups_cclose(const des_t pdes)
 
 {   return(pups_close(pdes));
 }
@@ -540,17 +540,17 @@ _PUBLIC int pups_cclose(const int pdes)
 
 
 
-/*------------------------------------------------------------------------------
-    Open a stream to a command pipeline ...
-------------------------------------------------------------------------------*/
+/*-------------------------------------*/
+/* Open a stream to a command pipeline */
+/*-------------------------------------*/
 
 _PUBLIC FILE *pups_fcopen(const char *command_pipeline, const char *shell, const char *mode)
 
-{   int  i,
-         i_mode,
-         c_des  = (-1);
+{   uint32_t  i;
+    int32_t   i_mode;
+    des_t     c_des    = (-1);
 
-    FILE *f_ptr = (FILE *)NULL;
+    FILE      *f_ptr   = (FILE *)NULL;
 
 
     /*--------------*/
@@ -619,90 +619,13 @@ _PUBLIC FILE *pups_fcopen(const char *command_pipeline, const char *shell, const
 
 
 
+/*-----------------------------------------------------------------------*/
+/* Do not kill pipestream processes explicitly when pipestream is closed */
+/*-----------------------------------------------------------------------*/
 
-#ifdef ZLIB_SUPPORT 
-/*------------------------------------------------------------------------------
-    Open a zstream to a command pipeline ...
-------------------------------------------------------------------------------*/
+_PUBLIC int32_t pups_pipestream_kill_disable(const des_t fdes)
 
-_PUBLIC gzFILE *pups_gzcopen(const char *command_pipeline, const char *shell, const char *mode)
-
-{   int  i,
-         i_mode,
-         c_des = (-1);
-
-    gzFILE *z_ptr = (gzFILE *)NULL;
-
-    if(command_pipeline == (const char *)NULL || mode == (const char *)NULL)
-    {  pups_set_errno(EINVAL);
-       return((gzFILE *)NULL);
-    }
-
-
-    /*----------------------*/
-    /* Set up mode switches */
-    /*----------------------*/
-
-    if(strcmp(mode,"r") == 0)
-       i_mode = 0;
-    else
-    {  if(strcmp(mode,"w") == 0)
-          i_mode = 1;
-       else
-       {  if(strcmp(mode,"w+") == 0   ||
-             strcmp(mode,"r+") == 0)
-             i_mode = 2;
-          else
-          {  pups_set_errno(EINVAL);
-             return((gzFILE *)NULL);
-          }
-       }
-    }
-
-
-    /*-------------------------*/
-    /* Open command descriptor */
-    /*-------------------------*/
-
-    c_des = pups_copen(command_pipeline,shell,i_mode);
-    z_ptr = gzdopen(c_des,mode);
-
-    #ifdef PTHREAD_SUPPORT
-    (void)pthread_mutex_lock(&ftab_mutex);
-    #endif /* PTHREAD_SUPPORT */
-
-    for(i=0; i<appl_max_files; ++i)
-    {  if(ftab[i].fname != (char *)NULL && strcmp(ftab[i].fname,command_pipeline) == 0)
-       {  ftab[i].zstream = z_ptr;
-
-          #ifdef PTHREAD_SUPPORT
-          (void)pthread_mutex_unlock(&ftab_mutex);
-          #endif /* PTHREAD_SUPPORT */
-
-          pups_set_errno(OK);
-          return(z_ptr);
-       }
-    }
-
-    #ifdef PTHREAD_SUPPORT
-    (void)pthread_mutex_unlock(&ftab_mutex);
-    #endif /* PTHREAD_SUPPORT */
-
-    pups_set_errno(ESRCH);
-    return(z_ptr);
-}
-#endif /* ZLIB_SUPPORT */
-
-
-
-
-/*-------------------------------------------------------------------------------
-    Do not kill pipestream processes explicitly when pipestream is closed ...
--------------------------------------------------------------------------------*/
-
-_PUBLIC int pups_pipestream_kill_disable(const int fdes)
-
-{   int f_index;
+{   uint32_t f_index;
 
     if(fdes < 0 || fdes >= appl_max_files)
     {  pups_set_errno(EINVAL);
@@ -715,7 +638,6 @@ _PUBLIC int pups_pipestream_kill_disable(const int fdes)
 
     if((f_index = pups_get_ftab_index(fdes)) == (-1))
     {  
-
        #ifdef PTHREAD_SUPPORT
        (void)pthread_mutex_unlock(&ftab_mutex);
        #endif /* PTHREAD_SUPPORT */
@@ -740,13 +662,13 @@ _PUBLIC int pups_pipestream_kill_disable(const int fdes)
 
 
 
-/*-------------------------------------------------------------------------------
-    Kill pipestream processes explicitly when pipestream is closed ...
--------------------------------------------------------------------------------*/
+/*----------------------------------------------------------------*/
+/* Kill pipestream processes explicitly when pipestream is closed */
+/*----------------------------------------------------------------*/
 
-_PUBLIC int pups_pipestream_kill_enable(const int fdes)
+_PUBLIC int32_t pups_pipestream_kill_enable(const des_t fdes)
 
-{   int f_index;
+{   uint32_t f_index;
     
     if(fdes < 0 || fdes >= appl_max_files)
     {  pups_set_errno(EINVAL);
@@ -759,7 +681,6 @@ _PUBLIC int pups_pipestream_kill_enable(const int fdes)
 
     if((f_index = pups_get_ftab_index(fdes)) == (-1))
     {  
-
        #ifdef PTHREAD_SUPPORT
        (void)pthread_mutex_lock(&ftab_mutex);
        #endif /* PTHREAD_SUPPORT */
@@ -785,9 +706,9 @@ _PUBLIC int pups_pipestream_kill_enable(const int fdes)
 
 
 
-/*-------------------------------------------------------------------------------
-    Close a pipestream waiting for its processes ...
--------------------------------------------------------------------------------*/
+/*------------------------------------------------------*/
+/* Close a pipestream waiting for its processes to exit */
+/*------------------------------------------------------*/
 
 _PUBLIC FILE *pups_fcclose(const FILE *pipe_stream)
 
@@ -796,352 +717,329 @@ _PUBLIC FILE *pups_fcclose(const FILE *pipe_stream)
 
 
 
+/*------------------------------------------------------------------------*/
+/* Extended system command processer with bi-directional data streams and */
+/* error/status stream                                                    */
+/*------------------------------------------------------------------------*/
 
-#ifdef ZLIB_SUPPORT
-/*-------------------------------------------------------------------------------
-    Close a pipezstream waiting for its processes ...
--------------------------------------------------------------------------------*/
+_PUBLIC int32_t pups_system2(const char       *command_str,  // Command string
+                             const char        *exec_shell,  // Shell used for execing
+                             const uint32_t     exec_flags,  // Exec control flags
+                             pid_t              *child_pid,  // PID of child process
+                             des_t                 *in_des,  // Pipe to child process
+                             des_t                *out_des,  // Pipe from child process
+                             des_t                *err_des)  // Child error pipe
 
-_PUBLIC gzFILE *pups_gzcclose(const gzFILE *pipe_zstream)
+{   uint32_t i;
 
-{    return(pups_gzclose(pipe_zstream));
-}
-#endif /* ZLIB_SUPPORT */
+    int32_t status,
+            tty,                                             // Generic control terminal
+            cnt               = 0;
 
+     pid_t pid;                                              // Pid of child process
 
+     des_t in_fildes[2],                                     // Pipe for O/P to child process
+           out_fildes[2],                                    // Pipe for O/P from child process
+           err_fildes[2];                                    // Pipe child error/status msgs
 
+     _BYTE buf[256]       = "";
+     FILE  *output_stream = (FILE *)NULL;                    // Stream for copy environment
 
+     char *shell_flags    = (char *)NULL,                    // Exec shell flags
+                  *cwd    = (char *)NULL;                    // Current working directory
 
-/*------------------------------------------------------------------------------
-    Extended system command processer with bi-directional data streams and
-    error/status stream ...
-------------------------------------------------------------------------------*/
+     _BOOLEAN obituary    = FALSE;
+ 
+     if(command_str == (const char *)NULL)
+     {  pups_set_errno(EINVAL);
+        return(-1);
+     }
+ 
 
-_PUBLIC int pups_system2(const char       *command_str,  // Command string
-                         const char        *exec_shell,  // Shell used for execing
-                         const unsigned int exec_flags,  // Exec control flags
-                         int                *child_pid,  // PID of child process
-                         int                   *in_des,  // Pipe to child process
-                         int                  *out_des,  // Pipe from child process
-                         int                  *err_des)  // Child error pipe
+     /*-------------------------------------------*/
+     /* Assign the I/O pipes to the child process */
+     /*-------------------------------------------*/
 
-{  int i,
-       status,
-       tty,                               // Generic control terminal
-       cnt               = 0,
-       pid,                               // Pid of child process
-       in_fildes[2],                      // Pipe for O/P to child process
-       out_fildes[2],                     // Pipe for O/P from child process
-       err_fildes[2];                     // Pipe child error/status msgs
+     if(in_des != (des_t *)NULL)
+     {  if(pipe(in_fildes)  == (-1))
+        {  pups_set_errno(ESPIPE);
+           return(-1);
+        }
+     }
 
-    _BYTE buf[256]       = "";
-    FILE  *output_stream = (FILE *)NULL;  // Stream for copy environment
+     if(out_des != (des_t *)NULL)
+     {  if(pipe(out_fildes)  == (-1))
+        {  pups_set_errno(ESPIPE);
+           return(-1);
+        }
+     }
 
-    int *istat           = (int *)NULL,
-        *qstat           = (int *)NULL;
-
-    char *shell_flags    = (char *)NULL,  // Exec shell flags
-                 *cwd    = (char *)NULL;  // Current working directory
-
-    _BOOLEAN obituary    = FALSE;
-
-    if(command_str == (const char *)NULL)
-    {  pups_set_errno(EINVAL);
-       return(-1);
-    }
-
-
-    /*-------------------------------------------*/
-    /* Assign the I/O pipes to the child process */
-    /*-------------------------------------------*/
-
-    if(in_des != (int *)NULL)
-    {  if(pipe(in_fildes)  == (-1))
-       {  pups_set_errno(ESPIPE);
-          return(-1);
-       }
-    }
-
-    if(out_des != (int *)NULL)
-    {  if(pipe(out_fildes)  == (-1))
-       {  pups_set_errno(ESPIPE);
-          return(-1);
-       }
-    }
-
-    if(err_des != (int *)NULL)
-    {  if(pipe(err_fildes)  == (-1))
-       {  pups_set_errno(ESPIPE);
-          return(-1);
-       }
-    }
+     if(err_des != (des_t *)NULL)
+     {  if(pipe(err_fildes)  == (-1))
+        {  pups_set_errno(ESPIPE);
+           return(-1);
+        }
+     }
 
 
-    /*---------------------------------------------------------------*/
-    /* Cancel automatic cleanup of child if we intend to wait for it */
-    /*---------------------------------------------------------------*/
+     /*---------------------------------------------------------------*/
+     /* Cancel automatic cleanup of child if we intend to wait for it */
+     /*---------------------------------------------------------------*/
 
-    if(exec_flags & PUPS_NOAUTO_CLEAN || exec_flags & PUPS_WAIT_FOR_CHILD)
-       (void)pups_sighandle(SIGCHLD,"default",SIG_DFL, (sigset_t *)NULL);
+     if(exec_flags & PUPS_NOAUTO_CLEAN || exec_flags & PUPS_WAIT_FOR_CHILD)
+        (void)pups_sighandle(SIGCHLD,"default",SIG_DFL, (sigset_t *)NULL);
 
-    if(exec_flags & PUPS_OBITUARY)
-       obituary = TRUE;
-
-
-    /*--------------------*/
-    /* Child side of fork */
-    /*--------------------*/
-
-    if((pid = pups_fork(TRUE,obituary)) == 0)
-    {  
-
-       /*--------------------*/
-       /* Child side of fork */
-       /*--------------------*/
-
-       int i;
+     if(exec_flags & PUPS_OBITUARY)
+        obituary = TRUE;
 
 
-       /*-----------------------------------*/
-       /* Set effective and real user i.d's */
-       /*-----------------------------------*/
+     /*--------------------*/
+     /* Child side of fork */
+     /*--------------------*/
 
-       (void)setreuid(getuid(),getuid());
+     if((pid = pups_fork(TRUE,obituary)) == 0)
+     {  
 
+        /*--------------------*/
+        /* Child side of fork */
+        /*--------------------*/
 
-       /*-----------------------------------------*/
-       /* Run child in new session if appropriate */
-       /*-----------------------------------------*/
-
-       if(exec_flags & PUPS_NEW_SESSION)
-          (void)setsid();
-
-
-       /*-------------------------*/
-       /* Clear any pending alarm */
-       /*-------------------------*/
-
-       (void)pups_malarm(0);
+        uint32_t i;
 
 
-       /*---------------------------------------*/ 
-       /* Restore all signals to default states */ 
-       /*---------------------------------------*/ 
+        /*-----------------------------------*/
+        /* Set effective and real user i.d's */
+        /*-----------------------------------*/
 
-       for(i=1; i<MAX_SIGS; ++i)
-          (void)pups_sighandle(i,"default",SIG_DFL, (sigset_t *)NULL);
-
-
-       /*----------------------------------------------------------------------*/
-       /* Reassign the descriptors which the user has requested to be detached */
-       /*----------------------------------------------------------------------*/
+        (void)setreuid(getuid(),getuid());
 
 
-       /*---------------------------------*/
-       /* Reassign child input descriptor */
-       /*---------------------------------*/
+        /*-----------------------------------------*/
+        /* Run child in new session if appropriate */
+        /*-----------------------------------------*/
+ 
+        if(exec_flags & PUPS_NEW_SESSION)
+           (void)setsid();
 
-       if(in_des == (int *)NULL)
-       {  if((tty = open("/dev/null",2)) == (-1))
+
+        /*-------------------------*/
+        /* Clear any pending alarm */
+        /*-------------------------*/
+
+        (void)pups_malarm(0);
+
+
+        /*---------------------------------------*/ 
+        /* Restore all signals to default states */ 
+        /*---------------------------------------*/ 
+
+        for(i=1; i<MAX_SIGS; ++i)
+           (void)pups_sighandle(i,"default",SIG_DFL, (sigset_t *)NULL);
+
+
+        /*----------------------------------------------------------------------*/
+        /* Reassign the descriptors which the user has requested to be detached */
+        /*----------------------------------------------------------------------*/
+        /*---------------------------------*/
+        /* Reassign child input descriptor */
+        /*---------------------------------*/
+
+        if(in_des == (des_t *)NULL)
+        {  if((tty = open("/dev/null",2)) == (-1))
+              _exit(255);
+ 
+           (void)dup2 (tty,0);
+           (void)close(tty);
+        }
+
+
+        /*--------------------------------------------------*/
+        /* Attach child input descriptor to parent via pipe */
+        /*--------------------------------------------------*/
+ 
+        else
+        {  (void)dup2 (in_fildes[0],0);
+           (void)close(in_fildes[0]);
+           (void)close(in_fildes[1]);
+        }
+
+
+        /*----------------------------------*/
+        /* Reassign child output descriptor */
+        /*----------------------------------*/
+
+        if(out_des == (des_t *)NULL)
+        {  if((tty = open("/dev/null",2)) == (-1))
              _exit(255);
 
-          (void)dup2 (tty,0);
-          (void)close(tty);
-       }
-       else
-       {
-
-          /*------------------------------------------------*/
-          /* Attach child I/P descriptor to parent via pipe */
-          /*------------------------------------------------*/
-
-          (void)dup2 (in_fildes[0],0);
-          (void)close(in_fildes[0]);
-          (void)close(in_fildes[1]);
-       }
+           (void)dup2 (tty,1);
+           (void)close(tty);
+        }
 
 
-       /*----------------------------------*/
-       /* Reassign child output descriptor */
-       /*----------------------------------*/
+        /*------------------------------------------------*/
+        /* Attach child O/P descriptor to parent via pipe */
+        /*------------------------------------------------*/
 
-       if(out_des == (int *)NULL)
-       {  if((tty = open("/dev/null",2)) == (-1))
-             _exit(255);
-
-          (void)dup2 (tty,1);
-          (void)close(tty);
-       }
-       else      
-       {
-
-          /*------------------------------------------------*/
-          /* Attach child O/P descriptor to parent via pipe */
-          /*------------------------------------------------*/
-
-          (void)dup2 (out_fildes[1],1);
-          (void)close(out_fildes[0]);
-          (void)close(out_fildes[1]);
-       }
+        else      
+        {  (void)dup2 (out_fildes[1],1);
+           (void)close(out_fildes[0]);
+           (void)close(out_fildes[1]);
+        }
 
 
-       /*--------------------------------*/
-       /* Detach error/status descriptor */
-       /*--------------------------------*/
+        /*--------------------------------*/
+        /* Detach error/status descriptor */
+        /*--------------------------------*/
 
-       if(err_des == (int *)NULL)
-       {  if((tty = open("/dev/null",2)) == (-1))
-             _exit(255);
-
-          (void)dup2 (tty,2);
-          (void)close(tty);
-       }
-       else
-       {
-
-          /*------------------------------------------------*/
-          /* Attach child O/P descriptor to parent via pipe */
-          /*------------------------------------------------*/
-
-          (void)dup2 (err_fildes[1],2);
-          (void)close(err_fildes[0]);
-          (void)close(err_fildes[1]);
-       }
+        if(err_des == (des_t *)NULL)
+        {  if((tty = open("/dev/null",2)) == (-1))
+              _exit(255);
+ 
+           (void)dup2 (tty,2);
+           (void)close(tty);
+        }
 
 
-       /*----------------------------------------------------------------*/
-       /* Build command to be executed - use a shell if one is requested */
-       /* otherwise directly overlay command on child                    */
-       /*----------------------------------------------------------------*/
+        /*------------------------------------------------*/
+        /* Attach child O/P descriptor to parent via pipe */
+        /*------------------------------------------------*/
+
+        else
+        {  (void)dup2 (err_fildes[1],2);
+           (void)close(err_fildes[0]);
+           (void)close(err_fildes[1]);
+        }
 
 
-       /*---------------------------------------*/
-       /* Build shell flag string if approriate */
-       /*---------------------------------------*/
+        /*----------------------------------------------------------------*/
+        /* Build command to be executed - use a shell if one is requested */
+        /* otherwise directly overlay command on child                    */
+        /*----------------------------------------------------------------*/
+        /*---------------------------------------*/
+        /* Build shell flag string if approriate */
+        /*---------------------------------------*/
 
-       if(exec_shell != (const char *)NULL)
-       {  shell_flags = pups_malloc(SSIZE);
-          (void)strlcpy(shell_flags,"-c",SSIZE);
-          if(exec_flags & PUPS_ERROR_EXIT)
-          {  (void)strlcat(shell_flags,"e",SSIZE);
-
-
-             /*---------------------------------------*/
-             /* Return the exit status of the command */
-             /*---------------------------------------*/
-
-             if(execlp(exec_shell,
-                       exec_shell,
-                      shell_flags,
-                      command_str,(char *)0) == -1)
-                _exit(255);
-          }
-       }
-       else
-       {  (void)pups_execls(command_str);
-          _exit(255);
-       }
-    }
+        if(exec_shell != (const char *)NULL)
+        {  shell_flags = pups_malloc(SSIZE);
+           (void)strlcpy(shell_flags,"-c",SSIZE);
+           if(exec_flags & PUPS_ERROR_EXIT)
+           {  (void)strlcat(shell_flags,"e",SSIZE);
 
 
-    /*----------------------*/
-    /* Parent side of fork  */
-    /*----------------------*/
+              /*---------------------------------------*/
+              /* Return the exit status of the command */
+              /*---------------------------------------*/
 
-    else if(pid == (-1))
-    {  pups_set_errno(ENOEXEC);
-       return(-1);
-    }
-    else
-    {  *child_pid      = pid;
-       appl_last_child = pid;
-    } 
-
-
-    /*----------------------------------*/ 
-    /* Set name of child we have forked */
-    /*----------------------------------*/ 
-
-    (void)pups_set_child_name(pid,command_str);
+              if(execlp(exec_shell,
+                        exec_shell,
+                        shell_flags,
+                        command_str,(char *)0) == -1)
+                 _exit(255);
+           }
+        }
+        else
+        {  (void)pups_execls(command_str);
+           _exit(255);
+        }
+     }
 
 
-    /*-------------------------------------*/
-    /* Set up pipe to read data from child */
-    /*-------------------------------------*/
+     /*----------------------*/
+     /* Parent side of fork  */
+     /*----------------------*/
 
-    if(in_des != (int *)NULL) 
-    {  *in_des = in_fildes[1];
-       (void)close(in_fildes[0]);
-    }
-
-
-    /*------------------------------------*/
-    /* Set up pipe to write data to child */
-    /*------------------------------------*/
-
-    if(out_des != (int *)NULL) 
-    {  *out_des = out_fildes[0];
-       (void)close(out_fildes[1]);
-    }
+     else if(pid == (-1))
+     {  pups_set_errno(ENOEXEC);
+        return(-1);
+     }
+     else
+     {  *child_pid      = pid;
+        appl_last_child = pid;
+     } 
 
 
-    /*--------------------------------------------------*/
-    /* Set up pipe to read status/error data from child */
-    /*--------------------------------------------------*/
+     /*----------------------------------*/ 
+     /* Set name of child we have forked */
+     /*----------------------------------*/ 
 
-    if(err_des != (int *)NULL) 
-    {  *err_des = err_fildes[0];
-       (void)close(err_fildes[1]);
-    }
+     (void)pups_set_child_name(pid,command_str);
 
 
-    /*----------------------------------*/
-    /* Wait for child process to return */ 
-    /*----------------------------------*/
+     /*-------------------------------------*/
+     /* Set up pipe to read data from child */
+     /*-------------------------------------*/
 
-    if(exec_flags & PUPS_WAIT_FOR_CHILD)
-    {  int ret = 0;
-
-
-       /*------------------------------------------------------------------*/
-       /* If the appropriate flag is set wait for the command to complete, */
-       /* otherwise carry on while child is executing ...                  */
-       /*------------------------------------------------------------------*/
-
-       istat = (void *)(signal(SIGINT, SIG_IGN));
-       qstat = (void *)(signal(SIGQUIT,SIG_IGN));
-
-       while((ret = waitpid(&pid,&status,WNOHANG)) != pid)
-       {    if(ret == (-1))
-            {  pups_set_errno(ENOEXEC);
-               return(-1);
-            }
-
-            (void)pups_usleep(100);
-       }
+     if(in_des != (pid_t *)NULL) 
+     {  *in_des = in_fildes[1];
+        (void)close(in_fildes[0]);
+     }
 
 
-       /*-------------------------------------------------------------------*/
-       /* Re-enabable automatic child handling once this child has returned */
-       /*-------------------------------------------------------------------*/
+     /*------------------------------------*/
+     /* Set up pipe to write data to child */
+     /*------------------------------------*/
 
-       (void)pups_auto_child();
-
-
-       /*-----------------------*/
-       /* Restore signal status */
-       /*-----------------------*/
-
-       (void)signal(SIGINT, (void *)istat);
-       (void)signal(SIGQUIT,(void *)qstat);
+     if(out_des != (des_t *)NULL) 
+     {  *out_des = out_fildes[0];
+        (void)close(out_fildes[1]);
+     }
 
 
-       /*----------------------------------------*/
-       /* Return exit status of executed command */
-       /*----------------------------------------*/
+     /*--------------------------------------------------*/
+     /* Set up pipe to read status/error data from child */
+     /*--------------------------------------------------*/
 
-       pups_set_errno(OK);
-       return(WEXITSTATUS(status));
+     if(err_des != (des_t *)NULL) 
+     {  *err_des = err_fildes[0];
+        (void)close(err_fildes[1]);
+     }
+
+
+     /*----------------------------------*/
+     /* Wait for child process to return */ 
+     /*----------------------------------*/
+
+     if(exec_flags & PUPS_WAIT_FOR_CHILD)
+     {   int32_t ret = 0;
+
+
+        /*------------------------------------------------------------------*/
+        /* If the appropriate flag is set wait for the command to complete, */
+        /* otherwise carry on while child is executing                      */
+        /*------------------------------------------------------------------*/
+
+        while((ret = waitpid(pid,&status,WNOHANG)) != pid)
+        {    if(ret == (-1))
+             {  pups_set_errno(ENOEXEC);
+                return(-1);
+             }
+
+             (void)pups_usleep(100);
+        }
+
+
+        /*-------------------------------------------------------------------*/
+        /* Re-enabable automatic child handling once this child has returned */
+        /*-------------------------------------------------------------------*/
+
+        (void)pups_auto_child();
+
+
+        /*-----------------------*/
+        /* Restore signal status */
+        /*-----------------------*/
+
+        //(void)signal(SIGINT, (void *)istat);
+        //(void)signal(SIGQUIT,(void *)qstat);
+
+
+        /*----------------------------------------*/
+        /* Return exit status of executed command */
+        /*----------------------------------------*/
+
+        pups_set_errno(OK);
+        return(WEXITSTATUS(status));
     }
 
     pups_set_errno(OK);
@@ -1152,20 +1050,20 @@ _PUBLIC int pups_system2(const char       *command_str,  // Command string
 
 
 
-/*------------------------------------------------------------------------------
-    Open a descriptor to a command pipeline - this is effectively a
-    simplified interface to the pups_system call ...
-------------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------*/
+/* Open a descriptor to a command pipeline - this is effectively a */
+/* simplified interface to the pups_system call                    */
+/*-----------------------------------------------------------------*/
 
-_PUBLIC int pups_copen2(const char *command_pipeline,  // Command stream to execute
-                        const char            *shell,  // Exec shell
-                        int               *child_pid,  // Child PID
-                        int                  *in_des,  // Input descriptor
-                        int                 *out_des,  // Output descriptor
-                        int                 *err_des)  // Error/status descriptor
+_PUBLIC int32_t pups_copen2(const char *command_pipeline,  // Command stream to execute
+                            const char            *shell,  // Exec shell
+                            pid_t             *child_pid,  // Child PID
+                            des_t                *in_des,  // Input descriptor
+                            des_t               *out_des,  // Output descriptor
+                            des_t               *err_des)  // Error/status descriptor
 
-{   int i,
-        f_index[3];
+{   uint32_t i,
+             f_index[3];
 
 
     /*--------------*/
@@ -1189,15 +1087,15 @@ _PUBLIC int pups_copen2(const char *command_pipeline,  // Command stream to exec
     #endif /* PTHREAD_SUPPORT */
 
     f_index[0] = (-1);
-    if(in_des != (int *)NULL)
+    if(in_des != (des_t *)NULL)
        f_index[0] = pups_find_free_ftab_index(); 
 
     f_index[1] = (-1);
-    if(out_des != (int *)NULL)
+    if(out_des != (des_t *)NULL)
        f_index[1] = pups_find_free_ftab_index(); 
 
     f_index[2] = (-1);
-    if(err_des != (int *)NULL)
+    if(err_des != (des_t *)NULL)
        f_index[2] = pups_find_free_ftab_index(); 
 
     if(f_index[0] == (-1) || f_index[1] == (-1) || f_index[2] == (-1))
@@ -1273,23 +1171,24 @@ _PUBLIC int pups_copen2(const char *command_pipeline,  // Command stream to exec
 
 
 
-/*------------------------------------------------------------------------------
-    Open command pipeline with optional attached input, output and
-    error streams ...
-------------------------------------------------------------------------------*/
+/*----------------------------------------------------------------*/
+/* Open command pipeline with optional attached input, output and */
+/* error streams                                                  */
+/*----------------------------------------------------------------*/
 
-_PUBLIC int pups_fcopen2(const char *command_pipeline,    // Command stream to exec
-                         const char            *shell,    // Exec shell
-                         int               *child_pid,    // Child PID
-                         FILE              *in_stream,    // Input stream
-                         FILE             *out_stream,    // Output stream
-                         FILE             *err_stream)    // Error/status stream
+_PUBLIC int32_t pups_fcopen2(const char  *command_pipeline,    // Command stream to exec
+                             const char             *shell,    // Exec shell
+                             pid_t              *child_pid,    // Child PID
+                             FILE               *in_stream,    // Input stream
+                             FILE              *out_stream,    // Output stream
+                             FILE              *err_stream)    // Error/status stream
 
-{   int i,
-        in_des,
-        out_des,
-        err_des,
-        f_index[3];
+{    int32_t i,
+             f_index[3];
+
+    des_t    in_des,
+             out_des,
+             err_des;
 
 
     /*--------------*/
@@ -1391,11 +1290,11 @@ _PUBLIC int pups_fcopen2(const char *command_pipeline,    // Command stream to e
 
 
 
-/*------------------------------------------------------------------------------
-    Detach process from pipeline ...
-------------------------------------------------------------------------------*/
+/*------------------------------*/
+/* Detach process from pipeline */
+/*------------------------------*/
 
-_PUBLIC void detach_from_pipeline(const int close_status)
+_PUBLIC void detach_from_pipeline(const int32_t close_status)
 
 {   
 
@@ -1405,7 +1304,7 @@ _PUBLIC void detach_from_pipeline(const int close_status)
     /*--------------------------------------------------*/
 
     if(pups_fork(TRUE,FALSE) != 0) 
-    {  int i;
+    {  uint32_t    i;
 
 
        /*-----------------------------------*/
@@ -1481,16 +1380,20 @@ _PUBLIC void detach_from_pipeline(const int close_status)
 
 
 
-/*--------------------------------------------------------------------------------------
-    Send signal to process running on remote host ...
---------------------------------------------------------------------------------------*/
+/*-----------------------------------------------*/
+/* Send signal to process running on remote host */
+/*-----------------------------------------------*/
 
-_PUBLIC int pups_rkill(const char *hostname, const char *ssh_port, const char *username, const char *pidname, const unsigned int signum)
+_PUBLIC int32_t pups_rkill(const char      *hostname,   // Signalled host
+                           const char      *ssh_port,   // Port on signalled host
+                           const char      *username,   // Username of signalled process
+                           const char      *pidname,    // Pidname of signalled process
+                           const uint32_t  signum)      // Signal to send
 
 {   _BOOLEAN looper = TRUE;
 
-    int trys,
-        pid;
+     int32_t trys,
+             pid;
 
     if(pidname == (const char *)NULL || signum > MAX_SIGS)
     {  pups_set_errno(EINVAL);
@@ -1518,13 +1421,13 @@ _PUBLIC int pups_rkill(const char *hostname, const char *ssh_port, const char *u
             strcmp(appl_host,hostname)   != 0   )
     {
 
-#ifndef SSH_SUPPORT
+       #ifndef SSH_SUPPORT
        (void)pups_set_errno(EINVAL);
        return(-1);
-#else
-       int nb,
-           status = 0,
-           ret    = 0;
+       #else
+
+       int32_t status = 0,
+               ret    = 0;
 
        char reply[512]              = "",
             xkilld_parameters[512]  = "";
@@ -1548,7 +1451,7 @@ _PUBLIC int pups_rkill(const char *hostname, const char *ssh_port, const char *u
           /* Child side of fork */
           /*--------------------*/
 
-          int      ret      = 0;
+          int32_t  ret      = 0;
           _BOOLEAN is_a_tty = TRUE;
 
 
@@ -1558,7 +1461,8 @@ _PUBLIC int pups_rkill(const char *hostname, const char *ssh_port, const char *u
           /*-----------------------------------------------------------------------*/
 
           (void)pups_malarm(0);
-          (void)signal(SIGALRM,SIG_IGN);
+          (void)pups_sighandle(SIGALRM,"ignore",SIG_IGN, (sigset_t *)NULL);
+          //(void)signal(SIGALRM,SIG_IGN);
  
           appl_verbose = FALSE;
 
@@ -1570,7 +1474,7 @@ _PUBLIC int pups_rkill(const char *hostname, const char *ssh_port, const char *u
           /* We don't need stdio */
           /*---------------------*/
 
-          (void)fclose(stdin);
+          (void)fclose(stdin );
           (void)fclose(stdout);
           (void)fclose(stderr);
 
@@ -1654,7 +1558,7 @@ _PUBLIC int pups_rkill(const char *hostname, const char *ssh_port, const char *u
        (void)pups_set_errno(OK);
        return(ret);
     }
-#endif /* SSH_SUPPORT */
+    #endif /* SSH_SUPPORT */
 
     else
     {  

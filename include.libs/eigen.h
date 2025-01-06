@@ -9,7 +9,7 @@
              United Kingdom
 
     Version: 2.00 
-    Dated:   4th January 2023
+    Dated:   5th February 2024
     E-mail:  mao@tumblingdice.co.uk
 -------------------------------------------------------------------------------------*/
 
@@ -50,28 +50,28 @@
 /*---------------------*/
 
 // Reduce matrix to tridiagonal form
-_PROTOTYPE _EXTERN int tqli(FTYPE *, FTYPE *, int, FTYPE **);
+_PROTOTYPE _EXTERN int32_t tqli(FTYPE *, FTYPE *, int32_t, FTYPE **);
 
 // Get eigenvalues and eigenvectors of matrix by Householder reduction
-_PROTOTYPE _EXTERN void tred2(_BOOLEAN, FTYPE **, int, FTYPE *, FTYPE *e);
+_PROTOTYPE _EXTERN void tred2(_BOOLEAN, FTYPE **, int32_t, FTYPE *, FTYPE *e);
 
 // Get eigenvalues and eigenvectors of a real symmetric matrix by Jacobi rotation
-_PUBLIC int jacobi(FTYPE **, int, FTYPE *, FTYPE **, int *);
+_PUBLIC int32_t jacobi(FTYPE **, int32_t, FTYPE *, FTYPE **, int32_t *);
 
-// Sort eigenvectors into ascending order
-_PUBLIC void eigsrt(FTYPE *, FTYPE **, int);
+// Sort eigenvectors  into ascending order
+_PUBLIC void eigsrt(FTYPE *, FTYPE **, int32_t);
 
 // Get pattern vector covariance matrix
-_PUBLIC void get_covariance_matrix(int, int, FTYPE **, FTYPE **);
+_PUBLIC void get_covariance_matrix(int, int32_t, FTYPE **, FTYPE **);
 
 // Get eigenvectors (of covariance matrix)
-_PUBLIC int get_eigenvectors(FTYPE, int, FTYPE **, FTYPE *, FTYPE *);
+_PUBLIC int32_t get_eigenvectors(FTYPE, int32_t, FTYPE **, FTYPE *, FTYPE *);
 
 // Transform pattern vectors to basis defined by eignvectors of covariance matrix
-_PUBLIC FTYPE **get_eigenpatterns(int, int, int, FTYPE **, FTYPE **);
+_PUBLIC FTYPE **get_eigenpatterns(int, int32_t, int32_t, FTYPE **, FTYPE **);
 
-// Map pattern into covariance basis (returning projection weights in that basis)
-_PUBLIC FTYPE *generate_weight_vector(int, int, FTYPE *, FTYPE **);
+// Map pattern  into covariance basis (returning projection weights in that basis)
+_PUBLIC FTYPE *generate_weight_vector(int32_t,  int32_t, FTYPE *, FTYPE **);
 
 #endif /* EIGEN_H */
 

@@ -1,7 +1,7 @@
-/*-----------------------------------------------*/
-/* Check criu functionality                      */
-/* M.A. O'Neill, Tumbling Dice, 4th January 2023 */
-/*-----------------------------------------------*/
+/*-------------------------------------------------*/
+/* Check criu functionality                        */
+/* M.A. O'Neill, Tumbling Dice, 10th December 2024 */
+/*-------------------------------------------------*/
 
 #include <stdio.h>
 #include <string.h>
@@ -12,6 +12,7 @@
 #include <signal.h>
 #include <sched.h>
 #include <time.h>
+#include <stdint.h>
 
 
 /*-------------*/
@@ -25,9 +26,9 @@
 /* Global variables */
 /*------------------*/
 
-int  pid                   = (-1);
-int  ssave_delay           = 10;
-char checkpoint_dir[SSIZE] = "";
+pid_t    pid                  = (-1);
+int32_t ssave_delay           = 10;
+char    checkpoint_dir[SSIZE] = "";
 
 
 
@@ -36,7 +37,7 @@ char checkpoint_dir[SSIZE] = "";
 /* Signal handler for SIGTERM and SIGINT */
 /*---------------------------------------*/
 
-int term_handler(int signum)
+static int32_t term_handler(int32_t signum)
 
 {   char rm_cmd[SSIZE] = "";
 
@@ -53,7 +54,7 @@ int term_handler(int signum)
 /* (Alarm) handler for state saving */
 /*----------------------------------*/
 
-int alarm_handler(int signum)
+static int32_t alarm_handler(int32_t signum)
 
 {   char   criu_cmd[SSIZE] = "";
     struct timespec delay;
@@ -100,10 +101,11 @@ int alarm_handler(int signum)
 /* Main entry point */
 /*------------------*/
 
-int main(int argc, char *argv[])
+int32_t main(int32_t argc, char *argv[])
 
-{   int             iter  = 0;
-    struct timespec nsleep;
+{   uint32_t          iter  = 0;
+    struct   timespec nsleep;
+
 
     /*-------------------------------*/
     /* Get iteration for (Criu) dump */

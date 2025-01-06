@@ -1,10 +1,17 @@
 /*-------------------------------------------------------------------------------------------------
     The PUPS bubble memory library.
-    (C) M.A. O'Neill, 4th January 2021, mao@tumblingdice.co.uk
+    (C) M.A. O'Neill, 12th December 2024, mao@tumblingdice.co.uk
 -------------------------------------------------------------------------------------------------*/
 
 #ifndef TYPEDEFS_H
 #define TYPEDEFS_H
+
+/*--------------------------*/
+/* Standard integer formats */
+/*--------------------------*/
+
+#include <stdint.h>
+
 
 #define	MAXLEN		1024
 
@@ -42,11 +49,11 @@ p------------>  |------------------------------------------------------------|
 /*-------------------------------------*/
 
 typedef struct jmalloc {
-  struct jmalloc *flink;
-  struct jmalloc *blink;
-  size_t         mmap_size;
-  size_t         size;
-  void           *space;
+    struct jmalloc *flink;
+    struct jmalloc *blink;
+    size_t         mmap_size;
+    size_t         size;
+    void           *space;
 } *Jmalloc;
 
 
@@ -57,15 +64,15 @@ typedef struct jmalloc {
 /*-----------------------------------------------------------------*/
 
 typedef struct ftable_struct {
-  int      inuse;
-  int      type;
-  char     filename[SSIZE];
-  int      size;
-  unsigned char buf[SSIZE];
-  int      attribute;
-  int      mode;
-  int      fd;
-  off_t    seek_ptr;
+    int32_t       inuse;
+    int32_t      type;
+    char          filename[SSIZE];
+    int32_t       size;
+    unsigned char buf[SSIZE];
+    int32_t       attribute;
+    int32_t       mode;
+    int32_t       fd;
+    off_t         seek_ptr;
 } ftable_entry;
 
 #endif /* TYPEDEFS_H */

@@ -1,4 +1,4 @@
-/*-----------------------------------------------------------------------------
+/*-------------------------------------------------------------------------
     Purpose: Set/update build date stamp on a PUPS application source. Used
              by applications to identify stale dynamic resources.
 
@@ -9,21 +9,27 @@
              NE3 4RT
              United Kingdom
 
-    Version: 1.05
-    Dated:   4th January 2023
+    Version: 1.06
+    Dated:   12th December 2024
     E-mail:  mao@tumblingdice.co.uk
------------------------------------------------------------------------------*/
+-------------------------------------------------------------------------*/
 
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <time.h>
+#include <fcntl.h>
+#include <stdint.h>
 
 
-/*-------------------*/
-/* Version of vstamp */
-/*-------------------*/
+/*---------*/
+/* Defines */
+/*---------*/
+/*---------*/
+/* Version */
+/*---------*/
 
-#define VSTAMP_VERSION    "1.05"
+#define VSTAMP_VERSION    "1.06"
 
 
 
@@ -32,13 +38,18 @@
 /* Main entry point */
 /*------------------*/
 
-int main(int argc, char *argv[])
+int32_t main(int32_t argc, char *argv[])
 
-{   int time_stamp = 0;
-    FILE *stream   = (FILE *)NULL;
+{   time_t time_stamp = 0;
+    FILE *stream    = (FILE *)NULL;
+
+
+    /*--------------------*/
+    /* Parse command line */
+    /*--------------------*/
 
     if(argc > 1)
-    {  (void)fprintf(stderr,"\nvstamp version %s, (C) Tumbling Dice 2000-2023 (built %s %s)\n\n",VSTAMP_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nvstamp version %s, (C) Tumbling Dice 2000-2024 (gcc %s: built %s %s)\n\n",VSTAMP_VERSION,__VERSION__,__TIME__,__DATE__);
        (void)fprintf(stderr,"VSTAMP is free software, covered by the GNU General Public License, and you are\n");
        (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
        (void)fprintf(stderr,"See the GPL and LGPL licences at www.gnu.org for further details\n");
@@ -57,7 +68,7 @@ int main(int argc, char *argv[])
 
     (void)fprintf(stream,"/*---------------------------------------------------*/\n");
     (void)fprintf(stream,"/* Time stamp file generated automatically by vstamp */\n");
-    (void)fprintf(stream,"/* (C) M.A. O'Neill, Tumbling Dice, 2023             */\n");
+    (void)fprintf(stream,"/* (C) M.A. O'Neill, Tumbling Dice, 2024             */\n");
     (void)fprintf(stream,"/* Do not edit                                       */\n");
     (void)fprintf(stream,"/*---------------------------------------------------*/\n");
     (void)fprintf(stream,"\n\n#ifdef TSTAMP_H\n#define TSTAMP_H\n\n");

@@ -1,4 +1,4 @@
-/*-------------------------------------------------------------------------------------------------------
+/*--------------------------------------------------------------------------------------
     Purpose: The digital maggot -- searches for psrp files and FIFOS and removes them if
              they are stale (e.g. exist without an associated PSRP process)  
 
@@ -9,10 +9,10 @@
              NE3 4RT
              United Kingdom
 
-    Version: 3.03 
-    Dated:   14th October 2023
+    Version: 4.01 
+    Dated:   29th Decemeber 2024
     E-mail:  mao@tumblingdice.co.uk
--------------------------------------------------------------------------------------------------------*/
+--------------------------------------------------------------------------------------*/
 
 
 #include <me.h>
@@ -21,6 +21,7 @@
 #include <psrp.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <stdlib.h>
 #include <string.h>
 #include <bsd/string.h>
 #include <errno.h>
@@ -32,7 +33,7 @@
 /* Version of maggot */
 /*-------------------*/
 
-#define MAGGOT_VERSION    "3.03"
+#define MAGGOT_VERSION    "4.01"
 
 
 /*----------------------------------------------------------------*/
@@ -59,20 +60,20 @@
 
 
 
-/*------------------------------------------------------------------------------------------------------
-    Get application information for slot manager ...
-------------------------------------------------------------------------------------------------------*/
+/*----------------------------------------------*/
+/* Get application information for slot manager */
+/*----------------------------------------------*/
 /*---------------------------*/ 
 /* Slot information function */
 /*---------------------------*/ 
 
-_PRIVATE void maggot_slot(int level)
+_PRIVATE void maggot_slot(int32_t level)
 {   (void)fprintf(stderr,"int app (PSRP) maggot %s: [ANSI C]\n",MAGGOT_VERSION);
  
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 1999-2023 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 1999-2024 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
-       (void)fprintf(stderr,"The digital maggot (PUPS stale resource and garbage collection) (built %s)\n\n",__TIME__,__DATE__);
+       (void)fprintf(stderr,"The digital maggot (PUPS stale resource and garbage collection) (gcc %s: built %s %s)\n\n",__VERSION__,__TIME__,__DATE__);
     }
     else
        (void)fprintf(stderr,"\n");
@@ -87,7 +88,7 @@ _PRIVATE void maggot_slot(int level)
 /* Application usage function */
 /*----------------------------*/ 
 
-_PRIVATE void maggot_usage()
+_PRIVATE void maggot_usage(void)
 
 {   
     (void)fprintf(stderr,"[-search <directory list:/tmp;/fifos/<localhost>]\n");
@@ -119,9 +120,9 @@ _EXTERN void (* USE )() __attribute__ ((aligned(16))) = maggot_usage;
 
 
 
-/*-------------------------------------------------------------------------------------------------------
-    Application build date ...
--------------------------------------------------------------------------------------------------------*/
+/*------------------------*/
+/* Application build date */
+/*------------------------*/
 
 _EXTERN char appl_build_time[SSIZE] = __TIME__;
 _EXTERN char appl_build_date[SSIZE] = __DATE__;
@@ -129,9 +130,9 @@ _EXTERN char appl_build_date[SSIZE] = __DATE__;
 
 
 
-/*-------------------------------------------------------------------------------------------------------
-    Defines which are used by this application ...
--------------------------------------------------------------------------------------------------------*/
+/*--------------------------------------------*/
+/* Defines which are used by this application */
+/*--------------------------------------------*/
 
 #define N_ENTRIES     1024
 #define MAX_S_DIRS    32
@@ -140,19 +141,19 @@ _EXTERN char appl_build_date[SSIZE] = __DATE__;
 
 
 
-/*-------------------------------------------------------------------------------------------------------
-    Public variables and function pointers used by this application ...
--------------------------------------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------*/
+/* Public variables and function pointers used by this application */
+/*-----------------------------------------------------------------*/
 
 
 
 
-/*-------------------------------------------------------------------------------------------------------
-    Functions which are private to this application ...
--------------------------------------------------------------------------------------------------------*/
+/*-------------------*/
+/* Private functions */
+/*-------------------*/
 
 /* Report on the status of the maggot process */
-_PROTOTYPE _PRIVATE int psrp_process_status(int, char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_process_status(int32_t, char *[]);
 
 /* Remove a stale PSRP resource */
 _PROTOTYPE _PRIVATE _BOOLEAN psrp_remove_stale_objects(char *, char *);
@@ -161,44 +162,44 @@ _PROTOTYPE _PRIVATE _BOOLEAN psrp_remove_stale_objects(char *, char *);
 _PROTOTYPE _PRIVATE void maggot_exit_f(char *);
 
 /* Builtin help for maggot PSRP API */
-_PROTOTYPE _PRIVATE int psrp_help(int, char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_help(int32_t, char *[]);
 
 /* PSRP function to set delay period */
-_PROTOTYPE _PRIVATE int set_delay_period(int, char *[]);
+_PROTOTYPE _PRIVATE int32_t set_delay_period(int32_t, char *[]);
 
 /* PSRP function to add a directory to scan list */
-_PROTOTYPE _PRIVATE int add_directory(int, char *[]);
+_PROTOTYPE _PRIVATE int32_t add_directory(int32_t, char *[]);
 
 /* PSRP function to remove a directory from scan list */
-_PROTOTYPE _PRIVATE int remove_directory(int, char *[]);
+_PROTOTYPE _PRIVATE  int32_t remove_directory(int32_t, char *[]);
 
 /* PSRP function to add a key to key list */
-_PROTOTYPE _PRIVATE int add_key(int, char *[]);
+_PROTOTYPE _PRIVATE  int32_t add_key(int32_t, char *[]);
 
 /* PSRP function to remove a key from key  list */
-_PROTOTYPE _PRIVATE int remove_key(int, char *[]);
+_PROTOTYPE _PRIVATE  int32_t remove_key(int32_t, char *[]);
 
 
 
 
 
-/*-------------------------------------------------------------------------------------------------------
-    Variables which are private to this module ...
--------------------------------------------------------------------------------------------------------*/
+/*-------------------*/
+/* Private variables */
+/*-------------------*/
                                                            /*---------------------------------------------------------*/
-_PRIVATE int         n_entries          = 0;               /* Directory entries (used in directory scanning)          */
-_PRIVATE int         scan_cnt           = 0;               /* Number of scan of directories completed                 */
-_PRIVATE int         start_time         = 0;               /* Start of last file system scan                          */
-_PRIVATE int         delay_period       = 60;              /* Period between file system scans                        */
-_PRIVATE int         d_cnt              = 0;               /* Number of user defined directories scanned              */
-_PRIVATE int         key_cnt              = 0;             /* Number of user defined serach keys                      */
-_PRIVATE int         delete_cnt         = 0;               /* Number of stale PSRP items removed by this maggot       */
-_PRIVATE int         log_wrap_cnt       = 1024;            /* Number of objects logged before log file wraps          */
-_PRIVATE int         items_logged       = 0;               /* Items in log file                                       */
-_PRIVATE long        wrap_pos           = 0L;              /* Rewrap position in log file                             */ 
+_PRIVATE int32_t     n_entries          = 0;               /* Directory entries (used in directory scanning)          */
+_PRIVATE int32_t     scan_cnt           = 0;               /* Number of scan of directories completed                 */
+_PRIVATE int32_t     start_time         = 0;               /* Start of last file system scan                          */
+_PRIVATE int32_t     delay_period       = 60;              /* Period between file system scans                        */
+_PRIVATE int32_t     d_cnt              = 0;               /* Number of user defined directories scanned              */
+_PRIVATE int32_t     key_cnt            = 0;               /* Number of user defined serach keys                      */
+_PRIVATE int32_t     delete_cnt         = 0;               /* Number of stale PSRP items removed by this maggot       */
+_PRIVATE int32_t     log_wrap_cnt       = 1024;            /* Number of objects logged before log file wraps          */
+_PRIVATE int32_t     items_logged       = 0;               /* Items in log file                                       */
+_PRIVATE uint64_t    wrap_pos           = 0L;              /* Rewrap position in log file                             */ 
 _PRIVATE _BOOLEAN    e_l_allocated      = FALSE;           /* TRUE if directory entry list allocated                  */
 _PRIVATE _BOOLEAN    global_maggot      = FALSE;           /* TRUE if maggot cleaning up global PUPS/P3 log files     */
-_PRIVATE char        **entry_list        = (char **)NULL;  /* List of PSRP resources which may be stale               */
+_PRIVATE char        **entry_list       = (char **)NULL;   /* List of PSRP resources which may be stale               */
 _PRIVATE struct stat buf;                                  /* Stat buffer for determining log stream type             */
 _PRIVATE char        d_list[MAX_S_DIRS][SSIZE];            /* List of user scanned directories                        */
 _PRIVATE char        key_list[MAX_S_DIRS][SSIZE];          /* List of user search keys                                */
@@ -206,25 +207,24 @@ _PRIVATE char        key_list[MAX_S_DIRS][SSIZE];          /* List of user searc
 
 
 
-/*-------------------------------------------------------------------------------------------------------
-    Software I.D. tag (used if CKPT support enabled to discard stale dynamic
-    checkpoint files) ...
--------------------------------------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------------*/
+/* Software I.D. tag (used if CKPT support enabled to discard stale dynamic */
+/* checkpoint files)                                                        */
+/* -------------------------------------------------------------------------*/
 
-#define VTAG  3878
-
-extern int appl_vtag = VTAG;
-
+#define VTAG  4433
+extern  int32_t appl_vtag = VTAG;
 
 
 
-/*-------------------------------------------------------------------------------------------------------
-    Main - decode command tail then interpolate using parameters supplied by user ...
--------------------------------------------------------------------------------------------------------*/
 
-_PUBLIC int pups_main(int argc, char *argv[])
+/*------------------*/
+/* Main entry point */
+/*------------------*/
 
-{   int i;
+_PUBLIC int32_t pups_main(int32_t argc, char *argv[])
+
+{   uint32_t i;
 
 
     /*--------------------------------*/
@@ -233,17 +233,18 @@ _PUBLIC int pups_main(int argc, char *argv[])
 
     (void)psrp_ignore_requests();
 
-/*-------------------------------------------------------------------------------------------------------
-    Get standard items form the command tail ...
--------------------------------------------------------------------------------------------------------*/
+
+    /*------------------------------------------*/
+    /* Get standard items from the command tail */
+    /*------------------------------------------*/
 
     pups_std_init(TRUE,
                   &argc,
                   MAGGOT_VERSION,
                   "M.A. O'Neill",
                   "(PSRP) maggot",
-                  "2023",
-                  argv);
+                  "2024",
+                  (void *)argv);
 
 
     /*-------------------------*/
@@ -272,13 +273,16 @@ _PUBLIC int pups_main(int argc, char *argv[])
     /*-----------------------------------------------------------------------*/           
 
     if((ptr = pups_locate(&init,"delay_period",&argc,args,0)) != NOT_FOUND)
-    {  if((delay_period = pups_i_dec(&ptr,&argc,args)) == (int)INVALID_ARG)
+    {  if((delay_period = pups_i_dec(&ptr,&argc,args)) == (int32_t)INVALID_ARG || delay_period < 0)
           pups_error("[maggot] expecting delay period for PSRP file system reaping");
-
-       delay_period = iabs(delay_period)*60;
     }
-    else
-       delay_period *= 60;
+
+
+    /*--------------------------*/
+    /* Convert delay to seconds */
+    /*--------------------------*/
+
+    delay_period *= 60;
 
     if(appl_verbose == TRUE)
     {  (void)strdate(date);
@@ -450,10 +454,10 @@ _PUBLIC int pups_main(int argc, char *argv[])
     (void)fstat(2,&buf);
     if(S_ISREG(buf.st_mode))
     {  if((ptr = pups_locate(&init,"delay_period",&argc,args,0)) != NOT_FOUND)
-       {  if((log_wrap_cnt = pups_i_dec(&ptr,&argc,args)) == (int)INVALID_ARG)
+       {  if((log_wrap_cnt = pups_i_dec(&ptr,&argc,args)) == (int32_t)INVALID_ARG)
               pups_error("[maggot] expecting maximum number of items in log file");
 
-          log_wrap_cnt = iabs(log_wrap_cnt);
+          log_wrap_cnt = abs(log_wrap_cnt);
        }
     }
 
@@ -473,7 +477,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
     /* Complain about any unparsed arguments */
     /*---------------------------------------*/
 
-    pups_t_arg_errs(argd,args);
+    pups_t_arg_errs(argd,(void *)args);
 
     if(appl_verbose == TRUE)
     {  (void)fprintf(stderr,"%s %s (%d@%s:%s): started\n",date,
@@ -492,12 +496,13 @@ _PUBLIC int pups_main(int argc, char *argv[])
     if(S_ISREG(buf.st_mode))
        wrap_pos = pups_lseek(2,0,SEEK_CUR);
 
-/*---------------------------------------------------------------------------------------------------------
-    Initialise PSRP function dispatch handler - note that the embryo is fully dynamic and prepared
-    to import both dynamic functions and data objects ...
----------------------------------------------------------------------------------------------------------*/
 
-    (void)psrp_init(PSRP_STATUS_ONLY | PSRP_HOMEOSTATIC_STREAMS,&psrp_process_status);
+    /*------------------------------------------------------------------------------------------------*/
+    /* Initialise PSRP function dispatch handler - note that the embryo is fully dynamic and prepared */
+    /* to import both dynamic functions and data objects                                              */
+    /*------------------------------------------------------------------------------------------------*/
+
+    (void)psrp_init(PSRP_STATUS_ONLY | PSRP_HOMEOSTATIC_STREAMS,(void *)&psrp_process_status);
     (void)psrp_attach_static_function("help",            &psrp_help);
     (void)psrp_attach_static_function("delay_period",    &set_delay_period);
     (void)psrp_attach_static_function("add_directory",   &add_directory);
@@ -506,20 +511,22 @@ _PUBLIC int pups_main(int argc, char *argv[])
     (void)psrp_attach_static_function("remove_key",      &remove_key);
     (void)psrp_accept_requests();
 
-/*---------------------------------------------------------------------------------------------------------
-    Set up exit function to free memory allocated by the stale resource removal function ...
----------------------------------------------------------------------------------------------------------*/
+
+    /*--------------------------------------------------------------------------------------*/
+    /* Set up exit function to free memory allocated by the stale resource removal function */
+    /*--------------------------------------------------------------------------------------*/
 
     pups_register_exit_f("maggot_exit_f",
                          &maggot_exit_f,
                          (char *)NULL);
 
-/*---------------------------------------------------------------------------------------------------------
-    This is the pups_main loop of the maggot -- it periodically checks the /fifo/<hostname> and /tmp
-    filesystems of its host and removes stale resources ...
----------------------------------------------------------------------------------------------------------*/
 
-    do {    unsigned int i;
+    /*--------------------------------------------------------------------------------------------------*/
+    /* This is the pups_main loop of the maggot -- it periodically checks the /fifo/<hostname> and /tmp */
+    /* filesystems of its host and removes stale resources                                              */
+    /*--------------------------------------------------------------------------------------------------*/
+
+    do {    uint32_t i;
 
 
             /*-------------------------------------------*/
@@ -562,7 +569,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
             /*-------------------------------------------------*/
 
             for(i=0; i<d_cnt; ++i)
-            {  unsigned int j;
+            {  uint32_t j;
 
                if(strcmp(d_list[i],"notset") != 0)
                {  (void)psrp_remove_stale_objects(d_list[i],"fifo");
@@ -595,22 +602,22 @@ _PUBLIC int pups_main(int argc, char *argv[])
 
 
 
-/*---------------------------------------------------------------------------------------------------------
-   Report on the status of this maggot ...
----------------------------------------------------------------------------------------------------------*/
+/*-------------------------------------*/
+/* Report on the status of this maggot */
+/*-------------------------------------*/
 
-_PRIVATE int psrp_process_status(int argc, char *argv[])
+_PRIVATE  int32_t psrp_process_status(int32_t argc, char *argv[])
 
-{    int i,
-         u_d_scan_dirs  = 0,
-         u_key_cnt      = 0;
+{    uint32_t i,
+              u_d_scan_dirs  = 0,
+              u_key_cnt      = 0;
 
      (void)fprintf(psrp_out,"\n\n    maggot version %s status\n",MAGGOT_VERSION);
      (void)fprintf(psrp_out,"    ==========================\n\n");
 
-#if defined(CRIU_SUPPORT)
+     #if defined(CRIU_SUPPORT)
      (void)fprintf(psrp_out,"    Binary is Crui enabled (checkpointable)\n");
-#endif  /* CRUI_SUPPORT */
+     #endif  /* CRUI_SUPPORT */
 
      (void)fprintf(psrp_out,"    Stale resources will be deleted after %d minutes\n",delay_period/60);    
      (void)fprintf(psrp_out,"    Scanning \"%s\" for stale PSRP objects\n",appl_fifo_dir);
@@ -680,15 +687,15 @@ _PRIVATE int psrp_process_status(int argc, char *argv[])
 /* Parse pid in <file name>-<pid> format file */
 /*--------------------------------------------*/
 
-_PRIVATE int parse_pidname(unsigned char *filename)
+_PRIVATE pid_t parse_pidname(unsigned char *filename)
 
-{    unsigned int i,
-                  size    = 0,
-                  cnt     = 0,
-                  pid_pos = 0;
+{    size_t i,
+            size          = 0,
+            cnt           = 0,
+            pid_pos       = 0;
 
-     int  pid             = (-1);
-     char pidstr[SSIZE]   = "";
+     pid_t pid            = (-1);
+     char  pidstr[SSIZE]  = "";
 
 
      /*----------------------*/
@@ -745,11 +752,11 @@ _PRIVATE int parse_pidname(unsigned char *filename)
 
 _PRIVATE _BOOLEAN psrp_remove_stale_objects(char *directory, char *object_key)
 
-{   unsigned int i;
+{   uint32_t i;
 
-    int entry_cnt  = 0,
-        psrp_pid   = (-1),
-        owner      = (-1);
+    int32_t  entry_cnt  = 0;
+    uid_t    owner      = (-1);
+    pid_t    psrp_pid   = (-1);
 
 
     /*----------------------------------------------------------*/
@@ -788,14 +795,14 @@ _PRIVATE _BOOLEAN psrp_remove_stale_objects(char *directory, char *object_key)
        (void)strclr(hostname);
        psrp_pid    = (-1);
        (void)strlcpy(next_entry,entry_list[i],SSIZE);
-       mchrep(' ',":#",next_entry);
+       mchrep(' ',".:#",next_entry);
 
-                                                                                                         /*------------------------------*/
-       if(sscanf(next_entry,"%s%s%s%s%s%d",strdum,strdum,hostname,strdum,strdum,&psrp_pid) == 6    ||    /* Standard PUP/P3 files/FIFO's */
-          (psrp_pid = parse_pidname(entry_list[i]))                                        >= 0     )    /* <filename>-<pid>             */
-                                                                                                         /*------------------------------*/
-       {  int    ret,
-                 c_time;
+                                                                                                                  /*------------------------------*/
+       if(sscanf(next_entry,"%s%s%s%s%s%d%d",strdum,strdum,hostname,strdum,strdum,&psrp_pid,&owner) == 7    ||    /* Standard PUP/P3 files/FIFO's */
+          (psrp_pid = parse_pidname(entry_list[i]))                                                 >= 0     )    /* <filename>-<pid>             */
+                                                                                                                  /*------------------------------*/
+       {   int32_t ret,
+                   c_time;
 
           char        pathname[1024] = "";
           struct stat buf;
@@ -822,13 +829,22 @@ _PRIVATE _BOOLEAN psrp_remove_stale_objects(char *directory, char *object_key)
           ret    = kill(psrp_pid,SIGALIVE);
           c_time = time((time_t *)NULL);
 
-                                                           /*-----------------------------*/
-          if(psrp_pid != (-1)                         &&   /* PSRP channel/lockpost etc.  */
-             c_time - buf.st_mtime >  delay_period    &&   /* Delay period OK             */
-             owner                 == getuid()        &&   /* We own PSRP server          */
-             psrp_pid              != appl_pid        &&   /* We are not damaging ourself */
-             ret                   == (-1)             )   /* PSRP server is dead         */
-                                                           /*-----------------------------*/
+                                                           /*--------------------------------*/
+          if(psrp_pid != (-1)                         &&   /* PSRP channel/lockpost etc.     */
+             c_time - buf.st_mtime >  delay_period    &&   /* Delay period OK                */
+                                                           /*--------------------------------*/
+
+
+                                                           /*--------------------------------*/
+             (owner                 == getuid()       ||   /* We own PSRP server             */
+              getuid()              == 0      )       &&   /* We are root and own everything */
+                                                           /*--------------------------------*/
+
+
+                                                           /*--------------------------------*/
+             psrp_pid              != appl_pid        &&   /* We are not damaging ourself    */
+             ret                   == (-1)             )   /* PSRP server is dead            */
+                                                           /*--------------------------------*/
           {  
 
              /*-----------------------*/
@@ -877,13 +893,13 @@ _PRIVATE _BOOLEAN psrp_remove_stale_objects(char *directory, char *object_key)
 
 
 
-/*---------------------------------------------------------------------------------------------------------
-    Routine to remove stale items from PSRP file systems ...
----------------------------------------------------------------------------------------------------------*/
+/*------------------------------------------------------*/
+/* Routine to remove stale items from PSRP file systems */
+/*------------------------------------------------------*/
 
 _PRIVATE void maggot_exit_f(char *arg_str)
 
-{   int i;
+{   uint32_t i;
 
     if(e_l_allocated == TRUE)
     {  for(i=0; i<n_entries; ++i)
@@ -898,13 +914,13 @@ _PRIVATE void maggot_exit_f(char *arg_str)
 
 
 
-/*---------------------------------------------------------------------------------------------------------
-   Static PSRP function which adds directories to the list of directories to be scanned ...
----------------------------------------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------------------------*/
+/* Static PSRP function which adds directories to the list of directories to be scanned */
+/*--------------------------------------------------------------------------------------*/
 
-_PRIVATE int add_directory(int argc, char *argv[])
+_PRIVATE  int32_t add_directory(int32_t argc, char *argv[])
 
-{   unsigned int i;
+{   uint32_t i;
 
 
     /*-----------------------------------------------*/
@@ -915,7 +931,7 @@ _PRIVATE int add_directory(int argc, char *argv[])
     {  (void)fprintf(psrp_out,"\n    usage: add_directory <name of scanned directory>\n\n");
        (void)fflush(psrp_out);
 
-       return(PSRP_OK);
+       return(PSRP_ERROR);
     }
 
 
@@ -925,7 +941,7 @@ _PRIVATE int add_directory(int argc, char *argv[])
 
     (void)stat(argv[1],&buf);
     if(!S_ISDIR(buf.st_mode))
-    {  (void)fprintf(psrp_out,"\n    ERROR add_directory: %s is not a directory\n\n",argv[1]);
+    {  (void)fprintf(psrp_out,"\n    %sERROR%s add_directory: %s is not a directory\n\n",boldOn,boldOff,argv[1]);
        (void)fflush(psrp_out);
 
        return(PSRP_ERROR);
@@ -938,7 +954,7 @@ _PRIVATE int add_directory(int argc, char *argv[])
 
     for(i=0; i<MAX_S_DIRS; ++i)
     {  if(strcmp(d_list[i],argv[1]) == 0)
-       {  (void)fprintf(psrp_out,"    ERROR add_directory: %s is already in the list of scanned directories\n",argv[1]);
+       {  (void)fprintf(psrp_out,"    %sERROR%s add_directory: %s is already in the list of scanned directories\n",boldOn,boldOff,argv[1]);
           (void)fflush(psrp_out);
 
           return(PSRP_ERROR);
@@ -969,13 +985,13 @@ _PRIVATE int add_directory(int argc, char *argv[])
 
 
 
-/*---------------------------------------------------------------------------------------------------------
-   Static PSRP function which removes directory from the list of directories to be scanned ...
----------------------------------------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------------------------------*/
+/* Static PSRP function which removes directory from the list of directories to be scanned */
+/*-----------------------------------------------------------------------------------------*/
 
-_PRIVATE int remove_directory(int argc, char *argv[])
+_PRIVATE int32_t remove_directory(int32_t argc, char *argv[])
 
-{   unsigned int i;
+{   uint32_t i;
 
 
     /*-----------------------------------------------*/
@@ -986,7 +1002,7 @@ _PRIVATE int remove_directory(int argc, char *argv[])
     {  (void)fprintf(psrp_out,"\n    usage: remove_directory <name of scanned directory>\n\n");
        (void)fflush(psrp_out);
 
-       return(PSRP_OK);
+       return(PSRP_ERROR);
     }
 
 
@@ -1005,7 +1021,7 @@ _PRIVATE int remove_directory(int argc, char *argv[])
        }
     }
 
-    (void)fprintf(psrp_out,"\n    ERROR remove_directory: %s not found in scanned directory list\n\n",argv[1]);
+    (void)fprintf(psrp_out,"\n    %sERROR%s remove_directory: %s not found in scanned directory list\n\n",boldOn,boldOff,argv[1]);
     (void)fflush(psrp_out);
 
     return(PSRP_ERROR);
@@ -1014,13 +1030,13 @@ _PRIVATE int remove_directory(int argc, char *argv[])
 
 
 
-/*---------------------------------------------------------------------------------------------------------
-   Static PSRP function which adds key to key list ...
----------------------------------------------------------------------------------------------------------*/
+/*-------------------------------------------------*/
+/* Static PSRP function which adds key to key list */
+/*-------------------------------------------------*/
 
-_PRIVATE int add_key(int argc, char *argv[])
+_PRIVATE int32_t add_key(int32_t argc, char *argv[])
 
-{   unsigned int i;
+{   uint32_t i;
 
 
     /*-----------------------------------------------*/
@@ -1031,7 +1047,7 @@ _PRIVATE int add_key(int argc, char *argv[])
     {  (void)fprintf(psrp_out,"usage: add_key <key>\n");
        (void)fflush(psrp_out);
 
-       return(PSRP_OK);
+       return(PSRP_ERROR);
     }
 
 
@@ -1041,7 +1057,7 @@ _PRIVATE int add_key(int argc, char *argv[])
 
     for(i=0; i<MAX_KEYS; ++i)
     {  if(strcmp(key_list[i],argv[1]) == 0)
-       {  (void)fprintf(psrp_out,"\n    ERROR add_key: %s is already in key list\n\n",argv[1]);
+       {  (void)fprintf(psrp_out,"\n    %sERROR%s add_key: %s is already in key list\n\n",boldOn,boldOff,argv[1]);
           (void)fflush(psrp_out);
 
           return(PSRP_ERROR);
@@ -1072,13 +1088,13 @@ _PRIVATE int add_key(int argc, char *argv[])
 
 
 
-/*---------------------------------------------------------------------------------------------------------
-   Static PSRP function which removes key from key list ...
----------------------------------------------------------------------------------------------------------*/
+/*------------------------------------------------------*/
+/* Static PSRP function which removes key from key list */
+/*------------------------------------------------------*/
 
-_PRIVATE int remove_key(int argc, char *argv[])
+_PRIVATE int32_t remove_key(int32_t argc, char *argv[])
 
-{   unsigned int i;
+{   uint32_t i;
 
 
     /*-----------------------------------------------*/
@@ -1089,7 +1105,7 @@ _PRIVATE int remove_key(int argc, char *argv[])
     {  (void)fprintf(psrp_out,"    usage: remove_key <key>\n");
        (void)fflush(psrp_out);
 
-       return(PSRP_OK);
+       return(PSRP_ERROR);
     }
 
 
@@ -1108,7 +1124,7 @@ _PRIVATE int remove_key(int argc, char *argv[])
        }
     }
 
-    (void)fprintf(psrp_out,"\n    ERROR remove_key: %s not found in file key list\n\n",argv[1]);
+    (void)fprintf(psrp_out,"\n    %sERROR%s remove_key: %s not found in file key list\n\n",boldOn,boldOff,argv[1]);
     (void)fflush(psrp_out);
 
     return(PSRP_ERROR);
@@ -1117,13 +1133,13 @@ _PRIVATE int remove_key(int argc, char *argv[])
 
 
 
-/*---------------------------------------------------------------------------------------------------------
-   Static PSRP function which sets scan delay period ...
----------------------------------------------------------------------------------------------------------*/
+/*---------------------------------------------------*/
+/* Static PSRP function which sets scan delay period */
+/*---------------------------------------------------*/
 
-_PRIVATE int set_delay_period(int argc, char *argv[])
+_PRIVATE int32_t set_delay_period(int32_t argc, char *argv[])
 
-{   int tmp_delay_period;
+{    int32_t tmp_delay_period;
 
 
     /*-----------------------------------------------*/
@@ -1131,19 +1147,22 @@ _PRIVATE int set_delay_period(int argc, char *argv[])
     /*-----------------------------------------------*/
 
     if(argc != 2)
-    {  (void)fprintf(psrp_out,"    usage: delay_period <seconds>\n");
+    {  (void)fprintf(psrp_out,"    usage: delay_period <seconds:%04d>\n",delay_period);
        (void)fflush(psrp_out);
 
-       return(PSRP_OK);
+       return(PSRP_ERROR);
     }
 
 
+    /*------------------*/
+    /* Get delay period */
+    /*------------------*/
     /*--------------*/
     /* Sanity check */
     /*--------------*/
 
-    if (sscanf(argv[1],&tmp_delay_period) != 1 || tmp_delay_period < 0)
-    {  (void)fprintf(psrp_out,"\n    ERROR: expecting delay period (integer >= 0)\n\n");
+    if (sscanf(argv[1],"%d",&tmp_delay_period) != 1 || tmp_delay_period < 0)
+    {  (void)fprintf(psrp_out,"\n    %sERROR%s: expecting delay period (integer >= 0)\n\n",boldOn,boldOff);
        (void)fflush(psrp_out);
 
        return(PSRP_ERROR);
@@ -1156,7 +1175,7 @@ _PRIVATE int set_delay_period(int argc, char *argv[])
 
     delay_period = tmp_delay_period;
 
-    (void)fprintf(psrp_out,"    set_delay_period: scan delay period is now %04d seconds\n\n");
+    (void)fprintf(psrp_out,"    set_delay_period: scan delay period is now %04d seconds\n\n",delay_period);
     (void)fflush(psrp_out);
 
     return(PSRP_OK);
@@ -1168,11 +1187,11 @@ _PRIVATE int set_delay_period(int argc, char *argv[])
 /* PSRP API - maggot specific help */
 /*---------------------------------*/
 
-_PRIVATE int psrp_help(int argc, char *argv[])
+_PRIVATE  int32_t psrp_help(int32_t argc, char *argv[])
 
 {
      (void)fprintf(psrp_out,"\n\n    Maggot version %s PSRP API\n",MAGGOT_VERSION);
-     (void)fprintf(psrp_out,"    (C) Tumbling Dice 2023\n\n");
+     (void)fprintf(psrp_out,"    (C) Tumbling Dice 2024\n\n");
      (void)fprintf(psrp_out,"    PSRP command interface\n");
      (void)fprintf(psrp_out,"    ======================\n\n");
      (void)fprintf(psrp_out,"    status                                           : display current status of maggot\n");

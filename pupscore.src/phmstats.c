@@ -1,4 +1,4 @@
-/*----------------------------------------------------------------------------
+/*------------------------------------------------------------------------
     Access the statistics pups_maintained by `malloc'.
     Copyright 1990, 1991, 1992 Free Software Foundation, Inc.
 		  Written May 1989 by Mike Haertel.
@@ -22,32 +22,33 @@
     or (US mail) as Mike Haertel c/o Free Software Foundation.
 
     Persistent heap modification by Mark O'Neill (mao@tumblingdice.co.uk)
-    (C) 1998-2023 M.A. O'Neill, Tumbling Dice
----------------------------------------------------------------------------*/
+    (C) 1998-2024 M.A. O'Neill, Tumbling Dice
+-------------------------------------------------------------------------*/
 
 #ifndef	_PHMALLOC_INTERNAL
 #define _PHMALLOC_INTERNAL
 #include <phmalloc.h>
 #endif /* _PHMALLOC_INTERNAL */
 #include <xtypes.h>
+#include <stdint.h>
 
-_PUBLIC struct mstats phmstats (int hdes)
+_PUBLIC struct mstats phmstats (int32_t hdes)
 {
-  struct mstats result;
+    struct mstats result;
 
-  #ifdef PTHREAD_SUPPORT
-  (void)pthread_mutex_lock(&htab_mutex);
-  #endif /* PTHREAD_SUPPORT */
+    #ifdef PTHREAD_SUPPORT
+    (void)pthread_mutex_lock(&htab_mutex);
+    #endif /* PTHREAD_SUPPORT */
 
-  result.bytes_total  = (char *) (*__phmorecore) (hdes, 0) - _pheapbase[hdes];
-  result.chunks_used  = _pheap_chunks_used[hdes];
-  result.bytes_used   = _pheap_bytes_used[hdes];
-  result.chunks_free  = _pheap_chunks_free[hdes];
-  result.bytes_free   = _pheap_bytes_free[hdes];
+    result.bytes_total  = (char *) (*__phmorecore) (hdes, 0) - _pheapbase[hdes];
+    result.chunks_used  = _pheap_chunks_used[hdes];
+    result.bytes_used   = _pheap_bytes_used[hdes];
+    result.chunks_free  = _pheap_chunks_free[hdes];
+    result.bytes_free   = _pheap_bytes_free[hdes];
 
-  #ifdef PTHREAD_SUPPORT
-  (void)pthread_mutex_unlock(&htab_mutex);
-  #endif /* PTHREAD_SUPPORT */
+    #ifdef PTHREAD_SUPPORT
+    (void)pthread_mutex_unlock(&htab_mutex);
+    #endif /* PTHREAD_SUPPORT */
 
-  return result;
+    return result;
 }

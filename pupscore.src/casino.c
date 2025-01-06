@@ -1,4 +1,4 @@
-/*------------------------------------------------------------------------------
+/*----------------------------------------------------------------------------
     Purpose: Portable random number generator library. This version has bug in
              ran3() routine corrected.
 
@@ -10,45 +10,35 @@
              United Kingdom
 
     Version: 1.16
-    Dated:   4th January 2023
+    Dated:   10th Decemeber 2024
     E-Mail:  mao@tumblingdice.co.uk
-------------------------------------------------------------------------------*/
+----------------------------------------------------------------------------*/
 
 #include <me.h>
 #include <utils.h>
 #include <errno.h>
 #include <math.h>
+#include <tad.h>
 
 #undef   __NOT_LIB_SOURCE__
 #include <casino.h>
 #define  __NOT_LIB_SOURCE__
 
 
-_PRIVATE void  avevar(FTYPE [], int, FTYPE *, FTYPE *);
-_PRIVATE FTYPE betacf(FTYPE, FTYPE, FTYPE x);
-_PRIVATE FTYPE betai(FTYPE, FTYPE, FTYPE);
-_PRIVATE void  gser(FTYPE *, FTYPE a, FTYPE, FTYPE *);
-_PRIVATE void  gcf(FTYPE *, FTYPE, FTYPE, FTYPE *);
-_PRIVATE FTYPE gammq(FTYPE, FTYPE);
-_PRIVATE FTYPE factln(int);
-
-
-/*------------------------------------------------------------------------------
-    Slot and usage functions - used by slot manager ...
-------------------------------------------------------------------------------*/
-
-
+/*-------------------------------------------------*/
+/* Slot and usage functions - used by slot manager */
+/*-------------------------------------------------*/
 /*---------------------*/
 /* Slot usage function */
 /*---------------------*/
 
-_PRIVATE void casino_slot(int level)
+_PRIVATE void casino_slot(int32_t level)
 {   (void)fprintf(stderr,"lib casino %s: [ANSI C]\n",CASINO_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 1985-2023 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 1985-2024 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
-       (void)fprintf(stderr,"PUPS/P3 random number generator library (built %s %s)\n\n",__TIME__,__DATE__);
+       (void)fprintf(stderr,"PUPS/P3 random number generator library (gcc %s: built %s %s)\n\n",__VERSION__,__TIME__,__DATE__);
     }
     else
        (void)fprintf(stderr,"\n");
@@ -72,35 +62,35 @@ _EXTERN void (* SLOT )() __attribute__ ((aligned(16))) = casino_slot;
 /* Defines for 'ran1' */
 /*--------------------*/
 
-_PRIVATE _CONST int    M1  = 259200;
-_PRIVATE _CONST int    IA1 = 7141;
-_PRIVATE _CONST int    IC1 = 54773;
-_PRIVATE _CONST int    M2  = 134456;
-_PRIVATE _CONST int    IA2 = 8121;
-_PRIVATE _CONST int    IC2 = 28411;
-_PRIVATE _CONST int    M3  = 243000;
-_PRIVATE _CONST int    IA3 = 4561;
-_PRIVATE _CONST int    IC3 = 51349;
-_PRIVATE _CONST FTYPE  RM1 = 3.85802469e-6;
-_PRIVATE _CONST FTYPE  RM2 = 7.437377283e-6;
+_PRIVATE _CONST  int32_t  M1  = 259200;
+_PRIVATE _CONST  int32_t  IA1 = 7141;
+_PRIVATE _CONST  int32_t  IC1 = 54773;
+_PRIVATE _CONST  int32_t  M2  = 134456;
+_PRIVATE _CONST  int32_t  IA2 = 8121;
+_PRIVATE _CONST  int32_t  IC2 = 28411;
+_PRIVATE _CONST  int32_t  M3  = 243000;
+_PRIVATE _CONST  int32_t  IA3 = 4561;
+_PRIVATE _CONST  int32_t  IC3 = 51349;
+_PRIVATE _CONST FTYPE     RM1 = 3.85802469e-6;
+_PRIVATE _CONST FTYPE     RM2 = 7.437377283e-6;
 
 
 /*--------------------*.
 /* Defines for 'ran2' */
 /*--------------------*/
 
-_PRIVATE _CONST int M  = 714025;
-_PRIVATE _CONST int IA = 1366;
-_PRIVATE _CONST int IC = 150889;
+_PRIVATE _CONST  int32_t M   = 714025;
+_PRIVATE _CONST  int32_t IA  = 1366;
+_PRIVATE _CONST  int32_t IC  = 150889;
 
 
 /*--------------------*/
 /* Defines for 'ran3' */
 /*--------------------*/
 
-_PRIVATE _CONST int MBIG   = 1000000000;
-_PRIVATE _CONST int MSEED  = 161803398;
-_PRIVATE _CONST int MZ     = 0;
+_PRIVATE _CONST  int32_t MBIG   = 1000000000;
+_PRIVATE _CONST  int32_t MSEED  = 161803398;
+_PRIVATE _CONST  int32_t MZ     = 0;
 
 _PRIVATE _CONST FTYPE FAC  = 1.0e-9;
 
@@ -116,18 +106,11 @@ _PUBLIC long r_init;
 /* Functions which are private to this library */
 /*---------------------------------------------*/
 
-// Log of Gamma function 
-_PROTOTYPE _PRIVATE FTYPE gammln(FTYPE);
 
-
-// Incomplete beta function
-_PROTOTYPE _PRIVATE FTYPE betai(FTYPE, FTYPE, FTYPE);
-
-
-/*------------------------------------------------------------------------------
-    Portable random number generator based on the 'ran1' uniform deviate
-    generator described in "Numerical Recipes in C" ...
-------------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------------*/
+/* Portable random number generator based on the 'ran1' uniform deviates */
+/* generator described in "Numerical Recipes in C"                       */
+/*-----------------------------------------------------------------------*/
 
 _PUBLIC FTYPE ran1(void)
 
@@ -138,15 +121,15 @@ _PUBLIC FTYPE ran1(void)
     /* negative value to reinitialise the sequence                      */
     /*------------------------------------------------------------------*/
 
-    _IMMORTAL long ix1,
-                   ix2,
-                   ix3;
+    _IMMORTAL  int64_t ix1,
+                       ix2,
+                       ix3;
 
     _IMMORTAL FTYPE r[98] = { 0.0 };
     FTYPE     temp;
 
-    _IMMORTAL int iff = 0;
-    int           j;
+    _IMMORTAL int32_t iff = 0;
+     int32_t          j;
 
 
     /*------------------------------------------------*/
@@ -237,10 +220,10 @@ _PUBLIC FTYPE ran1(void)
 
 
 
-/*------------------------------------------------------------------------------
-    Random number generator based on the 'ran2' deviate generator
-    described in "Numerical Recipes in C" ...
-------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------*/
+/* Random number generator based on the 'ran2' deviate generator */
+/* described in "Numerical Recipes in C"                         */
+/*---------------------------------------------------------------*/
 
 _PUBLIC FTYPE ran2(void)
 
@@ -251,12 +234,12 @@ _PUBLIC FTYPE ran2(void)
      /* negative value to initialise or reintialise the sequence         */
      /* -----------------------------------------------------------------*/
 
-     _IMMORTAL long iy,
-                    ir[98] = { 0L };
+     _IMMORTAL  int64_t iy,
+                        ir[98] = { 0L };
 
-     _IMMORTAL int  iff = 0;
+     _IMMORTAL  int32_t iff = 0;
 
-     int j;
+     uint32_t           j;
 
      if(r_init < 0 || iff == 0)
      {  iff = 1;
@@ -294,11 +277,11 @@ _PUBLIC FTYPE ran2(void)
 
 
 
-/*------------------------------------------------------------------------------
-    Random number generator based upon the random deviate generator
-    'ran3' described in "Numerical Recipes in C", which is in turn
-    based on the portable random deviate generator proposed by Knuth ...
-------------------------------------------------------------------------------*/
+/*------------------------------------------------------------------*/
+/* Random number generator based upon the random deviate generator  */
+/* 'ran3' described in "Numerical Recipes in C", which is in turn   */
+/* based on the portable random deviate generator proposed by Knuth */
+/*------------------------------------------------------------------*/
 
 _PUBLIC FTYPE ran3(void)
 
@@ -306,26 +289,26 @@ _PUBLIC FTYPE ran3(void)
 
     /*---------------------------------------------------------------------*/
     /* Returns a random deviate in the range 0.0 to 1.0. Set r_init to any */
-    /* negative value to intialise or reinitialise the sequence            */
+    /* negative value to  int32_tialise or reinitialise the sequence            */
     /*---------------------------------------------------------------------*/
 
-    _IMMORTAL int inext,
-                  inextp;
+    _IMMORTAL  int32_t inext,
+                       inextp;
 
 
     /*----------------------------------------------*/
     /* This value should not be modified, see Knuth */
     /*----------------------------------------------*/
 
-    _IMMORTAL long ma[56] = { 0L };
-    _IMMORTAL int iff     = 0;
+    _IMMORTAL  uint64_t ma[56] = { 0L };
+    _IMMORTAL  int32_t  iff     = 0;
 
-    long mj,
-         mk;
+     int64_t   mj,
+               mk;
 
-    int i,
-        ii,
-         k;
+     uint32_t  i,
+               ii,
+               k;
 
 
     /*----------------*/
@@ -340,7 +323,7 @@ _PUBLIC FTYPE ran3(void)
        /* Initialize ma[56] using the seed r_init and the large number MSEED */
        /*--------------------------------------------------------------------*/
 
-       mj     =  MSEED - ((int)r_init < 0 ? -(int)r_init: (int)r_init);
+       mj     =  MSEED - ((int32_t)r_init < 0 ? -(int32_t)r_init: (int32_t)r_init);
        mj     %= MBIG;
        ma[55] =  mj;
        mk     =  1;
@@ -383,8 +366,11 @@ _PUBLIC FTYPE ran3(void)
        r_init  = 1;
     }
 
-    if(++inext == 56)  inext  = 1;
-    if(++inextp == 56) inextp = 1;
+    if(++inext  == 56)
+       inext  = 1;
+
+    if(++inextp == 56)
+       inextp = 1;
 
     /*--------------------------------------------------------------------*/
     /* Here is where we start, except on initialisation. Increment inext, */
@@ -409,7 +395,7 @@ _PUBLIC FTYPE ran3(void)
 /*-----------------------------------------------------------------------------*/
 /* Long period random number generator of L'Ecuyer with Bays-Durham shuffle    */
 /* as added safeguards. Returns a uniform random deviate between 0.0 and 1.0.  */
-/* Call with idum as a negative integer to initialise; thereafter do not       */
+/* Call with idum as a negative  int32_teger to initialise; thereafter do not       */
 /* alter idum between calls. RNMX should aproximate the largest floating point */
 /* value which is less than one                                                */
 /*-----------------------------------------------------------------------------*/
@@ -430,10 +416,10 @@ _PUBLIC FTYPE ran3(void)
 #define LRNMX (1.0 - LEPS)
 
 
-_PUBLIC FTYPE ran4(long *idum)
+_PUBLIC FTYPE ran4(int64_t  *idum)
 
-{   int  j;
-    long k;
+{    int32_t  j;
+     int64_t  k;
 
     _IMMORTAL long idum2     = 123456789;
     _IMMORTAL long iy        = 0L;
@@ -543,16 +529,23 @@ _PUBLIC FTYPE ran4(long *idum)
 #define EPS   1.2e-7
 #define RNMX  (1.0 - EPS)
 
+#ifdef PTHREAD_SUPPORT
+pthread_mutex_t access_mutex;
+#endif /* PTHREAD_SUPPORT */
 
-_PROTOTYPE _PUBLIC FTYPE ran5(long *idum)
+_PROTOTYPE _PUBLIC FTYPE ran5(int64_t  *idum)
 
-{    int  j;
-     long k;
+{     int32_t  j;
+      int64_t  k;
 
-     _IMMORTAL long iy = 0,
-                    iv[NTAB];
+     _IMMORTAL  int64_t iy = 0,
+                        iv[NTAB];
 
      FTYPE temp;
+
+     #ifdef PTHREAD_SUPPORT
+     (void)pthread_mutex_lock(&access_mutex);
+     #endif /* PTHREAD SUPPORT */
 
 
      /*-----------------------*/
@@ -588,7 +581,7 @@ _PROTOTYPE _PUBLIC FTYPE ran5(long *idum)
      /* Start here when not initialising */
      /*----------------------------------*/
 
-     k     = (*idum)/IQ;
+     k = (*idum)/IQ;
 
 
      /*--------------------------------------------------------------------*/
@@ -604,6 +597,10 @@ _PROTOTYPE _PUBLIC FTYPE ran5(long *idum)
      iy = iv[j];
      iv[j] = *idum;
 
+     #ifdef PTHREAD_SUPPORT
+     (void)pthread_mutex_unlock(&access_mutex);
+     #endif /* PTHREAD SUPPORT */
+
      if((temp = AM*iy) > RNMX)
         return(RNMX);
      else
@@ -612,21 +609,24 @@ _PROTOTYPE _PUBLIC FTYPE ran5(long *idum)
 
 
 
+/*----------------------------------------------------------------*/
+/* Return a normally distributed deviate with zero mean, and unit */
+/* variance using user defined random number generator            */
+/*----------------------------------------------------------------*/
 
-/*------------------------------------------------------------------------------
-    Return a normally distributed deviate with zero mean, and unit
-    variance using user defined random number generator ...
-------------------------------------------------------------------------------*/
+_PUBLIC FTYPE gasdev(FTYPE (* ran)(__UDEF_ARGS__), const FTYPE variance)
 
-_PUBLIC FTYPE gasdev(FTYPE (* ran)(void), FTYPE variance)
-
-{   _IMMORTAL int iset = 0;
-    _IMMORTAL FTYPE  gset;
+{   _IMMORTAL int32_t iset = 0;
+    _IMMORTAL FTYPE   gset;
 
     FTYPE fac,
           r,
           v1,
           v2;
+
+    #ifdef PTHREAD_SUPPORT
+    (void)pthread_mutex_lock(&access_mutex);
+    #endif /* PTHREAD SUPPORT */
 
     if(iset == 0)
     {  do {
@@ -640,7 +640,7 @@ _PUBLIC FTYPE gasdev(FTYPE (* ran)(void), FTYPE variance)
               v2 = 2.0*(*ran)() - 1.0;
 
               r = v1*v1 + v2*v2;
-          } while(r >= 1.0);
+          } while (r >= 1.0);
           fac = SQRT(-2.0*LOG(r)/r);
 
 
@@ -652,25 +652,33 @@ _PUBLIC FTYPE gasdev(FTYPE (* ran)(void), FTYPE variance)
           gset = v1*fac;
           iset = 1;        // Set flag 
 
+          #ifdef PTHREAD_SUPPORT
+          (void)pthread_mutex_unlock(&access_mutex);
+          #endif /* PTHREAD SUPPORT */
+
           return((FTYPE)(v2*fac*SQRT(variance)));
      }
      else
      {  iset = 0;
+
+        #ifdef PTHREAD_SUPPORT
+        (void)pthread_mutex_unlock(&access_mutex);
+        #endif /* PTHREAD SUPPORT */
+
         return((FTYPE)gset*SQRT(variance));
      }
 }
 
 
 
+/*--------------------------------------------------------------*/
+/* Return Gaussian distribution using the central limit theorem */
+/*--------------------------------------------------------------*/
 
-/*------------------------------------------------------------------------------
-    Return Gaussian distribution using the central limit theorem ...
-------------------------------------------------------------------------------*/
+_PUBLIC FTYPE gasdev2(FTYPE (*ran)(__UDEF_ARGS__) , const uint32_t n, const FTYPE variance)
 
-_PUBLIC FTYPE gasdev2(FTYPE (*ran)(void) , FTYPE variance)
-
-{   int    i = 5;
-    FTYPE ret;
+{   uint32_t  i;
+    FTYPE     ret;
 
 
     /*----------------------------------------------------------------------*/
@@ -679,7 +687,7 @@ _PUBLIC FTYPE gasdev2(FTYPE (*ran)(void) , FTYPE variance)
     /*----------------------------------------------------------------------*/
 
     ret = 0.0;
-    for(i=0; i<5; ++i)
+    for(i=0; i<n; ++i)
        ret += (*ran)();
 
     ret = (ret - 2.50)*SQRT(12.0*variance)/5.0;
@@ -694,13 +702,13 @@ _PUBLIC FTYPE gasdev2(FTYPE (*ran)(void) , FTYPE variance)
     Return the log of the gamma function ...
 ------------------------------------------------------------------------------*/
 
-_PRIVATE FTYPE gammln(FTYPE xx)
+_PRIVATE FTYPE gammln(const FTYPE xx)
 
 {
 
     /*------------------------------------------------------------------------*/
     /* Returns the log of the gamma function for xx > 0. Full accuracy is     */
-    /* obtained if xx > 1. For 0 < xx < 1, the refelction formula can be used */
+    /* obtained if xx > 1. For 0 < xx < 1, the reflection formula can be used */
     /* first                                                                  */
     /*------------------------------------------------------------------------*/
 
@@ -708,21 +716,15 @@ _PRIVATE FTYPE gammln(FTYPE xx)
           tmp,
           ser;
 
-    _IMMORTAL FTYPE cof[6] = {  76.18009173,
-                                -86.50532033,
-                                 24.01409822,
-                                -1.231739516,
-                                 0.120858003e-2,
-                                 -0.536382e-5
-                             };
+    FTYPE cof[6] = {     76.18009173,
+                        -86.50532033,
+                         24.01409822,
+                        -1.231739516,
+                         0.120858003e-2,
+                        -0.536382e-5
+                   };
 
-    int j;
-
-
-    /*---------------------------------------------------------------------*/
-    /* Internal arithmetic will be done in FTYPE precision, a nicety which */
-    /* can be omitted, if five figure accuracy is sufficient               */
-    /*---------------------------------------------------------------------*/
+    uint32_t j;
 
     x    = xx - 1.0;
     tmp  =  x + 5.5;
@@ -740,16 +742,16 @@ _PRIVATE FTYPE gammln(FTYPE xx)
 
 
 
-/*------------------------------------------------------------------------------
-    Return N! as a floating point number ...
-------------------------------------------------------------------------------*/
+/*--------------------------------------*/
+/* Return n! as a floating point number */
+/*--------------------------------------*/
 
-_PUBLIC FTYPE factrl(int n)
+_PUBLIC FTYPE factrl(const uint32_t n)
 
-{   _IMMORTAL int ntop = 4;
-    _IMMORTAL FTYPE a[33] = {1.0, 1.0, 2.0, 6.0, 24.0};
+{   _IMMORTAL  int32_t ntop = 4;
+    _IMMORTAL FTYPE    a[33] = {1.0, 1.0, 2.0, 6.0, 24.0};
 
-    int j;
+    uint32_t j;
 
     pups_set_errno(OK);
     if(n < 0)
@@ -761,14 +763,23 @@ _PUBLIC FTYPE factrl(int n)
       return(EXP(gammln(n+1.0)));
 
 
-    /*----------------------------*/
-    /* This may cause an overflow */
-    /*----------------------------*/
+     #ifdef PTHREAD_SUPPORT
+     (void)pthread_mutex_lock(&access_mutex);
+     #endif /* PTHREAD SUPPORT */
+
+
+    /*----------------------------------------------*/
+    /* This may cause an overflow if n is too large */
+    /*----------------------------------------------*/
 
     while(ntop < n)
     {    j = ntop++;
          a[ntop] = a[j]*ntop;
     }
+
+     #ifdef PTHREAD_SUPPORT
+     (void)pthread_mutex_unlock(&access_mutex);
+     #endif /* PTHREAD SUPPORT */
 
     return(a[n]);
 }
@@ -776,37 +787,48 @@ _PUBLIC FTYPE factrl(int n)
 
 
 
-/*--------------------------------------------------------------------------------
-    Returns ln(n!) ...
---------------------------------------------------------------------------------*/
+/*----------------*/
+/* Returns ln(n!) */
+/*----------------*/
 
-_PRIVATE FTYPE factln(int n)
+_PUBLIC FTYPE factln(const uint32_t n)
 
-{   _IMMORTAL FTYPE a[101];
+{    _IMMORTAL FTYPE a[101];
 
-    pups_set_errno(OK);
-    if(n < 0)
-    {  pups_set_errno(EDOM);
-       return(-1.0);
-    }
+     pups_set_errno(OK);
 
-    if(n <= 1)
-       return(0.0);
+     if(n <= 1)
+     {  pups_set_errno(EINVAL);;
+        return(0.0);
+     }
 
-    if(n <= 100)
-       return( a[n] ? a[n] : (a[n] = gammln(n+1.0)) );
-    else
-       return(gammln(n+1.0));
+     if(n <= 100)
+     {  FTYPE ret;
+
+        #ifdef PTHREAD_SUPPORT
+        (void)pthread_mutex_lock(&access_mutex);
+        #endif /* PTHREAD SUPPORT */
+
+        ret =  a[n] ? a[n] : (a[n] = gammln(n+1.0));
+
+        #ifdef PTHREAD_SUPPORT
+        (void)pthread_mutex_unlock(&access_mutex);
+        #endif /* PTHREAD SUPPORT */
+
+        return(ret);
+     }
+     else
+        return(gammln(n+1.0));
 }
 
 
 
 
-/*--------------------------------------------------------------------------------
-    Return binomial coefficient as a floating point number ...
---------------------------------------------------------------------------------*/
+/*--------------------------------------------------------*/
+/* Return binomial coefficient as a floating point number */
+/*--------------------------------------------------------*/
 
-_PUBLIC FTYPE bico(int n, int k)
+_PUBLIC FTYPE bico(const uint32_t n, const uint32_t k)
 
 {   return(floor(0.5 + EXP(factln(n) - factln(k) - factln(n-k))));
 }
@@ -814,33 +836,30 @@ _PUBLIC FTYPE bico(int n, int k)
 
 
 
-/*------------------------------------------------------------------------------
-    Generate gamma distribution ...
-------------------------------------------------------------------------------*/
+/*-----------------------------*/
+/* Generate gamma distribution */
+/*-----------------------------*/
 
-_PUBLIC FTYPE gamdev(int ia, FTYPE (*ran)(void))
+_PUBLIC FTYPE gamdev(const uint32_t ia, FTYPE (*ran)(void))
 
 {
 
     /*-----------------------------------------------------------------------*/
-    /* Return a deviate distributed as a gamma distribution of integer order */
+    /* Return a deviate distributed as a gamma distribution of  int32_teger order */
     /* ia, i.e. a waiting time to the iath event in a Poisson process of     */
     /* unit mean, using the function pointed to by 'ran' as the source of    */
     /* uniform deviates                                                      */
     /*-----------------------------------------------------------------------*/
 
-    int j;
+    uint32_t j;
 
-    FTYPE am,
-          e,
-          s,
-          v1,
-          v2,
-          x,
-          y;
-
-    if(ia < 1)
-       pups_error("[gamdev] incorrect parameter");
+    FTYPE   am,
+            e,
+            s,
+            v1,
+            v2,
+            x,
+            y;
 
 
     /*----------------------------------------*/
@@ -901,16 +920,16 @@ _PUBLIC FTYPE gamdev(int ia, FTYPE (*ran)(void))
 
 
 
-/*------------------------------------------------------------------------------
-    Possion deviate distribution ...
-------------------------------------------------------------------------------*/
+/*------------------------------*/
+/* Possion deviate distribution */
+/*------------------------------*/
 
-_PUBLIC FTYPE poidev(FTYPE xm, FTYPE (*ran)(void))
+_PUBLIC FTYPE poidev(const FTYPE xm, FTYPE (*ran)(__UDEF_ARGS__))
 
 {
 
     /*--------------------------------------------------------------------*/
-    /* Returns as floating point number an integer value that is a random */
+    /* Returns as floating point number an  int32_teger value that is a random */
     /* deviate drawn from a Poisson distribution of mean xm, using the    */
     /* random deviate generator pointed to by 'ran'                       */
     /*--------------------------------------------------------------------*/
@@ -923,6 +942,11 @@ _PUBLIC FTYPE poidev(FTYPE xm, FTYPE (*ran)(void))
     FTYPE em,
           t,
           y;
+
+
+    #ifdef PTHREAD_SUPPORT
+    (void)pthread_mutex_lock(&access_mutex);
+    #endif /* PTHREAD SUPPORT */
 
 
     /*-------------------*/
@@ -996,7 +1020,7 @@ _PUBLIC FTYPE poidev(FTYPE xm, FTYPE (*ran)(void))
 
 
                  /*--------------------------------------------*/
-                 /*  The trick for integer based distributions */
+                 /*  The trick for  int32_teger based distributions */
                  /*--------------------------------------------*/
 
                  em = floor(em);
@@ -1012,29 +1036,33 @@ _PUBLIC FTYPE poidev(FTYPE xm, FTYPE (*ran)(void))
              } while((*ran)() > t);
     }
 
+    #ifdef PTHREAD_SUPPORT
+    (void)pthread_mutex_unlock(&access_mutex);
+    #endif /* PTHREAD SUPPORT */
+
     return((FTYPE)em);
 }
 
 
 
-/*------------------------------------------------------------------------------
-    Binomial distribution ...
-------------------------------------------------------------------------------*/
+/*-----------------------*/
+/* Binomial distribution */
+/*-----------------------*/
 
-_PUBLIC FTYPE bnldev(FTYPE pp, int n, FTYPE (*ran)())
+_PUBLIC FTYPE bnldev(const FTYPE pp, const uint32_t n, FTYPE (*ran)())
 
 {
 
     /*-------------------------------------------------------------------------*/
-    /* Return as a FTYPE precision floating point number, an integer value     */
+    /* Return as a FTYPE precision floating point number, an  int32_teger value     */
     /* that is a random deviate drawn from a binomial distribution of n trials */
     /* each of probability pp, using 'ran' as a source of uniform random       */
     /* deviates                                                                */
     /*-------------------------------------------------------------------------*/
 
-    int j;
+    uint32_t j;
 
-    _IMMORTAL int nold = (-1);
+    _IMMORTAL int32_t nold = (-1);
 
     FTYPE am,
           em,
@@ -1052,6 +1080,11 @@ _PUBLIC FTYPE bnldev(FTYPE pp, int n, FTYPE (*ran)())
                     pclog,
                     en,
                     oldg;
+
+
+    #ifdef PTHREAD_SUPPORT
+    (void)pthread_mutex_lock(&access_mutex);
+    #endif /* PTHREAD SUPPORT */
 
     p = (pp <= 0.5 ? pp : 1.0 - pp);
 
@@ -1135,7 +1168,7 @@ _PUBLIC FTYPE bnldev(FTYPE pp, int n, FTYPE (*ran)())
 
 
                                     /*---------------------------------------*/
-                 em = floor(em);    /* Trick for integer valued distribution */
+                 em = floor(em);    /* Trick for  int32_teger valued distribution */
                                     /*---------------------------------------*/
 
                  t = 1.2*sq*(1.0 + y*y)*EXP(oldg - gammln(em+1.0) -
@@ -1160,20 +1193,24 @@ _PUBLIC FTYPE bnldev(FTYPE pp, int n, FTYPE (*ran)())
     if(p != pp)
        bnl = n - bnl;
 
+    #ifdef PTHREAD_SUPPORT
+    (void)pthread_mutex_unlock(&access_mutex);
+    #endif /* PTHREAD SUPPORT */
+
     return((FTYPE)bnl);
 }
 
 
 
 
-/*------------------------------------------------------------------------------
-    Generate a user defined distribution from a numerical function ...
-------------------------------------------------------------------------------*/
+/*----------------------------------------------------------------*/
+/* Generate a user defined distribution from a numerical function */
+/*----------------------------------------------------------------*/
 
-_PUBLIC FTYPE numdev(FTYPE (*ran)(void) , gate_type *gate_f)
+_PUBLIC FTYPE numdev(FTYPE (*ran)(__UDEF_ARGS__) , const gate_type *gate_f)
 
-{   int i;
-    FTYPE level;
+{   uint32_t i;
+    FTYPE    level;
 
 
     /*------------------------*/
@@ -1210,16 +1247,16 @@ _PUBLIC FTYPE numdev(FTYPE (*ran)(void) , gate_type *gate_f)
 
 
 
-/*------------------------------------------------------------------------------
-    Routine to compute the number of unique combinations of n objects
-    taken from a set of m objects ...
-------------------------------------------------------------------------------*/
+/*-------------------------------------------------------------------*/
+/* Routine to compute the number of unique combinations of n objects */
+/* taken from a set of m objects                                     */
+/*-------------------------------------------------------------------*/
 
-_PUBLIC int n_from_m(int n, int m)
+_PUBLIC  int32_t n_from_m(const uint32_t    n, const uint32_t    m)
 
-{   int i,
-        ret         = 1,
-        n_factorial = 1;
+{   uint32_t i,
+             ret         = 1,
+             n_factorial = 1;
 
 
     /*---------------------*/
@@ -1243,20 +1280,20 @@ _PUBLIC int n_from_m(int n, int m)
 
 
 
-/*-----------------------------------------------------------------------------
-    Routine to gernerate the error function, erfcc ...
------------------------------------------------------------------------------*/
+/*-----------------------------------------------*/
+/* Routine to generate the error function, erfcc */
+/*-----------------------------------------------*/
 
-_PRIVATE FTYPE erfcc(FTYPE x)
+_PUBLIC FTYPE erfcc(const FTYPE x)
 
 {   FTYPE t,
           z,
           ans;
 
-    z   = fabs(x);
+    z   = FABS(x);
     t   = 1.0 / (1.0 + 0.5*z);
-    ans = t*EXP(-z*z - 1.26551223 + t*(1.00002368 + t*
-                       (0.37409196 + t*(0.09678418 + t*
+    ans = t*EXP(-z*z - 1.26551223   + t*(1.00002368 + t*
+                       (0.37409196  + t*(0.09678418 + t*
                        (-0.18628806 + t*(0.27886807 + t*
                        (-1.13520398 + t*(1.48851587 + t*
                        (-0.82215223 + t*0.17087277)))))))));
@@ -1267,15 +1304,15 @@ _PRIVATE FTYPE erfcc(FTYPE x)
 
 
  
-/*-----------------------------------------------------------------------------
-    Crank routine used by Spearmans rank correlation routine ...
------------------------------------------------------------------------------*/
+/*----------------------------------------------------------*/
+/* Crank routine used by Spearmans rank correlation routine */
+/*----------------------------------------------------------*/
 
-_PRIVATE void crank(int n, FTYPE w[], FTYPE *s)
+_PRIVATE void crank(const uint32_t n, FTYPE w[], FTYPE *s)
 
-{   int j = 0,
-           ji,
-           jt;
+{   uint32_t j = 0,
+             ji,
+             jt;
 
     FTYPE t,
           rank;
@@ -1313,20 +1350,20 @@ _PRIVATE void crank(int n, FTYPE w[], FTYPE *s)
 
 
 
-/*-----------------------------------------------------------------------------
-    Routine to perform non parametric rank correlation [Spearman] ...
------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------*/
+/* Routine to perform non parametric rank correlation [Spearman] */
+/*---------------------------------------------------------------*/
 
-_PUBLIC void spear(FTYPE   data1[],      // Data array 1
-                   FTYPE   data2[],      // Data array 2
-                   int           n,      // Number of data elements
-                   FTYPE        *d,      // Sum squared difference of ranks
-                   FTYPE       *zd,      // Deviation from null hypothesis
-                   FTYPE    *probd,      // Two sided significance
-                   FTYPE       *rs,      // Spearmans's rank correlation
-                   FTYPE   *probrs)      // Significance of rs dev from zero
+_PUBLIC void spear(const FTYPE        data1[],  // Data array 1
+                   const FTYPE        data2[],  // Data array 2
+                   const uint32_t           n,  // Number of data elements
+                   FTYPE                   *d,  // Sum squared difference of ranks
+                   FTYPE                  *zd,  // Deviation from null hypothesis
+                   FTYPE               *probd,  // Two sided significance
+                   FTYPE                  *rs,  // Spearmans's rank correlation
+                   FTYPE              *probrs)  // Significance of rs dev from zero
 
-{   int j;
+{   uint32_t j;
 
     FTYPE vard,
           t,
@@ -1353,10 +1390,10 @@ _PUBLIC void spear(FTYPE   data1[],      // Data array 1
     /* Sort each of the data arrays and convert the entries to ranks */
     /*---------------------------------------------------------------*/
 
-    sort2(n,wksp1,wksp2);
+    pups_sort(n,wksp1,wksp2);
     crank(n,wksp1,wksp2);
 
-    sort2(n,wksp1,wksp2);
+    pups_sort(n,wksp1,wksp2);
     crank(n,wksp1,wksp2);
 
     *d = 0.0;
@@ -1429,11 +1466,11 @@ _PUBLIC void spear(FTYPE   data1[],      // Data array 1
 
 
 
-/*-----------------------------------------------------------------------------
-    Routine to compute the incomplete beta functions ...
------------------------------------------------------------------------------*/
+/*--------------------------------------------------*/
+/* Routine to compute the incomplete beta functions */
+/*--------------------------------------------------*/
 
-_PRIVATE FTYPE betai(FTYPE a, FTYPE b, FTYPE x)
+_PUBLIC FTYPE betai(const FTYPE a, const FTYPE b, const FTYPE x)
 
 {   FTYPE bt;
 
@@ -1455,21 +1492,21 @@ _PRIVATE FTYPE betai(FTYPE a, FTYPE b, FTYPE x)
 
 
 
-/*-----------------------------------------------------------------------------
-    Routine to determine the linear correlation between two sets of
-    variables ...
------------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------*/
+/* Routine to determine the linear correlation between two sets of */
+/* variables                                                       */ 
+/*-----------------------------------------------------------------*/
 
 #define TINY 1.0e-20
 
-_PUBLIC void pearsn(FTYPE     x[],      // Data array 1 
-                    FTYPE     y[],      // Data array 2
-                    int         n,      // Number of elements in data array
-                    FTYPE      *r,      // Linear correlation coefficient
-                    FTYPE   *prob,      // Significance of correlation
-                    FTYPE      *z)      // Fisher's Z
+_PUBLIC void pearsn(const FTYPE          x[],  // Data array 1 
+                    const FTYPE          y[],  // Data array 2
+                    const uint32_t         n,  // Number of elements in data array
+                    FTYPE                 *r,  // Linear correlation coefficient
+                    FTYPE              *prob,  // Significance of correlation
+                    FTYPE                 *z)  // Fisher's Z
 
-{   int j;
+{   uint32_t j;
 
     FTYPE yt,
           xt,
@@ -1530,22 +1567,22 @@ _PUBLIC void pearsn(FTYPE     x[],      // Data array 1
 
 
 
-/*------------------------------------------------------------------------------
-    Return the mean, standard, deviation, variance, skewness and kurtosis of a
-    distribution ...
-------------------------------------------------------------------------------*/
+/*----------------------------------------------------------------------------*/
+/* Return the mean, standard, deviation, variance, skewness and kurtosis of a */
+/* distribution                                                               */
+/*----------------------------------------------------------------------------*/
 
-_PUBLIC void moment(FTYPE data[],   // Data to be analysed
-                    int        n,   // Number of pts in dataset
-                    FTYPE   *ave,   // Average deviation
-                    FTYPE   *rms,   // Root mean square error
-                    FTYPE  *adev,   // Average deviation
-                    FTYPE  *sdev,   // Standard deviation
-                    FTYPE  *svar,   // Variance
-                    FTYPE  *skew,   // Skewness
-                    FTYPE  *curt)   // Kurtosis
+_PUBLIC void moment(const FTYPE        data[],   // Data to be analysed
+                    const uint32_t          n,   // Number of pts in dataset
+                    FTYPE                *ave,   // Average deviation
+                    FTYPE                *rms,   // Root mean square error
+                    FTYPE               *adev,   // Average deviation
+                    FTYPE               *sdev,   // Standard deviation
+                    FTYPE               *svar,   // Variance
+                    FTYPE               *skew,   // Skewness
+                    FTYPE               *curt)   // Kurtosis
 
-{   int j;
+{   uint32_t j;
 
     FTYPE s = 0.0,
            r = 0.0,
@@ -1611,19 +1648,19 @@ _PUBLIC void moment(FTYPE data[],   // Data to be analysed
 
 
 
-/*------------------------------------------------------------------------------
-    Routine to test whether two distributions have the same mean. The
-    result of the Student t test is returned as t, and its significance
-    as prob. This routine is based on that given in Numerical Recipes in C
-    p616 ...
-------------------------------------------------------------------------------*/
+/*-------------------------------------------------------------------------*/
+/* Routine to test whether two distributions have the same mean. The       */
+/* result of the Student t test is returned as t, and its significance     */
+/*  as prob. This routine is based on that given in Numerical Recipes in C */
+/*  p616                                                                   */
+/*-------------------------------------------------------------------------*/
 
-_PUBLIC void ttest(FTYPE   data_1[],
-                   int           n1,
-                   FTYPE   data_2[],
-                   int           n2,
-                   FTYPE         *t,
-                   FTYPE      *prob)
+_PUBLIC void ttest(const FTYPE   data_1[],
+                   uint32_t            n1,
+                   const FTYPE   data_2[],
+                   uint32_t            n2,
+                   FTYPE               *t,
+                   FTYPE            *prob)
 
 
 {   FTYPE df,
@@ -1646,13 +1683,13 @@ _PUBLIC void ttest(FTYPE   data_1[],
 
 
 
-/*------------------------------------------------------------------------------
-    Find mean and variance of array ...
-------------------------------------------------------------------------------*/
+/*--------------------------------------*/
+/* Find mean and variance of data array */
+/*--------------------------------------*/
 
-_PRIVATE void avevar(FTYPE data[], int n, FTYPE *ave, FTYPE *var)
+_PUBLIC void avevar(const FTYPE data[], const uint32_t n, FTYPE *ave, FTYPE *var)
 
-{   int j;
+{   uint32_t j;
 
     FTYPE s,
           ep;
@@ -1675,17 +1712,17 @@ _PRIVATE void avevar(FTYPE data[], int n, FTYPE *ave, FTYPE *var)
 
 
 
-/*-----------------------------------------------------------------------------
-    Student's t for significantly different means where the two populations
-    to be compared have significantly different variances ...
------------------------------------------------------------------------------*/
+/*-------------------------------------------------------------------------*/
+/* Student's t for significantly different means where the two populations */
+/* to be compared have significantly different variances                   */
+/*-------------------------------------------------------------------------*/
 
-_PUBLIC void tutest(FTYPE data_1[],
-                    int         n1,
-                    FTYPE data_2[],
-                    int         n2,
-                    FTYPE       *t,
-                    FTYPE    *prob)
+_PUBLIC void tutest(const FTYPE         data_1[],
+                    const uint32_t            n1,
+                    const FTYPE         data_2[],
+                    const uint32_t            n2,
+                    FTYPE                     *t,
+                    FTYPE                  *prob)
 
 
 {   FTYPE df     = 0.0,
@@ -1714,24 +1751,25 @@ _PUBLIC void tutest(FTYPE data_1[],
 
 
 
-/*------------------------------------------------------------------------------
-    Compute chi-square and two measure of association for two different
-    distributions, Cramer's V and the contingency coefficient ...
-------------------------------------------------------------------------------*/
+/*----------------------------------------------------------------------*/
+/* Compute chi-square and two measures of association for two different */
+/* distributions, Cramer's V and the contingency coefficient            */
+/*----------------------------------------------------------------------*/
 
-_PUBLIC void cntab1(int       **nn,
-                    int         ni,
-                    int         nj,
-                    FTYPE   *chisq,
-                    FTYPE      *df,
-                    FTYPE    *prob,
-                    FTYPE  *cramrv,
-                    FTYPE     *ccc)
-{   int nnj,
-        nni,
-        j,
-        i,
-        minij;
+_PUBLIC void cntab1(const uint32_t        **nn,
+                    const uint32_t          ni,
+                    const uint32_t          nj,
+                    FTYPE               *chisq,
+                    FTYPE                  *df,
+                    FTYPE                *prob,
+                    FTYPE              *cramrv,
+                    FTYPE                 *ccc)
+
+{   uint32_t nnj,
+             nni,
+             j,
+             i,
+             minij;
 
     FTYPE sum      = 0.0,
           expectd,
@@ -1829,15 +1867,15 @@ _PUBLIC void cntab1(int       **nn,
 #define FPMIN 1.0e-30
 
 
-/*------------------------------------------------------------------------------
-    Evaluate the continued fraction for incomplete beta function using
-    Lentz's method ...
-------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------*/
+/*  Evaluate the continued fraction for incomplete beta function using */
+/*  Lentz's method                                                     */
+/*---------------------------------------------------------------------*/
 
-_PRIVATE FTYPE betacf(FTYPE a, FTYPE b, FTYPE x)
+_PUBLIC FTYPE betacf(const FTYPE a, const FTYPE b, const FTYPE x)
 
-{   int m,
-        m2;
+{    int32_t m,
+             m2;
 
     FTYPE aa,
            c,
@@ -1922,11 +1960,11 @@ _PRIVATE FTYPE betacf(FTYPE a, FTYPE b, FTYPE x)
 
 
 
-/*-----------------------------------------------------------------------------
-    Return the incomplete gamma function ...
------------------------------------------------------------------------------*/
+/*----------------------------------------*/
+/* Evaluate the incomplete gamma function */
+/*----------------------------------------*/
 
-_PRIVATE FTYPE gammq(FTYPE a, FTYPE x)
+_PUBLIC  FTYPE gammq(const FTYPE a, const FTYPE x)
 
 {   FTYPE gamser,
           gammcf,
@@ -1960,14 +1998,13 @@ _PRIVATE FTYPE gammq(FTYPE a, FTYPE x)
 
 
 
-/*------------------------------------------------------------------------------
-    Return the incomplete gamma function evaluated by its series
-    representation ...
-------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------*/
+/* Evaluate the incomplete gamma function by its series representation */
+/*---------------------------------------------------------------------*/
 
-_PRIVATE void gser(FTYPE *gamser, FTYPE a, FTYPE x, FTYPE *gln)
+_PUBLIC void gser(FTYPE *gamser, const FTYPE a, const FTYPE x, FTYPE *gln)
 
-{   int n;
+{   uint32_t n;
 
     FTYPE sum = 0.0,
            del,
@@ -2003,13 +2040,13 @@ _PRIVATE void gser(FTYPE *gamser, FTYPE a, FTYPE x, FTYPE *gln)
 
 
 
-/*------------------------------------------------------------------------------
-    Evaluate the incomplete gamma function by its continued fraction ...
-------------------------------------------------------------------------------*/
+/*------------------------------------------------------------------*/
+/* Evaluate the incomplete gamma function by its continued fraction */
+/*------------------------------------------------------------------*/
 
-_PRIVATE void gcf(FTYPE *gammcf, FTYPE a, FTYPE x, FTYPE *gln)
+_PUBLIC void gcf(FTYPE *gammcf, const FTYPE a, const FTYPE x, FTYPE *gln)
 
-{   int i;
+{   uint32_t i;
 
     FTYPE an,
            b,
@@ -2064,108 +2101,4 @@ _PRIVATE void gcf(FTYPE *gammcf, FTYPE a, FTYPE x, FTYPE *gln)
     /*----------------------*/
 
     *gammcf = EXP(-x + a*LOG(x) - (*gln))*h;
-}
-
-
-
-
-
-/*-----------------------------------------------------------------------------
-    Encrypt datastream using 8 rotor enigma machine (only secure enough to
-    deter casual snooping) ...
------------------------------------------------------------------------------*/
-
-_PUBLIC int enigma8write(unsigned long key, int fdes, _BYTE *buf, unsigned long size)
-
-{   _IMMORTAL _BOOLEAN entered = FALSE;
-    unsigned long      i;
-    int                ret;
-    _BYTE              rotor;
-
-    pups_set_errno(OK);
-    if(fdes == (-1) || key == 0 || buf == (_BYTE *)NULL || size == 0)
-    {  pups_set_errno(EINVAL);
-       return(-1);
-    }
-
-
-    /*------------------------------------------------*/
-    /* Start random number generator at correct point */
-    /* in its sequence                                */
-    /*------------------------------------------------*/
-
-    if(entered == FALSE)
-    {  entered = TRUE;
-       r_init = (unsigned long)getpid();
-    }
-
-
-    /*-------------------*/
-    /* Encrypt plaintext */
-    /*-------------------*/
-
-    for(i=0; i<size; ++i)
-    {  rotor  = (_BYTE)(ran1()*256.0); 
-       buf[i] = buf[i] % rotor; 
-    }
-
-
-    /*--------------*/
-    /* Write cipher */
-    /*--------------*/
-
-    ret = write(fdes,buf,size);
-    return(ret);
-}
-
-
-
-
-/*-----------------------------------------------------------------------------
-    Decrypt datastream using 8 rotor enigma machine (only secure enough to
-    stop casual snooping) ...
------------------------------------------------------------------------------*/
-
-_PUBLIC int enigma8read(unsigned long key, int fdes, _BYTE *buf, unsigned long int size)
- 
-{   _IMMORTAL _BOOLEAN entered = FALSE;
-    unsigned long      i;
-    int                ret;
-    _BYTE              rotor;
- 
-    pups_set_errno(OK); 
-    if(fdes == (-1) || key == 0 || buf == (_BYTE *)NULL || size == 0) 
-    {  pups_set_errno(EINVAL); 
-       return(-1); 
-    } 
-
-
-    /*------------------------------------------------*/
-    /* Start random number generator at correct point */ 
-    /* in its sequence                                */ 
-    /*------------------------------------------------*/
-
-    if(entered == FALSE)  
-    {  entered = TRUE; 
-       r_init = (unsigned long)getpid(); 
-    }
-
-
-    /*-------------*/ 
-    /* Read cipher */
-    /*-------------*/ 
-
-    ret = pups_pipe_read(fdes,buf,size);
-
-
-    /*----------------*/ 
-    /* Decrypt cipher */
-    /*----------------*/ 
-
-    for(i=0; i<size; ++i)  
-    {  rotor  = (_BYTE)(ran1()*256.0); 
-       buf[i] = buf[i] % rotor;
-    } 
-
-    return(ret);
 }

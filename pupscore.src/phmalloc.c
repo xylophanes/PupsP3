@@ -1,4 +1,4 @@
-/*------------------------------------------------------------------------------
+/*----------------------------------------------------------------------------
    Memory allocator `phmalloc'.
    Copyright 1990, 1991, 1992, 1993, 1994, 1995 Free Software Foundation, Inc.
 		  Written May 1989 by Mike Haertel.
@@ -22,14 +22,15 @@
    or (US mail) as Mike Haertel c/o Free Software Foundation.
 
    Persistent heap modifications by Mark O'Neill (mao@tumblingdice.co.uk) 
-   (C) 1998-2023 M.A. O'Neill, Tumbling Dice
------------------------------------------------------------------------------*/
+   (C) 1998-2024 M.A. O'Neill, Tumbling Dice
+---------------------------------------------------------------------------*/
 
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 #include <xtypes.h>
 #include <errno.h>
+#include <stdint.h>
 
 #ifndef	_PHMALLOC_INTERNAL
 #define _PHMALLOC_INTERNAL
@@ -41,30 +42,30 @@
 /* Signifies whether heap addresses are local or heap global */
 /*-----------------------------------------------------------*/
 
-_IMPORT int addresses_local;
+_IMPORT int32_t addresses_local;
 
 // Heap table (for local process)
 _IMPORT heap_type *htable;
 
 // How to really get more memory
-__ptr_t (*__phmorecore) __P ((int, ptrdiff_t __size)) = __default_phmorecore;
+__ptr_t (*__phmorecore) __P ((int32_t, ptrdiff_t __size)) = __default_phmorecore;
 
 // Debugging hook for `malloc'
-__ptr_t (*__phmalloc_hook) __P ((const unsigned int, __malloc_size_t __size, const char *));
+__ptr_t (*__phmalloc_hook) __P ((const uint32_t   , __malloc_size_t __size, const char *));
 
 //Number of objects in heap
-_IMPORT int *_phobjects;
+_IMPORT int32_t *_phobjects;
 
 // Number of objects slots in heap
-_IMPORT int *_phobjects_allocated;
+_IMPORT int32_t *_phobjects_allocated;
 
 // Pointer to table of significant objects on persistent heaps
 _IMPORT phobmap_type ***_phobjectmap;
 
 // Pointer to persistent heap parameter table (on persistent heap)
-_IMPORT unsigned long int **_pheap_parameters;
+_IMPORT uint64_t     **_pheap_parameters;
 
-// Pointer to the base of the first block.  */
+// Pointer to the base of the first block.
 _IMPORT char **_pheapbase;
 
 // Block information table.  Allocated with align/__free (not malloc/free)
@@ -88,14 +89,14 @@ _IMPORT struct list **_phfraghead;
 /* Add persistent object to persistent object map */
 /*------------------------------------------------*/
 
-_PROTOTYPE _EXTERN int msm_map_object(const unsigned int, const unsigned intint, const void *, const char *);
+_PROTOTYPE _EXTERN int32_t msm_map_object(const uint32_t, const uint32_t, const void *, const char *);
 
 
 /*-----------------------------------------------------*/
 /* Remove persistent object from persistent object map */
 /*-----------------------------------------------------*/
 
-_PROTOTYPE _EXTERN int msm_unmap_object(const unsigned int, const unsigned int);
+_PROTOTYPE _EXTERN int32_t msm_unmap_object(const uint32_t, const uint32_t);
 
 
 /*-----------------*/
@@ -112,17 +113,17 @@ _IMPORT __malloc_size_t *_pheap_bytes_free;
 /* Are you experienced? */
 /*----------------------*/
 
-_IMPORT int *__phmalloc_initialized;
+_IMPORT  int32_t *__phmalloc_initialized;
 
-void (*__malloc_initialize_hook) __P ((int));
-void (*__after_phmorecore_hook) __P ((void));
+void (*__malloc_initialize_hook) __P ((int32_t));
+void (*__after_phmorecore_hook)  __P ((void));
 
 
 /*---------------------------------------------*/
 /* Set everything up and remember that we have */
 /*---------------------------------------------*/
 
-_PRIVATE int initialize __P ((int));
+_PRIVATE  int32_t initialize __P ((int32_t));
 
 
 /*--------------------*/
@@ -132,12 +133,11 @@ _PRIVATE int initialize __P ((int));
 _PRIVATE  __ptr_t align __P ((int, __malloc_size_t));
 _PRIVATE  __ptr_t align (int hdes, __malloc_size_t size)
 {
-  __ptr_t result;
-  unsigned long int adj;
+  __ptr_t  result;
+  uint64_t adj;
 
   result = (*__phmorecore) (hdes, size);
-  adj = (unsigned long int) ((unsigned long int) ((char *) result -
-						  (char *) NULL)) % BLOCKSIZE;
+  adj = (uint64_t) ((uint64_t) ((char *) result - (char *) NULL)) % BLOCKSIZE;
   if (adj != 0)
   {
       adj = BLOCKSIZE - adj;
@@ -156,8 +156,8 @@ _PRIVATE  __ptr_t align (int hdes, __malloc_size_t size)
 /* Heap initialisation - called by heap_attach function */
 /*------------------------------------------------------*/
 
-_PUBLIC int initialize_heap __P ((int));
-_PUBLIC int initialize_heap (int hdes)
+_PUBLIC  int32_t initialize_heap __P ((int32_t));
+_PUBLIC  int32_t initialize_heap (int32_t hdes)
 {    
      #ifdef PTHREAD_SUPPORT
      (void)pthread_mutex_lock(&htab_mutex);
@@ -183,7 +183,7 @@ _PUBLIC int initialize_heap (int hdes)
      /*-------------------------*/
 
      else if(htable[hdes].exists == FALSE)
-     {  int i;
+     {  uint32_t i;
 
 
         /*----------------------------*/
@@ -233,7 +233,7 @@ _PUBLIC int initialize_heap (int hdes)
 /* Set everything up and remember that we have. */
 /*----------------------------------------------*/
 
-_PRIVATE int initialize (int hdes)
+_PRIVATE int32_t initialize (int32_t hdes)
 {
 
   #ifdef PTHREAD_SUPPORT
@@ -282,7 +282,7 @@ _PRIVATE int initialize (int hdes)
      /* Account for the _pheapinfo block itself in the statistics */
      /*-----------------------------------------------------------*/
 
-     _pheap_bytes_used[hdes]  = pheapsize[hdes] * sizeof (malloc_info) + 8*sizeof(int);
+     _pheap_bytes_used[hdes]  = pheapsize[hdes] * sizeof (malloc_info) + 8*sizeof(int32_t);
      _pheap_chunks_used[hdes] = 1;
 
      _phobjects[hdes]           = 0;
@@ -339,8 +339,8 @@ _PRIVATE int initialize (int hdes)
             (void)msm_isync_heaptables(hdes);
 
 #ifdef PHMALLOC_DEBUG
-         (void)fprintf(stderr,"initialize: persistent heap %d dynamically remapped\n",hdes);
-         (void)fflush(stderr);
+(void)fprintf(stderr,"initialize: persistent heap %d dynamically remapped\n",hdes);
+(void)fflush(stderr);
 #endif /* PHMALLOC_DEBUG */
 
       }
@@ -371,8 +371,8 @@ _PRIVATE int initialize (int hdes)
 /* growing the heap info table as necessary.  */
 /*--------------------------------------------*/
 
-_PRIVATE __ptr_t phmorecore __P ((int, __malloc_size_t));
-_PRIVATE __ptr_t phmorecore (int hdes, __malloc_size_t size)
+_PRIVATE __ptr_t phmorecore __P ((int32_t, __malloc_size_t));
+_PRIVATE __ptr_t phmorecore (int32_t hdes, __malloc_size_t size)
 {
   __ptr_t result;
 
@@ -406,8 +406,8 @@ _PRIVATE __ptr_t phmorecore (int hdes, __malloc_size_t size)
       { 
 
 #ifdef PHMALLOC_DEBUG
-        (void)fprintf(stderr,"BLOCK: %0x%010x\n",(__malloc_size_t)BLOCK (hdes, (char *) result + size));
-        (void)fflush(stderr);
+(void)fprintf(stderr,"BLOCK: %0x%010x\n",(__malloc_size_t)BLOCK (hdes, (char *) result + size));
+(void)fflush(stderr);
 #endif /* PHMALLOC_DEBUG */
 
 	newsize *= 2;
@@ -442,14 +442,14 @@ _PRIVATE __ptr_t phmorecore (int hdes, __malloc_size_t size)
       ++_pheap_chunks_used[hdes];
       _phfree_internal (hdes, oldinfo);
       pheapsize[hdes] = newsize;
-    }
+  }
 
 
   _pheaplimit[hdes] = BLOCK (hdes, (char *) result + size);
 
 #ifdef PHMALLOC_DEBUG
-  (void)fprintf(stderr,"MORECORE BLOCK: %d (%d)\n",_pheaplimit[hdes],BLOCK (hdes, (char *)result)); 
-  (void)fflush(stderr); 
+(void)fprintf(stderr,"MORECORE BLOCK: %d (%d)\n",_pheaplimit[hdes],BLOCK (hdes, (char *)result)); 
+(void)fflush(stderr); 
 #endif /* PHMALLOC_DEBUG */
  
   #ifdef PTHREAD_SUPPORT
@@ -464,101 +464,101 @@ _PRIVATE __ptr_t phmorecore (int hdes, __malloc_size_t size)
 /* Allocate memory from (persistent) heap. */
 /*-----------------------------------------*/
 
-_PUBLIC __ptr_t phmalloc (const unsigned int hdes, __malloc_size_t  size, const char *name)
-{ int             h_index;
-  __ptr_t         result;
-  __malloc_size_t block, blocks, lastblocks, start, req_size, i;
-  struct list     *next = (struct list *)NULL;
+_PUBLIC __ptr_t phmalloc (const uint32_t hdes, __malloc_size_t  size, const char *name)
+{   int32_t        h_index;
+   __ptr_t         result;
+   __malloc_size_t block, blocks, lastblocks, start, req_size, i;
+   struct list     *next = (struct list *)NULL;
 
-  #ifdef PTHREAD_SUPPORT
-  (void)pthread_mutex_lock(&htab_mutex);
-  #endif /* PTHREAD_SUPPORT */
-
-
-  /*--------------------------------------------------------------------------------------*/
-  /* Before we do anything else, check whether we have a valid persistent heap descriptor */
-  /*--------------------------------------------------------------------------------------*/
-
-  if(hdes > appl_max_pheaps || htable[hdes].addr == (void *)NULL)
-  {  errno = EACCES;
-
-     #ifdef PTHREAD_SUPPORT
-     (void)pthread_mutex_unlock(&htab_mutex);
-     #endif /* PTHREAD_SUPPORT */
-
-     return (__ptr_t*)NULL;
-  }
+   #ifdef PTHREAD_SUPPORT
+   (void)pthread_mutex_lock(&htab_mutex);
+   #endif /* PTHREAD_SUPPORT */
 
 
-  /*--------------------------------------------------------------------------*/
-  /* Does this persistent object already exits? If so, we cannot allocate it! */
-  /*--------------------------------------------------------------------------*/
+   /*--------------------------------------------------------------------------------------*/
+   /* Before we do anything else, check whether we have a valid persistent heap descriptor */
+   /*--------------------------------------------------------------------------------------*/
 
-  if(name != (const char *)NULL && msm_phobject_exists(hdes,name))
-  {  errno = EEXIST;
+   if(hdes > appl_max_pheaps || htable[hdes].addr == (void *)NULL)
+   {  errno = EACCES;
 
-     #ifdef PTHREAD_SUPPORT
-     (void)pthread_mutex_unlock(&htab_mutex);
-     #endif /* PTHREAD_SUPPORT */
+      #ifdef PTHREAD_SUPPORT
+      (void)pthread_mutex_unlock(&htab_mutex);
+      #endif /* PTHREAD_SUPPORT */
 
-     return((__ptr_t *)NULL);
-  }
+      return (__ptr_t*)NULL;
+   }
 
 
-  /*------------------------------------------------------------------*/
-  /* ANSI C allows `malloc (0)' to either return NULL, or to return a */
-  /* valid address you can realloc and free (though not dereference). */
-  /*------------------------------------------------------------------*/
+   /*--------------------------------------------------------------------------*/
+   /* Does this persistent object already exits? If so, we cannot allocate it! */
+   /*--------------------------------------------------------------------------*/
 
-#if	0
-  if (size == 0)
-  {
-     #ifdef PTHREAD_SUPPORT
-     (void)pthread_mutex_unlock(&htab_mutex);
-     #endif /* PTHREAD_SUPPORT */
+   if(name != (const char *)NULL && msm_phobject_exists(hdes,name))
+   {  errno = EEXIST;
 
-     return (__ptr_t*)NULL;
-  }
+      #ifdef PTHREAD_SUPPORT
+      (void)pthread_mutex_unlock(&htab_mutex);
+      #endif /* PTHREAD_SUPPORT */
+
+      return((__ptr_t *)NULL);
+   }
+
+
+   /*------------------------------------------------------------------*/
+   /* ANSI C allows `malloc (0)' to either return NULL, or to return a */
+   /* valid address you can realloc and free (though not dereference). */
+   /*------------------------------------------------------------------*/
+
+#if 0
+   if (size == 0)
+   {
+      #ifdef PTHREAD_SUPPORT
+      (void)pthread_mutex_unlock(&htab_mutex);
+      #endif /* PTHREAD_SUPPORT */
+
+      return (__ptr_t*)NULL;
+   }
 #endif /* 0 */
 
 
-  if (__phmalloc_hook != NULL)
-  {  result = (*__phmalloc_hook) (hdes, size, name);
+   if (__phmalloc_hook != NULL)
+   {  result = (*__phmalloc_hook) (hdes, size, name);
 
-     #ifdef PTHREAD_SUPPORT
-     (void)pthread_mutex_unlock(&htab_mutex);
-     #endif /* PTHREAD_SUPPORT */
+      #ifdef PTHREAD_SUPPORT
+      (void)pthread_mutex_unlock(&htab_mutex);
+      #endif /* PTHREAD_SUPPORT */
 
-     return result;
-  }
+      return result;
+   }
 
-  req_size = size;
+   req_size = size;
 
 
-  /*--------------------------------------------------------------------------*/
-  /* Does this persistent object already exits? If so, we cannot allocate it! */
-  /*--------------------------------------------------------------------------*/
+   /*--------------------------------------------------------------------------*/
+   /* Does this persistent object already exits? If so, we cannot allocate it! */
+   /*--------------------------------------------------------------------------*/
 
-  if(name != (const char *)NULL && msm_phobject_exists(hdes,name))
-  {  errno = EEXIST;
+   if(name != (const char *)NULL && msm_phobject_exists(hdes,name))
+   {  errno = EEXIST;
 
-     #ifdef PTHREAD_SUPPORT
-     (void)pthread_mutex_unlock(&htab_mutex);
-     #endif /* PTHREAD_SUPPORT */
+      #ifdef PTHREAD_SUPPORT
+      (void)pthread_mutex_unlock(&htab_mutex);
+      #endif /* PTHREAD_SUPPORT */
 
-     return((__ptr_t *)NULL);
-  }
+      return((__ptr_t *)NULL);
+   }
 
    if (size < sizeof (struct list))
-      size = sizeof (struct list);
+       size = sizeof (struct list);
 
 
-  /*-----------------------------------------------------------*/
-  /* Determine the allocation policy based on the request size */
-  /*-----------------------------------------------------------*/
+   /*-----------------------------------------------------------*/
+   /* Determine the allocation policy based on the request size */
+   /*-----------------------------------------------------------*/
 
-  if (size <= BLOCKSIZE / 2)
-  {
+   if (size <= BLOCKSIZE / 2)
+   {
 
       /*-----------------------------------------------------------*/
       /* Small allocation to receive a fragment of a block.        */
@@ -595,9 +595,7 @@ _PUBLIC __ptr_t phmalloc (const unsigned int hdes, __malloc_size_t  size, const 
 
 	  block = BLOCK (hdes, result);
 	  if (--_pheapinfo[hdes][block].busy.info.frag.nfree != 0)
-	    _pheapinfo[hdes][block].busy.info.frag.first = (unsigned long int)
-	                                                   ((unsigned long int) ((char *) next->next - (char *) NULL)
-	                                                                                          % BLOCKSIZE) >> log;
+	    _pheapinfo[hdes][block].busy.info.frag.first = (uint64_t) ((uint64_t) ((char *) next->next - (char *) NULL) % BLOCKSIZE) >> log;
 
 
           /*-----------------------*/
@@ -642,9 +640,10 @@ _PUBLIC __ptr_t phmalloc (const unsigned int hdes, __malloc_size_t  size, const 
 	  for (i = 1; i < (__malloc_size_t) (BLOCKSIZE >> log); ++i)
 	  {
 	      next = (struct list *) ((char *) result + (i << log));
-	      next->next = _phfraghead[hdes][log].next;
-	      next->prev = &_phfraghead[hdes][log];
+	      next->next       = _phfraghead[hdes][log].next;
+	      next->prev       = &_phfraghead[hdes][log];
 	      next->prev->next = next;
+
 	      if (next->next != NULL)
 		next->next->prev = next;
 	  }
@@ -663,9 +662,10 @@ _PUBLIC __ptr_t phmalloc (const unsigned int hdes, __malloc_size_t  size, const 
 	  _pheap_bytes_free[hdes]  += BLOCKSIZE - (1 << log);
 	  _pheap_bytes_used[hdes]  -= BLOCKSIZE - (1 << log);
 	}
-  }
-  else
-  {
+   }
+
+   else
+   {
 
       /*----------------------------------------------------------------------*/
       /* Large allocation to receive one or more blocks.                      */
@@ -752,15 +752,16 @@ _PUBLIC __ptr_t phmalloc (const unsigned int hdes, __malloc_size_t  size, const 
 
           /*-------------------------------------------------*/
 	  /* The block we found has a bit left over,         */
-	  /* so relink the tail end back into the free list. */
+	  /* so relink the tail end back  int32_to the free list. */
           /*-------------------------------------------------*/
 
-	  _pheapinfo[hdes][block + blocks].free.size                     = _pheapinfo[hdes][block].free.size - blocks;
-	  _pheapinfo[hdes][block + blocks].free.next                     = _pheapinfo[hdes][block].free.next;
-	  _pheapinfo[hdes][block + blocks].free.prev                     = _pheapinfo[hdes][block].free.prev;
+	  _pheapinfo[hdes][block + blocks].free.size                    = _pheapinfo[hdes][block].free.size - blocks;
+	  _pheapinfo[hdes][block + blocks].free.next                    = _pheapinfo[hdes][block].free.next;
+	  _pheapinfo[hdes][block + blocks].free.prev                    = _pheapinfo[hdes][block].free.prev;
 	  _pheapinfo[hdes][_pheapinfo[hdes][block].free.prev].free.next = _pheapindex[hdes] = block + blocks;
           _pheapinfo[hdes][_pheapinfo[hdes][block].free.next].free.prev = _pheapindex[hdes] = block + blocks;
       }
+
       else
       {
 
@@ -772,7 +773,7 @@ _PUBLIC __ptr_t phmalloc (const unsigned int hdes, __malloc_size_t  size, const 
 	  _pheapinfo[hdes][_pheapinfo[hdes][block].free.next].free.prev = _pheapinfo[hdes][block].free.prev;
 	  _pheapinfo[hdes][_pheapinfo[hdes][block].free.prev].free.next = _pheapindex[hdes] = _pheapinfo[hdes][block].free.next;
 	  --_pheap_chunks_free[hdes];
-	}
+      }
 
       _pheapinfo[hdes][block].busy.type = 0;
       _pheapinfo[hdes][block].busy.info.size = blocks;
@@ -791,21 +792,21 @@ _PUBLIC __ptr_t phmalloc (const unsigned int hdes, __malloc_size_t  size, const 
 
       while(--blocks > 0)
 	_pheapinfo[hdes][block + blocks].busy.info.size = -blocks;
-  }
+   }
 
-  if(_no_phobject_mapping == 0 && name != (char *)NULL)
-  {  h_index         = msm_get_free_mapslot(hdes);
+   if(_no_phobject_mapping == 0 && name != (char *)NULL)
+   {  h_index         = msm_get_free_mapslot(hdes);
 
-     (void)msm_map_object (hdes,h_index,result,name);
-     (void)msm_map_setinfo(hdes,h_index,"persistent GMAP object");
-     (void)msm_map_setsize(hdes,h_index,req_size);
+      (void)msm_map_object (hdes,h_index,result,name);
+      (void)msm_map_setinfo(hdes,h_index,"persistent GMAP object");
+      (void)msm_map_setsize(hdes,h_index,req_size);
 
-     _pheap_parameters[hdes][8] = _phobjects[hdes];
-  }
+      _pheap_parameters[hdes][8] = _phobjects[hdes];
+   }
 
-  #ifdef PTHREAD_SUPPORT
-  (void)pthread_mutex_unlock(&htab_mutex);
-  #endif /* PTHREAD_SUPPORT */
+   #ifdef PTHREAD_SUPPORT
+   (void)pthread_mutex_unlock(&htab_mutex);
+   #endif /* PTHREAD_SUPPORT */
 
-  return result;
+   return result;
 }

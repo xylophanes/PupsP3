@@ -2,13 +2,13 @@
 #
 #-----------------------------------------------------
 # Restart process which has been checkpointed via Criu
-# M.A. O'Neill, Tumbling Dice, 2021-2022 
+# M.A. O'Neill, Tumbling Dice, 2021-2025 
 #-----------------------------------------------------
 
 
 echo ""
 echo "    Restart version 2,00"
-echo "    (C) Tumbling Dice 2016-2022"
+echo "    (C) Tumbling Dice 2016-2025"
 echo ""
 
 #-------------------------

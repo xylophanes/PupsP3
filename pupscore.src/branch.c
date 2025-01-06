@@ -1,5 +1,5 @@
-/*-----------------------------------------------------------------------------
-     Purpose: Extracts sub "twig" from pathname branch. 
+/*----------------------------------------------------
+     Purpose: Extracts sub "twig" from pathname branch 
 
      Author:  M.A. O'Neill
               Tumbling Dice Ltd
@@ -8,10 +8,10 @@
               NE3 4RT
               United Kingdom
 
-     Version: 2.03 
-     Dated:   24th May 2023
+     Version: 2.04 
+     Dated:   10th Decemeber 2024 
      e-mail:  mao@tumblingdice.co.uk
------------------------------------------------------------------------------*/
+----------------------------------------------------*/
 
 
 #include <stdio.h>
@@ -20,13 +20,14 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <xtypes.h>
+#include <stdint.h>
 
 
 /*-------------------*/
 /* Version of branch */
 /*-------------------*/
 
-#define BRANCH_VERSION    "2.03"
+#define BRANCH_VERSION    "2.04"
 
 
 /*-------------*/
@@ -42,25 +43,31 @@
 /* Main entry point of application */
 /*---------------------------------*/
 
-_PUBLIC int main(int argc, char *argv[])
+_PUBLIC int32_t main(int32_t argc, char *argv[])
 
-{   int i,
-        decoded    = 0,
-        start      = 1,
-        twigLength = 1,
-        cnt        = 0,
-        cnt_pos    = 0;
+{   size_t i,
+           decoded          = 0,
+           start            = 1,
+           twigLength       = 1,
+           cnt              = 0,
+           cnt_pos          = 0;
 
-    _BOOLEAN do_verbose = FALSE;
+    _BOOLEAN do_verbose     = FALSE;
 
-    char hostname[SSIZE] = "",
-         pathname[SSIZE] = "",
-         twig[SSIZE]     = "";
+    char hostname[SSIZE]    = "",
+         pathname[SSIZE]    = "",
+         twig[SSIZE]        = "";
 
     (void)gethostname(hostname,SSIZE);
+
+
+    /*--------------------*/
+    /* Parse command line */
+    /*--------------------*/
+
     for(i=0; i<argc; ++i)
     {  if(argc == 1 || argc > 3 || strcmp(argv[i],"-usage") == 0 || strcmp(argv[i],"-help") == 0)
-       {  (void)fprintf(stderr,"\nbranch version %s, (C) Tumbling Dice 2010-2023 (built %s %s)\n\n",BRANCH_VERSION,__TIME__,__DATE__);
+       {  (void)fprintf(stderr,"\nbranch version %s, (C) Tumbling Dice 2010-2024 (gcc %s: built %s %s)\n\n",BRANCH_VERSION,__VERSION__,__TIME__,__DATE__);
           (void)fprintf(stderr,"BRANCH is free software, covered by the GNU General Public License, and you are\n");
           (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
           (void)fprintf(stderr,"See the GPL and LGPL licences at www.gnu.org for further details\n");
@@ -78,7 +85,7 @@ _PUBLIC int main(int argc, char *argv[])
        else if(strcmp(argv[i],"-tlength") == 0)
        {  if(i == argc - 2 || argv[i+1][0] == '-')
           {  if(do_verbose == TRUE)
-             {  (void)fprintf(stderr,"\nleaf (%d@%s): expecting twig length (cardinal integer >= 0)\n\n",getpid(),hostname);
+             {  (void)fprintf(stderr,"\nleaf (%d@%s): expecting twig length (cardinal  int32_teger >= 0)\n\n",getpid(),hostname);
                 (void)fflush(stderr);
              }
              exit(255);
@@ -86,7 +93,7 @@ _PUBLIC int main(int argc, char *argv[])
 
           if(sscanf(argv[i+1],"%d",&twigLength) != 1 || twigLength < 1)
           {  if(do_verbose == TRUE)
-             {  (void)fprintf(stderr,"\nleaf (%d@%s): twig length must be cardinal integer (>= 0)\n\n",getpid(),hostname);
+             {  (void)fprintf(stderr,"\nleaf (%d@%s): twig length must be cardinal  int32_teger (>= 0)\n\n",getpid(),hostname);
                 (void)fflush(stderr);
              }
              exit(255);

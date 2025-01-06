@@ -1,14 +1,13 @@
 #!/bin/tcsh 
 #
-#------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------------
 #  Install PUPSP3 libraries and service functions
-#  (C) M.A. O'Neill, Tumbling Dice Ltd, 2000-2023
+#  (C) M.A. O'Neill, Tumbling Dice Ltd, 2000-2025
 #
-#  $1 is build type
-#  $2 is logfile
-#  $3 is set to default (if security mode enable and we want default settings)
-#  $4 is set to debug (to build debuggable system e.g -g)
-#------------------------------------------------------------------------------
+#  $1 is logfile
+#  $2 is set to debug (to build debuggable system e.g -g)
+#  $2 is set to sanitize (to build bounds checking debuggable system (e.g. -fsanitize)
+#-------------------------------------------------------------------------------------
 
 set do_abort = FALSE
 
@@ -131,7 +130,7 @@ set ftype           = FLOAT
 
 #set usable_machtype = `echo $MACHTYPE | grep unknown`
 #if($usable_machtype != "") then
-	set MACHTYPE = `uname -a | awk '{print $13}'`
+	set MACHTYPE = `uname -m`
 #endif
 
 
@@ -154,6 +153,10 @@ rm -f ../config.install/$OSTYPE.cluster                                         
 rm -f ../config.install/linux.cluster												>&  /dev/null
 rm -f ../config.debug/$OSTYPE.cluster                                                           				>&  /dev/null
 rm -f ../config.debug/linux.cluster                                                             				>&  /dev/null
+rm -f ../config.sanitize/$OSTYPE.cluster                                                           				>&  /dev/null
+rm -f ../config.sanitize/linux.cluster                                                             				>&  /dev/null
+rm -f ../config.nobubble/$OSTYPE.cluster                                                           				>&  /dev/null
+rm -f ../config.nobubble/linux.cluster                                                             				>&  /dev/null
 
 onintr abort_build
 
@@ -169,13 +172,10 @@ setenv LD_LIBRARY_PATH
 # Initialise logfile
 #-------------------
 
-if($# == 0 || $1 == help || $1 == usage || $# == 0) then
+if($# == 0 && $# != 2 &&  $# != 3 || $1 == help || $1 == usage) then
 	echo ""
-	echo "    P3-2023 (SUP3) build script (C) M.A. O'Neill, Tumbling Dice Ltd 2023"
-	echo ""
-        echo "    Usage: install_pupsP3 [usage] | [clean] | [vanilla | cluster] [tty | logfile]"
-        echo "                          [default | nodefault] [debug]"
-
+	echo "    P3-2025 (SUP3) build script (C) M.A. O'Neill, Tumbling Dice Ltd 2025"
+        echo "    Usage: install_pupsP3 [usage] | [clean] | \!tty | logfile\! [nobubble] | [debug] | [sanitize]"
 	echo ""
 
 	exit 0
@@ -192,15 +192,20 @@ else if ($1 == clean) then
 	\rm -rf ../bin*														>&  /dev/null
 	\rm -f ../config/*linux.cluster												>&  /dev/null
 	\rm -f ../config.debug/*linux.cluster											>&  /dev/null
+	\rm -f ../config.sanitize/*linux.cluster										>&  /dev/null
+	\rm -f ../config.nobubble/*linux.cluster										>&  /dev/null
 	\rm -f ../config.install/*linux.cluster											>&  /dev/null
 	\rm -f BUILDLOCK													>&  /dev/null 
 	\rm -f Makefile														>&  /dev/null
 
 	exit 0
-else if($2 == default || $2 == "" || $2 == null || $2 == /dev/null) then
+
+else if($1 == default || $1 == "" || $1 == null || $1 == /dev/null) then
         set logFile = /dev/null
-else if($2 == "tty" || $2 == /dev/tty) then
+
+else if($1 == "tty" || $1 == /dev/tty) then
         set logFile = /dev/tty
+
 else
         set logFile = $2
 
@@ -215,57 +220,164 @@ endif
 #---------------------------------------------------------
 # Make sure we pick up the correct configuration directory
 #---------------------------------------------------------
+#-----------
+# Debug mode
+#-----------
 
-if($4 == debug) then
-	set debug = TRUE
-else if($4 != "") then
+if($2 == debug) then
+	set debug    = TRUE
+	set sanitize = FALSE
+	set nobubble = FALSE
+
+
+#--------------
+# Sanitize mode
+#--------------
+
+else if($2 == sanitize) then
+	set debug    = FALSE 
+	set sanitize = TRUE
+	set nobubble = FALSE
+
+
+#--------------
+# Nobubble mode
+#--------------
+
+else if($2 == sanitize) then
+	set debug    = FALSE 
+	set sanitize = FALSE 
+	set nobubble = TRUE
+
+#------
+# Error
+#------
+
+else if($2 != "") then
 	echo ""															>>& $logFile
-	echo "    ERROR install_pupsp3: 'debug' expected"									>>& $logFile
-	echo ""
+	echo "    ERROR install_pupsp3: 'debug' or 'sanitize' expected"								>>& $logFile
+	echo ""                                                                                                                 >>& $logFile
 
 	exit 255 
 else
-	set debug = FALSE
+	set debug    = FALSE
+	set sanitize = FALSE
+	set nobubble = FALSE
 endif
 
-if($debug == FALSE) then
-        setenv P3_CONFDIR   ../config                                                           				>&  /dev/null
-        setenv PUPS_CONFDIR ../config                                                           				>&  /dev/null
 
-        set confdir = ../config
-else
+#------------
+# Debug build
+#------------
+
+if($debug == TRUE) then
         setenv P3_CONFDIR   ../config.debug                                                     				>&  /dev/null
         setenv PUPS_CONFDIR ../config.debug                                                     				>&  /dev/null
 
         set confdir = ../config.debug
+
+
+#---------------
+# Sanitize build
+#---------------
+
+else if($sanitize == TRUE) then
+        setenv P3_CONFDIR   ../config.sanitize                                                   				>&  /dev/null
+        setenv PUPS_CONFDIR ../config.sanitize                                                     				>&  /dev/null
+
+        set confdir = ../config.sanitize
+
+
+#---------------
+# Nobubble build
+#---------------
+
+else if($nobubble == TRUE) then
+        setenv P3_CONFDIR   ../config.nobubble                                                   				>&  /dev/null
+        setenv PUPS_CONFDIR ../config.nobubble                                                     				>&  /dev/null
+
+        set confdir = ../config.nobubble
+
+
+#--------------
+# Default build
+#--------------
+
+else
+        setenv P3_CONFDIR   ../config                                                           				>&  /dev/null
+        setenv PUPS_CONFDIR ../config                                                           				>&  /dev/null
+
+        set confdir = ../config
 endif
 
 
-#--------------------------------------------------------------------
-# Set up configuration links - we also set the default floating point
-# precision here
-#--------------------------------------------------------------------
+
+
+#############################################################################
+#### Set up configuration links - we also set the default floating point ####
+#### precision here                                                      ####
+#############################################################################
+#------------------------------
+# Build with checkpoint support
+#------------------------------
 
 if($build_ckpt == TRUE) then
 
 
-	#------------------------------
-	# Build with checkpoint support
-	#------------------------------
+	#--------------
+	# Default build
+	#--------------
 
 	pushd ../config														>&  /dev/null
 	sed s/FTYPE/$ftype/g <$OSTYPE.cluster.ckpt >linux.cluster
 	popd															>&  /dev/null
 
-	if($debug == FALSE) then
-        	pushd ../config.install                                                         				>&  /dev/null
-		sed s/FTYPE/$ftype/g <$OSTYPE.cluster.ckpt >linux.cluster
-        	popd                                                                            				>&  /dev/null
-	else
+
+	#------------
+	# Debug build
+	#------------
+
+	if($debug == TRUE) then
                 pushd ../config.debug                                                           				>&  /dev/null
                 sed s/FTYPE/$ftype/g <$OSTYPE.cluster.ckpt >linux.cluster
                 popd                                                                            				>&  /dev/null
+
+
+	#---------------
+	# Sanitize build
+	#---------------
+
+	else if($sanitize == TRUE) then
+                pushd ../config.sanitize                                                           				>&  /dev/null
+                sed s/FTYPE/$ftype/g <$OSTYPE.cluster.ckpt >linux.cluster
+                popd                                                                            				>&  /dev/null
+
+
+	#---------------
+	# Nobubble build
+	#---------------
+
+	else if($nobubble == TRUE) then
+                pushd ../config.nobubble                                                           				>&  /dev/null
+                sed s/FTYPE/$ftype/g <$OSTYPE.cluster.ckpt >linux.cluster
+                popd                                                                            				>&  /dev/null
+
+
+	#--------------
+	# Install build
+	#---------------
+
+	else
+        	pushd ../config.install                                                         				>&  /dev/null
+		sed s/FTYPE/$ftype/g <$OSTYPE.cluster.ckpt >linux.cluster
+        	popd                                                                            				>&  /dev/null
         endif
+
+
+#---------------------------------
+# Build without checkpoint support
+#---------------------------------
+
 else
 
 	#---------------------------------
@@ -276,13 +388,43 @@ else
 	sed s/FTYPE/$ftype/g <$OSTYPE.cluster.nockpt >linux.cluster
 	popd															>&  /dev/null
 
-	if($debug == FALSE) then
-        	pushd ../config.install                                                         				>&  /dev/null
 
+	#------------
+	# Debug build
+	#------------
+
+	if($debug == TRUE) then
+        	pushd ../config.debug                                                           				>&  /dev/null
 		sed s/FTYPE/$ftype/g <$OSTYPE.cluster.nockpt >linux.cluster
         	popd                                                                            				>&  /dev/null
+
+
+	#---------------
+	# Sanitize build
+	#----------------
+
+	else if($sanitize == TRUE) then
+        	pushd ../config.sanitize                                                           				>&  /dev/null
+		sed s/FTYPE/$ftype/g <$OSTYPE.cluster.nockpt >linux.cluster
+        	popd   	                                                                        				>&  /dev/null
+
+
+	#---------------
+	# Nobubble build
+	#---------------
+
+	else if($nobubble == TRUE) then
+        	pushd ../config.nobubble                                                           				>&  /dev/null
+		sed s/FTYPE/$ftype/g <$OSTYPE.cluster.nockpt >linux.cluster
+        	popd   	                                                                        				>&  /dev/null
+
+
+	#--------------
+	# Install build
+	#--------------
+
 	else
-        	pushd ../config.debug                                                           				>&  /dev/null
+        	pushd ../config.install                                                         				>&  /dev/null
 		sed s/FTYPE/$ftype/g <$OSTYPE.cluster.nockpt >linux.cluster
         	popd                                                                            				>&  /dev/null
 	endif
@@ -297,13 +439,42 @@ set nCores = `lscpu | grep "CPU(s):" | head -1 | awk '{print $2}'`
 
 
 echo ""																>>& $logFile
-echo "    P3-2023 (SUP3) build script (C) M.A. O'Neill, Tumbling Dice Ltd 2023"							>>& $logFile
+echo "    P3-2025 (SUP3) build script (C) M.A. O'Neill, Tumbling Dice Ltd 2025"							>>& $logFile
+
+
+#------
+# Debug
+#------
 
 if($debug == TRUE) then
-	echo "    Configuring P3-2023 for "$MACHTYPE-$OSTYPE-gnu "host (debug mode)"						>>& $logFile
+	echo "    Configuring P3-2025 for "$MACHTYPE-$OSTYPE-gnu "host (debug mode)"						>>& $logFile
 	echo "    $nCores processor cores found"										>>& $logFile
+
+
+#---------
+# Sanitize
+#---------
+
+else if($sanitize == TRUE) then
+	echo "    Configuring P3-2025 for "$MACHTYPE-$OSTYPE-gnu "host (sanitize mode)"						>>& $logFile
+	echo "    $nCores processor cores found"										>>& $logFile
+
+
+#---------
+# Nobubble
+#---------
+
+else if($nobubble == TRUE) then
+	echo "    Configuring P3-2025 for "$MACHTYPE-$OSTYPE-gnu "host (nobubble mode)"						>>& $logFile
+	echo "    $nCores processor cores found"										>>& $logFile
+
+
+#-----------
+# Production
+#-----------
+
 else
-	echo "    Configuring P3-2023 for "$MACHTYPE-$OSTYPE-gnu "host"								>>& $logFile
+	echo "    Configuring P3-2025 for "$MACHTYPE-$OSTYPE-gnu "host"								>>& $logFile
 	echo "    $nCores processor cores found"										>>& $logFile
 endif
 
@@ -319,23 +490,6 @@ if($build_ckpt == TRUE) then
         echo "    Checkpointing support enabled"                                                				>>& $logFile
 endif
 
-
-
-#-------------------
-#  Set security mode
-#-------------------
-
-if($3 == default) then
-	set securitymode = default
-else if($3 != "" && $3 != default && $3 != nodefault) then
-	echo "    ERROR install_pupsP3: expecting 'default'"									>>& $logFile
-        echo "    Usage: install_pupsP3 [usage] | [clean] | [[vanilla | cluster] [tty | logfile]"				>>& $logFile
-        echo "                          [default | nodefault] [debug]"								>>& $logFile
-
-	exit 255
-else 
-	set securitymode = ""
-endif
 
 
 #--------------------------------------
@@ -362,7 +516,7 @@ if(`whoami` == "root") then
 	#-------
 	# 64 bit
 	#------- 
-	if(`uname -a | awk '{print $13}'` == x86_64 || `uname -a | awk '{print $13}'` == aarch64) then
+	if(`uname -m` == x86_64 || `uname -m` == aarch64) then
 		set LIBDIR  = /usr/lib64
 
 
@@ -410,7 +564,7 @@ else
 	#-------
 	# 64 bit
 	#-------
-	if(`uname -a | awk '{print $13}'` == x86_64 || `uname -a | awk '{print $13}'` == aarch64) then
+	if(`uname -m` == x86_64 || `uname -m` == aarch64) then
 		set LIBDIR = $HOME/lib64
 
 
@@ -552,6 +706,15 @@ if(! -e ~/.tcshrc) then
 	echo ""															>>& $logFile
 
 	\cp p3m_tcshrc ~/.tcshrc												>&  /dev/null
+endif
+
+gcc -w -Wfatal-errors -I../include.libs -O3 -o isatty isatty.c									>>& $logFile
+if($status != 0) then
+	echo ""															>>& $logFile
+	echo "    ERROR install_pupsp3:  operation failed [gcc isatty]"								>>& $logFile
+	echo ""															>>& $logFile
+
+	exit 255 
 endif
 
 gcc -w -Wfatal-errors -I../include.libs -O3 -o iscard iscard.c									>>& $logFile
@@ -698,8 +861,8 @@ if($status != 0) then
         exit 255
 endif
 
-strip tas iscard ishex isint isfloat ask add sub mul div fadd fsub fmul fdiv							>&  /dev/null
-\mv tas iscard ishex isint isfloat ask add sub mul div fadd fsub fmul fdiv fint intf $BINDIR					>&  /dev/null
+strip tas isatty iscard ishex isint isfloat ask add sub mul div fadd fsub fmul fdiv						>&  /dev/null
+\mv tas isatty iscard ishex isint isfloat ask add sub mul div fadd fsub fmul fdiv fint intf $BINDIR				>&  /dev/null
 if($status != 0) then
 	echo ""                                                                                		 			>>& $logFile
 	echo "    ERROR install_pupsp3: operation failed [install PUPS/P3 build tools"						>>& $logFile
@@ -712,22 +875,59 @@ pushd ..															>&  /dev/null
 set path=($path . .. `pwd`)
 popd																>&  /dev/null
 
+
+#----------------
+# Check buildlock
+#----------------
+
 if(-e BUILDLOCK) then
+
+
+	#---------------------------
+	# Check for interactive mode
+	#---------------------------
+
+	isatty stdin														>& /dev/null
+
+
+	#--------------------------------------------------------
+	# Error - cannot clear build lock in non-interactive mode
+	#--------------------------------------------------------
+
+	if ($? != 0) then
+		echo ""														>&  $logFile
+		echo "    ERROR cannot clear build lock in non-interactive mode"						>&  $logFile
+		echo ""														>&  $logFile
+
+		exit 255
+
+
+	#---------------------------------------------
+	# Interactive mode - build lock can be cleared
+	#---------------------------------------------
+
+	else
 
 ask_again:
 
-	set ret = `ask "    buildlock exists  -- delete?"`									>&  /dev/tty
-	if($ret == "y" || $ret == "yes") then
-		\rmdir BUILDLOCK												>&  /dev/null
-	else if($ret == "q" || $ret == "quit" || $ret == "bye") then
-		\rmdir BUILDLOCK        											>&  /dev/null
-		exit 255 
-	endif
+		set ret = `ask "    buildlock exists  -- delete?"`								>&  /dev/tty
+		if($ret == "y" || $ret == "yes") then
+			\rmdir BUILDLOCK											>&  /dev/null
+		else if($ret == "q" || $ret == "quit" || $ret == "bye") then
+			\rmdir BUILDLOCK        										>&  /dev/null
+			exit 255 
+		endif
 
-	if($ret != "yes" && $ret != "y") then
-		goto ask_again
+		if($ret != "yes" && $ret != "y") then
+			goto ask_again
+		endif
 	endif
 endif
+
+
+#---------------------------------------
+# Apply build lock (atomic test and set)
+#---------------------------------------
 
 tas BUILDLOCK															>&  /dev/null
 
@@ -808,36 +1008,7 @@ echo ""																>>& $logFile
 echo "    Configuring P3-20 for "$rawtarget "host"										>>& $logFile
 echo ""																>>& $logFile
 
-if($# == 0) then
-	set buildtype = cluster
-
-	echo ""															>>& $logFile	
-	echo "    ... Build identifier is 'cluster' (default)"									>>& $logFile
-	echo ""															>>& $logFile
-else if($1 == "usage" || $1 == "--usage") then
-	echo "    ERROR install_pupsP3: expecting 'default'"									>>& $logFile
-        echo "    Usage: install_pupsP3 [usage] | [clean] | [[vanilla | cluster] [tty | logfile] [default]"			>>& $logFile
-	echo "                          [default | nodefault] [debug]"								>>& $logFile
-        echo ""															>>& $logFile
-
-        exit 0 
-else if ($1 != "vanilla" && $1 != "cluster") then
-	echo "    ERROR install_pupsP3: expecting 'default'"									>>& $logFile
-        echo "    Usage: install_pupsP3 [usage] | [clean] | [[vanilla | cluster]  [tty | logfile] [default]"			>>& $logFile
-	echo "                          [default | nodefault] [debug]"								>>& $logFile
-        echo ""
-
-	\rmdir BUILDLOCK        												>&  /dev/null
-        exit 255 
-else
-	set buildtype = $1
-
-	echo ""															>>& $logFile
-	echo "    ... Build identifier is '$1'"											>>& $logFile
-	echo ""															>>& $logFile
-endif
-
-echo ""
+set buildtype = $1
 if(! -e pupsuname) then
         echo "    ERROR install_pupsP3: cannot determine P3 architecture (no [pupsuname] file present)"				>>& $logFile
 
@@ -875,25 +1046,17 @@ echo "    Authentication method support ($AUTHEN)"										>>& $logFile
 echo ""																>>& $logFile
 
 echo ""																>>& $logFile
-echo "    ... Making P3-2023 binary directories for libraries and service functions"						>>& $logFile
+echo "    ... Making P3-2025 binary directories for libraries and service functions"						>>& $logFile
 echo ""																>>& $logFile
 
 set pctarget = $target
 set mode     = INVALID
 
-if($buildtype == vanilla) then
-   echo "    ... Building basic P3/PSRP for standalone host"									>>& $logFile
-   echo ""															>>& $logFile
-   set dummy_shgmalloc = need_dummy_shgmalloc
-endif
-
-if($buildtype == cluster) then
-   echo "    Dynamic link library shared memory, checkpointing  and network support enabled"					>>& $logFile
-   echo "    ... Building dynamic P3/PSRP for network clustered MIMD environment"						>>& $logFile
-   echo ""															>>& $logFile
-   set pctarget = $target.cluster
-   set dummy_shgmalloc = none
-endif
+echo "    Dynamic link library shared memory, checkpointing  and network support enabled"					>>& $logFile
+echo ""                                                                                                                         >>& $logFile
+echo "    ... Building dynamic P3/PSRP for network clustered MIMD environment"							>>& $logFile
+echo ""																>>& $logFile
+set pctarget = $target.cluster
 
 pushd ..															>&  /dev/null
 
@@ -923,239 +1086,23 @@ endif
 popd																>&  /dev/null
 
 
-#------------------------------------
-# Are we in secure installation mode?
-#------------------------------------
 
-if(`grep "\#-DSECURE" <$confdir/$target.$buildtype` != "") then
-        set install_mode = insecure
-else
-        set install_mode = secure
-endif
 
-set method = default
-if($install_mode == secure) then
-
-	echo ""															>>& $logFile	
-        echo "    -----------------------------------------------------------------------------------------"			>>& $logFile
-	echo "    You have specified secure binaries in your configuration file -- so you will need to"				>>& $logFile
-	echo "    specify a licencing method (sdongle or dserial) under $OSTYPE."						>>& $logFile
-        echo "    -----------------------------------------------------------------------------------------"			>>& $logFile
-	echo ""															>>& $logFile
-
-	if($securitymode == default) then
-		set method = sdongle
-	else
-
-ask_method_again:
-        	set method = `ask "    Licensing method (sdongle or dserial) [default: sdongle]"`
-
-		if($method == "bye" || $method == "quit" || $method == "q") then
-			\rmdir BUILDLOCK											>&  /dev/null
-       	         	exit 255
-		endif
-
-		if($method != "" && $method != "sdongle" && $method != "dserial") then
-			echo ""													>>& $logFile
-			echo "    '$method' is not a valid licensing method ('sdongle' or 'dserial' expected)"			>>& $logFile
-			echo ""													>>& $logFile
-
-			goto ask_method_again
-		endif
-	endif
-
-        if($method == dserial) then
-                echo ""														>>& $logFile
-                echo "    Licence method is disk serial"									>>& $logFile
-		echo ""														>>& $logFile
-		echo "    ... Building hard disk device serial number extraction tool"						>>& $logFile
-		echo ""														>>& $logFile
-		gcc -w -Wfatal-errors -DLINUX -I../include.libs -O3 -o hdid hdid.c -lbsd					>>& $logFile
-		if($status != 0) then
-        	   echo ""                                                                                     			>>& $logFile
-        	   echo "    ERROR install_pupsP3: operation failed [gcc hdid"                                         		>>& $logFile
-        	   echo ""                                                                                      		>>& $logFile
-
-        	   exit 255
-		endif
-		\mv hdid $BINDIR                										>&  /dev/null
-
-               	set default_hd_device = `df | grep boot | awk '{print $1}' | striplc | sed s/"\/dev\/"//g`
-               	set hd_device = `ask "hd_device [default  $default_hd_device]"`
-               	if($hd_device == "q" || $hd_device == "quit" || $hd_device == "bye") then
-			\rmdir BUILDLOCK	>&  /dev/null
-	         	exit 255
- 	        else if($hd_device == "" || $hd_device == "default") then
-              		set hd_device = $default_hd_device
-                       	echo "    Hard disk device is" $hd_device "(default)"							>>& $logFile
-               	endif
-
-               	set seed = `ask "    encryption seed [default 9999]"`
-               	if($seed == "q" || $seed == "quit" || $seed == "bye") then
-			\rmdir BUILDLOCK        >&  /dev/null
-		  	exit 255
-               	else if($seed == "" || $seed == "default") then
-			set seed = 9999
-                       	echo "Encryption seed is" $seed "(default)"								>>& $logFile
-               	endif
-
-		set dserial = `ask "    disk serial [default use build disk serial]"`
-                if("$dserial" == "q" || "$dserial" == "quit" || "$dserial" == "bye") then
-			\rmdir BUILDLOCK	>&  /dev/null
-                        exit 255
-		endif
-
-		if("$dserial" != "" || "$dserial" == "default") then
-			setenv USE_DISK_SERIAL "$dserial"
-		else
-			echo ""													>>& $logFile
-                        echo "    -----------------------------------------------------------------------------------------"	>>& $logFile
-                	echo "    You must change permissions of installation disk device (a+r)"				>>& $logFile
-                        echo "    -----------------------------------------------------------------------------------------"	>>& $logFile
-			echo ""													>>& $logFile
-
-get_passwd:
-                	if(`whoami` != root) then
-                        	echo "    (Root) password: "
-                        	echo ""
-
-                        	if(`su -c "chmod a+r /dev/$hd_device" |& awk '{print $2}'` == incorrect) then
-					echo ""
-                                	echo "    not authenticated"
-					echo ""
-
-					goto get_passwd
-                	        endif
-                	else
-                        	echo "    authenticated"									
-                	endif
-		endif
-
-                sed s/WHICH_DEVICE/$hd_device/g <../include.libs/securicor.h  | sed s/SVAL/$seed/g >../include.libs/sed_securicor.h
-        else if($method == "" || $method == sdongle || $method == default) then
-                echo ""														>>& $logFile
-                echo "    Licence method is soft dongle"									>>& $logFile
-
-                set dongle_dir = ~`whoami`/.sdongles
-		if(! -e $dongle_dir) then
-			mkdir $dongle_dir											>&  /dev/null
-		endif
-		
-                echo ""														>>& $logFile
-                echo "    ... Building security tools (sdongle)"								>>& $logFile
-                echo ""														>>& $logFile
-
-                gcc -w -Wfatal-errors -I../include.libs -O3 -o sdongle sdongle.c  						>>& $logFile
-		if($status != 0) then
-		        echo ""                                                                                                 >>& $logFile
-        		echo "    ERROR install_pupsP3: operation failed [gcc sdongle]"                                         >>& $logFile
-        		echo ""                                                                                                 >>& $logFile
-
-        		exit 255
-		endif
-                \mv sdongle $dongle_dir/sdongle 										>&  /dev/null
-		if($status != 0) then
-		        echo ""                                                                                                 >>& $logFile
-        		echo "    ERROR install_pupsP3: operation failed [install sdongle]"                                     >>& $logFile
-        		echo ""                                                                                                 >>& $logFile
-
-		        exit 255
-		endif
-
-		set is_key = NO
-		if($securitymode == default) then
-			set dongle_file_name = pups.dongle
-		else
-                	set dongle_file_name = `ask "    dongle file name (default pups.dongle)"`
-                	if($dongle_file_name == "q" || $dongle_file_name == "quit" || $dongle_file_name == "bye") then
-				\rmdir BUILDLOCK	>&  /dev/null
-                        	exit 255
-                	else if($dongle_file_name == "") then
-				set dongle_file_name = pups.dongle
-			else if(`ishex $dongle_file_name | grep TRUE` != "") then
-				set is_key = YES
-                	endif
-		endif
-
-		if($securitymode == default) then
-			set seed = 9999
-		else 	
-                	set seed = `ask "    encryption seed [default 9999]"`
-                	if($seed == "q" || $seed == "quit" || $seed == "bye") then
-				\rmdir BUILDLOCK	>&  /dev/null
-                        	exit 255
-			endif
-
-	                if($seed == "") then
-				set seed = 9999
-                        	echo "    Encryption seed is" $seed "(default)"							>>& $logFile
-			endif
-                endif
-
-		pushd $dongle_dir												>&  /dev/null
-		echo ""														>>& $logFile
-		echo "    Creating dongle file in  `pwd`"									>>& $logFile
-		echo ""														>>& $logFile
-                \rm pups.dongle		>&  /dev/null
-
-		if($is_key == "NO") then
-                	sdongle  pups.dongle	>&  /dev/null
-                	setenv USE_SOFT_DONGLE $dongle_dir/pups.dongle 
-			echo ""													>>& $logFile
-                        echo "    -----------------------------------------------------------------------------------------"	>>& $logFile
-                	echo "    You need to setenv USE_SOFT_DONGLE $dongle_dir/pups.dongle" 					>>& $logFile
-                        echo "    -----------------------------------------------------------------------------------------"	>>& $logFile
-			echo ""
-		else
-			echo ""													>>& $logFile
-                        echo "    -----------------------------------------------------------------------------------------"	>>& $logFile
-                	echo "    You need to setenv USE_SOFT_DONGLE appopriately (on host holding dongle)" 			>>& $logFile
-                        echo "    -----------------------------------------------------------------------------------------"	>>& $logFile
-			echo ""													>>& $logFile
-		endif
-
-		chmod a+r *dongle*												>&  /dev/null
-		popd 														>&  /dev/null
-
-                sleep 1
-                sed s/WHICH_DEVICE/dummy/g <../include.libs/securicor.h | sed s/SVAL/$seed/g >../include.libs/sed_securicor.h
-        endif
-endif
+#################################
+#### Configuration utilities ####
+#################################
 
 echo ""																>>& $logFile
-echo "    ... Building (enigma) encrypting tool (ecrypt)"									>>& $logFile
+echo "    ... Compiling P3-2025 configure and binary time stamping utilities"							>>& $logFile
 echo ""																>>& $logFile
-gcc -w -Wfatal-errors -I../include.libs -O3 -o ecrypt ecrypt.c									>>& $logFile
-if($status != 0) then
-        echo ""                                                                                                 		>>& $logFile
-        echo "    ERROR install_pupsP3: operation failed [gcc ecrypt]"                                                 		>>& $logFile
-        echo ""                                                                                                 		>>& $logFile
-
-        exit 255
-endif
-
-strip ecrypt
-\mv ecrypt $BINDIR 														>&  /dev/null
-if($status != 0) then
-        echo ""    		                                                                               			>>& $logFile
-        echo "    ERROR install_pupsP3: operation failed [install ecrypt]"                                             		>>& $logFile
-        echo ""                                                                                                 		>>& $logFile
-
-        exit 255
-endif
 
 
-echo ""																>>& $logFile
-echo "    ... Compiling P3-2023 configure and binary time stamping utilities"							>>& $logFile
-echo ""																>>& $logFile
+#---------
+# pupsconf
+#---------
 
 set target = `upcase $target`
-if($install_mode == secure) then
-	gcc -w -Wfatal-errors -DDEFAULT_CONFIGDIR=$projectPath -DSECURE -I../include.libs -D$target \
-								     -O3 -o pupsconf pupsconf.c -lbsd				>>& $logFile
-else
-	gcc -w -Wfatal-errors -DDEFAULT_CONFIGDIR=$projectPath -I../include.libs -D$target          \
-							             -O3 -o pupsconf pupsconf.c -lbsd			  	>>& $logFile
+gcc -w -Wfatal-errors -DDEFAULT_CONFIGDIR=$projectPath -I../include.libs -D$target -O3 -o pupsconf pupsconf.c -lbsd	  	>>& $logFile
 endif
 if($status != 0) then
         echo ""                         		                                                                        >>& $logFile
@@ -1164,6 +1111,11 @@ if($status != 0) then
 
         exit 255
 endif
+
+
+#----------
+# configure
+#----------
 
 \rm $BINDIR/configure														>&  /dev/null
 sed "s|CONFIG_PATH|$PROJECTDIR|g; s|INC_PATH|$INCDIR|g" <configure.in >$$
@@ -1178,6 +1130,11 @@ if($status != 0) then
 
         exit 255
 endif
+
+
+#-------
+# vstamp
+#-------
 
 gcc -w -Wfatal-errors -D$target -I../include.libs -O3 -o vstamp vstamp.c							>>& $logFile
 if($status != 0) then
@@ -1197,6 +1154,11 @@ if($status != 0) then
 
         exit 255
 endif
+
+
+#-------
+# vtagup
+#-------
 
 gcc -w -Wfatal-errors -D$target -I../include.libs -O3 -o vtagup vtagup.c  							>>& $logFile
 if($status != 0) then
@@ -1224,6 +1186,11 @@ if($build_ckpt == TRUE) then
 	vtagup SSAVETAG utilib.c                                                                                                >&  /dev/null
 endif
 
+
+#-----
+# pc2c
+#-----
+
 echo ""																>>& $logFile
 echo "    ... Building P3 Dynamic C [D] to ANSI C translator (language level support for dynamic functions and threads)"	>>& $logFile
 echo ""																>>& $logFile
@@ -1247,9 +1214,20 @@ if($status != 0) then
 endif
 
 
+
+
+##########################################
+#### Application generator frameworks ####
+##########################################
+
 echo ""																>>& $logFile
 echo "    ... Building P3 skeleton application generator (generates P3 application source frameworks)"				>>& $logFile
 echo ""																>>& $logFile
+
+
+#-------
+# appgen
+#-------
 
 gcc  -w -Wfatal-errors -DDEFAULT_CONFIGDIR=$projectPath -I. -I../include.libs -D$target -D$arch \
 								     -O3 -o appgen appgen.c -lbsd				>>& $logFile
@@ -1271,6 +1249,10 @@ if($status != 0) then
         exit 255
 endif
 
+
+#-------
+# libgen
+#-------
 
 echo ""																>>& $logFile
 echo "    ... Building P3 skeleton library generator (generates P3 library source frameworks)"					>>& $logFile
@@ -1297,9 +1279,13 @@ if($status != 0) then
 endif
 
 
-echo ""
+#-------
+# dllgen
+#-------
+
+echo ""                                                                                                                         >>& $logFile
 echo "    ... Building P3 skeleton application DLL generator (generates P3 DLL source frameworks)"				>>& $logFile
-echo ""
+echo ""                                                                                                                         >>& $logFile
 
 gcc  -w -Wfatal-errors -DDEFAULT_CONFIGDIR=$projectPath -I. -I../include.libs -D$target -D$arch \
 								     -O3 -o dllgen dllgen.c -lbsd				>>& $logFile
@@ -1324,7 +1310,17 @@ endif
 
 sed s/\$ARCH/$arch/g <$confdir/$pctarget >$confdir/$arch.$pctarget
 
-if($buildtype == cluster) then
+
+
+
+###############################
+#### Bubble memory support ####
+###############################
+#----------------------------
+# Build bubble memory library 
+#----------------------------
+
+if($sanitize == FALSE) then
     echo ""															>>& $logFile
     echo "    ... Building P3 dynamic bubble memory allocation library"								>>& $logFile
     echo ""															>>& $logFile
@@ -1352,216 +1348,288 @@ if($buildtype == cluster) then
     echo ""															>>& $logFile
 endif
 
-if($buildtype == cluster) then
 
-    echo "    Network support enabled (Building P3/PSRP for hetrogenous network MIMD environment)"				>>& $logFile
-    echo ""															>>& $logFile
-    echo "" 															>>& $logFile
 
-    echo ""															>>& $logFile
-    echo "    ... Building P3 HUP to TERM signal relay (relays HUP as TERM to payload process)"					>>& $logFile
-    echo ""															>>& $logFile
-    gcc -w -Wfatal-errors -D$utarget -D$arch -O3 -I../include.libs -o hupter hupter.c						>>& $logFile
-    if($status != 0) then
-        echo ""                                                                                                                 >>& $logFile
-        echo "    ERROR install_pupsP3: operation failed [gcc hupter]"                                                          >>& $logFile
-        echo ""                                                                                                                 >>& $logFile
 
-        exit 255
-    endif
-    strip hupter														>&  /dev/null
+##############################################
+#### Service functions (not psrp enabled) ####
+##############################################
 
-    echo ""
-    echo "    ... Building P3 network signal distributor [nkill] (sends signals to PID or process name on [remote] host)"	>>& $logFile
-    echo ""
+#-------
+# hupter
+#-------
 
-    gcc -w -Wfatal-errors -D$utarget -D$arch $AUTHEN -DSSH_SUPPORT -DHAVE_PROC_FS -O3 -I.        \
-					      -I../include.libs -o nkill nkill.c $crypt $nis -lbsd  				>>& $logFile
-    if($status != 0) then
-        echo ""                                                                                                                 >>& $logFile
-        echo "    ERROR install_pupsP3: operation failed [gcc nkill]"                                                           >>& $logFile
-        echo ""                                                                                                                 >>& $logFile
+echo "    Network support enabled (Building P3/PSRP for hetrogenous network MIMD environment)"					>>& $logFile
+echo ""																>>& $logFile
+echo "" 															>>& $logFile
 
-        exit 255
-    endif
-    strip nkill															>&  /dev/null
+echo ""																>>& $logFile
+echo "    ... Building P3 HUP to TERM signal relay (relays HUP as TERM to payload process)"					>>& $logFile
+echo ""																>>& $logFile
+gcc -w -Wfatal-errors -D$utarget -D$arch -O3 -I../include.libs -o hupter hupter.c						>>& $logFile
+if($status != 0) then
+	echo ""                                                                                                                 >>& $logFile
+	echo "    ERROR install_pupsP3: operation failed [gcc hupter]"                                                          >>& $logFile
+	echo ""                                                                                                                 >>& $logFile
 
-    set target = `downcase $target`
+	exit 255
+endif
+strip hupter															>&  /dev/null
 
-    echo ""															>>& $logFile
-    echo "    ... Building P3 text file stripper [stripper] (strips comments from files in VDM's)"				>>& $logFile
-    echo ""															>>& $logFile
-    gcc -w -Wfatal-errors -D$utarget -D$arch -O3 -I../include.libs -o stripper stripper.c 					>>& $logFile
-    if($status != 0) then
-        echo ""                                                                                                                 >>& $logFile
-        echo "    ERROR install_pupsP3: operation failed [gcc stripper]"                                                        >>& $logFile
-        echo ""                                                                                                                 >>& $logFile
 
-        exit 255
-    endif
-    strip stripper														>&  /dev/null
+#------
+# nkill
+#------
 
-    echo ""															>>& $logFile
-    echo "    ... Building p3f (checks if process is P3 aware)"									>>& $logFile
-    echo ""															>>& $logFile
+echo ""																>>& $logFile
+echo "    ... Building P3 network signal distributor [nkill] (sends signals to PID or process name on [remote] host)"		>>& $logFile
+echo ""                                                                                                                     	>>& $logFile
 
-    gcc -w -Wfatal-errors -D$utarget -D$arch -DSSH_SUPPORT -DHAVE_PROC_FS -O3 -I.    \
-				     -I../include.libs -o p3f p3f.c $crypt $nis  -lbsd 						>>& $logFile
-    if($status != 0) then
+gcc -w -Wfatal-errors -D$utarget -D$arch $AUTHEN -DSSH_SUPPORT -DHAVE_PROC_FS -O3 -I.        \
+				          -I../include.libs -o nkill nkill.c $crypt $nis -lbsd  				>>& $logFile
+if($status != 0) then
+	echo ""                                                                                                                 >>& $logFile
+	echo "    ERROR install_pupsP3: operation failed [gcc nkill]"                                                           >>& $logFile
+	echo ""                                                                                                                 >>& $logFile
+
+	exit 255
+endif
+strip nkill															>&  /dev/null
+
+set target = `downcase $target`
+
+
+#---------
+# stripper
+#---------
+
+echo ""																>>& $logFile
+echo "    ... Building P3 text file stripper [stripper] (strips comments from files in VDM's)"					>>& $logFile
+echo ""																>>& $logFile
+gcc -w -Wfatal-errors -D$utarget -D$arch -O3 -I../include.libs -o stripper stripper.c 						>>& $logFile
+if($status != 0) then
+	echo ""                                                                                                                 >>& $logFile
+	echo "    ERROR install_pupsP3: operation failed [gcc stripper]"                                                        >>& $logFile
+	echo ""                                                                                                                 >>& $logFile
+
+	exit 255
+endif
+strip stripper															>&  /dev/null
+
+
+#----
+# p3f
+#----
+
+echo ""																>>& $logFile
+echo "    ... Building p3f (checks if process is P3 aware)"									>>& $logFile
+echo ""																>>& $logFile
+
+gcc -w -Wfatal-errors -D$utarget -D$arch -DSSH_SUPPORT -DHAVE_PROC_FS -O3 -I.    \
+			         -I../include.libs -o p3f p3f.c $crypt $nis  -lbsd 						>>& $logFile
+if($status != 0) then
 	echo ""                                                                                                                 >>& $logFile
 	echo "    ERROR install_pupsP3: operation failed [gcc p3f]"                                                             >>& $logFile
 	echo ""                                                                                                                 >>& $logFile
 
 	exit 255
-    endif
+endif
+strip p3f					   	 									>&  /dev/null
 
-    strip p3f					   	 									>&  /dev/null
+set target = `downcase $target`
 
-    set target = `downcase $target`
 
-    echo ""															>>& $logFile
-    echo "    ... Building P3 lightweight file homeostat [lyosome] (protects a file for specified time period)"			>>& $logFile
-    echo ""															>>& $logFile
-    gcc -w -Wfatal-errors -D$utarget -D$arch -O3 -I../include.libs -o lyosome lyosome.c	-lbsd					>>& $logFile
-    if($status != 0) then
-        echo ""                                                                                                                 >>& $logFile
-        echo "    ERROR install_pupsP3: operation failed [gcc lyosome]"                                                         >>& $logFile
-        echo ""                                                                                                                 >>& $logFile
+#--------
+# lyosome
+#--------
+ 
+echo ""																>>& $logFile
+echo "    ... Building P3 lightweight file homeostat [lyosome] (protects a file for specified time period)"			>>& $logFile
+echo ""																>>& $logFile
+gcc -w -Wfatal-errors -D$utarget -D$arch -O3 -I../include.libs -o lyosome lyosome.c	-lbsd					>>& $logFile
+if($status != 0) then
+	echo ""                                                                                                                 >>& $logFile
+	echo "    ERROR install_pupsP3: operation failed [gcc lyosome]"                                                         >>& $logFile
+	echo ""                                                                                                                 >>& $logFile
 
-        exit 255
-    endif
-    strip lyosome														>&  /dev/null
+exit 255
+endif
+strip lyosome															>&  /dev/null
 
-    echo ""															>>& $logFile
-    echo "    ... Building P3 lightweight process homeostat [phagocyte] (removes damaged processes)"				>>& $logFile
-    echo ""															>>& $logFile
-    gcc -w -Wfatal-errors -D$utarget -D$arch -D$ftype -O3 -I../include.libs -o phagocyte phagocyte.c -lbsd			>>& $logFile
-    if($status != 0) then
-        echo ""                                                                                                                 >>& $logFile
-        echo "    ERROR install_pupsP3: operation failed [gcc phagocyte]"                                                       >>& $logFile
-        echo ""                                                                                                                 >>& $logFile
 
-        exit 255
-    endif
-    strip phagocyte														>&  /dev/null
+#----------
+# phagocyte
+#----------
 
-    echo ""															>>& $logFile
-    echo "    ... Building P3 software watchdog (removes damaged processes)"							>>& $logFile
-    echo ""															>>& $logFile
-    gcc -w -Wfatal-errors -D$utarget -D$arch -O3 -I../include.libs -o softdog softdog.c -lbsd					>>& $logFile
-    if($status != 0) then
+echo ""																>>& $logFile
+echo "    ... Building P3 lightweight process homeostat [phagocyte] (removes damaged processes)"				>>& $logFile
+echo ""																>>& $logFile
+gcc -w -Wfatal-errors -D$utarget -D$arch -D$ftype -O3 -I../include.libs -o phagocyte phagocyte.c -lbsd				>>& $logFile
+if($status != 0) then
         echo ""                                                                                                                 >>& $logFile
         echo "    ERROR install_pupsP3: operation failed [gcc phagocyte]"                                                       >>& $logFile
         echo ""                                                                                                                 >>& $logFile
 
         exit 255
-    endif
-    strip softdog														>&  /dev/null
+endif
+strip phagocyte															>&  /dev/null
 
-    echo ""															>>& $logFile
-    echo "    ... Building P3 lightweight garbage collector [kepher] (removes stale temporary files)"				>>& $logFile
-    echo ""															>>& $logFile
-    gcc -w -Wfatal-errors -D$utarget -D$arch -O3 -I../include.libs -o kepher kepher.c -lbsd					>>& $logFile
-    if($status != 0) then
+
+#--------
+# softdog
+#--------
+
+echo ""																>>& $logFile
+echo "    ... Building P3 software watchdog (removes damaged processes)"							>>& $logFile
+echo ""																>>& $logFile
+gcc -w -Wfatal-errors -D$utarget -D$arch -O3 -I../include.libs -o softdog softdog.c -lbsd					>>& $logFile
+if($status != 0) then
+        echo ""                                                                                                                 >>& $logFile
+        echo "    ERROR install_pupsP3: operation failed [gcc phagocyte]"                                                       >>& $logFile
+        echo ""                                                                                                                 >>& $logFile
+
+        exit 255
+endif
+strip softdog															>&  /dev/null
+
+
+#-------
+# kepher
+#-------
+
+echo ""																>>& $logFile
+echo "    ... Building P3 lightweight garbage collector [kepher] (removes stale temporary files)"				>>& $logFile
+echo ""																>>& $logFile
+gcc -w -Wfatal-errors -D$utarget -D$arch -O3 -I../include.libs -o kepher kepher.c -lbsd						>>& $logFile
+if($status != 0) then
         echo ""                                                                                                                 >>& $logFile
         echo "    ERROR install_pupsP3: operation failed [gcc kepher]"                                                          >>& $logFile
         echo ""                                                                                                                 >>& $logFile
 
         exit 255
-    endif
-    strip kepher                      												>&  /dev/null
+endif
+strip kepher                      												>&  /dev/null
 
-    echo ""															>>& $logFile
-    echo "    ... Building P3 sub-pathname extractor [leaf] (extracts apical twigs from pathname branches)"			>>& $logFile
-    echo ""															>>& $logFile
-    gcc -w -Wfatal-errors -D$utarget -D$arch -O3 -I../include.libs -o leaf leaf.c -lbsd			     			>>& $logFile
-    if($status != 0) then
+
+#-----
+# leaf
+#-----
+
+echo ""																>>& $logFile
+echo "    ... Building P3 sub-pathname extractor [leaf] (extracts apical twigs from pathname branches)"				>>& $logFile
+echo ""																>>& $logFile
+gcc -w -Wfatal-errors -D$utarget -D$arch -O3 -I../include.libs -o leaf leaf.c -lbsd			     			>>& $logFile
+if($status != 0) then
         echo ""                                                                                                                 >>& $logFile
         echo "    ERROR install_pupsP3: operation failed [gcc leaf]"                                                            >>& $logFile
         echo ""                                                                                                                 >>& $logFile
 
         exit 255
-    endif
-    strip leaf                        												>&  /dev/null
+endif
+strip leaf                        												>&  /dev/null
 
-    echo ""															>>& $logFile
-    echo "    ... Building P3 basal-path extractor [branch] (extracts basal path from pathname branches)"			>>& $logFile
-    echo ""															>>& $logFile
-    gcc -w -Wfatal-errors -D$utarget -D$arch -O3 -I../include.libs -o branch branch.c -lbsd		   			>>& $logFile
-    if($status != 0) then
+echo ""																>>& $logFile
+echo "    ... Building P3 basal-path extractor [branch] (extracts basal path from pathname branches)"				>>& $logFile
+echo ""																>>& $logFile
+gcc -w -Wfatal-errors -D$utarget -D$arch -O3 -I../include.libs -o branch branch.c -lbsd		   				>>& $logFile
+if($status != 0) then
         echo ""                                                                                                                 >>& $logFile
         echo "    ERROR install_pupsP3: operation failed [gcc branch]"                                                          >>& $logFile
         echo ""                                                                                                                 >>& $logFile
 
         exit 255
-    endif
-    strip branch                       												>&  /dev/null
+endif
+strip branch                       												>&  /dev/null
 
 
-    echo ""															>>& $logFile
-    echo "    ... Building psrptool (starts psrp client process in new [vte] window)"						>>& $logFile
-    echo ""															>>& $logFile
-    gcc -w -Wfatal-errors -D$utarget -D$arch -O3 -I../include.libs -o psrptool psrptool.c -lbsd			 		>>& $logFile
-    if($status != 0) then
+#---------
+# psrptool
+#---------
+ 
+echo ""																>>& $logFile
+echo "    ... Building psrptool (starts psrp client process in new [vte] window)"						>>& $logFile
+echo ""																>>& $logFile
+gcc -w -Wfatal-errors -D$utarget -D$arch -O3 -I../include.libs -o psrptool psrptool.c -lbsd			 		>>& $logFile
+if($status != 0) then
         echo ""                                                                                                                 >>& $logFile
         echo "    ERROR install_pupsP3: operation failed gcc psrptool]"                                                         >>& $logFile
         echo ""                                                                                                                 >>& $logFile
 
         exit 255
-    endif
-    strip psrptool														>&  /dev/null
+endif
+strip psrptool															>&  /dev/null
 
-    echo ""															>>& $logFile
-    echo "    ... Building servertool (starts psrp server process in new [xterm] window)"					>>& $logFile
-    echo ""															>>& $logFile
-    gcc -w -Wfatal-errors -D$utarget -D$arch -O3 -I../include.libs -o servertool servertool.c -lbsd				>>& $logFile
-    if($status != 0) then
+
+#-----------
+# servertool
+#-----------
+
+echo ""																>>& $logFile
+echo "    ... Building servertool (starts psrp server process in new [xterm] window)"						>>& $logFile
+echo ""																>>& $logFile
+gcc -w -Wfatal-errors -D$utarget -D$arch -O3 -I../include.libs -o servertool servertool.c -lbsd					>>& $logFile
+if($status != 0) then
         echo ""                                                                                                                 >>& $logFile
         echo "    ERROR install_pupsP3: operation failed [gcc servertool]"                                                      >>& $logFile
         echo ""                                                                                                                 >>& $logFile
 
         exit 255
-    endif
-    strip servertool														>&  /dev/null
+endif
+strip servertool														>&  /dev/null
 
-    echo ""															>>& $logFile
-    echo "    ... Building P3 farm (permits definition of network-wide [homogenous] process farms)"			        >>& $logFile
-    echo ""															>>& $logFile
-    gcc -w -Wfatal-errors -D$utarget -D$arch -DSSH_SUPPORT -O3 -I../include.libs -o farm farm.c $crypt -lbsd			>>& $logFile
-    if($status != 0) then
+
+#-----
+# farm
+#-----
+
+echo ""																>>& $logFile
+echo "    ... Building P3 farm (permits definition of network-wide [homogenous] process farms)"			        	>>& $logFile
+echo ""																>>& $logFile
+gcc -w -Wfatal-errors -D$utarget -D$arch -DSSH_SUPPORT -O3 -I../include.libs -o farm farm.c $crypt -lbsd			>>& $logFile
+if($status != 0) then
         echo ""                                                                                                                 >>& $logFile
         echo "    ERROR install_pupsP3: operation failed [gcc farm]"                                                            >>& $logFile
         echo ""                                                                                                                 >>& $logFile
 
         exit 255
-    endif
-    strip farm	   													        >&  /dev/null
+endif
+strip farm	   													        >&  /dev/null
 
-    echo ""                                                                                                                     >>& $logFile
-    echo "    ... Building htype (tests if Linux instance is running in container or on regular host)"                          >>& $logFile
-    echo ""                                                                                                                     >>& $logFile
-    gcc -w -Wfatal-errors -O3 -o htype htype.c                                                                                  >>& $logFile
-    if($status != 0) then
+
+#------
+# htype
+#------
+
+echo ""                                                                                                                     	>>& $logFile
+echo "    ... Building htype (tests if Linux instance is running in container or on regular host)"                          	>>& $logFile
+echo ""                                                                                                                     	>>& $logFile
+gcc -w -Wfatal-errors -O3 -o htype htype.c                                                                                  	>>& $logFile
+if($status != 0) then
         echo ""                                                                                                                 >>& $logFile
         echo "    ERROR install_pupsP3: operation failed [gcc htype]"                                                           >>& $logFile
         echo ""                                                                                                                 >>& $logFile
 
         exit 255
-    endif
-    strip htype 														>&  /dev/null
+endif
+strip htype 															>&  /dev/null
 
-    if($build_ckpt == TRUE) then
+
+#------
+# ssave
+#------
+
+if($build_ckpt == TRUE) then
        echo ""                                                                                                                  >>& $logFile
        echo "    ... Building ssave (saves process state via Criu)"						                >>& $logFile
        echo ""                                                                                                                  >>& $logFile
        vtagup SSAVETAG ssave.c													>&  /dev/null 
        gcc -w -Wfatal-errors -O3 -o ssave ssave.c -lbsd										>>& $logFile
        if($status != 0) then
-          echo ""                                                                                                               >>& $logFile
-          echo "    ERROR install_pupsP3: operation failed [gcc ssave]"                                                         >>& $logFile
-          echo ""                                                                                                               >>& $logFile
+		echo ""                                                                                                         >>& $logFile
+          	echo "    ERROR install_pupsP3: operation failed [gcc ssave]"                                                   >>& $logFile
+          	echo ""                                                                                                         >>& $logFile
 
-          exit 255
+          	exit 255
        endif
        strip ssave 
 
@@ -1571,380 +1639,146 @@ if($buildtype == cluster) then
        vtagup SSAVETAG restart.c												>&  /dev/null
        gcc -w -Wfatal-errors -O3 -o restart restart.c -lbsd									>>& $logFile
        if($status != 0) then
-          echo ""                                                                                                               >>& $logFile
-          echo "    ERROR install_pupsP3: operation failed [gcc restart]"                                                       >>& $logFile
-          echo ""                                                                                                               >>& $logFile
+		echo ""                                                                                                         >>& $logFile
+		echo "    ERROR install_pupsP3: operation failed [gcc restart]"                                                 >>& $logFile
+		echo ""                                                                                                         >>& $logFile
 
-          exit 255
+		exit 255
        endif
        strip restart 
-    endif
+ endif
 
-    echo ""															>>& $logFile
-    echo "    ... Building cpuload (monitors server cpu loading)"								>>& $logFile
-    echo ""															>>& $logFile
-    gcc -w -Wfatal-errors -D$utarget -D$arch -DSSH_SUPPORT -O3 -I../include.libs -o cpuload cpuload.c -lbsd		 	>>& $logFile
-    if($status != 0) then
+
+#--------
+# cpuload
+#--------
+
+echo ""																>>& $logFile
+echo "    ... Building cpuload (monitors server cpu loading)"									>>& $logFile
+echo ""																>>& $logFile
+gcc -w -Wfatal-errors -D$utarget -D$arch -DSSH_SUPPORT -O3 -I../include.libs -o cpuload cpuload.c -lbsd		 		>>& $logFile
+if($status != 0) then
         echo ""                                                                                                                 >>& $logFile
         echo "    ERROR install_pupsP3: operation failed [gcc cpuload]"                                                         >>& $logFile
         echo ""                                                                                                                 >>& $logFile
 
         exit 255
-    endif
-    strip cpuload														>&  /dev/null
+endif
+strip cpuload															>&  /dev/null
 
-    echo ""															>>& $logFile
-    echo "    ... Building lol (detects whether owner of a lid associated with a simple link lock is alive)"			>>& $logFile
-    echo ""															>>& $logFile
-    gcc -w -Wfatal-errors -D$utarget -D$arch -DSSH_SUPPORT -O3 -I../include.libs -o lol lol.c -lbsd		 		>>& $logFile
-    if($status != 0) then
+
+#----
+# lol
+#----
+
+echo ""																>>& $logFile
+echo "    ... Building lol (detects whether owner of a lid associated with a simple link lock is alive)"			>>& $logFile
+echo ""																>>& $logFile
+gcc -w -Wfatal-errors -D$utarget -D$arch -DSSH_SUPPORT -O3 -I../include.libs -o lol lol.c -lbsd		 			>>& $logFile
+if($status != 0) then
         echo ""                                                                                                                 >>& $logFile
         echo "    ERROR install_pupsP3: operation failed [gcc lol]"                                                             >>& $logFile
         echo ""                                                                                                                 >>& $logFile
 
         exit 255
-    endif
-    strip lol															>&  /dev/null
+endif
+strip lol															>&  /dev/null
 
-    echo ""															>>& $logFile
-    echo "    ... Building gob (provides named gobhole FIFO allowing asynchronous data transfer to pipeline)"			>>& $logFile
+
+#----
+# gob
+#----
+
+echo ""																>>& $logFile
+echo "    ... Building gob (provides named gobhole FIFO allowing asynchronous data transfer to pipeline)"			>>& $logFile
  
-    echo ""															>>& $logFile
-    gcc -w -Wfatal-errors -D$utarget -D$arch -DSSH_SUPPORT -O3 -I../include.libs -o gob gob.c -lbsd		 		>>& $logFile
-    if($status != 0) then
+echo ""																>>& $logFile
+gcc -w -Wfatal-errors -D$utarget -D$arch -DSSH_SUPPORT -O3 -I../include.libs -o gob gob.c -lbsd		 			>>& $logFile
+if($status != 0) then
         echo ""                                                                                                                 >>& $logFile
         echo "    ERROR install_pupsP3: operation failed [gcc gob]"                                                             >>& $logFile
         echo ""                                                                                                                 >>& $logFile
 
         exit 255
-    endif
-    strip gob															>&  /dev/null
+endif
+strip gob															>&  /dev/null
 
-    echo ""															>>& $logFile
-    echo "    ... Building arse (provides named arse hole FIFO allowing asynchronous data transfer from pipeline)"		>>& $logFile
-    echo ""															>>& $logFile
-    gcc -w -Wfatal-errors -D$utarget -D$arch -DSSH_SUPPORT -O3 -I../include.libs -o arse arse.c -lbsd				>>& $logFile
-    if($status != 0) then
+
+#-----
+# arse
+#-----
+
+echo ""																>>& $logFile
+echo "    ... Building arse (provides named arse hole FIFO allowing asynchronous data transfer from pipeline)"			>>& $logFile
+echo ""																>>& $logFile
+gcc -w -Wfatal-errors -D$utarget -D$arch -DSSH_SUPPORT -O3 -I../include.libs -o arse arse.c -lbsd				>>& $logFile
+if($status != 0) then
         echo ""                                                                                                                 >>& $logFile
         echo "    ERROR install_pupsP3: operation failed [gcc arse]"                                                            >>& $logFile
         echo ""                                                                                                                 >>& $logFile
 
     	exit 255
-    endif
-    strip arse															>&  /dev/null
+endif
+strip arse															>&  /dev/null
 
-    echo ""															>>& $logFile
-    echo "    ... Building P3 tty device homeostat [mktty] (restores /dev/tty if it is deleted)"				>>& $logFile
-    echo ""															>>& $logFile
-    gcc -w -Wfatal-errors -D$utarget -D$arch -DSSH_SUPPORT -O3 -I../include.libs -o mktty mktty.c  				>>& $logFile
-    if($status != 0) then
+
+#------
+# mktty
+ #------
+
+echo ""																>>& $logFile
+echo "    ... Building P3 tty device homeostat [mktty] (restores /dev/tty if it is deleted)"					>>& $logFile
+echo ""																>>& $logFile
+gcc -w -Wfatal-errors -D$utarget -D$arch -DSSH_SUPPORT -O3 -I../include.libs -o mktty mktty.c  					>>& $logFile
+if($status != 0) then
         echo ""                                                                                                                 >>& $logFile
         echo "    ERROR install_pupsP3: operation failed gcc mktty]"                                                            >>& $logFile
         echo ""                                                                                                                 >>& $logFile
 
         exit 255
-    endif
-    strip mktty															>&  /dev/null
+endif
+strip mktty															>&  /dev/null
 
-    echo ""															>>& $logFile
-    echo "    ... Building P3 file creator [mkfile] (creates arbitrary files)"							>>& $logFile
-    echo ""															>>& $logFile
-    gcc -w -Wfatal-errors -D$utarget -D$arch -O3 -I../include.libs -o mkfile mkfile.c						>>& $logFile
-    if($status != 0) then
+
+#-------
+# mkfile
+#-------
+
+echo ""																>>& $logFile
+echo "    ... Building P3 file creator [mkfile] (creates arbitrary files)"							>>& $logFile
+echo ""																>>& $logFile
+gcc -w -Wfatal-errors -D$utarget -D$arch -O3 -I../include.libs -o mkfile mkfile.c						>>& $logFile
+if($status != 0) then
         echo ""                                                                                                                 >>& $logFile
         echo "    ERROR install_pupsP3: operation failed [mklfile]"                                                             >>& $logFile
         echo ""                                                                                                                 >>& $logFile
 
         exit 255
-    endif
-    strip mkfile														>&  /dev/null
+endif
+strip mkfile															>&  /dev/null
 
-    if($dummy_shgmalloc == need_dummy_shgmalloc) then
-       echo ""															>>& $logFile
-       echo "    ... Building dummy persistent heap library (needed to keep make happy)"					>>& $logFile
-       echo ""															>>& $logFile
-       gcc -w -Wfatal-errors -c dummy_phgmalloc.c										>>& $logFile
-       if($status != 0) then
-          echo ""                                                                                                               >>& $logFile
-          echo "    ERROR install_pupsP3: operation failed [gcc dummy_phgmalloc]"                                               >>& $logFile
-          echo ""                                                                                                               >>& $logFile
 
-          exit 255
-       endif
+#----------
+# gethostip
+#----------
 
-       \mv dummy_shgmalloc.o $LIBDIR/shgmalloc.o										>&  /dev/null
-       if($status != 0) then
-          echo ""                                                                                                               >>& $logFile
-          echo "    ERROR install_pupsP3: operation failed [install dummy_shgmalloc]"                                           >>& $logFile
-          echo ""                                                                                                               >>& $logFile
-
-          exit 255
-       endif
-    endif
-
-    echo ""															>>& $logFile
-    echo "    ... Building gethostip (gets I.P. address information for DHCP clients)"						>>& $logFile
-    echo ""															>>& $logFile
-    gcc -w -Wfatal-errors -I. -I../include.libs -D$target -O3 -o gethostip gethostip.c -lbsd					>>& $logFile
-    if($status != 0) then
+echo ""																>>& $logFile
+echo "    ... Building gethostip (gets I.P. address information for DHCP clients)"						>>& $logFile
+echo ""																>>& $logFile
+gcc -w -Wfatal-errors -I. -I../include.libs -D$target -O3 -o gethostip gethostip.c -lbsd					>>& $logFile
+if($status != 0) then
 	echo ""															>>& $logFile
 	echo "    ERROR install_pupsP3: operation failed [gcc gethostip]"							>>& $logFile
 	echo ""															>>& $logFile
 
 	exit 255
-    endif
-    strip gethostip														>&  /dev/null
-
-    \mv gethostip hupter nkill htype farm cpuload lol gob arse mktty mkfile lyosome phagocyte softdog kepher leaf branch psrptool servertool p3f stripper     \
-															$BINDIR	>&  /dev/null
-
-    if($status != 0) then
-        echo ""                                                                                                                 >>& $logFile
-        echo "    ERROR install_pupsP3: operation failed [install PUPS/P3 support tools]"                                       >>& $logFile
-        echo ""                                                                                                                 >>& $logFile
-
-        exit 255
-    endif
-
-    if($build_ckpt == TRUE) then
-        \mv ssave restart $BINDIR												>&  /dev/null
-
-        if($status != 0) then
-           echo ""                                                                                                              >>& $logFile
-           echo "    ERROR install_pupsP3: operation failed [install PUPS/P3 checkpoint support tools]"                         >>& $logFile
-           echo ""                                                                                                              >>& $logFile
-
-           exit 255
-        endif
-    endif
-else
-
-    echo ""															>>& $logFile
-    echo "    ... Building P3 HUP to TERM signal relay (relays HUP as TERM to payload process)"					>>& $logFile
-    echo ""															>>& $logFile
-    gcc -w -Wfatal-errors -D$utarget -D$arch -O3 -I../include.libs -o hupter hupter.c						>>& $logFile
-    if($status != 0) then
-        echo ""                                                                                                                 >>& $logFile
-        echo "    ERROR install_pupsP3: operation failed [gcc hupter]"                                                          >>& $logFile
-        echo ""                                                                                                                 >>& $logFile
-
-        exit 255
-    endif
-    strip hupter														>&  /dev/null
-
-    echo "    ... Building P3 network signal distributor [nkill] (sends signals to PID or process name on [remote] host)"	>>& $logFile
-    echo ""															>>& $logFile
-    gcc -w -Wfatal-errors -D$utarget -D$arch -O3 -I../include.libs -o nkill nkill.c $crypt  					>>& $logFile
-    if($status != 0) then
-        echo ""                                                                                                                 >>& $logFile
-        echo "    ERROR install_pupsP3: operation failed [gcc nkill]"                                                           >>& $logFile
-        echo ""                                                                                                                 >>& $logFile
-
-        exit 255
-    endif
-    strip nkill															>&  /dev/null
-
-    echo ""															>>& $logFile
-    echo "    ... Building P3 text file stripper [nkill] (strips comments from files in VDM's)"					>>& $logFile
-    echo ""															>>& $logFile
-    gcc -w -Wfatal-errors -D$utarget -D$arch -O3 -I../include.libs -o stripper stripper.c  					>>& $logFile
-    if($status != 0) then
-        echo ""                                                                                                                 >>& $logFile
-        echo "    ERROR install_pupsP3: operation failed [gcc stripper]"                                                        >>& $logFile
-        echo ""                                                                                                                 >>& $logFile
-
-        exit 255
-    endif
-    strip stripper														>&  /dev/null
-
-    echo ""															>>& $logFile
-    echo "    ... Building P3 tty device homeostat [mktty] (restores /dev/tty if it is deleted)"				>>& $logFile
-    echo ""															>>& $logFile
-    gcc -w -Wfatal-errors -D$utarget -D$arch -O3 -I../include.libs -o mktty mktty.c  >>& $logFile				>>& $logFile
-    if($status != 0) then
-        echo ""                                                                                                                 >>& $logFile
-        echo "    ERROR install_pupsP3: operation failed [gcc mktty]"                                                           >>& $logFile
-        echo ""                                                                                                                 >>& $logFile
-
-        exit 255
-    endif
-    strip mktty															>&  /dev/null
-
-    echo ""															>>& $logFile
-    echo "    ... Building P3 file creator [mkfile] (creates arbitrary files)"							>>& $logFile
-    echo ""															>>& $logFile
-    gcc -w -Wfatal-errors -D$utarget -D$arch -O3 -I../include.libs -o mkfile mkfile.c  >>& $logFile				>>& $logFile
-    if($status != 0) then
-        echo ""                                                                                                                 >>& $logFile
-        echo "    ERROR install_pupsP3: operation failed [gcc mkfile]"                                                          >>& $logFile
-        echo ""                                                                                                                 >>& $logFile
-
-        exit 255
-    endif
-    strip mkfile														>&  /dev/null
-
-    echo ""															>>& $logFile
-    echo "    ... Building P3 lightweight file homeostat [lyosome] (protects a file for specified time period)"			>>& $logFile
-    echo ""															>>& $logFile
-    gcc -w -Wfatal-errors -D$utarget -D$arch -O3 -I../include.libs -o lyosome lyosome.c	-lbsd					>>& $logFile
-    if($status != 0) then
-        echo ""                                                                                                                 >>& $logFile
-        echo "    ERROR install_pupsP3: operation failed [gcc lyosome]"                                                         >>& $logFile
-        echo ""                                                                                                                 >>& $logFile
-
-        exit 255
-    endif
-
-    echo ""															>>& $logFile
-    echo "    ... Building P3 lightweight garbage collector [kepher] (removes stale temporary files)"				>>& $logFile
-    echo ""															>>& $logFile
-    gcc -w -Wfatal-errors -D$utarget -D$arch -O3 -I../include.libs -o kepher kepher.c						>>& $logFile
-    if($status != 0) then
-        echo ""                                                                                                                 >>& $logFile
-        echo "    ERROR install_pupsP3: operation failed [gcc kepher]"                                                          >>& $logFile
-        echo ""                                                                                                                 >>& $logFile
-
-        exit 255
-    endif
-    strip kepher                      												>&  /dev/null
-
-    echo ""															>>& $logFile
-    echo "    ... Building P3 sub-path extractor [leaf] (extracts twigs from pathname branches)"				>>& $logFile
-    echo ""															>>& $logFile
-    gcc -w -Wfatal-errors -D$utarget -D$arch -O3 -I../include.libs -o leaf leaf.c   						>>& $logFile
-    if($status != 0) then
-        echo ""                                                                                                                 >>& $logFile
-        echo "    ERROR install_pupsP3: operation failed [gcc leaf]"                                                            >>& $logFile
-        echo ""                                                                                                                 >>& $logFile
-        exit 255
-    endif
-    strip leaf                        												>&  /dev/null
-
-    echo ""															>>& $logFile
-    echo "    ... Building psrptool (starts psrp client process in new [xterm] window)"						>>& $logFile
-    echo ""															>>& $logFile
-    gcc -w -Wfatal-errors -D$utarget -D$arch -O3 -I../include.libs -o psrptool psrptool.c  					>>& $logFile
-    if($status != 0) then
-        echo ""                                                                                                                 >>& $logFile
-        echo "    ERROR install_pupsP3: operation failed [gcc psrptool]"                                                        >>& $logFile
-        echo ""                                                                                                                 >>& $logFile
-
-        exit 255
-    endif
-    strip psrptool														>&  /dev/null
-
-    echo ""															>>& $logFile
-    echo "    ... Building P3 farm (permits definition of network-wide [homogenous] process farms)"			        >>& $logFile
-    echo ""															>>& $logFile
-    gcc -w -Wfatal-errors -D$utarget -D$arch -O3 -I../include.libs -o farm farm.c $crypt -lbsd			  		>>& $logFile
-    if($status != 0) then
-        echo ""                                                                                                                 >>& $logFile
-        echo "    ERROR  install_pupsP3: operation failed [gcc farm]"                                                           >>& $logFile
-        echo ""                                                                                                                 >>& $logFile
-
-        exit 255
-    endif
-
-    echo ""                                                                                                                     >>& $logFile
-    echo "    ... Building htype (tests if Linux instance is running in container or on regular host)"                          >>& $logFile
-    echo ""                                                                                                                     >>& $logFile
-    gcc -w -Wfatal-errors -O3 -o htype htype.c                                                                                  >>& $logFile
-    if($status != 0) then
-        echo ""                                                                                                                 >>& $logFile
-        echo "    ERROR install_pupsP3: operation failed [gcc htype]"                                                           >>& $logFile
-        echo ""                                                                                                                 >>& $logFile
-
-        exit 255
-    endif
-    strip htype															>&  /dev/null	
-
-    if($build_ckpt == TRUE) then
-       echo ""                                                                                                                  >>& $logFile
-       echo "    ... Building ssave (saves process state via Criu)"                                                             >>& $logFile
-       echo ""                                                                                                                  >>& $logFile
-       vtagup SSAVETAG ssave.c													>&  /dev/null 
-       gcc -w -Wfatal-errors -o ssave ssave.c                                                                                   >>& $logFile
-       if($status != 0) then
-          echo ""                                                                                                               >>& $logFile
-          echo "    ERROR install_pupsP3:  operation failed [gcc ssave]"                                                        >>& $logFile
-          echo ""                                                                                                               >>& $logFile
-
-          exit 255
-       endif
-       strip ssave
-
-       echo ""                                                                                                                  >>& $logFile
-       echo "    ... Building restart (restarted Criu checkpoints)"                                                             >>& $logFile
-       echo ""                                                                                                                  >>& $logFile
-       vtagup SSAVETAG restart.c												>&  /dev/null 
-       gcc -w -Wfatal-errors -O3 -o restart restart.c                                                                           >>& $logFile
-       if($status != 0) then                                                                                                    
-          echo ""                                                                                                               >>& $logFile
-          echo "    ERROR install_pupsP3: operation failed [gcc restart]"                                                       >>& $logFile
-          echo ""                                                                                                               >>& $logFile
-        
-          exit 255                                                                                                               
-       endif
-       strip restart
-    endif
-
-    echo ""															>>& $logFile
-    echo "    ... Building lol (detects whether owner of a lid associated with a simple link lock is alive)"			>>& $logFile
-    echo ""															>>& $logFile
-    gcc -w -Wfatal-errors -D$utarget -D$arch -DSSH_SUPPORT -O3 -I../include.libs -o lol lol.c  					>>& $logFile
-    if($status != 0) then
-        echo ""                                                                                                                 >>& $logFile
-        echo "    ERROR install_pupsP3: operation failed [gcc lol]"                                                             >>& $logFile
-        echo ""                                                                                                                 >>& $logFile
-
-        exit 255
-    endif
-    strip lol															>&  /dev/null
-
-    if($dummy_phgmalloc == need_dummy_phgmalloc) then
-       echo ""															>>& $logFile
-       echo "... Building dummy persistent heap library (needed to keep make happy)"						>>& $logFile
-       echo ""															>>& $logFile
-       gcc -w -Wfatal-errors -c dummy_phgmalloc.c										>>& $logFile
-       if($status != 0) then
-          echo ""                                                                                                               >>& $logFile
-          echo "    ERROR install_pupsP3: operation failed [gcc dummy_phgmalloc]"                                               >>& $logFile
-          echo ""                                                                                                               >>& $logFile
-
-          exit 255
-       endif
-
-       \mv dummy_shgmalloc.o $LIBDIR/shgmalloc.o										>&  /dev/null
-       if($status != 0) then
-          echo ""                                                                                                               >>& $logFile
-          echo "    ERROR install_pupsP3: operation failed [install dummy_phgmalloc]"                                           >>& $logFile
-          echo ""                                                                                                               >>& $logFile
-
-          exit 255
-       endif
-    endif
-
-    \mv hupter nkill mktty mkfile htype farm lol lyosome kepher leaf psrptool servertool stripper $BINDIR 			>&  /dev/null
-    if($status != 0) then
-       echo ""                                                                                                                  >>& $logFile
-       echo "    ERROR install_pupsP3: operation failed [install PUPS/P3 support tools]"                                        >>& $logFile
-       echo ""                                                                                                                  >>& $logFile
-
-       exit 255
-    endif
-
-    if($build_ckpt == TRUE) then
-    	\mv ssave restart $BINDIR												>&  /dev/null
-
-    	if($status != 0) then
-	   echo ""                                                                                                              >>& $logFile
-           echo "    ERROR install_pupsP3: operation failed [install PUPS/P3 checkpoint support tools]"                         >>& $logFile
-           echo ""                                                                                                              >>& $logFile
-
-           exit 255
-        endif
-    endif
 endif
+strip gethostip															>&  /dev/null
+
+
+#---------
+# catfiles
+#---------
 
 echo ""																>>& $logFile
 echo "    ... Building catfiles (appends two files preserving inode of first)"							>>& $logFile
@@ -1957,17 +1791,12 @@ if($status != 0) then
 
    exit 255
 endif
-
 strip catfiles															>&  /dev/null
-\mv catfiles $BINDIR 														>&  /dev/null
-if($status != 0) then
-   echo ""                                                                                                                      >>& $logFile
-   echo "    ERROR install_pupsP3: operation failed [install catfiles]"                                                         >>& $logFile
-   echo ""                                                                                                                      >>& $logFile
 
-   exit 255
-endif
 
+#------------
+# new_session
+#------------
 
 echo ""																>>& $logFile
 echo "    ... Building new_session (creates new session)"									>>& $logFile
@@ -1980,44 +1809,47 @@ if($status != 0) then
 
    exit 255
 endif
-
 strip new_session 														>&  /dev/null
-\mv new_session $BINDIR 													>&  /dev/null
+
+
+#----------------------
+# Install service tools
+#----------------------
+
+\mv gethostip hupter nkill htype farm cpuload lol gob arse mktty mkfile lyosome phagocyte softdog kepher leaf branch psrptool    \
+   									 servertool p3f stripper catfiles new_session $BINDIR	>&  /dev/null
+
 if($status != 0) then
-   echo ""                                                                                                                      >>& $logFile
-   echo "    ERROR install_pupsP3: operation failed [install new_session]"                                                      >>& $logFile
-   echo ""                                                                                                                      >>& $logFile
+        echo ""                                                                                                                 >>& $logFile
+        echo "    ERROR install_pupsP3: operation failed [install PUPS/P3 support tools]"                                       >>& $logFile
+        echo ""                                                                                                                 >>& $logFile
 
-   exit 255
+        exit 255
 endif
 
-if($buildtype == cluster) then
-   echo ""															>>& $logFile
-   echo "    ... Making persistent heap library"										>>& $logFile
-   echo ""															>>& $logFile
-   $BINDIR/pupsconf $arch.$pctarget Make_phmalloc.in Makefile									>&  /dev/null 
-   if($status != 0) then
-      echo ""                                                                                                                   >>& $logFile
-      echo "    ERROR install_pupsP3: operation failed [configure phmalloc]"                                                    >>& $logFile
-      echo ""                                                                                                                   >>& $logFile
+if($build_ckpt == TRUE) then
+        \mv ssave restart $BINDIR												>&  /dev/null
 
-      exit 255
-   endif
+        if($status != 0) then
+		echo ""                                                                                                         >>& $logFile
+		echo "    ERROR install_pupsP3: operation failed [install PUPS/P3 checkpoint support tools]"                    >>& $logFile
+		echo ""                                                                                                         >>& $logFile
 
-   make -j$nCores 														>>& $logFile
-
-   if($status != 0) then
-      echo ""                                                                                                                   >>& $logFile
-      echo "    ERROR install_pupsP3: operation failed make phmalloc]"                                                          >>& $logFile
-      echo ""                                                                                                                   >>& $logFile
-
-      exit 255
-   endif
-
-   make clean															>>& $logFile
-   echo ""															>>& $logFile
+		exit 255
+	endif
 endif
 
+
+
+
+#############################################
+#### Bubble memory compatibility support ####
+#############################################
+#---------------------------------
+# Dummy bubble memory library stub
+#---------------------------------
+
+if($sanitize == TRUE || $nobubble == TRUE) then
 echo ""                                                                                                                         >>& $logFile
 echo "    ... Making nobubble compatability library"                                                                            >>& $logFile
 echo ""                                                                                                                         >>& $logFile
@@ -2029,7 +1861,6 @@ if($status != 0) then
 
    exit 255
 endif
-
 make -j$nCores                                                                                                                  >>& $logFile
 if($status != 0) then
    echo ""                                                                                                                      >>& $logFile
@@ -2038,10 +1869,105 @@ if($status != 0) then
 
    exit 255
 endif
+endif
+
+
+
+
+#################################
+#### Persistent heap support ####
+#################################
+#------------------------
+# Persistent heap library
+#------------------------
 
 echo ""																>>& $logFile
-echo "    ... Making P3-2023 libraries"												>>& $logFile
+echo "    ... Making persistent heap library"											>>& $logFile
 echo ""																>>& $logFile
+$BINDIR/pupsconf $arch.$pctarget Make_phmalloc.in Makefile									>&  /dev/null 
+if($status != 0) then
+      echo ""                                                                                                           	>>& $logFile
+      echo "    ERROR install_pupsP3: operation failed [configure phmalloc]"                                            	>>& $logFile
+      echo ""                                                                                                           	>>& $logFile
+
+      exit 255
+endif
+
+make -j$nCores 															>>& $logFile
+
+if($status != 0) then
+      echo ""                                                                                                           	>>& $logFile
+      echo "    ERROR install_pupsP3: operation failed make phmalloc]"                                                  	>>& $logFile
+      echo ""                                                                                                           	>>& $logFile
+
+      exit 255
+endif
+
+make clean															>>& $logFile
+echo ""																>>& $logFile
+
+
+
+
+#################################
+#### Build PUPS/P3 libraries ####
+#################################
+
+echo ""																>>& $logFile
+echo "    ... Making P3-2025 libraries"												>>& $logFile
+echo ""																>>& $logFile
+
+
+#-----------
+# cmain stub
+#-----------
+#------
+# Debug
+#------
+if ($debug == TRUE) then
+	echo "    ... compiling cmain [debug format, bubble memory support]"							>>& $logFile
+	gcc -DPTHREAD_SUPPORT -DBUBBLE_MEMORY_SUPPORT -g -I../include.libs -c cmain.c						>>& $logFile
+
+
+#--------
+# Santize
+#--------
+
+else if ($sanitize == TRUE) then
+	echo "    ... compiling cmain [sanitize format]"									>>& $logFile
+	gcc -DPTHREAD_SUPPORT -g -I../include.libs -c cmain.c									>>& $logFile
+
+
+#-----------
+# Production
+#-----------
+
+else
+	echo "    ... compiling cmain"												>>& $logFile
+	gcc -DPTHREAD_SUPPORT -DBUBBLE_MEMORY_SUPPORT -O3 -I../include.libs -c cmain.c						>>& $logFile
+endif
+mv cmain.o ../lib
+
+
+#----------------------------------
+# Generate libraries from templates
+#----------------------------------
+
+echo "    ... generating libraries from templates"										>>& $logFile
+sed s/VDIM/3/g < veclib.c.in                 > vec3lib.c
+sed s/VDIM/3/g < ../include.libs/vector.h.in > ../include.libs/vector3.h
+
+
+#--------------------------
+# Compile PUPS/P3 libraries
+#--------------------------
+
+if ($debug == TRUE) then
+	echo "    ... compiling PUPS/P3 libraries [debug format]"								>>& $logFile
+else
+	echo "    ... compiling PUPS/P3 libraries"										>>& $logFile
+endif
+
 $BINDIR/pupsconf $arch.$pctarget Make_libs.in Makefile										>&  /dev/null 
 if($status != 0) then
    echo ""                                                                                                                      >>& $logFile
@@ -2061,12 +1987,14 @@ if($status != 0) then
 endif
 
 
-#-----------------------------------
-# Build PUPS/P3 service applications
-#-----------------------------------
+
+
+############################################
+#### Build PUPS/P3 service applications ####
+############################################
 
 echo ""																>>& $logFile
-echo "    ... Making P3-2023 service applications"										>>& $logFile
+echo "    ... Making P3-2025 service applications"										>>& $logFile
 echo ""																>>& $logFile
 
 
@@ -2074,7 +2002,7 @@ echo ""																>>& $logFile
 # Build psrp client shell 
 #------------------------
 
-echo "    ... Building P3-2023 interaction client (allows user to manipulate arbitrary processes)"				>>& $logFile
+echo "    ... Building P3-2025 interaction client (allows user to manipulate arbitrary processes)"				>>& $logFile
 echo ""
 
 $BINDIR/pupsconf $arch.$pctarget Make_psrp.in Makefile										>&  /dev/null
@@ -2095,7 +2023,7 @@ if($status != 0) then
    exit 255
 endif
 
-if($debug == TRUE) then
+if($debug == TRUE || $sanitize == TRUE) then
 	make unstripped  													>>& $logFile
 else
 	make install														>>& $logFile
@@ -2111,12 +2039,12 @@ endif
 make cleanall   														>>& $logFile
 
 
-#----------------------------------------
-# Build maggot (stale resource recylcler) 
-#----------------------------------------
+#---------------------------------------
+# Build maggot (stale resource recylcer) 
+#---------------------------------------
 
 echo ""																>>& $logFile
-echo "    ... Building P3-2023 maggot (removes stale PSRP resources from system)"						>>& $logFile
+echo "    ... Building P3-2025 maggot (removes stale PSRP resources from system)"						>>& $logFile
 echo ""																>>& $logFile
 $BINDIR/pupsconf $arch.$pctarget Make_maggot.in Makefile									>&  /dev/null
 if($status != 0) then
@@ -2136,7 +2064,7 @@ if($status != 0) then
    exit 255
 endif
 
-if($debug == TRUE) then
+if($debug == TRUE || sanitize == TRUE) then
 	make unstripped  													>>& $logFile
 else
 	make install														>>& $logFile
@@ -2178,7 +2106,7 @@ if($status != 0) then
    exit 255
 endif
 
-if($debug == TRUE) then
+if($debug == TRUE || $sanitize == TRUE) then
 	make unstripped  													>>& $logFile
 else
 	make install														>>& $logFile
@@ -2219,7 +2147,7 @@ if($status != 0) then
    exit 255
 endif
 
-if($debug == TRUE) then
+if($debug == TRUE || $sanitize == TRUE) then
 	make unstripped  													>>& $logFile
 else
 	make install														>>& $logFile
@@ -2240,7 +2168,7 @@ make cleanall   														>>& $logFile
 #-------------------------------------
 
 echo ""																>>& $logFile
-echo "    ... Building P3-2023 file system watcher (intelligently deals with full filesystems)"					>>& $logFile
+echo "    ... Building P3-2025 file system watcher (intelligently deals with full filesystems)"					>>& $logFile
 echo ""																>>& $logFile
 $BINDIR/pupsconf $arch.$pctarget Make_fsw.in Makefile										>&  /dev/null
 if($status != 0) then
@@ -2260,7 +2188,7 @@ if($status != 0) then
    exit 255
 endif
 
-if($debug == TRUE) then
+if($debug == TRUE || $sanitize == TRUE) then
 	make unstripped  													>>& $logFile
 else
 	make install														>>& $logFile
@@ -2281,7 +2209,7 @@ make cleanall  															>>& $logFile
 #-----------------------------------------
 
 echo ""																>>& $logFile
-echo "    ... Building P3-2023 file/directory protector (homeostatic protection for files and directories)"			>>& $logFile
+echo "    ... Building P3-2025 file/directory protector (homeostatic protection for files and directories)"			>>& $logFile
 echo ""																>>& $logFile
 $BINDIR/pupsconf $arch.$pctarget Make_protect.in Makefile									>&  /dev/null
 if($status != 0) then
@@ -2301,7 +2229,7 @@ if($status != 0) then
    exit 255
 endif
 
-if($debug == TRUE) then
+if($debug == TRUE || $sanitize == TRUE) then
 	make unstripped  													>>& $logFile
 else
 	make install														>>& $logFile
@@ -2322,7 +2250,7 @@ make cleanall   														>>& $logFile
 #----------------------------------
 
 echo ""																>>& $logFile
-echo "    ... Building P3-2023 extended file catenator (replacement for cat command))"						>>& $logFile
+echo "    ... Building P3-2025 extended file catenator (replacement for cat command))"						>>& $logFile
 echo ""																>>& $logFile
 $BINDIR/pupsconf $arch.$pctarget Make_xcat.in Makefile										>&  /dev/null
 if($status != 0) then
@@ -2342,7 +2270,7 @@ if($status != 0) then
    exit 255
 endif
 
-if($debug == TRUE) then
+if($debug == TRUE || $sanitize == TRUE) then
 	make unstripped  													>>& $logFile
 else
 	make install														>>& $logFile
@@ -2363,7 +2291,7 @@ make cleanall    														>>& $logFile
 #----------------------------------
 
 echo ""																>>& $logFile
-echo "    ... Building P3-2023 extended pipeline tee (replacement for tee command))"						>>& $logFile
+echo "    ... Building P3-2025 extended pipeline tee (replacement for tee command))"						>>& $logFile
 echo ""																>>& $logFile
 
 $BINDIR/pupsconf $arch.$pctarget Make_xtee.in Makefile										>&  /dev/null
@@ -2384,7 +2312,7 @@ if($status != 0) then
    exit 255
 endif
 
-if($debug == TRUE) then
+if($debug == TRUE || $sanitize == TRUE) then
 	make unstripped  													>>& $logFile
 else
 	make install														>>& $logFile
@@ -2400,58 +2328,11 @@ endif
 make cleanall   														>>& $logFile
 
 
-#-----------------------------------------
-# Build tcell (license violation detector) 
-#-----------------------------------------
-
-echo ""																>>& $logFile
-echo "    ... Building P3-2023 licence violation detector (terminates arbitrary process violating license)"			>>& $logFile
-echo ""																>>& $logFile
-
-$BINDIR/pupsconf $arch.$pctarget Make_tcell.in Makefile										>&  /dev/null
-if($status != 0) then
-   echo ""                                                                                                                      >>& $logFile
-   echo "    ERROR install_pupsP3: operation failed [configure tcell]"                                                          >>& $logFile
-   echo ""                                                                                                                      >>& $logFile
-
-   exit 255
-endif
-
-make -j$nCores  														>>& $logFile
-if($status != 0) then
-   echo ""                                                                                                                      >>& $logFile
-   echo "    ERROR install_pupsP3: operation failed [make tcell]"                                                               >>& $logFile
-   echo ""                                                                                                                      >>& $logFile
-
-   exit 255
-endif
-
-if($debug == TRUE) then
-	make unstripped  													>>& $logFile
-else
-	make install														>>& $logFile
-endif
-if($status != 0) then
-   echo ""                                                                                                                      >>& $logFile
-   echo "    ERROR install_pupsP3: operation failed [install tcell]"                                                            >>& $logFile
-   echo ""                                                                                                                      >>& $logFile
-
-   exit 255
-endif
-
-make cleanall   														>>& $logFile
-echo ""																>>& $logFile
 
 
-if(debug == TRUE) then
-	echo ""
-	echo "    ----------------------------------------------------"
-	echo "    Installing debuggable PUPS/P3 libraries and tools"
-	echo "    ----------------------------------------------------"
-	echo ""
-endif
-
-
+############################
+#### Final installation ####
+############################
 #-----------------------------------------------
 # Copy PSRP bash profile to local home directory
 #-----------------------------------------------
@@ -2468,12 +2349,20 @@ if($status < 0) then
 endif
 
 
+#---------------------------
+# Build PUPS/P3 version tool
+#---------------------------
+
+echo "    ... building P3 version tool"												>>& $logFile
+./pupsp3_setversion.sh
+
+
 #----------------------------------------
 # Copy tool script to local bin directory
 #----------------------------------------
 
 echo "    ... installing P3 scripts in '$BINDIR'"										>>& $logFile
-chmod +x uninstall_pups mantohtml manc.sh C2MAN.sh  tall pupsuname configure somake pupsp3-version				>&  /dev/null
+chmod +x uninstall_pups mantohtml manc.sh C2MAN.sh  tall pupsuname configure somake dllbuild pupsp3-version			>&  /dev/null
 \cp  uninstall_pupsP3.csh mantohtml manc.sh C2MAN.sh  tall pupsuname configure somake pupsp3-version $BINDIR			>&  /dev/null
 if($status < 0) then
     echo ""                                                                                                             	>>& $logFile
@@ -2541,7 +2430,7 @@ popd																>&  /dev/null
 
 echo "    ... installing P3 headers in '$HDRDIR'"										>>& $logFile
 pushd ../include.libs														>&  /dev/null
-\cp * $HDRDIR 															>&  /dev/null
+\cp * $HDRDIR 															#>&  /dev/null
 if($status != 0) then
     echo ""                                                                                                             	>>& $logFile
     echo "    ERROR install_pupsP3: operation failed [install PUPS/P3 headers]"                                                	>>& $logFile
@@ -2602,11 +2491,11 @@ if($status != 0) then
 endif
 
 
-#-----------------------------------------
-# Debuggable libraries cannot be installed 
-#-----------------------------------------
+#---------------------------------------------------
+# Debuggable/sanitized libraries cannot be installed 
+#---------------------------------------------------
 
-if($debug == FALSE) then
+if($debug == FALSE && $sanitize == FALSE) then
 
 
 	#-------------------------------
@@ -2684,13 +2573,54 @@ echo "    ----------------------------------------------------------------------
 echo ""																>>& $logFile
 
 
+#---------------------
+# Debuggable libraries
+#---------------------
+
 if($debug == TRUE) then
 	echo ""															>>& $logFile
-	echo "    ... Marking P3-2023 libraries as debuggable"									>>& $logFile
-	echo ""
+	echo "    ... Making P3-2025 libraries debuggable"									>>& $logFile
+	echo ""                                                                                                                 >>& $logFile
+	\rm ../lib.$arch.linux.cluster/sanitize											>&  /dev/null
 	mkfile ../lib.$arch.linux.cluster/debug											>&  /dev/null
-else
+
+
+#--------------------
+# Sanitized libraries
+#--------------------
+
+else if($sanitize == TRUE) then
+	echo ""															>>& $logFile
+	echo "    ... Making P3-2025 libraries debuggable and santized"								>>& $logFile
+	echo ""                                                                                                                 >>& $logFile
 	\rm ../lib.$arch.linux.cluster/debug											>&  /dev/null
+	mkfile ../lib.$arch.linux.cluster/sanitize										>&  /dev/null
+
+
+#-------------------
+# Nobubble libraries
+#-------------------
+
+else if($nobubble == TRUE) then
+	echo ""															>>& $logFile
+	echo "    ... Making  P3-2025 production libraries without bubble memory support"					>>& $logFile
+	echo ""                                                                                                                 >>& $logFile
+	\rm ../lib.$arch.linux.cluster/debug											>&  /dev/null
+	mkfile ../lib.$arch.linux.cluster/nobubble										>&  /dev/null
+
+
+
+#---------------------
+# Production libraries
+#---------------------
+
+else
+	echo ""															>>& $logFile
+	echo "    ... Making  P3-2025 production libraries"									>>& $logFile
+	echo ""                                                                                                                 >>& $logFile
+	\rm ../lib.$arch.linux.cluster/debug											>&  /dev/null
+	\rm ../lib.$arch.linux.cluster/sanitize											>&  /dev/null
+	\rm ../lib.$arch.linux.cluster/nobubble											>&  /dev/null
 endif
 
 if(`whoami` == root) then
@@ -2703,7 +2633,14 @@ if(`whoami` == root) then
 
 		sleep 2
 
-		if(`tty` != "not a tty") then
+
+		#----------------------------------
+		# Check install script is connected
+		# to a terminal
+		#----------------------------------
+
+		isatty stdin													>& /dev/null
+		if($? == 0)  then
 			vi /etc/ld.so.conf
 			ldconfig												>& /dev/null
 		endif
@@ -2711,7 +2648,7 @@ if(`whoami` == root) then
 endif
 
 echo ""																>>& $logFile
-echo "    ... build of P3-2023 libraries and services complete"									>>& $logFile
+echo "    ... build of P3-2025 libraries and services complete"									>>& $logFile
 echo ""																>>& $logFile
 
 \rmdir BUILDLOCK														>&/dev/null 
@@ -2724,7 +2661,7 @@ exit 0
 
 abort_build:
 
-echo ""
+echo ""                                                                                                                         >>& $logFile
 echo "    *** interrupted [PUPSP3]"												>>& $logFile	
 echo ""																>>& $logFile
 

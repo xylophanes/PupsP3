@@ -1,4 +1,4 @@
-/*------------------------------------------------------------------------------
+/*-------------------------------------------------------------------------
     Copyright (C) 1982 Michael Landy, Yoav Cohen, and George Sperling
 
     Disclaimer:  No guarantees of performance accompany this software,
@@ -13,11 +13,10 @@
                NE3 4RT
                United Kingdom
 
-    Version:  2.02 
-    Dated:    7th January 2023
+    Version:  2.04 
+    Dated:    29th December 2024 
     E-mail:   mao@tumblingdice.co.uk
-------------------------------------------------------------------------------*/
-
+------------------------------------------------------------------------*/
 
 #include <me.h>
 #include <utils.h>
@@ -26,6 +25,7 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <pwd.h>
+#include <bsd/bsd.h>
 
 #if defined(TIFF_SUPPORT) && defined(FLORET_TIFF_SUPPORT)
 #include <floret.h>
@@ -37,20 +37,20 @@
 
 
 
-/*------------------------------------------------------------------------------
-    Slot and usage functions - used by slot manager ...
-------------------------------------------------------------------------------*/
+/*-------------------------------------------------*/
+/* Slot and usage functions - used by slot manager */
+/*-------------------------------------------------*/
 /*---------------------*/
 /* Slot usage function */
 /*---------------------*/
 
-_PRIVATE void hiplib_slot(int level)
+_PRIVATE void hiplib_slot(int32_t level)
 {   (void)fprintf(stderr,"lib hiplib %s: [ANSI C]\n",HIPLIB_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 1987-2023 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 1987-2024 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
-       (void)fprintf(stderr,"PUPS/P3 HIPS support library (built %s %s)\n\n",__TIME__,__DATE__);
+       (void)fprintf(stderr,"PUPS/P3 HIPS support library (gcc %s: built %s %s)\n\n",__VERSION__,__TIME__,__DATE__);
     }
     else
        (void)fprintf(stderr,"\n");
@@ -72,11 +72,9 @@ _EXTERN void (* SLOT )() __attribute__ ((aligned(16))) = hiplib_slot;
 
 
 
-/*------------------------------------------------------------------------------
-    Functions which are local to this library ...
-------------------------------------------------------------------------------*/
-
-
+/*-------------------------------------------*/
+/* Functions which are local to this library */
+/*-------------------------------------------*/
 /*----------------------------------------*/
 /* Swap bytes if we have an endian change */
 /*----------------------------------------*/
@@ -86,14 +84,14 @@ _PROTOTYPE _PRIVATE void swap_bytes(_USHORT *);
 
 
 
-/*------------------------------------------------------------------------------
-    Dynamically allocate memory for HIPL data array ...
-------------------------------------------------------------------------------*/
+/*-------------------------------------------------*/
+/* Dynamically allocate memory for HIPL data array */
+/*-------------------------------------------------*/
 
 _PUBLIC void **hips_fralloc(hipl_hdr *hdr)
 
-{   int   element_size;
-    void  **ret = (void **)NULL;
+{   int32_t element_size;
+    void    **ret = (void **)NULL;
 
     if(hdr == (hipl_hdr *)NULL)
     {  pups_set_errno(EINVAL);
@@ -111,13 +109,13 @@ _PUBLIC void **hips_fralloc(hipl_hdr *hdr)
 
 
 
-/*------------------------------------------------------------------------------
-    Dynamically allocate data for n rows of HIPL data ...
-------------------------------------------------------------------------------*/
+/*---------------------------------------------------*/
+/* Dynamically allocate data for n rows of HIPL data */
+/*---------------------------------------------------*/
 
 _PUBLIC void **hips_nralloc(int n_rows, hipl_hdr *hdr)
 
-{   int element_size;
+{   int32_t element_size;
     void **ret = (void **)NULL;
 
     if(n_rows < 0 || hdr == (hipl_hdr *)NULL)
@@ -138,14 +136,13 @@ _PUBLIC void **hips_nralloc(int n_rows, hipl_hdr *hdr)
 
 
 
-/*------------------------------------------------------------------------------
-    Create a one line output buffer ...
-------------------------------------------------------------------------------*/
-
+/*---------------------------------*/
+/* Create a one line output buffer */
+/*---------------------------------*/
 
 _PUBLIC void *hips_ralloc(hipl_hdr *hdr)
 
-{   int   element_size;
+{   int32_t   element_size;
     void *ret = (void *)NULL;
 
     if(hdr == (hipl_hdr *)NULL)
@@ -163,17 +160,17 @@ _PUBLIC void *hips_ralloc(hipl_hdr *hdr)
 
 
  
-/*------------------------------------------------------------------------------
-    desc_massage.c - HIPL Picture Format description massager.
-    Michael Landy - 2/2/82
-------------------------------------------------------------------------------*/
+/*-----------------------------------------------------------*/
+/* desc_massage.c - HIPL Picture Format description massager */
+/* Michael Landy - 2/2/82                                    */
+/*-----------------------------------------------------------*/
 
 _PRIVATE char *hips_desc_massage(char *s)
 
-{  int len,
-         i,
-         k,
-         beg;
+{  size_t len,
+          i,
+          k,
+          beg;
 
     if(s == (char *)NULL || strcmp(s,"") == 0)
     {  pups_set_errno(EINVAL);
@@ -183,7 +180,7 @@ _PRIVATE char *hips_desc_massage(char *s)
     len = strlen(s);
     beg = 1;
 
-    for (i=0;i<len;i++)
+    for (i=0; i<len; i++)
     {   if (beg && s[i] == '.' && s[i+1] == '\n')
         {
             for (k=i+2;k<=len;k++)
@@ -204,12 +201,12 @@ _PRIVATE char *hips_desc_massage(char *s)
 
 
 
-/*------------------------------------------------------------------------------
-    hips_alloc - HIPL Picture Format core allocation.
-    Michael Landy 2/1/82
-------------------------------------------------------------------------------*/
+/*--------------------------------------------------*/
+/* hips_alloc - HIPL Picture Format core allocation */
+/* Michael Landy 2/1/82                             */
+/*--------------------------------------------------*/
 
-_PRIVATE _BYTE *hips_alloc(int i,int j)
+_PRIVATE _BYTE *hips_alloc(const uint32_t    i, const uint32_t    j)
 
 {    _BYTE *k = (_BYTE *)NULL;
 
@@ -222,12 +219,12 @@ _PRIVATE _BYTE *hips_alloc(int i,int j)
 
 
 
-/*------------------------------------------------------------------------------
-    hips_upd_desc.c - HIPL Picture Format update sequence description
-    Michael Landy - 2/1/82
-------------------------------------------------------------------------------*/
+/*-------------------------------------------------------------------*/
+/* hips_upd_desc.c - HIPL Picture Format update sequence description */
+/* Michael Landy - 2/1/82                                            */
+/*-------------------------------------------------------------------*/
 
-_PUBLIC void hips_upd_desc(hipl_hdr *hdr, char *txt)
+_PUBLIC void hips_upd_desc(hipl_hdr *hdr, const char *txt)
 
 {   if(hdr == (hipl_hdr *)NULL || txt == (char *)NULL || strcmp(txt,"") == 0)
     {  pups_set_errno(EINVAL);
@@ -250,11 +247,11 @@ _PUBLIC void hips_upd_desc(hipl_hdr *hdr, char *txt)
 
 
 
-/*------------------------------------------------------------------------------
-    hips_set_desc - HIPL Picture Format set sequence description
-------------------------------------------------------------------------------*/
+/*--------------------------------------------------------------*/
+/* hips_set_desc - HIPL Picture Format set sequence description */
+/*--------------------------------------------------------------*/
 
-_PUBLIC void hips_set_desc(hipl_hdr *hdr, char *txt)
+_PUBLIC void hips_set_desc(hipl_hdr *hdr, const char *txt)
 
 {   char s[SSIZE] = "";
 
@@ -274,23 +271,26 @@ _PUBLIC void hips_set_desc(hipl_hdr *hdr, char *txt)
 
 
 
-/*------------------------------------------------------------------------------
-    read_header.c - HIPL Picture Format Header read
-    Michael Landy - 2/1/82
-    modified to use read/write 4/26/82
-------------------------------------------------------------------------------*/
+/*-------------------------------------------------*/
+/* read_header.c - HIPL Picture Format Header read */
+/* Michael Landy - 2/1/82                          */
+/* modified to use read/write 4/26/82              */
+/*-------------------------------------------------*/
 
 #define LINES      100
 #define LINELENGTH SSIZE 
 
 _PRIVATE char *ssave[LINES];
-_PRIVATE int  slmax[LINES];
-_PRIVATE int  lalloc = 0;
+_PRIVATE  int32_t  slmax[LINES];
+_PRIVATE  int32_t  lalloc = 0;
 
-_PROTOTYPE _PRIVATE int  hips_dfscanf(int);
-_PROTOTYPE _PRIVATE char *hips_getline(int, char **, int *);
+_PROTOTYPE _PRIVATE  int32_t  hips_dfscanf(const des_t);
+_PROTOTYPE _PRIVATE char *hips_getline(const des_t, char **,  int32_t *);
 
 
+/*-----------------------------*/
+/* Read HIPS header from stdin */
+/*-----------------------------*/
 
 _PUBLIC void hips_rd_hdr(hipl_hdr *hdr)
 
@@ -299,11 +299,15 @@ _PUBLIC void hips_rd_hdr(hipl_hdr *hdr)
 
 
 
-_PUBLIC void hips_frd_hdr(int fd, hipl_hdr *hdr) 
 
-{
-   int lineno,
-       i;
+/*-----------------------------------*/
+/* Read HIPS header from (open) file */
+/*-----------------------------------*/
+
+_PUBLIC void hips_frd_hdr(const des_t fd, hipl_hdr *hdr) 
+
+{  uint32_t lineno,
+            i;
 
    char strdum[SSIZE]     = "",
         hips_magic[SSIZE] = "",
@@ -321,7 +325,6 @@ _PUBLIC void hips_frd_hdr(int fd, hipl_hdr *hdr)
     }
 
 
-
     /*----------------*/
     /* Get HIPS Magic */
     /*----------------*/
@@ -329,7 +332,6 @@ _PUBLIC void hips_frd_hdr(int fd, hipl_hdr *hdr)
     (void)hips_getline(fd,&ssave[0],&slmax[0]);
     if(strncmp(ssave[0],HIPS_MAGIC,strlen(HIPS_MAGIC)) != 0)
         pups_error("[hips_frd_hdr] not a HIPS image");
-
 
 
     /*------------*/
@@ -407,12 +409,18 @@ _PUBLIC void hips_frd_hdr(int fd, hipl_hdr *hdr)
 }
 
 
-_PRIVATE char *hips_getline(int fd, char **s, int *l)
+
+
+/*------------------------------------------------*/
+/* Get line of HIPS header data fropm (open) file */
+/*------------------------------------------------*/
+
+_PRIVATE char *hips_getline(const des_t fd, char **s, int32_t *l)
 
 {
-   int i,
-       m,
-       ret;
+   int32_t i,
+           m,
+           ret;
 
    char c,
         *s1  = (char *)NULL,
@@ -466,9 +474,14 @@ _PRIVATE char *hips_getline(int fd, char **s, int *l)
 
 
 
-_PRIVATE int hips_dfscanf(int fd)
 
-{  int i;
+/*--------------------------------------*/
+/* Get HIPS descriptor from (open) file */
+/*--------------------------------------*/
+
+_PRIVATE int32_t hips_dfscanf(const des_t fd)
+
+{  uint32_t i;
 
    if(hips_getline(fd,&ssave[0],&slmax[0]) == (char *)NULL)
       pups_error("[hips_dfscanf]: invalid file descriptor");
@@ -484,31 +497,40 @@ _PRIVATE int hips_dfscanf(int fd)
 
 
 
-/*------------------------------------------------------------------------------
-    HIPL Picture Format Header write
-    Michael Landy - 2/1/82
-    modified to use read/write 4/26/82
-------------------------------------------------------------------------------*/
+/*------------------------------------*/
+/* HIPL Picture Format Header write   */
+/* Michael Landy - 2/1/82             */
+/* modified to use read/write 4/26/82 */
+/*------------------------------------*/
 
-_PROTOTYPE _PRIVATE void hips_wstr(int, char *);
-_PROTOTYPE _PRIVATE void hips_wnocr(int, char *);
-_PROTOTYPE _PRIVATE void hips_dfprintf(int, int);
+_PROTOTYPE _PRIVATE void hips_wstr    (const des_t, const char *);
+_PROTOTYPE _PRIVATE void hips_wnocr   (const des_t, const char *);
+_PROTOTYPE _PRIVATE void hips_dfprintf(const des_t, const int32_t);
 
-_PUBLIC void hips_wr_hdr(hipl_hdr *hd)
+
+/*-----------------------------*/
+/* Write HIPS header to stdout */
+/*-----------------------------*/
+
+_PUBLIC void hips_wr_hdr(const hipl_hdr *hd)
 
 {  hips_fwr_hdr(1,hd);
 }
 
 
 
-_PUBLIC void hips_fwr_hdr(int fd, hipl_hdr *hdr)
+
+/*----------------------------------*/
+/* Write HIPS header to (open) file */
+/*----------------------------------*/
+
+_PUBLIC void hips_fwr_hdr(const des_t fd, const hipl_hdr *hdr)
 
 {  
    if(fd < 0 || hdr == (hipl_hdr *)NULL)
    {  pups_set_errno(EINVAL);
       return;
    }
-
 
 
    /*------------*/
@@ -540,7 +562,13 @@ _PUBLIC void hips_fwr_hdr(int fd, hipl_hdr *hdr)
 }
 
 
-_PRIVATE void hips_wstr(int fd, char *s)
+
+
+/*-----------------------------------------*/
+/* Write HIPS header string to (open) file */
+/*-----------------------------------------*/
+
+_PRIVATE void hips_wstr(const des_t fd, const char *s)
 
 {  
    if(write(fd,s,strlen(s)) == (-1))
@@ -551,13 +579,19 @@ _PRIVATE void hips_wstr(int fd, char *s)
 }
 
 
-_PRIVATE void hips_wnocr(int fd, char *s)
+
+
+/*--------------------------------------------------*/
+/* Write string with carriage return to (open) file */
+/*--------------------------------------------------*/
+
+_PRIVATE void hips_wnocr(const des_t fd, const char *s)
 
 {  char *t = (char *)NULL;
 
    if(s == (char *)NULL)
    {  if(write(fd,"\n\0",2) == (-1))
-         pups_set_errno("[hips_wnocr]: invalid file descriptor");
+         pups_set_errno(ENFILE);
       else
          return;
    }
@@ -570,34 +604,39 @@ _PRIVATE void hips_wnocr(int fd, char *s)
 }
 
 
-_PRIVATE void hips_dfprintf(int fd, int i)
+
+/*------------------------------------*/
+/* Write integer value to (open) file */
+/*------------------------------------*/
+
+_PRIVATE void hips_dfprintf(const des_t fd, const int32_t i)
 
 {  char s[50] = "";
 
    (void)sprintf(s,"%d\n",i);
    if(write(fd,s,strlen(s)) == (-1))
-      pups_set_errno("[hips_dfprintf]: invalid file descriptor");
+      pups_set_errno(ENFILE);
 } 
 
 
 
 
-/*------------------------------------------------------------------------------
-    initialise HIPL header ...
-------------------------------------------------------------------------------*/
+/*------------------------*/
+/* initialise HIPL header */
+/*------------------------*/
 
-_PUBLIC void hips_init_hdr(hipl_hdr *hdr,  // HIPL header structure
-                           char     *onm,  // Origin name
-                           char     *snm,  // Sequence name
-                           int       nfr,  // Number of frames [bands]
-                           char     *odt,  // Origin date
-                           int        rw,  // Image rows
-                           int        cl,  // Image cols
-                           int       bpp,  // Bits per pixel
-                           int       bpk,  // Bit packing
-                           int      pfmt,  // Pixel format
-                           char     *shi,  // Sequence history
-                           char    *desc)  // Sequence descriptor
+_PUBLIC void hips_init_hdr(hipl_hdr       *hdr,  // HIPL header structure
+                           const char     *onm,  // Origin name
+                           const char     *snm,  // Sequence name
+                           const  int32_t nfr,   // Number of frames [bands]
+                           const char     *odt,  // Origin date
+                           const  int32_t rw,    // Image rows
+                           const  int32_t cl,    // Image cols
+                           const  int32_t bpp,   // Bits per pixel
+                           const  int32_t bpk,   // Bit packing
+                           const  int32_t pfmt,  // Pixel format
+                           const char     *shi,  // Sequence history
+                           const char     *desc) // Sequence descriptor
 
 { 
 
@@ -636,17 +675,16 @@ _PUBLIC void hips_init_hdr(hipl_hdr *hdr,  // HIPL header structure
    hdr->bit_packing    = bpk;
    hdr->pixel_format   = pfmt;
 
-
    pups_set_errno(OK);
 }
 
 
 
-/*------------------------------------------------------------------------------
-    Routine to display HIPS header information in text format ... 
-------------------------------------------------------------------------------*/
+/*-----------------------------------------------------------*/
+/* Routine to display HIPS header information in text format */
+/*-----------------------------------------------------------*/
 
-_PUBLIC int hips_display_hdr_info(FILE *stream, hipl_hdr *hdr)
+_PUBLIC int32_t hips_display_hdr_info(const FILE *stream, const hipl_hdr *hdr)
 
 {
     if(stream == (FILE *)NULL || hdr == (hipl_hdr *)NULL)
@@ -736,16 +774,15 @@ _PUBLIC int hips_display_hdr_info(FILE *stream, hipl_hdr *hdr)
 
 
 
-/*------------------------------------------------------------------------------
-    Routine to read HIPS header from standard input and compute relevant
-    quantities ...
-------------------------------------------------------------------------------*/
+/*-------------------------------------------------*/
+/* Routine to read HIPS header from standard input */
+/*-------------------------------------------------*/
 
-_PUBLIC int  hips_rd_hdr_info(int pixel_format,
-                              int        *rows,
-                              int        *cols,
-                              int         *nfr,
-                              hipl_hdr    *hdr)
+_PUBLIC int32_t  hips_rd_hdr_info(uint32_t    pixel_format,   // Type of pixel
+                                  uint32_t           *rows,   // Rows in image
+                                  uint32_t           *cols,   // Columns in image
+                                  uint32_t            *nfr,   // Number of frames in image
+                                  hipl_hdr            *hdr)   // HIPS header structure
 
 {   return(hips_f_rd_hdr_info(0,pixel_format,rows,cols,nfr,hdr));
 }
@@ -758,40 +795,41 @@ _PUBLIC int  hips_rd_hdr_info(int pixel_format,
     compute relevent quantities ...
 ------------------------------------------------------------------------------*/
 
-_PUBLIC int  hips_f_rd_hdr_info(int       fildes,
-                                int pixel_format,
-                                int        *rows,
-                                int        *cols,
-                                int         *nfr,
-                                hipl_hdr    *hdr)
+_PUBLIC int32_t  hips_f_rd_hdr_info(des_t           fildes,   // File decriptor
+                                    uint32_t  pixel_format,   // Type of pixel
+                                    uint32_t         *rows,   // Rows in images 
+                                    uint32_t         *cols,   // Columns in image
+                                    uint32_t          *nfr,   // Number of frames in image
+                                    hipl_hdr          *hdr)   // HIPS header structure
 
 { 
 
-
-/*------------------------------------------------------------------------------
-    Read HIPS header from file ...
-------------------------------------------------------------------------------*/
+    /*----------------------------*/
+    /* Read HIPS header from file */
+    /*----------------------------*/
 
     hips_frd_hdr(fildes,hdr);
 
-/*------------------------------------------------------------------------------
-    If pixel type is inconsistent, report it and stop ...
-------------------------------------------------------------------------------*/
+
+    /*---------------------------------------------------*/
+    /* If pixel type is inconsistent, report it and stop */
+    /*---------------------------------------------------*/
 
     if(hdr->pixel_format != pixel_format && pixel_format != PFANY)
        pups_error("[hips_f_rd_hdr_info] incorrect pixel format");
 
-/*------------------------------------------------------------------------------
-    Return relevent items to caller ...
-------------------------------------------------------------------------------*/
 
-    if(rows != (int *)NULL)
+    /*---------------------------------*/
+    /* Return relevent items to caller */
+    /*---------------------------------*/
+
+    if(rows != (int32_t *)NULL)
        *rows = hdr->rows;
 
-    if(cols != (int *)NULL)
+    if(cols != (int32_t *)NULL)
        *cols = hdr->cols;
 
-    if(nfr != (int *)NULL)
+    if(nfr != (int32_t *)NULL)
        *nfr  = hdr->num_frame;
 
     pups_set_errno(OK);
@@ -801,16 +839,16 @@ _PUBLIC int  hips_f_rd_hdr_info(int       fildes,
 
 
 
-/*------------------------------------------------------------------------------
-    Routine to write HIPS header to standard input - also updates history
-    at the same time ...
-------------------------------------------------------------------------------*/
+/*------------------------------------------------------------------------*/
+/* Routine to write HIPS header to standard output - also updates history */
+/* at the same time                                                       */
+/*------------------------------------------------------------------------*/
 
-_PUBLIC void hips_wr_hdr_info(char     *application,
-                              int              argc,
-                              char          *args[],
-                              char        *desc_str,
-                              hipl_hdr         *hdr)
+_PUBLIC void hips_wr_hdr_info(const char      *application,  // Application performing HIPS operation
+                              const uint32_t  argc,          // Number of arguments (application)
+                              const char      *args[],       // Argument vector (application)
+                              const char      *desc_str,     // Descriptor string
+                              hipl_hdr        *hdr)          // HIPS header
 
 {   hips_f_wr_hdr_info(1,application,argc,args,desc_str,hdr);
 }
@@ -818,17 +856,17 @@ _PUBLIC void hips_wr_hdr_info(char     *application,
 
 
 
-/*------------------------------------------------------------------------------
-    Routine to write HIPS header to file - also updates the
-    history at the same time ...
-------------------------------------------------------------------------------*/
+/*---------------------------------------------------------*/
+/* Routine to write HIPS header to file - also updates the */
+/* history at the same time                                */
+/*---------------------------------------------------------*/
 
-_PUBLIC void hips_f_wr_hdr_info(int            fildes,
-                                char     *application,
-                                int              argc,
-                                char          *args[],
-                                char        *desc_str,
-                                hipl_hdr         *hdr)
+_PUBLIC void hips_f_wr_hdr_info(const des_t     fildes,        // File descriptor
+                                const char      *application,  // Application performing HIPS operation 
+                                const uint32_t  argc,          // Number of arguments (application)
+                                const char      *args[],       // Argument vector (application)
+                                const char      *desc_str,     // Descriptor string
+                                hipl_hdr        *hdr)          // HIPS header
 
 {   hips_upd_hdr(hdr,application,argc,args);
     hips_upd_desc(hdr,desc_str);
@@ -837,18 +875,18 @@ _PUBLIC void hips_f_wr_hdr_info(int            fildes,
 
 
 
-/*----------------------------------------------------------------------------
-    Routine to update HIPS header description ...
-----------------------------------------------------------------------------*/
+/*-------------------------------------------*/
+/* Routine to update HIPS header description */
+/*-------------------------------------------*/
 
-_PUBLIC void hips_upd_hdr(hipl_hdr          *hd,
-                          char     *application,
-                          int              argc,
-                          char           **argv)
+_PUBLIC void hips_upd_hdr(hipl_hdr       *hd,           // HIPS header
+                          const char     *application,  // Application performing HIPS operation
+                          const uint32_t argc,          // Number of arguments (application)
+                          const char     **argv)        // Argument vector (application)
 
-{   int  ac,
-         len,
-         i;
+{   uint32_t i,
+	     ac,
+             len;
 
     char **av = (char **)NULL;
 
@@ -859,8 +897,8 @@ _PUBLIC void hips_upd_hdr(hipl_hdr          *hd,
        return;
     }
 
-    av  = argv;
-    ac  = argc;
+    av  = (char **)argv;
+    ac  = (int)argc;
     len = 38 + strlen(hd->seq_history) + strlen(application);
 
     if(ac > 0)
@@ -880,8 +918,8 @@ _PUBLIC void hips_upd_hdr(hipl_hdr          *hd,
     }
 
     if(argc > 0 && argv != (char **)NULL)
-    {  ac = argc;
-       av = argv;
+    {  av = (char **)argv;
+       ac = (int32_t)argc;
 
        (void)strlcat(hd->seq_history,application,SSIZE);
        (void)strlcat(hd->seq_history," ",        SSIZE);
@@ -891,9 +929,9 @@ _PUBLIC void hips_upd_hdr(hipl_hdr          *hd,
              (void)strlcat(hd->seq_history," ",    SSIZE);
        }
 
-       strlcat(hd->seq_history,"\"-D ",SSIZE);
-       tm = (long int) time(0);
-       (void)strlcat(hd->seq_history, (char *)((long int)ctime(&tm)),SSIZE); // Was unsigned long 
+       (void)strlcat(hd->seq_history,"\"-D ",SSIZE);
+       tm = (int64_t) time(0);
+       (void)strlcat(hd->seq_history, (char *)((int64_t)ctime(&tm)),SSIZE); 
 
        for (i=len;i<strlen(hd->seq_history);i++)
        {   if (hd->seq_history[i]=='\n')
@@ -911,22 +949,22 @@ _PUBLIC void hips_upd_hdr(hipl_hdr          *hd,
 
 
 
-/*------------------------------------------------------------------------------
-    Get pixel size in bytes ...
-------------------------------------------------------------------------------*/
+/*-------------------------*/
+/* Get pixel size in bytes */
+/*-------------------------*/
 
-_PUBLIC int hips_pixel_size(int pixel_format)
+_PUBLIC int32_t hips_pixel_size(const int32_t pixel_format)
 
 {   pups_set_errno(OK);
 
     switch(pixel_format)
     {   case PFBYTE:     return(sizeof(_BYTE));
 
-        case PFSHORT:    return(sizeof(short int));
+        case PFSHORT:    return(sizeof(int16_t));
 
-        case PFINT:      return(sizeof(int));
+        case PFINT:      return(sizeof(int32_t));
 
-        case PFLONG:     return(sizeof(long int));
+        case PFLONG:     return(sizeof(int64_t));
 
         case PFFLOAT:    return(sizeof(float));
 
@@ -950,25 +988,28 @@ _PUBLIC int hips_pixel_size(int pixel_format)
 
 
 
-/*-----------------------------------------------------------------------------
-    Routine to manipulate a HIPS raster of arbitrary type ...
------------------------------------------------------------------------------*/
+/*--------------------------------------------*/
+/* Manipulate a HIPS raster of arbitrary type */
+/*--------------------------------------------*/
 
-_PUBLIC void *hips_access_pixel(int pixel_size, int row, int col, void **raster)
+_PUBLIC void *hips_access_pixel(const uint32_t  pixel_size,   // Pixel size (bytes)
+                                const uint32_t  row,          // Pixel (row) position
+                                const uint32_t  col,          // Pixel (col) position
+                                void            **raster)     // Image raster
 
 {    void *pixel_ptr = (void *)NULL;
-
 
      if(pixel_size < 0 || row < 0 || col < 0 || raster == (void **)NULL)
      {  pups_set_errno(EINVAL);
         return((void *)NULL);
      }
 
+
      /*--------------------------------------------------------*/
      /* Get a pointer to the specified pixel noting pixel size */
      /*--------------------------------------------------------*/
 
-     pixel_ptr = (void *)((unsigned long int)raster[row] + (unsigned long int)col*pixel_size);
+     pixel_ptr = (void *)((uint64_t)raster[row] + (uint64_t)col*pixel_size);
 
      pups_set_errno(OK);
      return(pixel_ptr);
@@ -977,12 +1018,12 @@ _PUBLIC void *hips_access_pixel(int pixel_size, int row, int col, void **raster)
 
 
 
-/*-----------------------------------------------------------------------------
-    Routine to return a HIPS descriptor accociated with a given pixel
-    type string ...
------------------------------------------------------------------------------*/
+/*------------------------------------------------------------*/
+/* Routine to return a HIPS pixel type descriptor given pixel */
+/* type string                                                */
+/*------------------------------------------------------------*/
 
-_PUBLIC int hips_output_pixel_type(char *pixel_type_str)
+_PUBLIC int32_t hips_output_pixel_type(const char *pixel_type_str)
 
 {
     if(pixel_type_str == (char *)NULL)
@@ -990,9 +1031,10 @@ _PUBLIC int hips_output_pixel_type(char *pixel_type_str)
        return(-1);
     }
 
-/*-----------------------------------------------------------------------------
-    These are the acceptable HIPS pixel formats ...
------------------------------------------------------------------------------*/
+
+    /*---------------------------------------------*/
+    /* These are the acceptable HIPS pixel formats */
+    /*---------------------------------------------*/
 
     pups_set_errno(OK);
     if(strcmp(pixel_type_str,"byte") == 0)
@@ -1026,11 +1068,11 @@ _PUBLIC int hips_output_pixel_type(char *pixel_type_str)
 
 
 
-/*-----------------------------------------------------------------------------
-    Return a descriptor string corresponding to a HIPL pixel type ...
------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------*/
+/* Return a descriptor string corresponding to a HIPL pixel type */
+/*---------------------------------------------------------------*/
 
-_PUBLIC char *hips_pixstr(int hipl_type)
+_PUBLIC char *hips_pixstr(const uint32_t hipl_type)
 
 {   switch(hipl_type)
     {   case PFBYTE:     return("byte");
@@ -1049,47 +1091,49 @@ _PUBLIC char *hips_pixstr(int hipl_type)
 
 
 #ifdef TIFF_SUPPORT
-/*------------------------------------------------------------------------------
-    Routines for interconverting between HIPS and TIFF image formats ...
-------------------------------------------------------------------------------*/
+/*------------------------------------------------------------------*/
+/* Routines for interconverting between HIPS and TIFF image formats */
+/*------------------------------------------------------------------*/
 
 #include <tiff.h>
 #include <tiffio.h>
 
 
-/*-----------------------------------------------------------------------------
-    Convert HIPS file to TIFF file ...
------------------------------------------------------------------------------*/
+/*--------------------------------*/
+/* Convert HIPS file to TIFF file */
+/*--------------------------------*/
 
-_PUBLIC void hips_to_tiff(_BOOLEAN     do_in_mem,    // Force in memory RGB conversion
-                          int       planarconfig,    // Image geometry for TIFF
-                          int               argc,    // Application argument count
-                          char           *argv[],    // Application argument vector
-                          int   compression_mode,    // TIFF compression mode
-                          char    *hips_filename,    // Name of file containing HIPS data
-                          char    *tiff_filename)    // Name of file containing TIFF data
+_PUBLIC void hips_to_tiff(const _BOOLEAN  do_in_mem,         // Force in memory RGB conversion
+                          const  int32_t  planarconfig,      // Image geometry for TIFF
+                          const  int32_t  argc,              // Application argument count
+                          const char      *argv[],           // Application argument vector
+                          const  int32_t  compression_mode,  // TIFF compression mode
+                          const char      *hips_filename,    // Name of file containing HIPS data
+                          const char      *tiff_filename)    // Name of file containing TIFF data
 
-{   int  i,
-         j,
-         k,
-         rows,
-         cols,
-         bands,
-         fdes,
-         pixel_type,
-         pixel_layers,
-         photint_type,
-         size_in_bytes,
-         rows_per_strip;
+{   uint32_t i,
+             j,
+             k;
 
-    _BYTE *buf                 = (_BYTE *)NULL,
-          **bandbuf            = (_BYTE **)NULL;
+     int32_t rows,
+             cols,
+             bands,
+             pixel_type,
+             pixel_layers,
+             photint_type,
+             size_in_bytes,
+             rows_per_strip;
+
+    des_t    fdes;
+
+    _BYTE    *buf              = (_BYTE *)NULL,
+             **bandbuf         = (_BYTE **)NULL;
 
     hipl_hdr hdr;
     TIFF     *tiff_hdr         = (TIFF *)NULL;
  
-    time_t          clock;
-    struct tm       *tm        = (struct tm *)NULL;
+    time_t         clock;
+    struct tm      *tm         = (struct tm *)NULL;
     struct passwd  *pwd        = (struct passwd *) NULL;
 
     char   datetime[SSIZE]     = "",
@@ -1193,14 +1237,11 @@ _PUBLIC void hips_to_tiff(_BOOLEAN     do_in_mem,    // Force in memory RGB conv
     /*------------------------------*/
 
      rows_per_strip = 8;
-     // MAO rows_per_strip = (hdr.cols*hdr.rows*size_in_bytes / 8192) + 1;
 
 
     /*------------------------------------------------------------------*/
     /* Update tags in TIFF header to reflect information in HIPS header */
     /*------------------------------------------------------------------*/
-
-
     /*---------------------*/
     /* Set TIFF date field */
     /*---------------------*/
@@ -1246,7 +1287,7 @@ _PUBLIC void hips_to_tiff(_BOOLEAN     do_in_mem,    // Force in memory RGB conv
     (void)TIFFSetField(tiff_hdr,TIFFTAG_PHOTOMETRIC,      photint_type);
     (void)TIFFSetField(tiff_hdr,TIFFTAG_COMPRESSION,      compression_mode);
     (void)TIFFSetField(tiff_hdr,TIFFTAG_ROWSPERSTRIP,     rows_per_strip);
-    (void)TIFFSetField(tiff_hdr,TIFFTAG_PAGENAME,         eff_seq_desc);  // MAO to first \n
+    (void)TIFFSetField(tiff_hdr,TIFFTAG_PAGENAME,         eff_seq_desc); 
     (void)TIFFSetField(tiff_hdr,TIFFTAG_SOFTWARE,         "hips2tiff");
     (void)TIFFSetField(tiff_hdr,TIFFTAG_RESOLUTIONUNIT,   1);
 
@@ -1278,10 +1319,10 @@ _PUBLIC void hips_to_tiff(_BOOLEAN     do_in_mem,    // Force in memory RGB conv
        /* image before converting it                                         */
        /*--------------------------------------------------------------------*/
       
-       int   cnt,
-             bbcnt;
+        int32_t cnt,
+                bbcnt;
 
-       _BYTE **bandbuf = (_BYTE **)NULL;
+       _BYTE    **bandbuf = (_BYTE **)NULL;
 
 
        /*-----------------------------------------------------*/
@@ -1335,6 +1376,7 @@ _PUBLIC void hips_to_tiff(_BOOLEAN     do_in_mem,    // Force in memory RGB conv
              for(k=0; k<pixel_layers; ++k)
                 (void)pups_free((void *)bandbuf[k*rows + i]);
 
+
              /*----------------------------------------------------*/
              /* We have built up a chunky scanline -- write it out */
              /*----------------------------------------------------*/
@@ -1350,7 +1392,7 @@ _PUBLIC void hips_to_tiff(_BOOLEAN     do_in_mem,    // Force in memory RGB conv
           /* we can use lseek() to do conversion efficiently */
           /*-------------------------------------------------*/
        
-          unsigned long int pos;
+          uint64_t pos;
 
           bandbuf = (_BYTE **)pups_calloc(pixel_layers,sizeof(_BYTE *));
           for(i=0; i<pixel_layers; ++i)
@@ -1362,7 +1404,6 @@ _PUBLIC void hips_to_tiff(_BOOLEAN     do_in_mem,    // Force in memory RGB conv
           /*---------------*/
 
           pos = pups_lseek(fdes,0,SEEK_CUR);
-
           for(j=0; j<rows; ++j)
           {
 
@@ -1412,9 +1453,9 @@ _PUBLIC void hips_to_tiff(_BOOLEAN     do_in_mem,    // Force in memory RGB conv
 
     (void)pups_free((void *)buf);
 
-/*---------------------------------------------------------------------------------
-    Close HIPS and TIFF files ...
----------------------------------------------------------------------------------*/
+    /*---------------------------*/
+    /* Close HIPS and TIFF files */
+    /*---------------------------*/
 
     (void)close(fdes);
     (void)TIFFClose(tiff_hdr);
@@ -1425,46 +1466,47 @@ _PUBLIC void hips_to_tiff(_BOOLEAN     do_in_mem,    // Force in memory RGB conv
 
 
 
-/*------------------------------------------------------------------------------
-    Routine to TIFF file to HIPS file ...
-------------------------------------------------------------------------------*/
+/*-----------------------------------*/
+/* Routine to TIFF file to HIPS file */
+/*-----------------------------------*/
 
-_PUBLIC void tiff_to_hips(_BOOLEAN  do_in_mem,    // Force in memory RGNB conversion
-                          int            argc,    // Application argument count
-                          char        *argv[],    // Application argument vector
-                          char *tiff_filename,    // Name of file containing TIFF data
-                          char *hips_filename)    // Name of file containing HIPS data
+_PUBLIC void tiff_to_hips(const _BOOLEAN  do_in_mem,    // Force in memory RGNB conversion
+                          const uint32_t       argc,    // Application argument count
+                          const char        *argv[],    // Application argument vector
+                          const char *tiff_filename,    // Name of file containing TIFF data
+                          const char *hips_filename)    // Name of file containing HIPS data
 
-{   int i,
-        j,
-        k,
-        fdes,
-        rows,
-        cols,
-        pixel_format,
-        tile_width,
-        tile_length,
-        size_in_bytes;
+{   uint64_t i,
+             j,
+             k,
+             rows,
+             cols,
+             pixel_format,
+             tile_width,
+             tile_length,
+             size_in_bytes;
 
-    short int bits_per_pixel = 8,
-              pixel_type     = 1,    
-              pixel_layers   = 1,
-              planarconfig;
+    des_t    fdes;
 
-    char *orig_name          = (char *)NULL,
-         *orig_date          = (char *)NULL,
-         *seq_history        = (char *)NULL,
-         *seq_desc           = (char *)NULL;
+    int16_t  bits_per_pixel = 8,
+             pixel_type     = 1,    
+             pixel_layers   = 1,
+             planarconfig;
 
-    _BYTE *buf               = (_BYTE *)NULL,
-          **band_buf         = (_BYTE **)NULL;
+    char *orig_name         = (char *)NULL,
+         *orig_date         = (char *)NULL,
+         *seq_history       = (char *)NULL,
+         *seq_desc          = (char *)NULL;
+
+    _BYTE *buf              = (_BYTE *)NULL,
+          **band_buf        = (_BYTE **)NULL;
 
     time_t        clock;
-    struct tm     *tm        = (struct tm *)NULL;
-    struct passwd *pwd       = (struct passwd *)NULL;
+    struct tm     *tm       = (struct tm *)NULL;
+    struct passwd *pwd      = (struct passwd *)NULL;
 
     hipl_hdr hdr;
-    TIFF     *tiff_hdr       = (TIFF *)NULL;
+    TIFF     *tiff_hdr      = (TIFF *)NULL;
 
     if(argc          < 0   ||
        argv          == (char **)NULL  ||
@@ -1662,15 +1704,15 @@ _PUBLIC void tiff_to_hips(_BOOLEAN  do_in_mem,    // Force in memory RGNB conver
        /* process                                              */
        /*------------------------------------------------------*/
 
-       int   cnt,
-             bbcnt;
+        int32_t cnt,
+                bbcnt;
 
-       _BYTE **bandbuf = (_BYTE **)NULL;
+       _BYTE    **bandbuf = (_BYTE **)NULL;
 
 
        /*------------------------------------------------------*/
        /* If fdes is associated with a seekable device we can  */
-       /* convert chunky TIFF to band HIPS formats efficeintly */
+       /* convert chunky TIFF to band HIPS formats effectively */
        /*------------------------------------------------------*/
 
        if(do_in_mem == TRUE || pups_is_seekable(fdes) == FALSE)
@@ -1727,7 +1769,7 @@ _PUBLIC void tiff_to_hips(_BOOLEAN  do_in_mem,    // Force in memory RGNB conver
           /* so we can do things effieciently              */
           /*-----------------------------------------------*/
 
-          unsigned long int pos;
+          uint64_t pos;
 
 
           /*---------------*/
@@ -1744,9 +1786,9 @@ _PUBLIC void tiff_to_hips(_BOOLEAN  do_in_mem,    // Force in memory RGNB conver
           {  (void)TIFFReadScanline(tiff_hdr,(tdata_t)buf,i,0);
 
 
-             /*---------------------------------------------------*/
-             /* Decompose a chunky scanline into N band scanlines */
-             /*---------------------------------------------------*/
+             /*-------------------------------------------------*/
+             /* Decompose a chunky scanline to N band scanlines */
+             /*-------------------------------------------------*/
 
              bbcnt = 0;
              cnt   = 0; 
@@ -1800,17 +1842,19 @@ _PUBLIC void tiff_to_hips(_BOOLEAN  do_in_mem,    // Force in memory RGNB conver
 
 
 
-#ifdef KONTRON_SUPPORT
-/*-------------------------------------------------------------------------------------
-    Check to see that header matches image specifications ...
--------------------------------------------------------------------------------------*/
+#ifdef IMG_SUPPORT
+/*-------------------------------*/
+/* Read Kontron header from file */
+/*-------------------------------*/
 
-_PUBLIC void img_read_hdr(int fdes, _BOOLEAN endian_swap, img_hdr_type *img_hdr)
+_PUBLIC void img_read_hdr(const        des_t    fdes       ,  // File descriptor
+                          const        _BOOLEAN endian_swap,  // Swap endianiciy if TRUE
+                          img_hdr_type          *img_hdr   )  // Kontron image header
 {
-    _USHORT *hd        = (_USHORT *)NULL,
+    _USHORT *hd            = (_USHORT *)NULL,
             n_recs;
 
-    long int hdr_size      = 0L,
+     int64_t hdr_size      = 0L,
              datatype,
              startimdata;      
 
@@ -1819,7 +1863,7 @@ _PUBLIC void img_read_hdr(int fdes, _BOOLEAN endian_swap, img_hdr_type *img_hdr)
        return;
     }
 
-    if(pups_read(fdes,&n_recs,sizeof(_USHORT)) == (-1))
+    if(pups_read(fdes,(_BYTE *)&n_recs,sizeof(_USHORT)) == (-1))
        pups_error("[img_read_hdr] invalid file descriptor\n");
 
     if(endian_swap == TRUE)
@@ -1831,7 +1875,7 @@ _PUBLIC void img_read_hdr(int fdes, _BOOLEAN endian_swap, img_hdr_type *img_hdr)
     /* to determine how big the header is                                        */
     /*---------------------------------------------------------------------------*/
 
-    hdr_size = (long int)(128L*n_recs) - 2;
+    hdr_size = (int64_t)(128L*n_recs) - 2;
     hd       = (_USHORT *)pups_malloc(hdr_size);
 
 
@@ -1839,7 +1883,7 @@ _PUBLIC void img_read_hdr(int fdes, _BOOLEAN endian_swap, img_hdr_type *img_hdr)
     /* Read the header */
     /*-----------------*/
 
-    if(pups_read(fdes,hd,hdr_size) != hdr_size)
+    if(pups_read(fdes,(_BYTE *)hd,hdr_size) != hdr_size)
     {  (void)close(fdes);
        pups_error("[img_read_hdr] Incorrect number of pixels read\n");
     }
@@ -1869,8 +1913,8 @@ _PUBLIC void img_read_hdr(int fdes, _BOOLEAN endian_swap, img_hdr_type *img_hdr)
     /* Read image size (hd[2],hd[3]) */
     /*-------------------------------*/
 
-    img_hdr->cols  = (int)hd[2];
-    img_hdr->rows  = (int)hd[3];
+    img_hdr->cols  = (int32_t)hd[2];
+    img_hdr->rows  = (int32_t)hd[3];
 
     if(endian_swap == TRUE)
        (void)swap_bytes(&hd[5]);
@@ -1880,7 +1924,7 @@ _PUBLIC void img_read_hdr(int fdes, _BOOLEAN endian_swap, img_hdr_type *img_hdr)
     /* Read number of images in sequence */
     /*-----------------------------------*/ 
 
-    if((int)hd[5] != 1)
+    if((int32_t)hd[5] != 1)
        pups_error("[img_read_hdr] can only have single frame images");
     else
        img_hdr->n_frames = 1;
@@ -1919,16 +1963,16 @@ _PUBLIC void img_read_hdr(int fdes, _BOOLEAN endian_swap, img_hdr_type *img_hdr)
 
 
 
-/*---------------------------------------------------------------------------
-    Write KONTRON header to file -- this routine will typically be 
-    used by image processing filters which support the KONTRON image
-    format ...
----------------------------------------------------------------------------*/
+/*------------------------------*/
+/* Write KONTRON header to file */
+/*------------------------------*/
 
-_PUBLIC void img_write_hdr(int fdes, _BOOLEAN endian_swap, img_hdr_type *img_hdr)
+_PUBLIC void img_write_hdr(const des_t     fdes,        // File descriptor
+                           const _BOOLEAN endian_swap,  // Swap endianicity if TRUE
+                           img_hdr_type   *img_hdr)     // Kontron image header
 
 {   _USHORT  buf[128] = { 0 };
-    long int ltmp;
+     int64_t ltmp;
 
 
     if(fdes < 0 || img_hdr == (img_hdr_type *)NULL)
@@ -1936,32 +1980,33 @@ _PUBLIC void img_write_hdr(int fdes, _BOOLEAN endian_swap, img_hdr_type *img_hdr
        return;
     }
 
+
     /*-------------------------------*/
     /* Number of records in IMG file */
     /*-------------------------------*/
 
     if(img_hdr->colour == IMG_RGB && img_hdr->has_lut == TRUE)
-       buf[0] = (short)7;
+       buf[0] = (uint16_t)7;
     else
-       buf[0] = (short)1;
+       buf[0] = (uint16_t)1;
 
 
     /*---------------------------*/
     /* Magic number for img file */
     /*---------------------------*/
 
-    buf[1] = (short)0x1247;
-    buf[2] = (short)0xb06d; 
+    buf[1] = (uint16_t)0x1247;
+    buf[2] = (uint16_t)0xb06d; 
 
 
     /*------------------------------*/
     /* Image size and sequence size */
     /*------------------------------*/
 
-    buf[3] = (short)img_hdr->cols;
-    buf[4] = (short)img_hdr->rows;
-    buf[5] = (short)0x4321;
-    buf[6] = (short)1;
+    buf[3] = (uint16_t)img_hdr->cols;
+    buf[4] = (uint16_t)img_hdr->rows;
+    buf[5] = (uint16_t)0x4321;
+    buf[6] = (uint16_t)1;
 
 
     /*----------------------------------------------*/
@@ -1969,7 +2014,7 @@ _PUBLIC void img_write_hdr(int fdes, _BOOLEAN endian_swap, img_hdr_type *img_hdr
     /*----------------------------------------------*/
 
     if(endian_swap == TRUE)
-    {  int i;
+    {  uint32_t i;
 
        for(i=0; i<7; ++i)
           swap_bytes(&buf[i]);
@@ -1998,7 +2043,7 @@ _PUBLIC void img_write_hdr(int fdes, _BOOLEAN endian_swap, img_hdr_type *img_hdr
     /* Image grey (Red) data offset */
     /*------------------------------*/
 
-    ltmp =  (long int)buf[0]*128L;
+    ltmp =  (int64_t)buf[0]*128L;
     (void)memcpy(buf+11,&ltmp,4);
 
 
@@ -2007,10 +2052,10 @@ _PUBLIC void img_write_hdr(int fdes, _BOOLEAN endian_swap, img_hdr_type *img_hdr
     /*----------------------------------------------------------*/
 
     if(img_hdr->colour == IMG_RGB)
-    {  ltmp = (long int)buf[0]*128L + img_hdr->size;  
+    {  ltmp = (int64_t)buf[0]*128L + img_hdr->size;  
        (void)memcpy(buf+13,&ltmp,4);
 
-       ltmp = (long int)buf[0]*128L + 2L*img_hdr->size;
+       ltmp = (int64_t)buf[0]*128L + 2L*img_hdr->size;
        (void)memcpy(buf+15,&ltmp,4);
     } 
 
@@ -2036,20 +2081,21 @@ _PUBLIC void img_write_hdr(int fdes, _BOOLEAN endian_swap, img_hdr_type *img_hdr
 
 
 
-/*-----------------------------------------------------------------------------
-    Convert HIPS image to Kontron image ...
------------------------------------------------------------------------------*/
+/*-------------------------------------*/
+/* Convert HIPS image to Kontron image */
+/*-------------------------------------*/
 
-_PUBLIC void hips_to_img(_BOOLEAN endian_swap,   // Big or little endian?
-                         char *hips_filename,    // HIPS filename
-                         char  *img_filename)    // Kontron filename
+_PUBLIC void hips_to_img(const _BOOLEAN endian_swap,   // Swao endianicity if TRUE 
+                         const char *hips_filename,    // HIPS filename
+                         const char  *img_filename)    // Kontron filename
 
-{   int i,
-        j,
-        fdes  = (-1),
-        ides  = (-1);
+{   uint32_t i,
+             j;
 
-    _BYTE *buf = (_BYTE *)NULL;
+    des_t    fdes  = (-1),
+             ides  = (-1);
+
+    _BYTE    *buf  = (_BYTE *)NULL;
 
     hipl_hdr     hdr;
     img_hdr_type img_hdr;
@@ -2059,6 +2105,7 @@ _PUBLIC void hips_to_img(_BOOLEAN endian_swap,   // Big or little endian?
        return;
     }
     
+
     /*----------------*/
     /* Open HIPS file */
     /*----------------*/
@@ -2136,26 +2183,27 @@ _PUBLIC void hips_to_img(_BOOLEAN endian_swap,   // Big or little endian?
 
 
 
-/*-----------------------------------------------------------------------------
-    Convert IMG image to HIPS image ...
------------------------------------------------------------------------------*/
+/*-------------------------------------*/
+/* Convert Kontron image to HIPS image */
+/*-------------------------------------*/
 
-_PUBLIC void img_to_hips(_BOOLEAN  endian_swap,    // Big or little endian?
-                          int              argc,    // Argument count
-                          char          *argv[],    // Argument vector
-                          char    *img_filename,    // Kontron filename
-                          char   *hips_filename)    // HIPS filename
+_PUBLIC void img_to_hips(const _BOOLEAN  endian_swap,    // Swap endianicity if TRUR 
+                         const uint32_t         argc,    // Argument count
+                         const char          *argv[],    // Argument vector
+                         const char    *img_filename,    // Kontron filename
+                         const char   *hips_filename)    // HIPS filename
 
-{   int i,
-        j,
-        pixel_layers,
-        fdes  = (-1),
-        ides  = (-1);
+{   uint32_t  i,
+              j,
+              pixel_layers;
 
-    _BYTE *buf = (_BYTE *)NULL;
+     int32_t  hdes  = (-1),
+              ides  = (-1);
 
-    _BOOLEAN do_close_fdes = FALSE,
-             do_close_des  = FALSE;
+    _BYTE *buf      = (_BYTE *)NULL;
+
+    _BOOLEAN do_close_hdes = FALSE,
+             do_close_ides = FALSE;
 
     hipl_hdr     hdr;
     img_hdr_type img_hdr;
@@ -2175,31 +2223,30 @@ _PUBLIC void img_to_hips(_BOOLEAN  endian_swap,    // Big or little endian?
     /*----------------*/
 
     if(hips_filename == (char *)NULL)
-       fdes = 1;
+       hdes = 1;
     else
-    {  do_close_fdes = TRUE;
-       fdes          = pups_open(hips_filename,0,DEAD);
+    {  do_close_hdes = TRUE;
+       hdes          = pups_open(hips_filename,0,DEAD);
     }
 
 
-    /*---------------------------*/
-    /* Open img file for reading */ 
-    /*---------------------------*/
+    /*-------------------------------*/
+    /* Open Kontron file for reading */ 
+    /*-------------------------------*/
 
     if(img_filename == (char *)NULL)
        ides = 0;
     else
-    {  do_close_des = TRUE;
-       ides         = pups_open(img_filename,1,DEAD);
+    {  do_close_ides = TRUE;
+       ides          = pups_open(img_filename,1,DEAD);
     }
 
 
-    /*----------------------*/
-    /* Read IMG header data */ 
-    /*----------------------*/
+    /*--------------------------*/
+    /* Read Kontron header data */ 
+    /*--------------------------*/
 
     img_read_hdr(ides,endian_swap,&img_hdr);
-
     if(img_hdr.colour == IMG_RGB)
        pixel_layers = 3;
     else
@@ -2209,8 +2256,6 @@ _PUBLIC void img_to_hips(_BOOLEAN  endian_swap,    // Big or little endian?
     /*---------------------------------------------*/
     /* Initialise HIPS header and write it to file */
     /*---------------------------------------------*/
-
-
     /*---------------------*/
     /* Set HIPS date field */
     /*---------------------*/
@@ -2244,7 +2289,7 @@ _PUBLIC void img_to_hips(_BOOLEAN  endian_swap,    // Big or little endian?
     /*-------------------*/
 
     hips_upd_hdr(&hdr,appl_name,argc,argv);
-    hips_fwr_hdr(fdes,&hdr);
+    hips_fwr_hdr(hdes,&hdr);
 
 
     /*------------------------------------------------*/
@@ -2255,15 +2300,15 @@ _PUBLIC void img_to_hips(_BOOLEAN  endian_swap,    // Big or little endian?
     for(i=0; i<hdr.num_frame; ++i)
     {  for(j=0; j<hdr.rows; ++j)
        {  (void)pups_read(ides,buf,hdr.cols*sizeof(_BYTE));
-          (void)write(fdes,buf,hdr.cols*sizeof(_BYTE));
+          (void)write(hdes,buf,hdr.cols*sizeof(_BYTE));
        }
     }
     (void)pups_free((void *)buf);
 
-    if(do_close_fdes == TRUE)
-       (void)pups_close(fdes);
+    if(do_close_hdes == TRUE)
+       (void)pups_close(hdes);
 
-    if(do_close_des == TRUE)
+    if(do_close_ides == TRUE)
        (void)pups_close(ides);
 
     pups_set_errno(OK);
@@ -2272,36 +2317,36 @@ _PUBLIC void img_to_hips(_BOOLEAN  endian_swap,    // Big or little endian?
 
 
 
-/*-------------------------------------------------------------------------
-    Routine to switch byte sequence ...
--------------------------------------------------------------------------*/
+/*---------------------------------*/
+/* Routine to switch byte sequence */
+/*---------------------------------*/
 
 _PRIVATE void swap_bytes(_USHORT *arg)
 
-{       _USHORT lsb_mask,
-                msb_mask;
+{   _USHORT lsb_mask,
+    msb_mask;
 
 
-        /*-------------------------------------------------------*/
-        /* Get least significant and most significant byte masks */
-        /*-------------------------------------------------------*/
+    /*-------------------------------------------------------*/
+    /* Get least significant and most significant byte masks */
+    /*-------------------------------------------------------*/
 
-        lsb_mask = (*arg) & 0xff;
-        msb_mask = (*arg) & 0xff00;
-
-
-        /*----------------------------------------------------*/
-        /* Shift masks left and right arithmetic respectively */
-        /*----------------------------------------------------*/
-
-        lsb_mask *= 0x100;
-        msb_mask /= 0x100;
+    lsb_mask = (*arg) & 0xff;
+    msb_mask = (*arg) & 0xff00;
 
 
-        /*-------------------------*/
-        /* Form byte swapped short */
-        /*-------------------------*/
+    /*----------------------------------------------------*/
+    /* Shift masks left and right arithmetic respectively */
+    /*----------------------------------------------------*/
 
-        *arg = lsb_mask + msb_mask;
+    lsb_mask *= 0x100;
+    msb_mask /= 0x100;
+
+
+    /*-------------------------*/
+    /* Form byte swapped short */
+    /*-------------------------*/
+
+    *arg = lsb_mask + msb_mask;
 }
-#endif /* KONTRON_SUPPORT */
+#endif /* IMG_SUPPORT */

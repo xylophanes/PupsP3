@@ -1,5 +1,5 @@
-/*------------------------------------------------------------------------------
-    Purpose: Check status of file system before trying to write data to
+/*--------------------------------------------------------------------------------
+    Purpose: PUPS extended tee filter which check filesysgtem before writing to it 
              it.
 
     Author:  M.A. O'Neill
@@ -10,7 +10,7 @@
              United Kingdom
 
     Version: 2.00 
-    Dated:   4th January 2023
+    Dated:   12th December 2024
     Email:   mao@tumblingdice.co.uk
 ------------------------------------------------------------------------------*/
 
@@ -22,11 +22,12 @@
 #include <vstamp.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <bsd/bsd.h>
 
 
-/*-----------------*/
-/* Version of xtee */
-/*-----------------*/
+/*---------*/
+/* Version */
+/*---------*/
 
 #define XTEE_VERSION    "2.00"
 
@@ -38,30 +39,29 @@
 
 
 
-/*------------------------------------------------------------------------------
-    Version ID (used by CKPT enabled binaries to discard stale checkpoint
-    files) ...
-------------------------------------------------------------------------------*/
+/*------------*/
+/* Version ID */
+/*------------*/
 
 #include <vstamp.h>
 
 
 
 
-/*------------------------------------------------------------------------------
-    Get application information for slot manager ...
-------------------------------------------------------------------------------*/
+/*----------------------------------------------*/
+/* Get application information for slot manager */
+/*----------------------------------------------*/
 /*---------------------------*/
 /* Slot information function */
 /*---------------------------*/
 
-_PRIVATE void xtee_slot(int level)
+_PRIVATE void xtee_slot(int32_t level)
 {   (void)fprintf(stderr,"int app xtee %s: [ANSI C]\n",XTEE_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 1999-2023 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 1999-2024 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
-       (void)fprintf(stderr,"Extended tee filter (built %s %s)\n\n",__TIME__,__DATE__);
+       (void)fprintf(stderr,"Extended tee filter (built %s %s)\n\n",__VERSION__,__TIME__,__DATE__);
     }
     else
        (void)fprintf(stderr,"\n");
@@ -103,9 +103,9 @@ _EXTERN void (* USE )() __attribute__ ((aligned(16))) = xtee_usage;
 #endif /* SLOT */
 
 
-/*------------------------------------------------------------------------------
-    Application build date ...
-------------------------------------------------------------------------------*/
+/*------------------------*/
+/* Application build date */
+/*------------------------*/
 
 _EXTERN char appl_build_time[SSIZE] = __TIME__;
 _EXTERN char appl_build_date[SSIZE] = __DATE__;
@@ -114,31 +114,31 @@ _EXTERN char appl_build_date[SSIZE] = __DATE__;
 
 
 
-/*------------------------------------------------------------------------------
-    Private variables required by this application ...
-------------------------------------------------------------------------------*/
+/*-----------------*/
+/* Local variables */
+/*-----------------*/
 
-_PRIVATE _BOOLEAN tee_to_fifo         = FALSE;
-_PRIVATE _BOOLEAN tee_to_pipestream   = FALSE;
-_PRIVATE _BOOLEAN do_compress         = FALSE;
-_PRIVATE _BOOLEAN detached            = FALSE;
+_PRIVATE _BOOLEAN tee_to_fifo              = FALSE;
+_PRIVATE _BOOLEAN tee_to_pipestream        = FALSE;
+_PRIVATE _BOOLEAN do_compress              = FALSE;
+_PRIVATE _BOOLEAN detached                 = FALSE;
 
-                                                   /*-------------------------*/
-_PRIVATE char tee_f_name[SSIZE]         = "";      /* Name of tee file        */
-_PRIVATE char line_of_input[SSIZE]      = "";      /* Line buffer             */
-_PRIVATE char compress_command[SSIZE]   = "";;     /* Compression command     */
-_PRIVATE char pipestream_command[SSIZE] = "";      /* Compression pipestream  */
-_PRIVATE int tee_file_des;                         /* Tee file descriptor     */
-_PRIVATE int bytes_read;                           /* Bytes read (input)      */
-                                                   /*-------------------------*/
+                                                      /*-------------------------*/
+_PRIVATE char    tee_f_name[SSIZE]         = "";      /* Name of tee file        */
+_PRIVATE char    line_of_input[SSIZE]      = "";      /* Line buffer             */
+_PRIVATE char    compress_command[SSIZE]   = "";;     /* Compression command     */
+_PRIVATE char    pipestream_command[SSIZE] = "";      /* Compression pipestream  */
+_PRIVATE des_t   tee_file_des;                        /* Tee file descriptor     */
+_PRIVATE ssize_t bytes_read;                          /* Bytes read (input)      */
+                                                      /*-------------------------*/
 
 
 
-/*------------------------------------------------------------------------------
-    Report process status ...
-------------------------------------------------------------------------------*/
+/*-----------------------*/
+/* Report process status */
+/*-----------------------*/
 
-_PRIVATE int psrp_process_status(int argc, char *argv[])
+_PRIVATE  int32_t psrp_process_status(int32_t argc, char *argv[])
 
 {    (void)fprintf(psrp_out,"\n    Extended tee filter status\n");
      (void)fprintf(psrp_out,"    =============================\n\n");
@@ -168,24 +168,22 @@ _PRIVATE int psrp_process_status(int argc, char *argv[])
 
 
 
-/*------------------------------------------------------------------------------
-    Software I.D. tag (used if CKPT support enabled to discard stale dynamic
-    checkpoint files) ...
--------------------------------------------------------------------------------*/
+/*-------------------*/
+/* Software I.D. tag */
+/*-------------------*/
 
-#define VTAG  3768
-
-extern int appl_vtag = VTAG;
+#define VTAG  4304
+extern  int32_t appl_vtag = VTAG;
 
 
 
 
 
-/*------------------------------------------------------------------------------
-    Main entry point to application ...
-------------------------------------------------------------------------------*/
+/*------------------*/
+/* Main entry point */
+/*------------------*/
 
-_PUBLIC int pups_main(int argc, char *argv[])
+_PUBLIC  int32_t pups_main(int32_t argc, char *argv[])
 
 {   _BOOLEAN do_append = FALSE;
 
@@ -207,8 +205,8 @@ _PUBLIC int pups_main(int argc, char *argv[])
                   XTEE_VERSION,
                   "M.A. O'Neill",
                   "xtee",
-                  "2023",
-                  argv);
+                  "2024",
+                  (void *)argv);
 
 
 
@@ -216,7 +214,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
     /* Enable PUPS/P3 communication */
     /*------------------------------*/
 
-    (void)psrp_init(PSRP_STATUS_ONLY  | PSRP_HOMEOSTATIC_STREAMS,&psrp_process_status);
+    (void)psrp_init(PSRP_STATUS_ONLY  | PSRP_HOMEOSTATIC_STREAMS,(void *)&psrp_process_status);
     (void)psrp_load_default_dispatch_table();
     (void)psrp_accept_requests();
  
@@ -349,7 +347,8 @@ _PUBLIC int pups_main(int argc, char *argv[])
     /* Complain about any unparsed command line items */
     /*------------------------------------------------*/
 
-    pups_t_arg_errs(argd,args);
+    pups_t_arg_errs(argd,(void *)args);
+
 
     /*--------------------------------------------------------------------------*/
     /* This is the pups_main part of the program - it takes data from stdin and */
@@ -363,26 +362,26 @@ _PUBLIC int pups_main(int argc, char *argv[])
         } while(bytes_read > 0); /* Was != 0 */
 
     if(tee_to_fifo == TRUE)
-    {  (void)close(tee_file_des);    
+    {  (void)pups_close(tee_file_des);    
        unlink(tee_f_name);
     }
     else
     {  if(tee_to_pipestream == TRUE)
        {  if(detached == TRUE)
-          {  (void)close(tee_file_des);
+          {  (void)pups_close(tee_file_des);
 
-             if(fork() != 0)
+             if(pups_fork(FALSE,FALSE) != 0)
                 pups_exit(0);
 
-             close(0);
-             close(1);
-             close(2);
+             (void)pups_close(0);
+             (void)pups_close(1);
+             (void)pups_close(2);
           } 
           else
-             (void)close(tee_file_des);
+             (void)pups_close(tee_file_des);
        }
        else
-          (void)close(tee_file_des);
+          (void)pups_close(tee_file_des);
     }
 
     if(appl_verbose == TRUE)

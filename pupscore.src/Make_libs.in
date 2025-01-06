@@ -1,15 +1,24 @@
 #---------------------------------------
 # Makefile for PUPS/P3 libraries
-# M.A. O'Neill, Tumbling Dice 04/01/2022
+# M.A. O'Neill, Tumbling Dice 12/12/2024
 #---------------------------------------
 #-----------------------------------------------
 # Need -fcommon as gcc 10 does not handle
 # extern instantiation properly (is this a bug?)
 #-----------------------------------------------
 
-CFLAGS  = 	TARGET_CFLAGS TARGET_ARCHDEPCFLAGS -DKONTRON_SUPPORT -fcommon -fPIC -fopenmp -ffast-math -c
-CC	=	gcc
+#-----------------------
+# Fully resourced system
+#-----------------------
+CFLAGS  = 	TARGET_CFLAGS TARGET_ARCHDEPCFLAGS -DIMG_SUPPORT -DTIFF_SUPPORT -fcommon -fPIC -fopenmp -ffast-math -funsafe-math-optimizations -c
 
+
+#----------------
+# Embedded system
+#----------------
+#CFLAGS  = 	TARGET_CFLAGS TARGET_ARCHDEPCFLAGS -DSINGLE_THREAD -fcommon -fPIC -ffast-math -c
+
+CC	=	gcc
 ALL	=	slotman.o utilib.o vec3lib.o larraylib.o cachelib.o nfolib.o casino.o hiplib.o hashlib.o	\
 		fhtlib.o netlib.o dlllib.o psrplib.o eigenlib.o tadlib.o cantorlib.o mvmlib.o
 
@@ -70,6 +79,8 @@ tadlib.o:	tadlib.c
 cantorlib.o:	cantorlib.c
 		$(CC) $(CFLAGS) -DSLOT=seg_slot_16 cantorlib.c
 
+mvmlib.o:	mvmlib.c
+		$(CC) $(CFLAGS) -DSLOT=seg_slot_17 mvmlib.c
 
 nfolib.c:	../include.libs/nfo.h
 vec3lib.c:	../include.libs/vector3.h

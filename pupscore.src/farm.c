@@ -1,4 +1,4 @@
-/*-----------------------------------------------------------------------------
+/*-----------------------------------------------
     Purpose: Start a homogenous farm of processes
 
     Author:  M.A. O'Neill
@@ -8,10 +8,10 @@
              NE3 4RT
              United Kingdom
 
-    Version: 2.03
-    Dated:   24th May 2023
+    Version: 2.04
+    Dated:   10th December 2024
     E-mail:  mao@tumblingdice.co.uk
------------------------------------------------------------------------------*/
+-----------------------------------------------*/
 
 #include <stdio.h>
 #include <xtypes.h>
@@ -22,16 +22,17 @@
 #include <bsd/string.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 
-/*-----------------------------------------------------------------------------
-    Defines which are private to this application ...
------------------------------------------------------------------------------*/
+/*-----------------------------------------------*/
+/* Defines which are private to this application */
+/*-----------------------------------------------*/
 /*-----------------*/
 /* Version of farm */
 /*-----------------*/
 
-#define FARM_VERSION     "2.03"
+#define FARM_VERSION     "2.04"
 
 
 /*-------------*/
@@ -39,23 +40,21 @@
 /*-------------*/
 
 #define SSIZE            20148 
-
-
 #define MAX_PIDS         1024 
 #define END_STRING       (-1)
 
 
 
 
-/*-----------------------------------------------------------------------------
-    Look for the occurence of string s2 within string s1 ...
------------------------------------------------------------------------------*/
+/*--------------------------------------------------*/
+/* Look for occurence of string s2 within string s1 */
+/*--------------------------------------------------*/
 
 _PRIVATE _BOOLEAN strin(char *s1, char *s2)
 
-{   int i,
-        cmp_size,
-        chk_limit;
+{    int32_t i,
+             cmp_size,
+             chk_limit;
 
     if(strlen(s2) > strlen(s1))
        return(FALSE);
@@ -74,19 +73,19 @@ _PRIVATE _BOOLEAN strin(char *s1, char *s2)
 
 
 
-/*------------------------------------------------------------------------------
-    Routine to extract substrings which are demarkated by a usr defined
-    character ...
-------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------*/
+/* Routine to extract substrings which are demarkated by a usr defined */
+/* character                                                           */
+/*---------------------------------------------------------------------*/
                                       /*--------------------------------------*/
 _PRIVATE _BOOLEAN strext(char dm_ch,  /* Demarcation character                */
                          char   *s1,  /* Extracted sub string                 */
                          char   *s2)  /* Argument string                      */
                                       /*--------------------------------------*/
-{   int s1_ptr = 0;
+{   int32_t s1_ptr = 0;
 
                                       /*--------------------------------------*/
-    _IMMORTAL int  s2_ptr = 0;        /* Current pointer into arg string      */
+    _IMMORTAL  int32_t  s2_ptr = 0;   /* Current pointer  int32_to arg string */
     _IMMORTAL char *s2_was;           /* Copy of current argument string      */
                                       /*--------------------------------------*/
 
@@ -175,15 +174,14 @@ _PRIVATE _BOOLEAN strext(char dm_ch,  /* Demarcation character                */
 
 
 
-/*-----------------------------------------------------------------------------
-    Execls - routine to overlay and execute a command string ...
------------------------------------------------------------------------------*/
+/*----------------------------------------------------------*/
+/* Execls - routine to overlay and execute a command string */
+/*----------------------------------------------------------*/
 
-_PRIVATE int execls(char *command)
+_PRIVATE int32_t execls(char *command)
 
-{   int ret,
-          j,
-          i = 0;
+{   int32_t ret,
+            j;
 
     char     exec_command[SSIZE] = ""; 
     _BOOLEAN looper;
@@ -205,20 +203,20 @@ _PRIVATE int execls(char *command)
 
 
 
-/*-----------------------------------------------------------------------------
-    Handler for failed exec attempts ...
------------------------------------------------------------------------------*/
+/*----------------------------------*/
+/* Handler for failed exec attempts */
+/*----------------------------------*/
 
-_PRIVATE int current_index;
-_PRIVATE int  pid[MAX_PIDS] = { (-1) };
-_PRIVATE int exec_handler(int signum)
+_PRIVATE  int32_t   current_index;
+_PRIVATE  pid_t     pid[MAX_PIDS] = { (-1) };
+_PRIVATE  int32_t   exec_handler(int signum)
 
 {   pid[current_index] = (-1);
     (void)signal(SIGUSR1,(void *)&exec_handler);
 }
 
 
-int term_handler(int signum)
+int32_t term_handler(int32_t signum)
 
 {   (void)fprintf(stderr,"terminated\n");
     (void)fflush(stderr);
@@ -227,20 +225,20 @@ int term_handler(int signum)
 
 
 
-/*-----------------------------------------------------------------------------
-    Main entry point for program ...
------------------------------------------------------------------------------*/
+/*------------------------------*/
+/* Main entry point for program */
+/*------------------------------*/
 
 _PRIVATE char hostname[SSIZE] = "";
-_PUBLIC int main(int argc, char *argv[])
+_PUBLIC int32_t main(int32_t argc, char *argv[])
 
-{   int i,
-        n_procs,
-        status,
-        cnt             = 0;
+{    int32_t i,
+             n_procs,
+             status,
+             cnt             = 0;
 
-    char command[SSIZE] = "";
-    _BOOLEAN verbose    = FALSE;
+    char     command[SSIZE]  = "";
+    _BOOLEAN verbose         = FALSE;
 
     (void)gethostname(hostname,SSIZE);
 
@@ -250,7 +248,7 @@ _PUBLIC int main(int argc, char *argv[])
     /*-------------------------------*/
 
     if(argc < 3 || argc > 4)
-    {  (void)fprintf(stderr,"\nfarm version %s, (C) Tumbling Dice 2002-2023 (built %s %s)\n\n",FARM_VERSION,__TIME__,__DATE__); 
+    {  (void)fprintf(stderr,"\nfarm version %s, (C) Tumbling Dice 2002-2024 (gcc %s: built %s %s)\n\n",FARM_VERSION,__VERSION__,__TIME__,__DATE__); 
        (void)fprintf(stderr,"FARM is free software, covered by the GNU General Public License, and you are\n");
        (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
        (void)fprintf(stderr,"See the GPL and LGPL licences at www.gnu.org for further details\n");
@@ -264,7 +262,7 @@ _PUBLIC int main(int argc, char *argv[])
 
     if(argc == 4)
     {  if(strcmp(argv[1],"-verbose") != 0)
-       {  (void)fprintf(stderr,"\nfarm version %s, (C) Tumbling Dice 2023 (built %s %s)\n\n",FARM_VERSION,__TIME__,__DATE__);
+       {  (void)fprintf(stderr,"\nfarm version %s, (C) Tumbling Dice 2024 (gcc %s: built %s %s)\n\n",FARM_VERSION,__VERSION__,__TIME__,__DATE__);
           (void)fprintf(stderr,"FARM is free software, covered by the GNU General Public License, and you are\n");
           (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
           (void)fprintf(stderr,"See the GpL and LGPL licences at www.gnu.org for further details\n");
@@ -343,7 +341,7 @@ _PUBLIC int main(int argc, char *argv[])
     (void)signal(SIGTERM,(void *)term_handler);
     do {   for(i=0; i<n_procs; ++i)
            {  if(pid[i] != (-1))
-              {  int ret;
+              {   int32_t ret;
 
                  ret = waitpid(pid[i],&status,WNOHANG);
 

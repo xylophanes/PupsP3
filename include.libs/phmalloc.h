@@ -21,7 +21,7 @@
    or (US mail) as Mike Haertel c/o Free Software Foundation.
 
    Shared heap modifications by Mark O'Neill, Tumbling DIce  <mao@tumblingdice.co.uk>
-   (C) M.A. O'Neill. Tumbling Dice 2005-2023
+   (C) M.A. O'Neill. Tumbling Dice 2005-2024
 --------------------------------------------------------------------------------------*/
 
 #ifndef _PHMALLOC_H
@@ -122,49 +122,49 @@ extern "C"
 /* Allocate SIZE bytes of memory. */
 /*--------------------------------*/
 
-extern __ptr_t phmalloc __P ((const unsigned int, __malloc_size_t __size, const char *));
+extern __ptr_t phmalloc __P ((const uint32_t, __malloc_size_t __size, const char *));
 
 /*--------------------------------------------------*/
 /* Re-allocate the previously allocated block       */
 /* in __ptr_t, making the new block SIZE bytes long */
 /*--------------------------------------------------*/
 
-extern __ptr_t phrealloc __P ((const unsigned int, const __ptr_t __ptr, __malloc_size_t __size, const char *));
+extern __ptr_t phrealloc __P ((const uint32_t, const __ptr_t __ptr, __malloc_size_t __size, const char *));
 
 
 /*------------------------------------------------------------------*/
 /* Allocate NMEMB elements of SIZE bytes each, all initialized to 0 */
 /*------------------------------------------------------------------*/
 
-extern __ptr_t phcalloc __P ((const unsigned int, const __malloc_size_t __nmemb, const __malloc_size_t __size, const char *));
+extern __ptr_t phcalloc __P ((const uint32_t, const __malloc_size_t __nmemb, const __malloc_size_t __size, const char *));
 
 
 /*-----------------------------------------------------------*/
 /* Free a block allocated by `malloc', `realloc' or `calloc' */
 /*-----------------------------------------------------------*/
 
-extern void *phfree __P ((const unsigned int, const __ptr_t __ptr));
+extern void *phfree __P ((const uint32_t, const __ptr_t __ptr));
 
 
 /*--------------------------------------------------*/
 /* Allocate SIZE bytes allocated to ALIGNMENT bytes */
 /*--------------------------------------------------*/
 
-extern __ptr_t phmemalign __P ((const unsigned int, const __malloc_size_t __alignment, __malloc_size_t __size, const char *));
+extern __ptr_t phmemalign __P ((const uint32_t, const __malloc_size_t __alignment, __malloc_size_t __size, const char *));
 
 
 /*----------------------------------------*/
 /* Allocate SIZE bytes on a page boundary */
 /*----------------------------------------*/
 
-extern __ptr_t phvalloc __P ((const unsigned int, __malloc_size_t __size, const char *));
+extern __ptr_t phvalloc __P ((const uint32_t, __malloc_size_t __size, const char *));
 
 
 #ifdef _PHMALLOC_INTERNAL
 
 
 /*-------------------------------------------------------------------*/
-/* The allocator divides the heap into blocks of fixed size; large   */
+/* The allocator divides the heap  int32_to blocks of fixed size; large   */
 /* requests receive one or more whole blocks, and small requests     */
 /* receive a fragment of a block.  Fragment sizes are powers of two  */
 /* and all fragments of a block are the same size.  When all the     */
@@ -259,7 +259,7 @@ extern phobmap_type ***_shobjectmap;
 /* Pointer to heap parameter table on persistent heap */
 /*----------------------------------------------------*/
 
-extern int **pheap_parameters;
+extern  int32_t **pheap_parameters;
 
 
 /*------------------------------------*/
@@ -380,7 +380,7 @@ extern __malloc_size_t *_pheap_bytes_free;
 /* Internal version of `free' used in `shmorecore' (malloc.c). */
 /*-------------------------------------------------------------*/
 
-extern void _phfree_internal __P ((const unsigned int, const __ptr_t __ptr));
+extern void _phfree_internal __P ((const uint32_t   , const __ptr_t __ptr));
 
 #endif /* _MALLOC_INTERNAL.  */
 
@@ -420,7 +420,7 @@ extern void (*__after_phmorecore_hook) __P ((void));
 /* Nonzero if `malloc' has been called and done its initialization */
 /*-----------------------------------------------------------------*/
 
-extern int *__phmalloc_initialized;
+extern  int32_t *__phmalloc_initialized;
 
 
 /*------------------------------*/
@@ -428,10 +428,10 @@ extern int *__phmalloc_initialized;
 /*------------------------------*/
 
 extern void (*__phmalloc_initialize_hook) __P ((int));
-extern void (*__phfree_hook) __P ((const unsigned int, const __ptr_t __ptr));
-extern __ptr_t (*__phmalloc_hook) __P ((const unsigned int, __malloc_size_t __size, const char *));
-extern __ptr_t (*__phrealloc_hook) __P ((const unsigned int, const __ptr_t __ptr, __malloc_size_t __size, const char *));
-extern __ptr_t (*__phmemalign_hook) __P ((const unsigned int, __malloc_size_t __size, const __malloc_size_t __alignment, const char *));
+extern void (*__phfree_hook) __P ((const uint32_t   , const __ptr_t __ptr));
+extern __ptr_t (*__phmalloc_hook) __P ((const uint32_t   , __malloc_size_t __size, const char *));
+extern __ptr_t (*__phrealloc_hook) __P ((const uint32_t   , const __ptr_t __ptr, __malloc_size_t __size, const char *));
+extern __ptr_t (*__phmemalign_hook) __P ((const uint32_t   , __malloc_size_t __size, const __malloc_size_t __alignment, const char *));
 
 
 /*-------------------------------------------------------------------------*/
@@ -460,7 +460,7 @@ enum mcheck_status
 /* null, the standard function prints on stderr and then calls `abort'     */
 /*-------------------------------------------------------------------------*/
 
-extern int mcheck __P ((void (*__abortfunc) __P ((enum mcheck_status))));
+extern  int32_t mcheck __P ((void (*__abortfunc) __P ((enum mcheck_status))));
 
 
 /*-------------------------------------------------------------------------*/

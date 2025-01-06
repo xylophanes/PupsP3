@@ -1,4 +1,4 @@
-/*---------------------------------------------------------------------------
+/*------------------------------------------------------------------------
     Copyright (C) 1991, 1992, 1994 Free Software Foundation, Inc.
 
     This library is free software; you can redistribute it and/or
@@ -20,10 +20,11 @@
    or (US mail) as Mike Haertel c/o Free Software Foundation.
 
    Shared heap modifications by Mark O'Neill (mao@tumblingdice.co.uk)
-   (C) 1998-2023 M.A. O'Neill, Tumbling Dice
---------------------------------------------------------------------------*/
+   (C) 1998-2024 M.A. O'Neill, Tumbling Dice
+-----------------------------------------------------------------------*/
 
 #include <errno.h>
+#include <stdint.h>
 
 #ifndef	_PHMALLOC_INTERNAL
 #define	_PHMALLOC_INTERNAL
@@ -38,7 +39,7 @@
 /* The entire array is initialized to zeros.                 */
 /*-----------------------------------------------------------*/
 
-_PUBLIC __ptr_t phcalloc (const unsigned int hdes, const __malloc_size_t nmemb, const __malloc_size_t size, const char *name)
+_PUBLIC __ptr_t phcalloc (const uint32_t hdes, const __malloc_size_t nmemb, const __malloc_size_t size, const char *name)
 {
   register __ptr_t result;
 

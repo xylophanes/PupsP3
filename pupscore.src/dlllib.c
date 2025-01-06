@@ -1,4 +1,4 @@
-/*----------------------------------------------------------------------------
+/*-------------------------------------------
     Purpose: DLL support for PUPS environment
 
     Author:  M.A. O'Neill
@@ -8,10 +8,10 @@
              NE3 4RT
              United Kingdom
 
-    Version: 2.02 
-    Dated:   4th January 2023
+    Version: 2.03 
+    Dated:   29th Decemeber 2024
     E-mail:  mao@tumblingdice.co.uk
-----------------------------------------------------------------------------*/
+-------------------------------------------*/
 
 #ifdef DLL_SUPPORT
 
@@ -33,6 +33,7 @@
 #include <utils.h>
 #include <dlfcn.h>
 #include <unistd.h>
+#include <bsd/bsd.h>
 
 #undef   __NOT_LIB_SOURCE__
 #include <tad.h>
@@ -49,22 +50,20 @@
 
 
 
-/*----------------------------------------------------------------------------
-    Get application information for slot manager ...
-----------------------------------------------------------------------------*/
-
-
+/*----------------------------------------------*/
+/* Get application information for slot manager */
+/*----------------------------------------------*/
 /*---------------------------*/
 /* Slot information function */
 /*---------------------------*/
 
-_PRIVATE void dlllib_slot(int level)
+_PRIVATE void dlllib_slot(int32_t level)
 {   (void)fprintf(stderr,"lib dlllib %s: [ANSI C]\n",DLL_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 1999-2023 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 1999-2024 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
-       (void)fprintf(stderr,"PUPS/P3 DLL support library (built %s %s)\n\n",__TIME__,__DATE__);
+       (void)fprintf(stderr,"PUPS/P3 DLL support library (gcc %s: built %s %s)\n\n",__VERSION__,__TIME__,__DATE__);
        (void)fflush(stderr);
     }
 
@@ -73,9 +72,9 @@ _PRIVATE void dlllib_slot(int level)
 }
 
 
-/*------------------------------------------------------------------------------
-    Segment identification for dynamic link support library ...
-------------------------------------------------------------------------------*/
+/*---------------------------------------------------------*/
+/* Segment identification for dynamic link support library */
+/*---------------------------------------------------------*/
 
 #ifdef SLOT
 #include <slotman.h>
@@ -88,8 +87,6 @@ _EXTERN void (* SLOT ) __attribute__ ((aligned(16))) = dlllib_slot;
 /*----------------------------------------------*/
 /* Variables which are imported by this library */
 /*----------------------------------------------*/
-
-
 /*-----------------------------------------------------------------------*/
 /*  Public variables exported by this library (note this is not the best */
 /*  way of exporting the thread table -- it would be better to have all  */
@@ -97,20 +94,20 @@ _EXTERN void (* SLOT ) __attribute__ ((aligned(16))) = dlllib_slot;
 /*  which are themselves _PUBLIC functions of this library)              */
 /*-----------------------------------------------------------------------*/
 
-_PUBLIC int             n_orifices                   = 0;    // Number of orifices in use
-_PUBLIC int             ortab_slots                  = 0;    // Number of active orifice slots
+_PUBLIC int32_t         n_orifices                   = 0;    // Number of orifices in use
+_PUBLIC int32_t         ortab_slots                  = 0;    // Number of active orifice slots
 _PUBLIC ortab_type      *ortab      = (ortab_type *)NULL;    // Orifice table
 
 
 
 
-/*----------------------------------------------------------------------------
-    Get next free slot in the orifice table ...
-----------------------------------------------------------------------------*/
+/*-----------------------------------------*/
+/* Get next free slot in the orifice table */
+/*-----------------------------------------*/
 
-_PRIVATE int get_ortab_slot(void)
+_PRIVATE int32_t get_ortab_slot(void)
 
-{   int i;
+{   uint32_t i;
 
     for(i=0; i<appl_max_orifices; ++i)
     {  if(ortab[i].dll_handle == (void *)NULL)
@@ -128,13 +125,13 @@ _PRIVATE int get_ortab_slot(void)
 
 
 
-/*-----------------------------------------------------------------------------
-    Find an ortab slot given orifice handle ...
------------------------------------------------------------------------------*/
+/*-----------------------------------------*/
+/* Find an ortab slot given orifice handle */
+/*-----------------------------------------*/
 
-_PUBLIC int find_ortab_slot_by_handle(const void *orifice_handle)
+_PUBLIC int32_t find_ortab_slot_by_handle(const void *orifice_handle)
 
-{   int i;
+{   uint32_t i;
 
     /*----------------------------------*/
     /* Only the root thread can process */
@@ -142,7 +139,7 @@ _PUBLIC int find_ortab_slot_by_handle(const void *orifice_handle)
     /*----------------------------------*/
 
     if(pupsthread_is_root_thread() == FALSE)
-       error("[find_ortab_slot_by_handle] attempt by non root thread to perform PUPS/P3 DLL operation");
+       pups_error("[find_ortab_slot_by_handle] attempt by non root thread to perform PUPS/P3 DLL operation");
 
     if(orifice_handle == (void *)NULL)
     {  pups_set_errno(EINVAL);
@@ -163,13 +160,13 @@ _PUBLIC int find_ortab_slot_by_handle(const void *orifice_handle)
 
 
 
-/*------------------------------------------------------------------------------
-    Return the index of the ortab entry of named orifice ...
-------------------------------------------------------------------------------*/
+/*------------------------------------------------------*/
+/* Return the index of the ortab entry of named orifice */
+/*------------------------------------------------------*/
 
-_PUBLIC int find_ortab_slot_by_name(const char *orifice_name)
+_PUBLIC  int32_t find_ortab_slot_by_name(const char *orifice_name)
 
-{   int i;
+{   uint32_t i;
 
 
     /*--------------*/
@@ -188,7 +185,7 @@ _PUBLIC int find_ortab_slot_by_name(const char *orifice_name)
     /*----------------------------------*/
 
     if(pupsthread_is_root_thread() == FALSE)
-       error("[find_ortab_slot_by_name] attempt by non root thread to perform PUPS/P3 DLL operation");
+       pups_error("[find_ortab_slot_by_name] attempt by non root thread to perform PUPS/P3 DLL operation");
 
     for(i=0; i<appl_max_orifices; ++i)
     {  if(ortab[i].orifice_name != (char *)NULL && strcmp(ortab[i].orifice_name,orifice_name) == 0) 
@@ -204,11 +201,11 @@ _PUBLIC int find_ortab_slot_by_name(const char *orifice_name)
 
 
 
-/*------------------------------------------------------------------------------
-    Clear orifice table slot ...
-------------------------------------------------------------------------------*/
+/*--------------------------*/
+/* Clear orifice table slot */
+/*--------------------------*/
 
-_PUBLIC int clear_ortab_slot(const _BOOLEAN destroy, const unsigned int index)
+_PUBLIC int32_t clear_ortab_slot(const _BOOLEAN destroy, const uint32_t index)
 
 {   
 
@@ -228,7 +225,7 @@ _PUBLIC int clear_ortab_slot(const _BOOLEAN destroy, const unsigned int index)
     /*----------------------------------*/
 
     if(pupsthread_is_root_thread() == FALSE)
-       error("[clear_ortab_slot] attempt by non root thread to perform PUPS/P3 DLL operation");
+       pups_error("[clear_ortab_slot] attempt by non root thread to perform PUPS/P3 DLL operation");
 
     ortab[index].cnt            = 0;
     ortab[index].dll_handle     = (void *)NULL;
@@ -259,13 +256,13 @@ _PUBLIC int clear_ortab_slot(const _BOOLEAN destroy, const unsigned int index)
 
 
 
-/*------------------------------------------------------------------------------
-    Initialise orifice table ...
-------------------------------------------------------------------------------*/
+/*--------------------------*/
+/* Initialise orifice table */
+/*--------------------------*/
 
-_PUBLIC void ortab_init(const unsigned int max_orifices)
+_PUBLIC void ortab_init(const uint32_t max_orifices)
 
-{   int i;
+{   uint32_t i;
 
 
     /*----------------------------------*/
@@ -274,7 +271,7 @@ _PUBLIC void ortab_init(const unsigned int max_orifices)
     /*----------------------------------*/
 
     if(pupsthread_is_root_thread() == FALSE)
-       error("[ortab_init] attempt by non root thread to perform PUPS/P3 DLL operation");
+       pups_error("[ortab_init] attempt by non root thread to perform PUPS/P3 DLL operation");
 
 
     /*---------------------------------------------*/
@@ -303,10 +300,10 @@ _PUBLIC void ortab_init(const unsigned int max_orifices)
 
 
 
-/*------------------------------------------------------------------------------
-    Check for existence of an orifice. If the orifice exists its prototype
-    is returned ...  
-------------------------------------------------------------------------------*/
+/*------------------------------------------------------------------------*/
+/* Check for existence of an orifice. If the orifice exists its prototype */
+/* is returned                                                            */
+/*------------------------------------------------------------------------*/
 
 _PUBLIC _BOOLEAN pups_is_orifice(const char          *dll_name,    // Name of DLL exporting orifice
                                  const char      *orifice_name,    // Name of orifice
@@ -339,7 +336,7 @@ _PUBLIC _BOOLEAN pups_is_orifice(const char          *dll_name,    // Name of DL
     /*----------------------------------*/
 
     if(pupsthread_is_root_thread() == FALSE)
-       error("[pups_is_orifice] attempt by non root thread to perform PUPS/P3 DLL operation");
+       pups_error("[pups_is_orifice] attempt by non root thread to perform PUPS/P3 DLL operation");
 
 
     /*-------------------------------------------------------------*/
@@ -377,7 +374,7 @@ _PUBLIC _BOOLEAN pups_is_orifice(const char          *dll_name,    // Name of DL
     /* Check that this is an orifice function */
     /*----------------------------------------*/
 
-    if(*(_BOOLEAN *)is_orifice == TRUE)
+    if((*(_BOOLEAN *)is_orifice) == TRUE)
     {  char prototype_handle_name[SSIZE] = "";
 
        (void)snprintf(prototype_handle_name,SSIZE,"%s_prototype",orifice_name);
@@ -422,23 +419,23 @@ _PUBLIC _BOOLEAN pups_is_orifice(const char          *dll_name,    // Name of DL
 
 
 
-/*------------------------------------------------------------------------------
-    Bind orifice handle. An orifice is a function or variable which is
-    exported by a DLL. In C, a prototypical orifice looks like:
-
-    _BOOLEAN <name>_is_orifice: Tells binder this is an orifice function.
-
-    char     <name>_prototype : Prototype of orifice should be EXACTLY the
-                                same as internal C definition.
-
-    C declaration of orifice function ...
-------------------------------------------------------------------------------*/
+/*-------------------------------------------------------------------------*/
+/* Bind orifice handle. An orifice is a function or variable which is      */
+/* exported by a DLL. In C, a prototypical orifice looks like:             */
+/*                                                                         */
+/* _BOOLEAN <name>_is_orifice: Tells binder this is an orifice function.   */
+/*                                                                         */
+/* char     <name>_prototype : Prototype of orifice should be EXACTLY the  */
+/*                             same as internal C definition.              */
+/*                                                                         */
+/* C declaration of orifice function                                       */
+/*-------------------------------------------------------------------------*/
 
 _PUBLIC void *pups_bind_orifice_handle(const char *dll_name,            // Name of DLL which exports orifice
                                        const char *orifice_name,        // Name of orifice
                                        const char *orifice_prototype)   // Prototype of orifice
 
-{   int index;
+{    int32_t index;
 
     void *dll_handle                 = (void *)NULL, 
          *orifice_handle             = (void *)NULL,
@@ -469,7 +466,7 @@ _PUBLIC void *pups_bind_orifice_handle(const char *dll_name,            // Name 
     /*----------------------------------*/
 
     if(pupsthread_is_root_thread() == FALSE)
-       error("[pups_bind_orifice_handle] attempt by non root thread to perform PUPS/P3 DLL operation");
+       pups_error("[pups_bind_orifice_handle] attempt by non root thread to perform PUPS/P3 DLL operation");
 
 
     /*--------------------------------------------------*/
@@ -535,7 +532,7 @@ _PUBLIC void *pups_bind_orifice_handle(const char *dll_name,            // Name 
     {  char prototype_handle_name[SSIZE]    = "",
             orifice_initialiser_name[SSIZE] = "";
 
-       int  (*initialiser_handle)(void);
+        int32_t  (*initialiser_handle)(void);
 
        (void)snprintf(prototype_handle_name,SSIZE,"%s_prototype",orifice_name); 
        if((prototype_handle = dlsym(dll_handle,prototype_handle_name)) != (void *)NULL)
@@ -595,7 +592,7 @@ _PUBLIC void *pups_bind_orifice_handle(const char *dll_name,            // Name 
 
           /*-------------------------------------------------------*/
           /* We have loaded the DLL. Copy data associated with the */
-          /* DLL into the orifice table                            */
+          /* DLL  int32_to the orifice table                            */
           /*-------------------------------------------------------*/
 
           if(ortab[index].orifice_name == (char )NULL)
@@ -649,14 +646,14 @@ _PUBLIC void *pups_bind_orifice_handle(const char *dll_name,            // Name 
 
 
  
-/*------------------------------------------------------------------------------
-    Free orifice handle ...
-------------------------------------------------------------------------------*/
+/*---------------------*/
+/* Free orifice handle */
+/*---------------------*/
 
 _PUBLIC void *pups_free_orifice_handle(const void *orifice_handle)
 
-{   int  index;
-    char orifice_exitf_name[SSIZE] = "";
+{   int32_t index;
+    char    orifice_exitf_name[SSIZE] = "";
 
     void (*orifice_exit_handle)(void);
 
@@ -677,7 +674,7 @@ _PUBLIC void *pups_free_orifice_handle(const void *orifice_handle)
     /*----------------------------------*/
 
     if(pupsthread_is_root_thread() == FALSE)
-       error("[pups_free_orifice_handle] attempt by non root thread to perform PUPS/P3 DLL operation");
+       pups_error("[pups_free_orifice_handle] attempt by non root thread to perform PUPS/P3 DLL operation");
 
 
     /*------------------------------------------------*/
@@ -726,15 +723,15 @@ _PUBLIC void *pups_free_orifice_handle(const void *orifice_handle)
 
 
 
-/*-----------------------------------------------------------------------------
-    Routine to display currently loaded DLL's - this routine will probably
-    be called in response to signalling an active process ...
------------------------------------------------------------------------------*/
+/*------------------------------------------------------------------------*/
+/* Routine to display currently loaded DLL's - this routine will probably */
+/* be called in response to signalling an active process                  */
+/*------------------------------------------------------------------------*/
 
 _PUBLIC void pups_show_orifices(const FILE *stream)
 
-{   int i,
-        orifices = 0;
+{    int32_t i,
+             orifices = 0;
 
 
     /*--------------*/
@@ -753,7 +750,7 @@ _PUBLIC void pups_show_orifices(const FILE *stream)
     /*----------------------------------*/
 
     if(pupsthread_is_root_thread() == FALSE)
-       error("[pups_show_orifices] attempt by non root thread to perform PUPS/P3 DLL operation");
+       pups_error("[pups_show_orifices] attempt by non root thread to perform PUPS/P3 DLL operation");
 
     (void)fprintf(stream,"\n\n    Bound DLL orifices\n");
     (void)fprintf(stream,"    ==================\n\n");
@@ -771,7 +768,7 @@ _PUBLIC void pups_show_orifices(const FILE *stream)
           (void)fprintf(stream,"    %04d: Orifice %-48s (prototype %-32s) (handle at %018x virtual) imported from DLL %s\n",i,
                                                                                                         ortab[i].orifice_name,
                                                                                                    ortab[i].orifice_prototype,
-                                                                                   (unsigned long int)ortab[i].orifice_handle,
+                                                                                   (uint64_t         )ortab[i].orifice_handle,
                                                                                                             ortab[i].dll_name);
 
 
@@ -801,13 +798,13 @@ _PUBLIC void pups_show_orifices(const FILE *stream)
 
 
 
-/*-----------------------------------------------------------------------------
-    Decode a formatted function prototype ...
------------------------------------------------------------------------------*/
+/*---------------------------------------*/
+/* Decode a formatted function prototype */
+/*---------------------------------------*/
 
 _PUBLIC _BOOLEAN dll_decode_ffp(const char *in_proto, const char *orifice_name)
 
-{   int index; 
+{    int32_t index; 
 
     char stripped_in_proto[SSIZE] = "",
          stripped_ff_proto[SSIZE] = "";
@@ -829,7 +826,7 @@ _PUBLIC _BOOLEAN dll_decode_ffp(const char *in_proto, const char *orifice_name)
     /*----------------------------------*/
 
     if(pupsthread_is_root_thread() == FALSE)
-       error("[dll_decode_ffp] attempt by non root thread to perform PUPS/P3 DLL operation");
+       pups_error("[dll_decode_ffp] attempt by non root thread to perform PUPS/P3 DLL operation");
 
     if((index = find_ortab_slot_by_name(orifice_name)) == FALSE)
        return(-1);
@@ -860,16 +857,16 @@ _PUBLIC _BOOLEAN dll_decode_ffp(const char *in_proto, const char *orifice_name)
 
 
 
-/*------------------------------------------------------------------------------
-    Scan a DLL and display its orifices ...
-------------------------------------------------------------------------------*/
+/*-------------------------------------*/
+/* Scan a DLL and display its orifices */
+/*-------------------------------------*/
 
 _PUBLIC _BOOLEAN pups_show_dll_orifices(const FILE *stream, const char *dll_name)
 
 {   FILE *nm_stream = (FILE *)NULL;
 
-    int      orifices = 0;
-    long int index;
+     int32_t  orifices                 = 0;
+     int64_t  index                    = 0;
 
     void *dll_handle                   = (void *)NULL,
          *orifice_prototype_handle     = (void *)NULL,
@@ -902,7 +899,7 @@ _PUBLIC _BOOLEAN pups_show_dll_orifices(const FILE *stream, const char *dll_name
     /*----------------------------------*/
 
     if(pupsthread_is_root_thread() == FALSE)
-       error("[pups_show_dll_orifices] attempt by non root thread to perform PUPS/P3 DLL operation");
+       pups_error("[pups_show_dll_orifices] attempt by non root thread to perform PUPS/P3 DLL operation");
 
 
     /*-------------------------------------*/
@@ -977,7 +974,7 @@ _PUBLIC _BOOLEAN pups_show_dll_orifices(const FILE *stream, const char *dll_name
               /* Do we have an orifice? */
               /*------------------------*/
 
-              if(strinp((long *)&index,next_symbol,"_is_orifice") == TRUE)
+              if(strinp((size_t *)&index,next_symbol,"_is_orifice") == TRUE)
               {
 
                  /*----------------------*/
@@ -1040,5 +1037,4 @@ _PUBLIC _BOOLEAN pups_show_dll_orifices(const FILE *stream, const char *dll_name
     pups_set_errno(OK);
     return(TRUE);
 }
-
 #endif /* DLL_SUPPORT */

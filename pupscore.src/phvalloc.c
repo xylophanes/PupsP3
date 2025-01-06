@@ -1,4 +1,4 @@
-/*---------------------------------------------------------------------------
+/*--------------------------------------------------------------------------
      Allocate memory on a page boundary.
      Copyright (C) 1991, 1992, 1993, 1994 Free Software Foundation, Inc.
 
@@ -21,34 +21,26 @@
      or (US mail) as Mike Haertel c/o Free Software Foundation.
 
      Shared heap modifications by Mark O'Neill (mao@tumblingdice.co.uk)
-     (C) 1998-2023 M.A. O'Neill, Tumbling Dice
----------------------------------------------------------------------------*/
+     (C) 1998-2024 M.A. O'Neill, Tumbling Dice
+-------------------------------------------------------------------------*/
 
-#ifndef GLIBC
-#if defined (__GNU_LIBRARY__) || defined (_LIBC)
-#include <stddef.h>
-#include <sys/cdefs.h>
-extern size_t __getpagesize __P ((void));
-#else
 #define	 __getpagesize()	getpagesize()
-#endif /* defined (__GNU_LIBRARY__) || defined (_LIBC) */
-#endif /* GLIBC                                        */
-
 
 #ifndef	_PHMALLOC_INTERNAL
 #define	_PHMALLOC_INTERNAL
 #include <phmalloc.h>
 #endif /* _PHMALLOC_INTERNAL */
 #include <xtypes.h>
+#include <stdint.h>
 
 
 _PRIVATE __malloc_size_t pagesize;
 
-_PUBLIC __ptr_t phvalloc (const unsigned int hdes, const __malloc_size_t size, const char *name)
+_PUBLIC __ptr_t phvalloc (const uint32_t hdes, const __malloc_size_t size, const char *name)
 {
 
-  if(pagesize == 0)
-    pagesize = __getpagesize();
+    if(pagesize == 0)
+      pagesize = __getpagesize();
 
-  return phmemalign (hdes, pagesize, size, name);
+    return phmemalign (hdes, pagesize, size, name);
 }

@@ -2,7 +2,7 @@
 #
 #------------------------------------------------------------------------------
 #  Install PUPSP3 libraries and service functions
-#  (C) M.A. O'Neill, Tumbling Dice Ltd, 2000-2022
+#  (C) M.A. O'Neill, Tumbling Dice Ltd, 2000-2024
 #
 #  $1 is build type
 #  $2 is logfile

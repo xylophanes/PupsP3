@@ -2,7 +2,7 @@
 #
 #####################################
 # Unset P3 signal mappings for bash 
-# (C) M.A O'Neill, Tumbling Dice 2023
+# (C) M.A O'Neill, Tumbling Dice 2025
 #####################################
 
 

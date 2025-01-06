@@ -1,5 +1,5 @@
-/*----------------------------------------------------------------------
-    Purpose: Get host I.P (by interrogating interface).
+/*----------------------------------------------------
+    Purpose: Get host I.P (by interrogating interface)
 
     Author:  M.A. O'Neill
              Tumbling Dice Ltd
@@ -9,20 +9,21 @@
              United Kingdom
 
     Version: 2.02 
-    Dated:   24th May 2023
+    Dated:   10th Decemeber 2024
     E-Mail:  mao@tumblingdice.co.uk
------------------------------------------------------------------------*/
+----------------------------------------------------*/
 
 #include <xtypes.h>
 #include <stdio.h>
 #include <string.h>
 #include <bsd/string.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 
-/*----------------------------------------------------------------------
-    Defines which are local to this application ...
------------------------------------------------------------------------*/
+/*---------------------------------------------*/
+/* Defines which are local to this application */
+/*---------------------------------------------*/
 /*----------------------*/
 /* Version of gethostip */
 /*----------------------*/
@@ -38,14 +39,14 @@
 
 
 
-/*-----------------------------------------------------------------------
-    Remove whitespace and ':' characters from line ...
------------------------------------------------------------------------*/
+/*------------------------------------------------*/
+/* Remove whitespace and ':' characters from line */
+/*------------------------------------------------*/
 
 _PRIVATE void remove_char(char rm_char, char *line)
 
-{   int  i;
-    char tmp_line[SSIZE];
+{   size_t i;
+    char   tmp_line[SSIZE] = "";
 
     for(i=0; i<strlen(line); ++i)
     {  if(line[i] == rm_char)
@@ -64,11 +65,11 @@ _PRIVATE void remove_char(char rm_char, char *line)
 
 
 
-/*-----------------------------*/
-/* Entry point to main program */
-/*-----------------------------*/
+/*------------------*/
+/* Main entry point */
+/*------------------*/
 
-_PUBLIC int main(int argc, char *argv[])
+_PUBLIC int32_t main(int32_t argc, char *argv[])
 
 {   FILE *stream = (FILE *)NULL;
 
@@ -79,9 +80,14 @@ _PUBLIC int main(int argc, char *argv[])
 
     _BOOLEAN extract_c_subnet = FALSE;
 
+
+    /*--------------------*/
+    /* Parse command line */
+    /*--------------------*/
+
     if(argc >= 2)
     {  if(strcmp(argv[1],"-usage") == 0 | strcmp(argv[1],"-help") == 0)
-       {  (void)fprintf(stderr,"\ngethostip version %s, (C) Tumbling Dice 2003-2023 (built %s %s)\n\n",GETHOSTIP_VERSION,__TIME__,__DATE__);
+       {  (void)fprintf(stderr,"\ngethostip version %s, (C) Tumbling Dice 2003-2024 (gcc %s: built %s %s)\n\n",GETHOSTIP_VERSION,__VERSION__,__TIME__,__DATE__);
           (void)fprintf(stderr,"GETHOSTIP is free software, covered by the GNU General Public License, and you are\n");
           (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
           (void)fprintf(stderr,"See the GPL and LGPL licences at www.gnu.org for further details\n");
@@ -144,7 +150,7 @@ _PUBLIC int main(int argc, char *argv[])
        (void)fflush(stdout);
     }
     else
-    {  (void)fprintf(stderr,"gethostip: interface \"%s\" is not configured\n\n",argv[1]);
+    {  (void)fprintf(stderr,"gethostip:  int32_terface \"%s\" is not configured\n\n",argv[1]);
        (void)fflush(stderr);
 
        exit(255);

@@ -1,7 +1,6 @@
 #----------------------------------------------------
 # Sample entry in /etc/group for psrp access accounts
-#
-# Mark O'Neill, Tumbling Dice, 1999-2021
+# Mark O'Neill, Tumbling Dice, 1999-2024
 #----------------------------------------------------
 
 psrpusers:x:9000

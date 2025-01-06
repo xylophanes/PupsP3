@@ -6,29 +6,39 @@
 #
 # $1: name of the shared object 
 # $2: name(s) of the objects to be shared 
+# $3: name(s) of additional shared libraries
 #
-# (C) M.A. O'Neill, Tumbling Dice 2000-2022
+# (C) M.A. O'Neill, Tumbling Dice 2000-2024
 #-------------------------------------------------------------
 
 
 PATH="$PATH:..:."
 echo ""
-echo "    PUPSP3 (SUPUPS) shared object generator"
-echo "    (C) M.A. O'Neill, Tumbling Dice 2000-2022"
+echo "    PUPSP3 shared object generator"
+echo "    (C) M.A. O'Neill, Tumbling Dice 2000-2024"
 echo ""
 
 
 #-------------------
 # Parse command line
 #-------------------
+#------
+# Error
+#------
 
 if [ "$1" = "" ] || [ "$1" = "usage" ] || [ "$1" = "help" ] ; then
-        echo ""
-	echo "    Usage: somake [usage | help]                                                                  |"
-        echo "                  !<shared object [.so] file>! [<archive [.a]  file> \| <<list of object [.o] files>]"
+        echo ""                                                                                                                               >&2
+	echo "    Usage: somake [usage | help]                                                                                            |"  >&2
+        echo "                  !<shared object [.so] file>! [<archive [.a]  file> \| <"list of object [.o] files>" [<"list of libraries>"]"  >&2
 	echo ""
 
 	exit 1
+
+
+#--------------------
+# Shared library name
+#--------------------
+
 else
 	sharename=$1
 fi
@@ -39,19 +49,54 @@ fi
 #------
 
 if [ "$2" = "" ] ;  then
-	echo "    somake ERROR: expecting name of [.o, .a] objects to be shared"
+	echo ""                                                                   >&2
+	echo "    somake ERROR: expecting name of [.o, .a] objects to be shared"  >&2
+	echo ""                                                                   >&2
+
 	exit 255 
+
+
+#----------------------
+# List of shard objects
+#----------------------
+
+else
+	objects=$2
 fi
+
+
+
+#------
+# Error
+#------
+
+if [ "$3" != "" ] ;  then
+	libraries=$3
+else
+	libraries=""
+fi
+
 
 
 #----------------------------
 # Generate the shared library
 #----------------------------
 
-\rm $sharename 2> /dev/null
-gcc -shared -fPIC -Wl,-soname,$sharename -o $sharename $2 -lc
-if [ $? = 0 ] ; then
-	echo "    somake: shared library [$sharename] generated"
+\rm $sharename >& /dev/null
+gcc -shared -fPIC -Wl,-soname,$sharename -o $sharename $objects -lc $libraries
+
+if [[ $? == 0 ]] ; then
+	echo "    somake: shared library [$sharename] generated"    >&2
+
+
+#------
+# Error
+#------
+
+else
+	echo ""                                                     >&2
+	echo "    ERROR somake: failed to generate shared library"  >&2
+	echo ""                                                     >&2
 fi
 
 exit 0

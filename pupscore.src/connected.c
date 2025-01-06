@@ -1,4 +1,4 @@
-/*-----------------------------------------------------------------------
+/*------------------------------------------------------------------
    Purpose: daemon which looks to see if local network is connected
             to the Internet. If local network is connected, then it
             starts name resolution services for host.
@@ -10,10 +10,10 @@
              NE3 4RT
              United Kingdom
 
-   Version: 2.02
-   Dated:   24th May 2023
+   Version: 2.03
+   Dated:   10th December 2024
    E-mail:  mao@tumblingdice.co.uk
------------------------------------------------------------------------*/
+-----------------------------------------------------------------*/
 
 #include <stdio.h>
 #include <unistd.h>
@@ -26,15 +26,16 @@
 #include <string.h>
 #include <bsd/string.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 
-/*-----------------------------------------------------------------------
-    Definitions used by this application ...
------------------------------------------------------------------------*/
+/*--------------------------------------*/
+/* Definitions used by this application */
+/*--------------------------------------*/
 /*----------------------*/
 /* Version of connected */
 /*----------------------*/
-#define CONNECTED_VERSION    "2.02" 
+#define CONNECTED_VERSION    "2.03" 
 
 
 /*-------------*/
@@ -49,8 +50,8 @@
 #define PING_TIMEOUT         5 
 #define NET_UMASK            0xff
 
-#ifndef PUPS_SUPPORT
-#define _BOOLEAN             int
+#ifndef P3_SUPPORT
+#define _BOOLEAN              int32_t
 #define _PRIVATE             static
 #define _PUBLIC
 
@@ -64,21 +65,21 @@
 #endif
 #define TRUE                 255
 
-#endif /* PUPS_SUPPORT */
+#endif /* P3_SUPPORT */
 
 
-/*-----------------------------------------------------------------------
-    Variables which are private to this application ...
------------------------------------------------------------------------*/
+/*-------------------------------------------------*/
+/* Variables which are private to this application */
+/*-------------------------------------------------*/
 
 _PRIVATE sigjmp_buf env;
 
 
 
 
-/*-----------------------------------------------------------------------
-    Handler for (SIGALRM) timeouts ...
------------------------------------------------------------------------*/
+/*--------------------------------*/
+/* Handler for (SIGALRM) timeouts */
+/*--------------------------------*/
 
 _PRIVATE void alarm_handler(int signo)
 
@@ -88,15 +89,15 @@ _PRIVATE void alarm_handler(int signo)
 
 
 
-/*-----------------------------------------------------------------------
-    Main entry point to application ...
------------------------------------------------------------------------*/
+/*---------------------------------*/
+/* Main entry point to application */
+/*---------------------------------*/
 
-_PUBLIC int main(int argc, char *argv[])
+_PUBLIC int32_t main(int32_t argc, char *argv[])
 
-{   int i,
-        ping_timeout = PING_TIMEOUT,
-        cnt          = 0;
+{    int32_t i,
+             ping_timeout = PING_TIMEOUT,
+             cnt          = 0;
 
     _BOOLEAN state = INTERNET_UNREACHABLE;
 
@@ -135,7 +136,7 @@ _PUBLIC int main(int argc, char *argv[])
     /*------------------------------------------------------*/
 
     if(argc != 4)
-    {  (void)fprintf(stderr,"\nConnected version %s, (C) Tumbling Dice, 2002-2023 (built %s %s)\n",CONNECTED_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nConnected version %s, (C) Tumbling Dice, 2002-2024 (gcc %s: built %s %s)\n",CONNECTED_VERSION,__VERSION__,__TIME__,__DATE__);
        (void)fprintf(stderr,"\nUsage: connected <nameserver> <upscript> <downscript> [<ping timeout>]\n\n");
        (void)fprintf(stderr,"CONNECTED is free software, covered by the GNU General Public License, and you are\n");
        (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
@@ -148,10 +149,10 @@ _PUBLIC int main(int argc, char *argv[])
        exit(255);
     }
     else
-    {  char netname[SSIZE] = "";
+    {  char netname[SSIZE]         = "";
 
-       unsigned long nameserver_address,
-                     host_address;
+       uint64_t nameserver_address = 0x0,
+                host_address       = 0x0;
 
        struct in_addr ns_addr;
        in_addr_t      ns_net;

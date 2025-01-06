@@ -1,5 +1,5 @@
-/*------------------------------------------------------------------------------
-    Purpose: Support library for PSRP enabled applications.
+/*--------------------------------------------------------
+    Purpose: Support library for PSRP enabled applications
 
     Author:  M.A. O'Neill
              Tumbling Dice Ltd
@@ -8,13 +8,14 @@
              NE3 4RT
              United Kingdom
 
-    Version: 5.08 
-    Dated:   26th October 2023 
+    Version: 7.05 
+    Dated:   29th December 2024 
     E-mail:  mao@tumblingdice.co.uk
-------------------------------------------------------------------------------*/
+-------------------------------------------------------*/
 
 #include <me.h>
 #include <utils.h>
+#include <cache.h>
 #include <string.h>
 #include <signal.h>
 #include <unistd.h>
@@ -33,6 +34,8 @@
 #include <dirent.h>
 #include <stdlib.h>
 #include <limits.h>
+#include <bsd/bsd.h>
+
 
 #define SSIZE SSIZE
 
@@ -51,6 +54,7 @@
 #endif /* PERSISTENT_HEAP_SUPPORT */
 
 #ifdef BUBBLE_MEMORY_SUPPORT
+#define P3_SUPPORT
 #include <bubble.h>
 #endif /* BUBBLE_MEMORY_SUPPORT */
 
@@ -110,11 +114,11 @@
 
 
                                                         /*-------------------------------------------------*/
-_IMPORT int  pupsighold_cnt[];                          /* Counter for signal hold count                   */
-_IMPORT int  rkill_pid;                                 /* Xkill PID                                       */
-_IMPORT int  n_abort_funcs_alloc;                       /* Number of abort functions allocated             */
-_IMPORT void (*pups_abort_f[MAX_FUNCS])(char *);        /* Abort function point array                      */
-_IMPORT char *pups_abort_arg[MAX_FUNCS];                /* Abort function argument pointer array           */
+_IMPORT int32_t  pupsighold_cnt[];                      /* Counter for signal hold count                   */
+_IMPORT int32_t  rkill_pid;                             /* Xkill PID                                       */
+_IMPORT int32_t  n_abort_funcs_alloc;                   /* Number of abort functions allocated             */
+_IMPORT void     (*pups_abort_f[MAX_FUNCS])(char *);    /* Abort function point array                      */
+_IMPORT char     *pups_abort_arg[MAX_FUNCS];            /* Abort function argument pointer array           */
                                                         /*-------------------------------------------------*/
 
 
@@ -126,10 +130,10 @@ _IMPORT char *pups_abort_arg[MAX_FUNCS];                /* Abort function argume
 
 _PUBLIC _BOOLEAN psrp_child_instance            = FALSE;
 _PUBLIC _BOOLEAN psrp_mode                      = FALSE;
-_PUBLIC int      psrp_instances                 = 0;
-_PUBLIC int      max_trys                       = MAX_TRYS;
-_PUBLIC int      psrp_seg_cnt                   = 0;
-_PUBLIC int      chlockdes                      = (-1);
+_PUBLIC int32_t  psrp_instances                 = 0;
+_PUBLIC int32_t  max_trys                       = MAX_TRYS;
+_PUBLIC int32_t  psrp_seg_cnt                   = 0;
+_PUBLIC int32_t  chlockdes                      = (-1);
 _PUBLIC char     channel_name[SSIZE]            = "";
 _PUBLIC char     channel_name_in[SSIZE]         = "";
 _PUBLIC char     channel_name_out[SSIZE]        = "";
@@ -142,7 +146,7 @@ _PUBLIC psrp_object_type  *psrp_object_list     = (psrp_object_type *)NULL;
 /* Variables which are private to this module */
 /*--------------------------------------------*/
 
-_PRIVATE int      segmentation_delay            = SEGMENTATION_DELAY;
+_PRIVATE int32_t  segmentation_delay            = SEGMENTATION_DELAY;
 _PRIVATE _BOOLEAN terminate_current_instance    = FALSE;
 _PRIVATE char     psrp_c_code[SSIZE]            = "";
 _PRIVATE _BOOLEAN psrp_requests_ignored         = TRUE;
@@ -150,9 +154,9 @@ _PRIVATE _BOOLEAN overforking                   = FALSE;
 _PRIVATE _BOOLEAN psrp_abrtflag_enable          = FALSE;
 _PRIVATE _BOOLEAN psrp_abrtflag                 = FALSE;
 _PRIVATE _BOOLEAN psrp_error_handling           = TRUE;
-_PRIVATE int      overforked_child_pid          = (-1);
-_PRIVATE int      ssh_pid                       = (-1);
-_PRIVATE int      ssh_sic_index                 = (-1);
+_PRIVATE int32_t  overforked_child_pid          = (-1);
+_PRIVATE int32_t  ssh_pid                       = (-1);
+_PRIVATE int32_t  ssh_sic_index                 = (-1);
 _PRIVATE char     psrp_password[SSIZE]          = "";
 
 
@@ -161,13 +165,13 @@ _PRIVATE char     psrp_password[SSIZE]          = "";
 /* Slot and usage functions - used by slot manager */
 /*-------------------------------------------------*/
 
-_PRIVATE void psrplib_slot(int level)
+_PRIVATE void psrplib_slot(int32_t level)
 {   (void)fprintf(stderr,"lib psrplib %s: [ANSI C]\n",PSRPLIB_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 1995-2023 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 1995-2024 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
-       (void)fprintf(stderr,"PUPS/P3 multiuser threadsafe PSRP [SUPUPS] library (built %s %s)\n\n",__TIME__,__DATE__);
+       (void)fprintf(stderr,"PUPS/P3 multiuser threadsafe PSRP [SUPUPS] library (gcc %s: built %s %s)\n\n",__VERSION__,__TIME__,__DATE__);
     }
     else
        (void)fprintf(stderr,"\n");
@@ -190,35 +194,33 @@ _EXTERN void (* SLOT )() __attribute__ ((aligned(16))) = psrplib_slot;
 /*------------------------------------*/
 /* Variables imported by this library */
 /*------------------------------------*/
-
-
 /*-------------------------------------------------------------------*/
 /* Public variables exported by the multithread dynamic link library */
 /* support library                                                   */
 /*-------------------------------------------------------------------*/
  
-_PUBLIC FILE     *psrp_in                  = (FILE *)NULL;  // I/P from PSRP client
-_PUBLIC FILE     *psrp_out                 = (FILE *)NULL;  // O/P to PSRP client 
-_PUBLIC _BOOLEAN psrp_reactivate_client    = FALSE;         // Reactivate attached client
-_PUBLIC _BOOLEAN connected_once            = FALSE;         // TRUE if connection made
-_PUBLIC _BOOLEAN in_psrp_new_segment       = FALSE;         // TRUE if in segment code 
-_PUBLIC _BOOLEAN in_psrp_handler           = FALSE;         // TRUE if in PSRP handler code
-_PUBLIC _BOOLEAN in_chan_handler           = FALSE;         // TRUE if in chan_handler code
+_PUBLIC FILE     *psrp_in                  = (FILE *)NULL;    // I/P from PSRP client
+_PUBLIC FILE     *psrp_out                 = (FILE *)NULL;    // O/P to PSRP client 
+_PUBLIC _BOOLEAN psrp_reactivate_client    = FALSE;           // Reactivate attached client
+_PUBLIC _BOOLEAN connected_once            = FALSE;           // TRUE if connection made
+_PUBLIC _BOOLEAN in_psrp_new_segment       = FALSE;           // TRUE if in segment code 
+_PUBLIC _BOOLEAN in_psrp_handler           = FALSE;           // TRUE if in PSRP handler code
+_PUBLIC _BOOLEAN in_chan_handler           = FALSE;           // TRUE if in chan_handler code
 
 
 /*----------------------------------------*/
 /* Multiple client access database tables */
 /*----------------------------------------*/
 
-_PUBLIC int      n_clients = MAX_CLIENTS;                   // Number of clients
-_PUBLIC int      c_client  = 0;                             // Active client
-_PUBLIC char     psrp_client_name[MAX_CLIENTS][SSIZE];      // Name of client application
-_PUBLIC char     psrp_client_host[MAX_CLIENTS][SSIZE];      // Name of localhost
-_PUBLIC char     psrp_remote_hostpath[MAX_CLIENTS][SSIZE];  // Path to basal client
-_PUBLIC int      psrp_client_pid[MAX_CLIENTS];              // Clients pid
-_PUBLIC int      psrp_transactions[MAX_CLIENTS];            // PSRP transaction count
-_PUBLIC char     psrp_client_efname[MAX_CLIENTS][SSIZE];    // Name of client exit func
-_PUBLIC int      (*psrp_client_exitf[MAX_CLIENTS])(int);    // Client exit function
+_PUBLIC int32_t  n_clients = MAX_CLIENTS;                     // Number of clients
+_PUBLIC int32_t  c_client  = 0;                               // Active client
+_PUBLIC char     psrp_client_name[MAX_CLIENTS][SSIZE];        // Name of client application
+_PUBLIC char     psrp_client_host[MAX_CLIENTS][SSIZE];        // Name of localhost
+_PUBLIC char     psrp_remote_hostpath[MAX_CLIENTS][SSIZE];    // Path to basal client
+_PUBLIC int32_t  psrp_client_pid[MAX_CLIENTS];                // Clients pid
+_PUBLIC int32_t  psrp_transactions[MAX_CLIENTS];              // PSRP transaction count
+_PUBLIC char     psrp_client_efname[MAX_CLIENTS][SSIZE];      // Name of client exit func
+_PUBLIC int32_t  (*psrp_client_exitf[MAX_CLIENTS])(int32_t);  // Client exit function
 
 
 
@@ -226,9 +228,9 @@ _PUBLIC int      (*psrp_client_exitf[MAX_CLIENTS])(int);    // Client exit funct
 /* Variables which are private to this module */
 /*--------------------------------------------*/
 
-_PRIVATE _BOOLEAN psrp_channel_open        = FALSE;         // TRUE if PSRP channel open
-_PRIVATE _BOOLEAN siginit_pending          = FALSE;         // TRUE if SIGINIT pending
-_PRIVATE _BOOLEAN sigchan_pending          = FALSE;         // TRUE if SIGCHAN pending
+_PRIVATE _BOOLEAN psrp_channel_open        = FALSE;           // TRUE if PSRP channel open
+_PRIVATE _BOOLEAN siginit_pending          = FALSE;           // TRUE if SIGINIT pending
+_PRIVATE _BOOLEAN sigchan_pending          = FALSE;           // TRUE if SIGCHAN pending
 
 
 
@@ -237,7 +239,7 @@ _PRIVATE _BOOLEAN sigchan_pending          = FALSE;         // TRUE if SIGCHAN p
 /*---------------------------------------------*/
 
 // Handler for PUPS virtual interval timers
-_PROTOTYPE _IMPORT int vt_handler(const int);
+_PROTOTYPE _IMPORT int32_t vt_handler(const int32_t);
 
 
 
@@ -250,22 +252,22 @@ _PROTOTYPE _IMPORT int vt_handler(const int);
 _PROTOTYPE _PRIVATE void psrp_clear_channel_slot(psrp_channel_type *);
 
 // Set stdio background detach state
-_PROTOTYPE _PRIVATE int psrp_builtin_set_nodetach(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_set_nodetach(const uint32_t, const char *[]);
 
 // Set PSRP (vitimer) quantum
-_PROTOTYPE _PRIVATE int psrp_builtin_set_vitimer_quantum(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_set_vitimer_quantum(const uint32_t, const char *[]);
 
 // Set (secure) server authentication token
-_PROTOTYPE _PRIVATE int psrp_builtin_set_secure(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_set_secure(const uint32_t, const char *[]);
 
 // Reactivate connected clients
-_PROTOTYPE _PRIVATE int psrp_reactivate_clients(void);
+_PROTOTYPE _PRIVATE int32_t psrp_reactivate_clients(void);
 
 // Handler for SIGCLIENT
-_PROTOTYPE _PRIVATE int cdoss_handler(int);
+_PROTOTYPE _PRIVATE int32_t cdoss_handler(const int32_t);
+
 
 #ifdef MAIL_SUPPORT
-
 // Save PSRP channels
 _PROTOTYPE _PRIVATE void psrp_save_channels(void);
 
@@ -273,292 +275,292 @@ _PROTOTYPE _PRIVATE void psrp_save_channels(void);
 _PROTOTYPE _PRIVATE void psrp_restore_channels(void);
 
 // Parse PRSP commands (from MIME mail interface)
-_PROTOTYPE _PRIVATE int psrp_parse_requests(char *);
+_PROTOTYPE _PRIVATE int32_t psrp_parse_requests(char *);
 
 // Set parts of MIME message to be saved from PSRP API
-_PROTOTYPE _PRIVATE int psrp_builtin_set_mime_type(const int, const char *[]);
-
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_set_mime_type(const uint32_t, const char *[]);
 #endif /* MAIL_SUPPORT */
 
 
-// Display (fast) caches mapped into the address space of caller
-_PROTOTYPE _PRIVATE int psrp_builtin_show_caches(const int, const char *[]);
+// Display (fast) caches mapped  int32_to the address space of caller
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_show_caches(const uint32_t, const char *[]);
 
 // Parse a PSRP request (noting which interface originated it)
-_PROTOTYPE _PRIVATE int psrp_parse_request(char *, int);
+_PROTOTYPE _PRIVATE int32_t psrp_parse_request(char *, const uint32_t);
 
 // Show host information
-_PROTOTYPE _PRIVATE int psrp_builtin_show_hinfo(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_show_hinfo(const uint32_t, const char *[]);
 
 
 #ifdef BUBBLE_MEMORY_SUPPORT 
 // Set (J)malloc options
-_PROTOTYPE _PRIVATE int psrp_builtin_set_mbubble_utilisation_threshold(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_set_mbubble_utilisation_threshold(const uint32_t, const char *[]);
 
 // Display (J)malloc statistics
-_PROTOTYPE _PRIVATE int psrp_builtin_show_malloc_stats(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_show_malloc_stats(const uint32_t, const char *[]);
 #endif /* BUBBLE_MEMORY_SUPPORT */
 
 #ifdef CRIU_SUPPORT
 // Enable/disable (Criu) state saving
-_PROTOTYPE _PRIVATE int psrp_builtin_ssave(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_ssave(const uint32_t, const char *[]);
 #endif /* CRIU_SUPPORT */
 
 // Enable/disable software watchdog
-_PROTOTYPE _PRIVATE int psrp_builtin_softdog(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_softdog(const uint32_t, const char *[]);
 
 // Process exits if its effective parent is terminated
-_PROTOTYPE _PRIVATE int psrp_builtin_set_pexit(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_set_pexit(const uint32_t, const char *[]);
 
 // Process does not exit if its effective parent is terminated
-_PROTOTYPE _PRIVATE int psrp_builtin_set_unpexit(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_set_unpexit(const uint32_t, const char *[]);
 
 // Set (effective) parent
-_PROTOTYPE _PRIVATE int psrp_builtin_set_parent(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_set_parent(const uint32_t, const char *[]);
 
 // Set system context to rooted (system context cannot migrate)
-_PROTOTYPE _PRIVATE int psrp_builtin_set_rooted(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_set_rooted(const uint32_t, const char *[]);
 
 // Set system context to unrooted (system context can migrate)
-_PROTOTYPE _PRIVATE int psrp_builtin_set_unrooted(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_set_unrooted(const uint32_t, const char *[]);
   
 // Set current working directory for PSRP server
-_PROTOTYPE _PRIVATE int psrp_builtin_set_cwd(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_set_cwd(const uint32_t, const char *[]);
    
 // Set number of times operation is retryed (before aborting)
-_PROTOTYPE _PRIVATE int psrp_builtin_set_trys(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_set_trys(const uint32_t, const char *[]);
 
 // Create trailfile and associated destructor lyosome
-_PROTOTYPE _PRIVATE void psrp_create_trailfile(char *, char *, char *, char *);
+_PROTOTYPE _PRIVATE void psrp_create_trailfile(const char *, const char *, const char *, const char *);
 
 // Protect a file
-_PROTOTYPE _PRIVATE int psrp_builtin_file_live(const int, const char *argv[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_file_live(const uint32_t, const char *argv[]);
 
 // Unprotect a file
-_PROTOTYPE _PRIVATE int psrp_builtin_file_dead(const int, const char *argv[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_file_dead(const uint32_t, const char *argv[]);
 
 // Show resource usage for this server
-_PROTOTYPE _PRIVATE int psrp_builtin_show_rusage(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_show_rusage(const uint32_t, const char *[]);
 
 // Set resource usage for this server
-_PROTOTYPE _PRIVATE int psrp_builtin_set_rlimit(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_set_rlimit(const uint32_t, const char *[]);
 
 // Builtin to display crontab contents
-_PROTOTYPE _PRIVATE int psrp_builtin_show_crontab(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_show_crontab(const uint32_t, const char *[]);
 
 // Builtin to schedule a crontab operation
-_PROTOTYPE _PRIVATE int psrp_builtin_crontab_schedule(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_crontab_schedule(const uint32_t, const char *[]);
 
 // Builtin to unschedule a crontab operation
-_PROTOTYPE _PRIVATE int psrp_builtin_crontab_unschedule(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_crontab_unschedule(const uint32_t, const char *[]);
 
 // Check to see if any cron operations are pending
 _PROTOTYPE _PRIVATE void psrp_crontab_checkschedule(char *);
 
 // Add an alias to a PSRP object
-_PROTOTYPE _PRIVATE int psrp_builtin_alias(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_alias(const uint32_t, const char *[]);
 
 // Builtin to show process status
-_PROTOTYPE _PRIVATE int psrp_builtin_show_procstatus(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_show_procstatus(const uint32_t, const char *[]);
 
-// Show the (current) clients attached to PSRP server
-_PROTOTYPE _PRIVATE int psrp_builtin_show_clients(const int, const char *[]);
+// Show clients connected to this server
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_show_clients(const uint32_t, const char *[]);
 
 // Create a new proces instance of PSRP server process
-_PROTOTYPE _PRIVATE int psrp_builtin_new_instance(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_new_instance(const uint32_t, const char *[]);
 
 // Return number of clients connected to server
-_PROTOTYPE _PRIVATE int psrp_connected_clients(void);
+_PROTOTYPE _PRIVATE int32_t psrp_connected_clients(void);
 
 // Get index in connected client array
-_PROTOTYPE _PRIVATE int psrp_get_client_slot(int);
+_PROTOTYPE _PRIVATE int32_t psrp_get_client_slot(pid_t);
 
 // Clear index in connected client array
-_PROTOTYPE _PRIVATE int psrp_clear_client_slot(int);
+_PROTOTYPE _PRIVATE int32_t psrp_clear_client_slot(int32_t);
 
 // Show clients attached to server
-_PROTOTYPE _PRIVATE int psrp_show_clients(void);
+_PROTOTYPE _PRIVATE int32_t psrp_show_clients(void);
 
 // Flag end of (interrupt driven) PSRP operation
 _PROTOTYPE _PRIVATE void psrp_endop(char *op_tag);
 
-// Show clients connected to this server
-_PROTOTYPE _PRIVATE int psrp_builtin_show_clients(const int, const char *[]);
-
 // Remove a tag from a tag list (alias)
-_PROTOTYPE _PRIVATE int psrp_builtin_unalias(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_unalias(const uint32_t, const char *[]);
 
 // Show aliases for objects bound to this PRSP server
-_PROTOTYPE _PRIVATE int psrp_builtin_showaliases(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_showaliases(const uint32_t, const char *[]);
 
 // Detach an object from the PSRP dispatch list
-_PROTOTYPE _PRIVATE int psrp_detach_object(unsigned int);
+_PROTOTYPE _PRIVATE  int32_t psrp_detach_object(uint32_t);
 
 // Get argument vector from request string
-_PROTOTYPE _PRIVATE void psrp_argvec(int *, char *);
+_PROTOTYPE _PRIVATE void psrp_argvec(uint32_t *, const char *);
 
 // Switch transaction/error logging on/off
-_PROTOTYPE _PRIVATE int psrp_builtin_appl_verbose(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_appl_verbose(const int32_t, const char *[]);
 
 // Toggle (client) error handling on/off
-_PROTOTYPE _PRIVATE int psrp_builtin_error_handling(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_error_handling(const int32_t, const char *[]);
 
 // Delete object from PSRP dispatch table
-_PROTOTYPE _PRIVATE int psrp_builtin_transactions(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_transactions(const uint32_t, const char *[]);
 
 // Delete object from PSRP dispatch table
-_PROTOTYPE _PRIVATE int psrp_builtin_detach_object(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_detach_object(const uint32_t, const char *[]);
 
 // Show state of PSRP bindings (to client)
-_PROTOTYPE _PRIVATE int psrp_builtin_show_psrp_state(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_show_psrp_state(const uint32_t, const char *[]);
 
 // Show bindings of all PSRP objects
-_PROTOTYPE _PRIVATE int psrp_builtin_show_psrp_bind_type(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_show_psrp_bind_type(const uint32_t, const char *[]);
 
 // Terminate PSRP server process
-_PROTOTYPE _PRIVATE int psrp_builtin_terminate_process(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_terminate_process(const uint32_t, const char *[]);
 
 
 #ifdef SSH_SUPPORT
 // Set ssh compression
-_PROTOTYPE _PRIVATE int psrp_builtin_ssh_compress(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_ssh_compress(const uint32_t, const char *[]);
 
 // Set remote ssh port
-_PROTOTYPE _PRIVATE int psrp_builtin_ssh_port(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_ssh_port(const uint32_t, const char *[]);
 #endif /* SSH_SUPPORT */
 
+
 // Display help for psrp_handler
-_PROTOTYPE _PRIVATE int psrp_builtin_help(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_help(const uint32_t, const char *[]);
+
 
 #ifdef DLL_SUPPORT
 // Show DLL orifices which are bound to this application
-_PROTOTYPE _PRIVATE int psrp_builtin_show_attached_orifices(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_show_attached_orifices(const uint32_t, const char *[]);
 #endif /* DLL_SUPPORT */
+
 
 #ifdef PTHREAD_SUPPORT
 // Show threads running in PSRP server
-_PROTOTYPE _PRIVATE int psrp_builtin_show_threads(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_show_threads(const uint32_t, const char *[]);
 
 // Start thread running in PSRP server
-_PROTOTYPE _PRIVATE int psrp_builtin_launch_thread(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_launch_thread(const uint32_t, const char *[]);
 
 // Pause thread runnin in PSRP server
-_PROTOTYPE _PRIVATE int psrp_builtin_pause_thread(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_pause_thread(const uint32_t, const char *[]);
 
 // Pause thread runnin in PSRP server
-_PROTOTYPE _PRIVATE int psrp_builtin_restart_thread(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_restart_thread(const uint32_t, const char *[]);
 
 // Kill thread running in PSRP server
-_PROTOTYPE _PRIVATE int psrp_builtin_kill_thread(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_kill_thread(const uint32_t, const char *[]);
 #endif /* PTHREAD_SUPPORT */
 
+
 // Show this applications concurrently held link file locks
-_PROTOTYPE _PRIVATE int psrp_builtin_show_link_file_locks(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_show_link_file_locks(const uint32_t, const char *[]);
 
 // Show this applications flock locks
-_PROTOTYPE _PRIVATE int psrp_builtin_show_flock_locks(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_show_flock_locks(const uint32_t, const char *[]);
 
 // Show this applications non-default signal handlers
-_PROTOTYPE _PRIVATE int psrp_builtin_show_sigstatus(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_show_sigstatus(const uint32_t, const char *[]);
 
 // Show this applications signal mask/ pending signal status
-_PROTOTYPE _PRIVATE int psrp_builtin_show_sigmaskstatus(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_show_sigmaskstatus(const uint32_t, const char *[]);
 
 // Show streams/file descriptors opened by this application
-_PROTOTYPE _PRIVATE int psrp_builtin_show_open_fdescriptors(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_show_open_fdescriptors(const uint32_t, const char *[]);
 
 // Show (active) children of this application
-_PROTOTYPE _PRIVATE int psrp_builtin_show_children(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_show_children(const uint32_t, const char *[]);
 
-// Show slaved interation client channels open
-_PROTOTYPE _PRIVATE int psrp_builtin_show_open_sics(const int, const char *[]);
+// Show slaved  interaction client channels open
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_show_open_sics(const uint32_t, const char *[]);
 
 // Show exit functions registered for this application 
-_PROTOTYPE _PRIVATE int psrp_builtin_pups_show_exit_f(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_pups_show_exit_f(const uint32_t, const char *[]);
 
 // Show abort functions registered for this application
-_PROTOTYPE _PRIVATE int psrp_builtin_pups_show_abort_f(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_pups_show_abort_f(const uint32_t, const char *[]);
 
 // Show entrance functions registered for this application
-_PROTOTYPE _PRIVATE int psrp_builtin_pups_show_entrance_f(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_pups_show_entrance_f(const uint32_t, const char *[]);
 
 // Show status of PUPS virtual timers
-_PROTOTYPE _PRIVATE int psrp_builtin_pups_show_vitimers(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_pups_show_vitimers(const uint32_t, const char *[]);
 
-// show persistent heaps mapped into process address space
-_PROTOTYPE _PRIVATE int psrp_builtin_show_persistent_heaps(const int, const char *[]);
+// show persistent heaps mapped  int32_to process address space
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_show_persistent_heaps(const uint32_t, const char *[]);
 
-// show persistent heaps mapped into process address space
-_PROTOTYPE _PRIVATE int psrp_builtin_show_htobjects(const int, const char *[]);
-
-// Load a new dispatch table
-_PROTOTYPE _PRIVATE int psrp_builtin_autosave_dispatch_table(const int, const char *[]);
+// show persistent heaps mapped  int32_to process address space
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_show_htobjects(const uint32_t, const char *[]);
 
 // Load a new dispatch table
-_PROTOTYPE _PRIVATE int psrp_builtin_load_dispatch_table(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_autosave_dispatch_table(const uint32_t, const char *[]);
+
+// Load a new dispatch table
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_load_dispatch_table(const uint32_t, const char *[]);
 
 // Save dispatch table
-_PROTOTYPE _PRIVATE int psrp_builtin_save_dispatch_table(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_save_dispatch_table(const uint32_t, const char *[]);
 
 // Reset dispatch table to it initial state */
-_PROTOTYPE _PRIVATE int psrp_builtin_reset_dispatch_table(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_reset_dispatch_table(const uint32_t, const char *[]);
 
 // Extend the child table
-_PROTOTYPE _PRIVATE int psrp_builtin_extend_chtab(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_extend_chtab(const uint32_t, const char *[]);
 
 
 #ifdef PERSISTENT_HEAP_SUPPORT
 // Attach a persistent heap to PSRP handler
-_PROTOTYPE _PRIVATE int psrp_builtin_attach_persistent_heap(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_attach_persistent_heap(const uint32_t, const char *[]);
 
 // Extend persistent heap table
-_PROTOTYPE _PRIVATE int psrp_builtin_extend_htab(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_extend_htab(const uint32_t, const char *[]);
 #endif /* PERSISTENT_HEAP_SUPPORT */
 
 
 #ifdef DLL_SUPPORT
 // Attach dynamic function to PSRP handler
-_PROTOTYPE _PRIVATE int psrp_builtin_attach_dynamic_function(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_attach_dynamic_function(const uint32_t, const char *[]);
 
 // Extend orifice [DLL] table
-_PROTOTYPE _PRIVATE int psrp_builtin_extend_ortab(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_extend_ortab(const uint32_t, const char *[]);
 #endif /* DLL_SUPPORT */
 
 
-// Show number of (fast) caches memory mapped into process address space
-_PROTOTYPE _PRIVATE int psrp_builtin_show_caches(const int, const char *[]);
+// Show number of (fast) caches memory mapped  int32_to process address space
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_show_caches(const uint32_t, const char *[]);
 
 // Display statistics of a mapped (fast) cache
-_PROTOTYPE _PRIVATE int psrp_builtin_display_cache(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_display_cache(const uint32_t, const char *[]);
 
 // Extend virtual timer table
-_PROTOTYPE _PRIVATE int psrp_builtin_extend_vitab(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_extend_vitab(const uint32_t, const char *[]);
 
 // Extend the file table
-_PROTOTYPE _PRIVATE int psrp_builtin_extend_ftab(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_extend_ftab(const uint32_t, const char *[]);
 
 // Overlay PSRP server with new command 
-_PROTOTYPE _PRIVATE int psrp_builtin_overlay_server_process(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_overlay_server_process(const uint32_t, const char *[]);
 
 // Overfork PSRP server with new command
-_PROTOTYPE _PRIVATE int psrp_builtin_overfork_server_process(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_overfork_server_process(const uint32_t, const char *[]);
 
 // Attach dynamic function to PSRP handler
-_PROTOTYPE _PRIVATE int psrp_builtin_attach_dbag(const int, const char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_builtin_attach_dbag(const uint32_t, const char *[]);
 
 // Handler for SIGALRM
 _PROTOTYPE _PRIVATE void psrp_homeostat(void *, char *);
 
 // Handler for SIGCHAN
-_PROTOTYPE _PRIVATE int chan_handler(int);
+_PROTOTYPE _PRIVATE int32_t chan_handler(const int32_t);
 
 // Handler for SIGPSRP 
-_PROTOTYPE _PRIVATE int psrp_handler(int);
+_PROTOTYPE _PRIVATE int32_t psrp_handler(const int32_t);
 
 // Handler for propagated SIGABRT
-_PROTOTYPE _PRIVATE int abrt_handler(int);
+_PROTOTYPE _PRIVATE int32_t abrt_handler(const int32_t);
 
-// Initialise channel table for slaved interation clients
+// Initialise channel table for slaved interaction clients
 _PROTOTYPE _PRIVATE void psrp_initsic(void);
 
 
@@ -568,7 +570,7 @@ _PROTOTYPE _PRIVATE void psrp_initsic(void);
 
 _PRIVATE sigjmp_buf        chan_env;                                         // Env at chan_handler entry
 _PRIVATE sigjmp_buf        psrp_env;                                         // Env at psrp_handler entry
-_PRIVATE int               req_r_cnt[MAX_CLIENTS];                           // Attached client request counts
+_PRIVATE uint32_t          req_r_cnt[MAX_CLIENTS];                           // Attached client request counts
 _PRIVATE char              old_request_str[MAX_CLIENTS][SSIZE];              // Last request for each attached client
 _PRIVATE _BOOLEAN          psrp_log[MAX_CLIENTS]              =  { FALSE };  // Per client transaction logging flags
 
@@ -577,12 +579,12 @@ _PRIVATE _BOOLEAN          psrp_log[MAX_CLIENTS]              =  { FALSE };  // 
 /* Variables which are private to the PSRP subsystem */
 /*---------------------------------------------------*/
 
-_PRIVATE int               psrp_object_list_size;
-_PRIVATE int               psrp_object_list_used;
-_PRIVATE int               psrp_bind_status  = PSRP_STATIC_FUNCTION;
-_PRIVATE _BOOLEAN          psrp_ignore       = FALSE;
-_PRIVATE psrp_channel_type channel[PSRP_MAX_SIC_CHANNELS];
-_PRIVATE psrp_crontab_type crontab[MAX_CRON_SLOTS];
+_PRIVATE uint32_t          psrp_object_list_used;                            // Size of (bound) PSRP object list
+_PRIVATE uint32_t          psrp_object_list_allocated;                       // Number of PSRP objects allocated
+_PRIVATE int32_t           psrp_bind_status  = PSRP_STATIC_FUNCTION;         // Default (attached) function bindiong type
+_PRIVATE _BOOLEAN          psrp_ignore       = FALSE;                        // Ignore PSRP requests
+_PRIVATE psrp_channel_type channel[PSRP_MAX_SIC_CHANNELS];                   // PSRP slaved ineraction channels
+_PRIVATE psrp_crontab_type crontab[MAX_CRON_SLOTS];                          // PSRP crontab slots
 
 
 
@@ -593,7 +595,7 @@ _PRIVATE psrp_crontab_type crontab[MAX_CRON_SLOTS];
 
 _PUBLIC void psrp_ignore_requests(void)
 
-{   if(appl_root_thread != 0 && pupsthread_is_root_thread() == FALSE)
+{   if(pupsthread_is_root_thread() == FALSE)
     {  (void)fprintf(stderr,"psrp_ignore_requests: attempt by non root thread to perform PUPS/P3 PSRP operation");
        (void)fflush(stderr);
 
@@ -659,34 +661,162 @@ _PUBLIC void psrp_accept_requests(void)
 
 
 
+#ifdef DLL_SUPPORT
+/*------------------------------------------------------------------*/
+/* Attach dynamic action function to the PSRP handler dispatch list */
+/* Dynamic functions must conform to PUPS-DLL semantics and cand be */
+/* auto-generated by the the pc2c (PUPS-C) pre-processor            */ 
+/*------------------------------------------------------------------*/
+ 
+_PUBLIC  int32_t psrp_attach_dynamic_function(const _BOOLEAN  search,  // Search for DLL containing object
+                                              const char *object_tag,  // Tag of dyanmic object (function)
+                                             const char   *dll_name)  // Name of DLL contaaining object
+ 
+{   int32_t  slot_index,
+             tag_index;
+
+    char     dll_path_name[SSIZE] = "";
+    void     *object_handle       = (void *)NULL;
+
+    if(object_tag == (const char *)NULL || dll_name == (const char *)NULL)
+    {  pups_set_errno(EINVAL);
+       return(PSRP_DISPATCH_ERROR);
+    }
+
+
+    /*----------------------------------*/
+    /* Only the root thread can process */
+    /* PSRP requests                    */
+    /*----------------------------------*/
+
+    if(pupsthread_is_root_thread() == FALSE)
+       pups_error("[psrp_attach_dynamic_function] attempt by non root thread to perform PUPS/P3 PSRP operation");
+
+
+    /*------------------------------------------------*/
+    /* Check to see if object exist on specified path */
+    /* if it doesn't search the directories specified */
+    /* in the DISPATCH_PATH environment variable      */
+    /*------------------------------------------------*/
+
+    if(access(dll_name,F_OK | R_OK | W_OK) == (-1))
+    {  if(search == TRUE)
+       {  char tmp_str[SSIZE] = ""; 
+
+          if(strrext(dll_name,tmp_str,'/') == TRUE)
+             (void)strlcpy(dll_path_name,tmp_str,SSIZE);
+          else
+          {  pups_set_errno(EEXIST);
+             return(PSRP_DISPATCH_ERROR);
+          }
+
+          if(strccpy(tmp_str,pups_search_path("DISPATCH_PATH",dll_path_name)) == (char *)NULL)
+          {  pups_set_errno(EEXIST);
+             return(PSRP_DISPATCH_ERROR);
+          }
+          (void)strlcpy(dll_path_name,tmp_str,SSIZE);
+       }
+       else
+       {  pups_set_errno(EEXIST);
+          return(PSRP_DISPATCH_ERROR);
+       }
+    }   
+    else
+       (void)strlcpy(dll_path_name,dll_name,SSIZE);
+
+
+    /*--------------------------------*/
+    /* Try to load the dynamic object */
+    /*--------------------------------*/
+
+ 
+    if((object_handle = pups_bind_orifice_handle(dll_path_name,
+                                                 object_tag,
+                                                 "int32_t (*)(int32_t, char *[])")) == (void *)NULL)
+    {  pups_set_errno(EEXIST);
+       return(PSRP_DISPATCH_ERROR);
+    }
+
+    if((slot_index = psrp_find_action_slot_index(object_tag)) == (-1))
+        slot_index = psrp_get_action_slot_index();
+    else
+    {  if(appl_verbose == TRUE)
+       {  if(appl_verbose == TRUE)
+          {  (void)strdate(date);
+             (void)fprintf(stderr,"%s %s (%d@%s:%s): overwriting existing object %s\n",
+                               date,appl_name,appl_pid,appl_host,appl_owner,object_tag);
+             (void)fflush(stderr);
+          }
+       }
+    }
+
+
+    psrp_object_list[slot_index].aliases               = 0;
+    psrp_object_list[slot_index].aliases_allocated     = 0;
+    tag_index                                          = psrp_get_tag_index(slot_index);
+
+    if(psrp_object_list[slot_index].object_tag[tag_index] == (char *)NULL)
+       psrp_object_list[slot_index].object_tag[tag_index] = (char *)pups_malloc(SSIZE);
+
+    if(psrp_object_list[slot_index].object_f_name == (char *)NULL)
+       psrp_object_list[slot_index].object_f_name = (char *)pups_malloc(SSIZE);
+
+    psrp_object_list[slot_index].object_handle         = object_handle;
+    psrp_object_list[slot_index].object_size           = 0;
+    psrp_object_list[slot_index].object_type           = PSRP_DYNAMIC_FUNCTION;
+ 
+    (void)strlcpy((char *)psrp_object_list[slot_index].object_tag[tag_index],object_tag,SSIZE);
+    (void)strlcpy((char *)psrp_object_list[slot_index].object_f_name,dll_name,SSIZE);
+
+    if(appl_verbose == TRUE)
+    {  (void)strdate(date);
+       (void)fprintf(stderr,"%s %s (%d@%s:%s): dynamic function \"%-32s\" attached (from %s at %016lx virtual)\n",
+                                                                                                             date,
+                                                                                                        appl_name,
+                                                                                                         appl_pid,
+                                                                                                        appl_host,
+                                                                                                       appl_owner,
+                                                                                                       object_tag,
+                                                                                                         dll_name,
+                                                                                          (uint64_t)object_handle);
+       (void)fflush(stderr);
+    }
+
+    pups_set_errno(OK);
+    return(PSRP_OK);
+}
+#endif  /* DLL_SUPPORT */
+
+
+
 
 /*----------------------------------*/
 /* Import PSRP dispatch table items */
 /*----------------------------------*/
 
-_PUBLIC int psrp_load_dispatch_table(const _BOOLEAN          search,    // If TRUE search for objects
-                                     const char *autoload_file_name)    // Dispatch table file name
+_PUBLIC int32_t psrp_load_dispatch_table(const _BOOLEAN          search,    // If TRUE search for objects
+                                         const char *autoload_file_name)    // Dispatch table file name
 
-{   int i,
-        tag_index,
-        h_mode,
-        cnt           = 0,
-        aliases       = 0,
-        psrp_objects  = 0;
+{   int32_t  i,
+             tag_index,
+             h_mode,
+             cnt                       = 0,
+             aliases                   = 0,
+             psrp_objects              = 0;
 
-    unsigned long int f_pos = 0;
+    uint64_t f_pos                     = 0;
 
-    char object_tag[SSIZE]        = "",
-         object_type[SSIZE]       = "",
-         object_f_name[SSIZE]     = "",
-         homeostasis_mode[SSIZE]  = "",
-         alias_name[SSIZE]        = "",
-         next_line[SSIZE]         = "",
-         tmp_f_name[SSIZE]        = "",
-         tmp_str[SSIZE]           = "";
+    char     object_tag[SSIZE]         = "",
+             object_type[SSIZE]        = "",
+             object_f_name[SSIZE]      = "",
+             homeostasis_mode[SSIZE]   = "",
+             alias_name[SSIZE]         = "",
+             next_line[SSIZE]          = "",
+             tmp_f_name[SSIZE]         = "",
+             tmp_str[SSIZE]            = "";
 
-    FILE *raw_autoload_file_stream = (FILE *)NULL,
-         *autoload_file_stream     = (FILE *)NULL;
+    FILE     *raw_autoload_file_stream = (FILE *)NULL,
+             *autoload_file_stream     = (FILE *)NULL;
 
     struct stat buf;
 
@@ -776,7 +906,7 @@ _PUBLIC int psrp_load_dispatch_table(const _BOOLEAN          search,    // If TR
        (void)fflush(stderr);
     }
 
-    do {    int ret;
+    do {    int32_t ret;
 
 
             /*----------------------------------*/
@@ -914,18 +1044,18 @@ _PUBLIC int psrp_load_dispatch_table(const _BOOLEAN          search,    // If TR
 
 
 
-/*----------------------------------------------------------------------------
-    Initialise PSRP action handler system ...
-----------------------------------------------------------------------------*/
+/*---------------------------------------*/
+/* Initialise PSRP action handler system */
+/*---------------------------------------*/
 
-_PUBLIC void psrp_init(const int bind_status, const int (*psrp_process_status)(const int,  const char *argv[]))
+_PUBLIC void psrp_init(const int32_t bind_status, const int32_t (*psrp_process_status)(const int32_t,  const char *argv[]))
 
-{   int i,
-        authentication;
+{   int32_t  i,
+             authentication;
 
-    char strdum[SSIZE]  = "";
+    char     strdum[SSIZE]         = "";
 
-    FILE *autoload_file_stream = (FILE *)NULL;
+    FILE     *autoload_file_stream = (FILE *)NULL;
 
     sigset_t init_set,
              chan_set,
@@ -941,10 +1071,10 @@ _PUBLIC void psrp_init(const int bind_status, const int (*psrp_process_status)(c
     if(pupsthread_is_root_thread() == FALSE)
        pups_error("[psrp_init] attempt by non root thread to perform PUPS/P3 PSRP operation");
 
-    psrp_object_list_size = 0;
-    psrp_object_list_used = 0;
-    psrp_bind_status      = bind_status;
-    appl_psrp             = TRUE;
+    psrp_object_list_used       = 0;
+    psrp_object_list_allocated  = 0;
+    psrp_bind_status            = bind_status;
+    appl_psrp                   = TRUE;
 
 
     /*---------------------------------------------*/
@@ -966,9 +1096,13 @@ _PUBLIC void psrp_init(const int bind_status, const int (*psrp_process_status)(c
 
     if(access((char *)channel_name_in,F_OK | R_OK | W_OK) == (-1))
        (void)mkfifo(channel_name_in,0600);
+    else
+       pups_error("[psrp_init] failed to created psrp input channel");
 
     if(access((char *)channel_name_out,F_OK | R_OK | W_OK) == (-1))
        (void)mkfifo(channel_name_out,0600);
+    else
+       pups_error("[psrp_init] failed to created psrp input channel");
 
 
     /*---------------------------------------------------------------------*/
@@ -1000,7 +1134,8 @@ _PUBLIC void psrp_init(const int bind_status, const int (*psrp_process_status)(c
                                               date,appl_name,appl_pid,appl_host,appl_owner);
        }
 
-       (void)pups_setvitimer("psrp_homeostat",1,VT_CONTINUOUS,1,NULL,(void *)psrp_homeostat);
+       // MAO - was SHORT_DELAY
+       (void)pups_setvitimer("psrp_homeostat",DELAY,VT_CONTINUOUS,VITIMER_QUANTUM,NULL,(void *)psrp_homeostat);
     }
 
     if(appl_verbose == TRUE && psrp_bind_status & PSRP_PERSISTENT_HEAP)
@@ -1072,12 +1207,13 @@ _PUBLIC void psrp_init(const int bind_status, const int (*psrp_process_status)(c
     /*-----------------------------------------------*/
 
     (void)sigemptyset(&chan_set);
+
     (void)sigaddset(&chan_set,SIGINIT);
     (void)sigaddset(&chan_set,SIGCHAN);
     (void)sigaddset(&chan_set,SIGPSRP);
     (void)sigaddset(&chan_set,SIGCHLD);
-    (void)sigaddset(&init_set,SIGABRT);
-    (void)sigaddset(&init_set,SIGALRM);
+    (void)sigaddset(&chan_set,SIGABRT);
+    (void)sigaddset(&chan_set,SIGALRM);
 
 
     /*-----------------------------------------------*/
@@ -1085,12 +1221,13 @@ _PUBLIC void psrp_init(const int bind_status, const int (*psrp_process_status)(c
     /*-----------------------------------------------*/
 
     (void)sigemptyset(&psrp_set);
+
     (void)sigaddset(&psrp_set,SIGINIT);
     (void)sigaddset(&psrp_set,SIGCHAN);
-    (void)sigaddset(&chan_set,SIGPSRP);
+    (void)sigaddset(&psrp_set,SIGPSRP);
     (void)sigaddset(&psrp_set,SIGCHLD);
     (void)sigaddset(&psrp_set,SIGABRT);
-    (void)sigaddset(&init_set,SIGALRM);
+    (void)sigaddset(&psrp_set,SIGALRM);
 
 
     /*-----------------------------------------------------*/
@@ -1098,7 +1235,8 @@ _PUBLIC void psrp_init(const int bind_status, const int (*psrp_process_status)(c
     /*-----------------------------------------------------*/
 
     (void)sigemptyset(&init_set);
-    (void)sigaddset(&chan_set,SIGINIT);
+
+    (void)sigaddset(&init_set,SIGINIT);
     (void)sigaddset(&init_set,SIGCHAN);
     (void)sigaddset(&init_set,SIGPSRP);
     (void)sigaddset(&init_set,SIGCHLD);
@@ -1112,8 +1250,9 @@ _PUBLIC void psrp_init(const int bind_status, const int (*psrp_process_status)(c
     /*-----------------------------------------------------*/
 
     (void)sigfillset(&abrt_set);
-    (void)sigdelset(&abrt_set,SIGSEGV);
-    (void)sigdelset(&abrt_set,SIGTERM);
+
+    (void)sigdelset (&abrt_set,SIGSEGV);
+    (void)sigdelset (&abrt_set,SIGTERM);
 
     (void)pups_sighandle(SIGINIT,  "chan_handler", (void *)chan_handler, &init_set);
     (void)pups_sighandle(SIGCHAN,  "chan_handler", (void *)chan_handler, &chan_set);
@@ -1149,10 +1288,10 @@ _PUBLIC void psrp_init(const int bind_status, const int (*psrp_process_status)(c
 
 
 
-/*----------------------------------------------------------------------------
-    If an autoload file exists for this PSRP server load the objects
-    in it and their (user defined attributes) ...
-----------------------------------------------------------------------------*/
+/*------------------------------------------------------------------*/
+/* If an autoload file exists for this PSRP server load the objects */
+/* in it and their (user defined) attributes                        */
+/*------------------------------------------------------------------*/
 
 _PUBLIC _BOOLEAN psrp_load_default_dispatch_table(void)
 
@@ -1187,14 +1326,14 @@ _PUBLIC _BOOLEAN psrp_load_default_dispatch_table(void)
 
 
 
-/*----------------------------------------------------------------------------
-   Find action slot index by name ...
-----------------------------------------------------------------------------*/
+/*--------------------------------*/
+/* Find action slot index by name */
+/*--------------------------------*/
 
-_PUBLIC int psrp_find_action_slot_index(const char *object_tag)
+_PUBLIC  int32_t psrp_find_action_slot_index(const char *object_tag)
 
-{   int i,
-        j;
+{   uint32_t i,
+             j;
 
 
     if(object_tag == (const char *)NULL)
@@ -1210,7 +1349,7 @@ _PUBLIC int psrp_find_action_slot_index(const char *object_tag)
     if(pupsthread_is_root_thread() == FALSE)
        pups_error("[psrp_find_action_slot_index] attempt by non root thread to perform PUPS/P3 PSRP operation");
 
-    for(i=0; i<psrp_object_list_used; ++i)
+    for(i=0; i<psrp_object_list_allocated; ++i)
     {  if(psrp_object_list[i].aliases > 0)
        {
 
@@ -1235,14 +1374,14 @@ _PUBLIC int psrp_find_action_slot_index(const char *object_tag)
 
 
 
-/*----------------------------------------------------------------------------
-   Get the first free slot in the dispatch table allocating more space if
-   necessary ...
-----------------------------------------------------------------------------*/
+/*------------------------------------------------------------------------*/
+/* Get the first free slot in the dispatch table allocating more space if */
+/* necessary                                                              */
+/*------------------------------------------------------------------------*/
 
-_PUBLIC int psrp_get_action_slot_index(void)
+_PUBLIC int32_t psrp_get_action_slot_index(void)
 
-{   int i;
+{   uint32_t i;
 
 
     /*----------------------------------*/
@@ -1253,36 +1392,40 @@ _PUBLIC int psrp_get_action_slot_index(void)
     if(pupsthread_is_root_thread() == FALSE)
        pups_error("[psrp_get_action_slot_index] attempt by non root thread to perform PUPS/P3 PSRP operation");
 
-    if(psrp_object_list_size == psrp_object_list_used)
-    {  psrp_object_list_used += PSRP_DISPATCH_TABLE_SIZE;
-       psrp_object_list = (psrp_object_type *)pups_realloc((void *)psrp_object_list,
-                                                           psrp_object_list_used*sizeof(psrp_object_type));
+    if(psrp_object_list_used == psrp_object_list_allocated)
+    {  psrp_object_list_allocated += PSRP_DISPATCH_TABLE_SIZE;
+
+       if(psrp_object_list == (psrp_object_type *)NULL)
+          psrp_object_list = (psrp_object_type *)pups_calloc(psrp_object_list_allocated,sizeof(psrp_object_type));
+       else
+          psrp_object_list = (psrp_object_type *)pups_realloc((void *)psrp_object_list,
+                                                              psrp_object_list_allocated*sizeof(psrp_object_type));
 
 
        /*---------------------------------------*/
        /* Clean out the newly allocated entries */
        /*---------------------------------------*/
 
-       for(i=psrp_object_list_used-PSRP_DISPATCH_TABLE_SIZE; i<psrp_object_list_used; ++i)
+       for(i=psrp_object_list_used; i<psrp_object_list_allocated; ++i)
        {   psrp_object_list[i].aliases_allocated = 0;
            psrp_object_list[i].aliases           = 0;
            psrp_object_list[i].object_tag        = (char **)NULL;
-           psrp_object_list[i].object_f_name     = (char *)NULL;
-           psrp_object_list[i].hid               = (-1);
-           psrp_object_list[i].object_type       = (-1);
-           psrp_object_list[i].object_size       = (-1);
+           psrp_object_list[i].object_f_name     = (char  *)NULL;
+           psrp_object_list[i].hid               = 0;
+           psrp_object_list[i].object_type       = 0;
+           psrp_object_list[i].object_size       = 0;
            psrp_object_list[i].object_handle     = (void *)NULL;
        }
 
-       ++psrp_object_list_size;
+       ++psrp_object_list_used;
 
        pups_set_errno(OK);
-       return(psrp_object_list_size-1);
+       return(psrp_object_list_used-1);
     }
 
-    for(i=0; i<psrp_object_list_used; ++i)
-    {  if(psrp_object_list[i].object_handle == NULL)
-       {  ++psrp_object_list_size;
+    for(i=0; i<psrp_object_list_allocated; ++i)
+    {  if(psrp_object_list[i].object_handle == (void *)NULL)
+       {  ++psrp_object_list_used;
 
           pups_set_errno(OK);
           return(i);
@@ -1296,17 +1439,16 @@ _PUBLIC int psrp_get_action_slot_index(void)
 
     
 
-/*----------------------------------------------------------------------------
-   Attach a static databag to the PSRP handler dispatch list ...
-----------------------------------------------------------------------------*/
+/*-----------------------------------------------------------*/
+/* Attach a static databag to the PSRP handler dispatch list */
+/*-----------------------------------------------------------*/
 
-_PUBLIC int psrp_attach_static_databag(const char               *object_tag,
-                                       const unsigned long  int databag_size,
-                                       const _BYTE              *databag_handle)
+_PUBLIC int32_t psrp_attach_static_databag(const char     *object_tag,
+                                           const uint64_t databag_size,
+                                           const _BYTE    *databag_handle)
 
-{   int slot_index,
-        tag_index;
-
+{    int32_t slot_index,
+             tag_index;
 
     if(object_tag == (const char *)NULL || databag_handle == (const void *)NULL)
     {  pups_set_errno(EINVAL);
@@ -1320,7 +1462,6 @@ _PUBLIC int psrp_attach_static_databag(const char               *object_tag,
 
     if(pupsthread_is_root_thread() == FALSE)
        pups_error("[psrp_attach_static_databag] attempt by non root thread to perform PUPS/P3 PSRP operation");
-
 
     if((slot_index = psrp_find_action_slot_index(object_tag)) == (-1))
         slot_index = psrp_get_action_slot_index();
@@ -1356,7 +1497,7 @@ _PUBLIC int psrp_attach_static_databag(const char               *object_tag,
                                                                                                      appl_host,
                                                                                                     appl_owner,
                                                                                                     object_tag,
-                                                                             (unsigned long int)databag_handle);
+                                                                                      (uint64_t)databag_handle);
        (void)fflush(stderr);
     }
 
@@ -1367,22 +1508,24 @@ _PUBLIC int psrp_attach_static_databag(const char               *object_tag,
 
 
 
-/*----------------------------------------------------------------------------
-    Attach a dynamic databag to the PSRP handler dispatch list ...
-----------------------------------------------------------------------------*/
+/*------------------------------------------------------------*/
+/* Attach a dynamic databag to the PSRP handler dispatch list */
+/*------------------------------------------------------------*/
 
-_PUBLIC int psrp_attach_dynamic_databag(const _BOOLEAN     search,  // If TRUE search DISPATCH_PATH directories
-                                        const char    *object_tag,  // Object (root) tag
-                                        const char *bag_file_name,  // Name of file containing bag data
-                                        const int          h_mode)  // Databag homeostasis mode
+_PUBLIC int32_t psrp_attach_dynamic_databag(const _BOOLEAN     search,  // If TRUE search DISPATCH_PATH directories
+                                            const char    *object_tag,  // Object (root) tag
+                                            const char *bag_file_name,  // Name of file containing bag data
+                                            const int32_t      h_mode)  // Databag homeostasis mode
  
-{   int  slot_index,
-         tag_index,
-         bag_size,
-         bag_bytes_read,
-         bag_des;
+{    int32_t slot_index,
+             tag_index;
+
+    des_t    bag_des;
+
+    size_t   bag_size,
+             bag_bytes_read;
  
-    _BYTE *bag_handle = (_BYTE *)NULL;
+    _BYTE    *bag_handle = (_BYTE *)NULL;
  
 
     if(object_tag == (const char *)NULL || bag_file_name == (const char *)NULL)
@@ -1464,7 +1607,7 @@ _PUBLIC int psrp_attach_dynamic_databag(const _BOOLEAN     search,  // If TRUE s
            bag_bytes_read = pups_pipe_read(bag_des,bag_handle,PSRP_BAG_TABLE_SIZE);
        } while(bag_bytes_read == PSRP_BAG_TABLE_SIZE);
 
-    if(psrp_object_list[slot_index].object_tag[tag_index] == (char *)NULL) 
+    if(psrp_object_list[slot_index].object_tag[tag_index] == (char *)NULL)
        psrp_object_list[slot_index].object_tag[tag_index] = (char *)pups_malloc(SSIZE);
 
     if(psrp_object_list[slot_index].object_f_name == (char *)NULL)
@@ -1488,7 +1631,7 @@ _PUBLIC int psrp_attach_dynamic_databag(const _BOOLEAN     search,  // If TRUE s
                                                                                                       appl_owner,
                                                                                                       object_tag,
                                                                                                    bag_file_name,
-                                                                                   (unsigned long int)bag_handle);
+                                                                                            (uint64_t)bag_handle);
        (void)fflush(stderr);
     }
 
@@ -1501,17 +1644,17 @@ _PUBLIC int psrp_attach_dynamic_databag(const _BOOLEAN     search,  // If TRUE s
 
 
 #ifdef PERSISTENT_HEAP_SUPPORT
-/*----------------------------------------------------------------------------
-    Attach a persistent heap to the PSRP handler dispatch list ...
-----------------------------------------------------------------------------*/
+/*------------------------------------------------------------*/
+/* Attach a persistent heap to the PSRP handler dispatch list */
+/*------------------------------------------------------------*/
 
-_PUBLIC int psrp_attach_persistent_heap(const _BOOLEAN      search,    // If TRUE search DISPATCH_PATH directories for heap
-                                        const char       *heap_tag,    // (Root) tag of persistent heap
-                                        const char *heap_file_name,    // Name of file containing heap data
-                                        const int           h_mode)    // Heap homeostatsis mode
+_PUBLIC int32_t psrp_attach_persistent_heap(const _BOOLEAN         search,    // If TRUE search DISPATCH_PATH directories for heap
+                                            const char          *heap_tag,    // (Root) tag of persistent heap
+                                            const char    *heap_file_name,    // Name of file containing heap data
+                                            const int32_t          h_mode)    // Heap homeostatsis mode
  
-{   int  slot_index,
-         tag_index;
+{    int32_t slot_index,
+             tag_index;
 
     if(heap_tag == (const char *)NULL || heap_file_name == (const char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -1590,6 +1733,10 @@ _PUBLIC int psrp_attach_persistent_heap(const _BOOLEAN      search,    // If TRU
     psrp_object_list[slot_index].object_size           = (-1);
     psrp_object_list[slot_index].object_type           = PSRP_PERSISTENT_HEAP;
 
+    if((psrp_object_list[slot_index].hid = msm_heap_attach(heap_file_name,h_mode)) == (-1))
+       return(PSRP_DISPATCH_ERROR);
+
+
     (void)strlcpy(psrp_object_list[slot_index].object_tag[tag_index],heap_tag,SSIZE);
     (void)strlcpy(psrp_object_list[slot_index].object_f_name,heap_file_name,SSIZE);
 
@@ -1603,7 +1750,7 @@ _PUBLIC int psrp_attach_persistent_heap(const _BOOLEAN      search,    // If TRU
                                                                                                       appl_owner,
                                                                                                         heap_tag,
                                                                                                   heap_file_name,
-                                                (unsigned long int)htable[psrp_object_list[slot_index].hid].addr);
+                                                         (uint64_t)htable[psrp_object_list[slot_index].hid].addr);
        (void)fflush(stderr);
     }
 
@@ -1615,15 +1762,15 @@ _PUBLIC int psrp_attach_persistent_heap(const _BOOLEAN      search,    // If TRU
  
 
 
-/*----------------------------------------------------------------------------
-    Attach an action function to the PSRP handler dispatch list ...
-----------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------*/
+/* Attach static action function to the PSRP handler dispatch list */
+/*-----------------------------------------------------------------*/
 
-_PUBLIC int psrp_attach_static_function(const char    *object_tag,
-                                        const void *object_handle)
+_PUBLIC int32_t psrp_attach_static_function(const char    *object_tag,
+                                            const void *object_handle)
  
-{   int slot_index,
-        tag_index;
+{    int32_t slot_index,
+             tag_index;
 
 
     if(object_tag == (const char *)NULL || object_handle == (const void *)NULL)
@@ -1655,16 +1802,17 @@ _PUBLIC int psrp_attach_static_function(const char    *object_tag,
 
     psrp_object_list[slot_index].aliases               = 0;
     psrp_object_list[slot_index].aliases_allocated     = 0;
+    psrp_object_list[slot_index].object_handle         = object_handle;
+    psrp_object_list[slot_index].object_size           = 0;
+    psrp_object_list[slot_index].object_state          = 0;
+    psrp_object_list[slot_index].object_type           = PSRP_STATIC_FUNCTION;
     tag_index                                          = psrp_get_tag_index(slot_index);
-
+  
     if(psrp_object_list[slot_index].object_tag[tag_index] == (char *)NULL)
        psrp_object_list[slot_index].object_tag[tag_index] = (char *)pups_malloc(SSIZE);
 
-    psrp_object_list[slot_index].object_handle         = object_handle;
-    psrp_object_list[slot_index].object_size           = 0;
-    psrp_object_list[slot_index].object_type           = PSRP_STATIC_FUNCTION;
-
     (void)strlcpy(psrp_object_list[slot_index].object_tag[tag_index],object_tag,SSIZE);
+ 
  
     if(appl_verbose == TRUE)
     {  (void)strdate(date);
@@ -1675,7 +1823,7 @@ _PUBLIC int psrp_attach_static_function(const char    *object_tag,
                                                                                                       appl_host,
                                                                                                      appl_owner,
                                                                                                      object_tag,
-                                                                               (unsigned long int)object_handle);
+                                                                                        (uint64_t)object_handle);
        (void)fflush(stderr);
     }
 
@@ -1685,147 +1833,15 @@ _PUBLIC int psrp_attach_static_function(const char    *object_tag,
 
 
 
-
-#ifdef DLL_SUPPORT
-/*----------------------------------------------------------------------------
-    Routine to load a dynamic object into one of the slots of the PSRP
-    system. This object must conform to PSRP semantics - e.g it must
-    be a pointer to an int function with arguments of int argc and
-    char **argv ...
-----------------------------------------------------------------------------*/
- 
-_PUBLIC int psrp_attach_dynamic_function(const _BOOLEAN  search,  // Search for DLL containing object
-                                         const char *object_tag,  // Tag of dyanmic object (function)
-                                         const char   *dll_name)  // Name of DLL contaaining object
- 
-{   int  slot_index,
-         tag_index;
-
-    char dll_path_name[SSIZE] = "";
- 
-    void *object_handle = (void *)NULL;
-
-
-    if(object_tag == (const char *)NULL || dll_name == (const char *)NULL)
-    {  pups_set_errno(EINVAL);
-       return(PSRP_DISPATCH_ERROR);
-    }
-
-
-    /*----------------------------------*/
-    /* Only the root thread can process */
-    /* PSRP requests                    */
-    /*----------------------------------*/
-
-    if(pupsthread_is_root_thread() == FALSE)
-       pups_error("[psrp_attach_dynamic_function] attempt by non root thread to perform PUPS/P3 PSRP operation");
-
-
-    /*------------------------------------------------*/
-    /* Check to see if object exist on specified path */
-    /* if it doesn't search the directories specified */
-    /* in the DISPATCH_PATH environment variable      */
-    /*------------------------------------------------*/
-
-    if(access(dll_name,F_OK | R_OK | W_OK) == (-1))
-    {  if(search == TRUE)
-       {  char tmp_str[SSIZE] = ""; 
-
-          if(strrext(dll_name,tmp_str,'/') == TRUE)
-             (void)strlcpy(dll_path_name,tmp_str,SSIZE);
-          else
-          {  pups_set_errno(EEXIST);
-             return(PSRP_DISPATCH_ERROR);
-          }
-
-          if(strccpy(tmp_str,pups_search_path("DISPATCH_PATH",dll_path_name)) == (char *)NULL)
-          {  pups_set_errno(EEXIST);
-             return(PSRP_DISPATCH_ERROR);
-          }
-          (void)strlcpy(dll_path_name,tmp_str,SSIZE);
-       }
-       else
-       {  pups_set_errno(EEXIST);
-          return(PSRP_DISPATCH_ERROR);
-       }
-    }   
-    else
-       (void)strlcpy(dll_path_name,dll_name,SSIZE);
-
-
-    /*--------------------------------*/
-    /* Try to load the dynamic object */
-    /*--------------------------------*/
-
- 
-    if((object_handle = pups_bind_orifice_handle(dll_path_name,
-                                                 object_tag,
-                                                 "int (*)(int, char *[])")) == (void *)NULL)
-    {  pups_set_errno(EEXIST);
-       return(PSRP_DISPATCH_ERROR);
-    }
-
-    if((slot_index = psrp_find_action_slot_index(object_tag)) == (-1))
-        slot_index = psrp_get_action_slot_index();
-    else
-    {  if(appl_verbose == TRUE)
-       {  if(appl_verbose == TRUE)
-          {  (void)strdate(date);
-             (void)fprintf(stderr,"%s %s (%d@%s:%s): overwriting existing object %s\n",
-                               date,appl_name,appl_pid,appl_host,appl_owner,object_tag);
-             (void)fflush(stderr);
-          }
-       }
-    }
-
-
-    psrp_object_list[slot_index].aliases               = 0;
-    psrp_object_list[slot_index].aliases_allocated     = 0;
-    tag_index                                          = psrp_get_tag_index(slot_index);
-
-    if(psrp_object_list[slot_index].object_tag[tag_index] == (char *)NULL)
-       psrp_object_list[slot_index].object_tag[tag_index] = (char *)pups_malloc(SSIZE);
-
-    if(psrp_object_list[slot_index].object_f_name == (char *)NULL)
-       psrp_object_list[slot_index].object_f_name = (char *)pups_malloc(SSIZE);
-
-    psrp_object_list[slot_index].object_handle         = object_handle;
-    psrp_object_list[slot_index].object_size           = 0;
-    psrp_object_list[slot_index].object_type           = PSRP_DYNAMIC_FUNCTION;
- 
-    (void)strlcpy(psrp_object_list[slot_index].object_tag[tag_index],object_tag,SSIZE);
-    (void)strlcpy(psrp_object_list[slot_index].object_f_name,dll_name,SSIZE);
-
-    if(appl_verbose == TRUE)
-    {  (void)strdate(date);
-       (void)fprintf(stderr,"%s %s (%d@%s:%s): dynamic function \"%-32s\" attached (from %s at %016lx virtual)\n",
-                                                                                                             date,
-                                                                                                        appl_name,
-                                                                                                         appl_pid,
-                                                                                                        appl_host,
-                                                                                                       appl_owner,
-                                                                                                       object_tag,
-                                                                                                         dll_name,
-                                                                                 (unsigned long int)object_handle);
-       (void)fflush(stderr);
-    }
-
-    pups_set_errno(OK);
-    return(PSRP_OK);
-}
-#endif  /* DLL_SUPPORT */
- 
- 
-
-
-/*----------------------------------------------------------------------------
-    Show function currently bound to PSRP action list ...
-----------------------------------------------------------------------------*/
+/*-----------------------------------------*/
+/* Show objects in PSRP dispatch table and */
+/* PSRP server status information          */ 
+/*-----------------------------------------*/
 
 _PUBLIC void psrp_show_object_list(void)
 
-{   int  i;
-    char pname[SSIZE] = "";
+{   uint32_t i;
+    char     pname[SSIZE] = "";
 
 
     /*----------------------------------*/
@@ -1840,37 +1856,6 @@ _PUBLIC void psrp_show_object_list(void)
     (void)fprintf(psrp_out,"    ==================\n\n");
     (void)fflush(psrp_out);
 
-    #ifdef SECURE
-    if(strcmp(HD_DEVICE,"/dev/dummy") == 0)
-       (void)fprintf(psrp_out,"    %s (%d@%s) using soft dongle authentication (for licencing)\n",
-                                                                                         appl_name,
-                                                                                          appl_pid,
-                                                                                         appl_host);
-    else
-       (void)fprintf(psrp_out,"    %s (%d@%s) using disk serial number authentication (for licensing)\n",
-                                                                                                appl_name,
-                                                                                                 appl_pid,
-                                                                                                appl_host);
-
-    #ifdef SINGLE_HOST_LICENSE
-    (void)fprintf(psrp_out,"    %s (%d@%s) has single copy single host license\n",
-                                                                        appl_name,
-                                                                         appl_pid,
-                                                                        appl_host);
-    #else
-    (void)fprintf(psrp_out,"    %s (%d@%s) has single copy multiple host license\n",
-                                                                           appl_name,
-                                                                            appl_pid,
-                                                                           appl_host);
-    #endif /* SINGLE_HOST_LICENSE */
-
-    #else
-    (void)fprintf(psrp_out,"    %s (%d@%s) has multiple copy multiple host (unrestricted) license\n",
-                                                                                            appl_name,
-                                                                                             appl_pid,
-                                                                                            appl_host);
-    #endif /* SECURE */
-
    
     #ifdef PSRP_AUTHENTICATE
     if(appl_secure == TRUE)
@@ -1883,9 +1868,8 @@ _PUBLIC void psrp_show_object_list(void)
     }
     #endif /* PSRP_AUNTHENTICATE */
 
+
     #ifdef MAIL_SUPPORT
-
-
     /*---------*/
     /* Postbox */
     /*---------*/
@@ -1938,20 +1922,20 @@ _PUBLIC void psrp_show_object_list(void)
     (void)fprintf(psrp_out,"\n");
     (void)fflush(psrp_out);
 
-    if(psrp_object_list_size == 0)
-    {  (void)fprintf(psrp_out,"    No PSRP objects bound to dispatch handler (%04d slots free)\n",psrp_object_list_used);
+    if(psrp_object_list_used == 0)
+    {  (void)fprintf(psrp_out,"    No PSRP objects bound to dispatch handler (%04d slots free)\n",psrp_object_list_allocated);
        (void)fflush(psrp_out);
     }
     else
-    {  (void)fprintf(psrp_out,"    %d PSRP object slots in use\n",psrp_object_list_size);
+    {  (void)fprintf(psrp_out,"    %d PSRP object slots in use\n",psrp_object_list_used);
        (void)fprintf(psrp_out,"    PSRP objects bound to %s (%d@%s)\n\n",appl_name,appl_pid,appl_host);
        (void)fflush(psrp_out);
 
-       for(i=0; i<psrp_object_list_used; ++i)
+       for(i=0; i<psrp_object_list_allocated; ++i)
        {  if(psrp_object_list[i].object_handle != (void *)NULL)
           {  (void)fprintf(psrp_out,"    %04d: \"%-32s\" (entry at %016lx virtual)    ",i,
                                                         psrp_object_list[i].object_tag[0],
-                                     (unsigned long int)psrp_object_list[i].object_handle);
+                                     (uint64_t         )psrp_object_list[i].object_handle);
               (void)fflush(psrp_out);
 
               switch(psrp_object_list[i].object_type)
@@ -1981,10 +1965,10 @@ _PUBLIC void psrp_show_object_list(void)
           (void)fflush(psrp_out);
        }
 
-       if(psrp_object_list_used > 1)
-          (void)fprintf(psrp_out,"\n\n    %04d PSRP objects bound to dispatch handler (%04d slots free)\n\n",psrp_object_list_used,psrp_object_list_used - psrp_object_list_size);
-       else if(psrp_object_list_used  == 1)
-          (void)fprintf(psrp_out,"\n\n    %04d PSRP object bound to dispatch handler (%04d slots free)\n\n",1,psrp_object_list_used - 1);
+       if(psrp_object_list_allocated > 1)
+          (void)fprintf(psrp_out,"\n\n    %04d PSRP objects bound to dispatch handler (%04d slots free)\n\n",psrp_object_list_used,psrp_object_list_allocated - psrp_object_list_used);
+       else if(psrp_object_list_allocated  == 1)
+          (void)fprintf(psrp_out,"\n\n    %04d PSRP object bound to dispatch handler (%04d slots free)\n\n",1,psrp_object_list_allocated - 1);
 
        (void)fflush(psrp_out);
     }
@@ -2000,15 +1984,15 @@ _PUBLIC void psrp_show_object_list(void)
 
 
 
-/*----------------------------------------------------------------------------
-    Routine to re-initialise the dispatch table -- all dynamic objects are
-    detached and all static objects are restored to their initial states
-    (e.g. any aliases associated with static objects are removed) ...
-----------------------------------------------------------------------------*/
+/*----------------------------------------------------------------------*/
+/* Routine to re-initialise the dispatch table. All dynamic objects are */
+/* detached and all static objects are restored to their initial states */
+/* (e.g. any aliases associated with static objects are removed)        */
+/*----------------------------------------------------------------------*/
 
 _PUBLIC void psrp_reset_dispatch_table(void)
 
-{   int i;
+{   uint32_t i;
 
 
     /*----------------------------------*/
@@ -2019,24 +2003,23 @@ _PUBLIC void psrp_reset_dispatch_table(void)
     if(pupsthread_is_root_thread() == FALSE)
        pups_error("[psrp_reset_dispatch_table] attempt by non root thread to perform PUPS/P3 PSRP operation");
 
-    for(i=0; i<psrp_object_list_used; ++i)
+    for(i=0; i<psrp_object_list_allocated; ++i)
     {  if(psrp_object_list[i].object_handle != (void *)NULL && psrp_object_list[i].aliases > 0)
           (void)psrp_detach_object(i); 
-
     }
 }
 
 
 
 
-/*----------------------------------------------------------------------------
-    Routine to detach object from dispatch list by name ...
-----------------------------------------------------------------------------*/
+/*----------------------------------------------*/
+/* Detach object from PSRP handler list by name */
+/*----------------------------------------------*/
  
 _PUBLIC _BOOLEAN psrp_detach_object_by_name(const char *object_tag)
  
-{    int i,
-         slot_index;
+{    uint32_t i;
+     int32_t  slot_index;
 
 
     if(object_tag == (const char *)NULL)
@@ -2052,7 +2035,7 @@ _PUBLIC _BOOLEAN psrp_detach_object_by_name(const char *object_tag)
     if(pupsthread_is_root_thread() == FALSE)
        pups_error("[psrp_detach_object_by_name] attempt by non root thread to perform PUPS/P3 PSRP operation");
 
-    for(i=0; i<psrp_object_list_used; ++i)
+    for(i=0; i<psrp_object_list_allocated; ++i)
     {  if(psrp_object_list[i].object_handle != (void *)NULL && (slot_index = psrp_isearch_tag_list(object_tag,i)) >= 0)
        {  
 
@@ -2063,7 +2046,7 @@ _PUBLIC _BOOLEAN psrp_detach_object_by_name(const char *object_tag)
                                                                      date,appl_name,appl_pid,appl_host,appl_owner,
                                                                           psrp_object_list[slot_index].object_tag,
                                                                                                        slot_index,
-                                                    (unsigned long int)psrp_object_list[slot_index].object_handle);
+                                                             (uint64_t)psrp_object_list[slot_index].object_handle);
                 (void)fflush(stderr);
              }
           }
@@ -2080,13 +2063,13 @@ _PUBLIC _BOOLEAN psrp_detach_object_by_name(const char *object_tag)
 
 
 
-/*----------------------------------------------------------------------------
-    Routine to detach object from dispatch list by name ...
-----------------------------------------------------------------------------*/
+/*------------------------------------------------*/
+/* Detach object from PSRP handler list by handle */
+/*------------------------------------------------*/
  
 _PUBLIC _BOOLEAN psrp_detach_object_by_handle(const void *object_handle)
  
-{   int i;
+{   uint32_t i;
  
     if(object_handle == (const char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -2102,7 +2085,7 @@ _PUBLIC _BOOLEAN psrp_detach_object_by_handle(const void *object_handle)
     if(pupsthread_is_root_thread() == FALSE)
        pups_error("[psrp_detach_object_by_handle] attempt by non root thread to perform PUPS/P3 PSRP operation");
 
-    for(i=0; i<psrp_object_list_used; ++i)
+    for(i=0; i<psrp_object_list_allocated; ++i)
     {  if(psrp_object_list[i].object_handle != (void *)NULL && psrp_object_list[i].object_handle == object_handle)
        { 
 
@@ -2113,7 +2096,7 @@ _PUBLIC _BOOLEAN psrp_detach_object_by_handle(const void *object_handle)
                                                                      date,appl_name,appl_pid,appl_host,appl_owner,
                                                                                    psrp_object_list[i].object_tag,
                                                                                                                 i,
-                                                             (unsigned long int)psrp_object_list[i].object_handle);
+                                                                      (uint64_t)psrp_object_list[i].object_handle);
                 (void)fflush(stderr);
              }
           }
@@ -2135,21 +2118,13 @@ _PUBLIC _BOOLEAN psrp_detach_object_by_handle(const void *object_handle)
 /* information                                                        */
 /*--------------------------------------------------------------------*/
 
-_PRIVATE int psrp_detach_object(unsigned int slot_index)
+_PRIVATE int32_t psrp_detach_object(uint32_t slot_index)
  
-{   int i,
-        type;
+{   uint32_t i,
+             type;
 
 
-    /*----------------------------------*/
-    /* Only the root thread can process */
-    /* PSRP requests                    */
-    /*----------------------------------*/
-
-    if(pupsthread_is_root_thread() == FALSE)
-       pups_error("[psrp_detach_object] attempt by non root thread to perform PUPS/P3 PSRP operation");
-
-    if(slot_index > psrp_object_list_used)
+    if(slot_index > psrp_object_list_allocated)
     {  pups_set_errno(EINVAL);
        return(PSRP_DISPATCH_ERROR);
     }
@@ -2216,8 +2191,6 @@ _PRIVATE int psrp_detach_object(unsigned int slot_index)
     /*-------------------------------------------------------*/   
     /* Object is dynamic - process it according to its type. */
     /*-------------------------------------------------------*/    
-
-
     /*--------------------------------------------------------------------------*/
     /* If the object is dynamic, the type of processing is dependent on         */
     /* whether it is a dynamic function, a dynamic databag of a persistentheap. */
@@ -2266,23 +2239,21 @@ _PRIVATE int psrp_detach_object(unsigned int slot_index)
     /*----------------------------------------------------*/
 
     for(i=0; i< psrp_object_list[slot_index].aliases_allocated; ++i)
-        if(psrp_object_list[slot_index].object_tag[i] != (char *)NULL)
+    {   if(psrp_object_list[slot_index].object_tag[i] != (char *)NULL)
            (void)pups_free((void *)psrp_object_list[slot_index].object_tag[i]);
- 
-    (void)pups_free((void *)psrp_object_list[slot_index].object_tag);
-    (void)pups_free((void *)psrp_object_list[slot_index].object_f_name);
+    }
 
-    psrp_object_list[slot_index].object_tag        = (char **)NULL;
-    psrp_object_list[slot_index].object_f_name     = (char *)NULL;
+    (void)strlcpy(psrp_object_list[slot_index].object_f_name,"",SSIZE);
+
     psrp_object_list[slot_index].object_handle     = (void *)NULL;
     psrp_object_list[slot_index].object_type       = PSRP_NONE;
     psrp_object_list[slot_index].object_size       = 0;
     psrp_object_list[slot_index].object_state      = PSRP_NONE;
     psrp_object_list[slot_index].aliases           = 0;
     psrp_object_list[slot_index].aliases_allocated = 0;
-    psrp_object_list[slot_index].hid               = (-1);
+    psrp_object_list[slot_index].hid               = 0;
  
-    --psrp_object_list_size;
+    --psrp_object_list_used;
 
     pups_set_errno(OK); 
     return(type);
@@ -2295,11 +2266,17 @@ _PRIVATE int psrp_detach_object(unsigned int slot_index)
 /* Handler for client disconnect in response to server stop */
 /*----------------------------------------------------------*/
 
-_PRIVATE int cdoss_handler(int signum)
-{   psrp_chbrk_handler(c_client,PSRP_CLIENT_TERMINATED);
+_PRIVATE int32_t cdoss_handler(int32_t signum)
+{   
 
-    if(in_psrp_handler == TRUE)
-       (void)pups_sigvector(SIGALRM, &psrp_env);
+    /*------------------------------*/
+    /* Ignore disconnect if exiting */
+    /*------------------------------*/
+ 
+    if(psrp_chbrk_handler(c_client,PSRP_CLIENT_TERMINATED) == 0)
+    {  if(in_psrp_handler == TRUE)
+          (void)pups_sigvector(SIGALRM, &psrp_env);
+    }
 
     return(0);
 }
@@ -2310,7 +2287,7 @@ _PRIVATE int cdoss_handler(int signum)
 /* Handler for client disconnect in response to server stop */
 /*----------------------------------------------------------*/
 
-_PUBLIC int psrp_cont_handler(const int signum)
+_PUBLIC int32_t psrp_cont_handler(const int32_t signum)
 {   
 
     /*----------------------------------*/
@@ -2337,7 +2314,7 @@ _PUBLIC int psrp_cont_handler(const int signum)
 _PROTOTYPE _PUBLIC _BOOLEAN (*on_abort_callback_f)(void);
 _PRIVATE   char             on_abort_callback_f_name[SSIZE] = "";
 
-_PUBLIC int psrp_register_on_abort_callback_f(const char *on_abort_f_name, const void *on_abort_f)
+_PUBLIC int32_t psrp_register_on_abort_callback_f(const char *on_abort_f_name, const void *on_abort_f)
 
 {   
 
@@ -2392,16 +2369,24 @@ _PUBLIC void psrp_deregister_on_abort_callback_f(void)
 /* Display client side abort callback function details */
 /*-----------------------------------------------------*/
 
-_PUBLIC int psrp_show_on_abort_callback_f(const FILE *stream)
+_PUBLIC int32_t psrp_show_on_abort_callback_f(const FILE *stream)
 
 {   if(stream == (FILE *)NULL)
     {  pups_set_errno(EINVAL);
        return(-1);
     }
 
+    /*----------------------------------*/
+    /* Only the root thread can process */
+    /* PSRP requests                    */
+    /*----------------------------------*/
+
+    if(pupsthread_is_root_thread() == FALSE)
+       pups_error("[register_psrp_on_abort] attempt by non root thread to perform PUPS/P3 PSRP operation");
+
     if(on_abort_callback_f != (void *)NULL)
     {  (void)fprintf(stream,"\n    Client side abort callback function \"%-32s\" installed at %016lx virtual\n\n",
-                                                  on_abort_callback_f_name,(unsigned long int)on_abort_callback_f);
+                                                           on_abort_callback_f_name,(uint64_t)on_abort_callback_f);
        (void)fflush(stream);
     }
 
@@ -2416,11 +2401,11 @@ _PUBLIC int psrp_show_on_abort_callback_f(const FILE *stream)
 /* Handler for client abort */
 /*--------------------------*/
 
-_PRIVATE int abrt_handler(int signum)
+_PRIVATE int32_t abrt_handler(const int32_t signum)
 
-{   int i,
-        f_index,
-        client_pid;
+{   int32_t  i,
+             f_index,
+             client_pid;
 
     _BOOLEAN omp_abort          = FALSE,
              close_psrp_channel = FALSE;
@@ -2475,7 +2460,7 @@ _PRIVATE int abrt_handler(int signum)
        close_psrp_channel = TRUE;
     }
 
-    (void)efscanf(psrp_in,"%d",&client_pid);
+    (void)fscanf(psrp_in,"%d",&client_pid);
 
 
     /*-----------------------------------------*/
@@ -2507,7 +2492,7 @@ _PRIVATE int abrt_handler(int signum)
     }
 
     #ifdef PSRPLIB_DEBUG
-    (void)fprintf(stderr,""PSRPLIB %d SIGABRT stage 2\n",appl_pid);
+    (void)fprintf(stderr,"PSRPLIB %d SIGABRT stage 2\n",appl_pid);
     (void)fflush(stderr);
     #endif /* PSRPLIB_DEBUG */
 
@@ -2521,21 +2506,21 @@ _PRIVATE int abrt_handler(int signum)
     {  
 
        #ifdef PSRPLIB_DEBUG
-       (void)fprintf(stderr,""PSRPLIB %d SIGABRT stage 3 (propagate to SIC: %d)\n",appl_pid,psrp_current_sic->scp);
+       (void)fprintf(stderr,"PSRPLIB %d SIGABRT stage 3 (propagate to SIC: %d)\n",appl_pid,psrp_current_sic->scp);
        (void)fflush(stderr);
        #endif /* PSRPLIB_DEBUG */
 
        (void)kill(psrp_current_sic->scp,SIGINT);
 
        #ifdef PSRPLIB_DEBUG
-       (void)fprintf(stderr,""PSRPLIB %d SIGABRT stage 4: SIC closed\n",appl_pid);
+       (void)fprintf(stderr,"PSRPLIB %d SIGABRT stage 4: SIC closed\n",appl_pid);
        (void)fflush(stderr);
        #endif /* PSRPLIB_DEBUG */
 
     }
 
     #ifdef PSRPLIB_DEBUG
-    (void)fprintf(stderr,""PSRPLIB %d SIGABRT stage 5: abrt sent\n",appl_pid);
+    (void)fprintf(stderr,"PSRPLIB %d SIGABRT stage 5: abrt sent\n",appl_pid);
     (void)fflush(stderr);
     #endif /* PSRPLIB_DEBUG */
 
@@ -2654,13 +2639,13 @@ _PRIVATE int abrt_handler(int signum)
 /* PSRP client function                                                  */
 /*-----------------------------------------------------------------------*/
 
-_PRIVATE int chan_handler(int signum)
+_PRIVATE int32_t chan_handler(const int32_t signum)
 
 {   sigset_t set;
 
-    char  psrp_channel_name[SSIZE] = "",
-          recreated[SSIZE]         = "",
-          psrp_channel_op[SSIZE]   = "";
+    char     psrp_channel_name[SSIZE] = "",
+             recreated[SSIZE]         = "",
+             psrp_channel_op[SSIZE]   = "";
 
     _IMMORTAL _BOOLEAN entered = FALSE;
 
@@ -2685,7 +2670,7 @@ _PRIVATE int chan_handler(int signum)
     }
 
     #ifdef PSRPLIB_DEBUG
-    (void)fprintf(stderr,""PSRPLIB CHAN open (%d)\n",signum);
+    (void)fprintf(stderr,"PSRPLIB CHAN open (%d)\n",signum);
     (void)fflush(stderr);
     #endif /* PSRPLIB_DEBUG */
 
@@ -2697,15 +2682,15 @@ _PRIVATE int chan_handler(int signum)
     (void)snprintf(psrp_channel_name,SSIZE,"%s/psrp#%s#fifo#in#%d#%d",appl_fifo_dir,appl_ch_name,appl_pid,getuid());
 
 
-    /*----------------------------------------------------------*/
-    /* Homeostatsis for the psrp channels is pups_maintained by */
-    /* the psrp_homeostat                                       */
-    /*----------------------------------------------------------*/
+    /*-----------------------------------------------------*/
+    /* Homeostatsis for the psrp channels is maintained by */
+    /* the psrp_homeostat                                  */
+    /*-----------------------------------------------------*/
 
     if((psrp_in = pups_fopen(psrp_channel_name,"r+",DEAD)) == (FILE *)NULL)
     {  if(appl_verbose == TRUE)
        {  (void)fprintf(stderr,
-                  "error(%d@%s): failed to open input stream (%s) for status request\n",appl_ch_name,appl_pid,appl_host);
+                        "error(%d@%s): failed to open input stream (%s) for status request\n",appl_ch_name,appl_pid,appl_host);
           (void)fflush(stderr);
        }
 
@@ -2742,29 +2727,37 @@ _PRIVATE int chan_handler(int signum)
 
     if(psrp_bind_status & PSRP_HOMEOSTATIC_STREAMS)
     {  ftab[pups_get_ftab_index(fileno(psrp_in)) ].homeostatic = 1;
+       ftab[pups_get_ftab_index(fileno(psrp_in)) ].creator     = TRUE;
        ftab[pups_get_ftab_index(fileno(psrp_out))].homeostatic = 1;
+       ftab[pups_get_ftab_index(fileno(psrp_out))].creator     = TRUE;
     }
 
+#ifdef DEBUG
+(void)fprintf(stderr,"**** FTAB %d: OPEN %s CREATOR %d\n",pups_get_ftab_index(fileno(psrp_in)),
+                                             ftab[pups_get_ftab_index(fileno(psrp_in)) ].fname,
+                                           ftab[pups_get_ftab_index(fileno(psrp_in)) ].creator);
+(void)fflush(stderr);
+#endif /* DEBUG */
 
     /*--------------------------------------------------------*/
     /* A client wants to connect to us -- service the request */
     /*--------------------------------------------------------*/
 
     if(signum == SIGINIT)
-    {  int  psrp_op_pid;
-       char tmp_str[SSIZE] = "";
+    {  int32_t psrp_op_pid;
+       char    tmp_str[SSIZE] = "";
 
 
        /*----------------------------*/
        /* Get PSRP channel operation */ 
        /*----------------------------*/
 
-       (void)efgets(tmp_str,SSIZE,psrp_in);
+       (void)fgets(tmp_str,SSIZE,psrp_in);
        (void)sscanf(tmp_str,"%s %d %s",psrp_channel_op,&psrp_op_pid,psrp_password);
 
        #ifdef PSRPLIB_DEBUG
-       (void)fprintf(stderr,""PSRPLIB CLIENT OP: %s\n",tmp_str);
-       (void)fflush(stderr);
+       (void)fprintf(stderr,"PSRPLIB CLIENT OP: %s\n",tmp_str);
+       (void)fflush (stderr);
        #endif /* PSRPLIB_DEBUG */
 
 
@@ -2780,13 +2773,13 @@ _PRIVATE int chan_handler(int signum)
           if(appl_verbose == TRUE)
           {  (void)strdate(date);
              (void)fprintf(stderr,"%s %s(%d@%s:%s): segmented server secure\n",
-                            date,appl_name,appl_pid,appl_host,appl_owner);
+                                  date,appl_name,appl_pid,appl_host,appl_owner);
              (void)fflush(stderr);
           }
        }
 
        #ifdef PSRPLIB_DEBUG
-       (void)fprintf(stderr,""PSRPLIB SIGINIT (op = %s): password is %s:%s\n",psrp_channel_op,psrp_password,appl_password);
+       (void)fprintf(stderr,"PSRPLIB SIGINIT (op = %s): password is %s:%s\n",psrp_channel_op,psrp_password,appl_password);
        (void)fflush(stderr);
        #endif /* PSRPLIB_DEBUG */
 
@@ -2794,7 +2787,7 @@ _PRIVATE int chan_handler(int signum)
        {  psrp_channel_open = FALSE;
 
           #ifdef PSRPLIB_DEBUG
-          (void)fprintf(stderr,""PSRPLIB SIGINIT (disconnect)\n");
+          (void)fprintf(stderr,"PSRPLIB SIGINIT (disconnect)\n");
           (void)fflush(stderr);
           #endif /* PSRPLIB_DEBUG */
 
@@ -2866,7 +2859,7 @@ _PRIVATE int chan_handler(int signum)
           psrp_out = pups_fclose(psrp_out);
 
           #ifdef PSRPLIB_DEBUG
-          (void)fprintf(stderr,""PSRPLIB CHAN CLOSE close\n");
+          (void)fprintf(stderr,"PSRPLIB CHAN CLOSE close\n");
           (void)fflush(stderr);
           #endif /* PSRPLIB_DEBUG */
 
@@ -2876,8 +2869,8 @@ _PRIVATE int chan_handler(int signum)
        }
        else if(strncmp(psrp_channel_op,"OPEN",4) == 0                                        ||
                       (strncmp(psrp_channel_op,"GRAB",4) == 0 && in_psrp_new_segment == FALSE))
-       {  int  trys = 0,
-               fdes = (-1);
+       {   int32_t   trys = 0;
+          des_t fdes = (-1);
 
           char client_info[SSIZE] = "";
 
@@ -2932,17 +2925,17 @@ _PRIVATE int chan_handler(int signum)
 
           #ifdef PSRPLIB_DEBUG
           if(strncmp(psrp_channel_op,"OPEN",4) == 0)
-             (void)fprintf(stderr,""PSRPLIB SIGINIT (connect)\n");
+             (void)fprintf(stderr,"PSRPLIB SIGINIT (connect)\n");
           else
-             (void)fprintf(stderr,""PSRPLIB SIGINIT (grab)\n");
+             (void)fprintf(stderr,"PSRPLIB SIGINIT (grab)\n");
 
           (void)fflush(stderr);
           #endif /* PSRPLIB_DEBUG */
 
-          (void)efgets(client_info,SSIZE,psrp_in);
+          (void)fgets(client_info,SSIZE,psrp_in);
 
           #ifdef PSRPLIB_DEBUG
-          (void)fprintf(stderr,""PSRPLIB CLIENT INFO %s\n",client_info);
+          (void)fprintf(stderr,"PSRPLIB CLIENT INFO %s\n",client_info);
           (void)fflush(stderr);
           #endif /* PSRPLIB_DEBUG */
 
@@ -3001,7 +2994,7 @@ _PRIVATE int chan_handler(int signum)
           psrp_out = pups_fclose(psrp_out);
 
           #ifdef PSRPLIB_DEBUG
-          (void)fprintf(stderr,""PSRPLIB CHAN GROPE close\n");
+          (void)fprintf(stderr,"PSRPLIB CHAN GROPE close\n");
           (void)fflush(stderr);
           #endif /* PSRPLIB_DEBUG */
 
@@ -3012,7 +3005,7 @@ _PRIVATE int chan_handler(int signum)
     }
 
     #ifdef PSRPLIB_DEBUG
-    (void)fprintf(stderr,""PSRPLIB SIGCHAN (%016lx)\n",(unsigned long int)psrp_out);
+    (void)fprintf(stderr,"PSRPLIB SIGCHAN (%016lx)\n",(uint64_t)psrp_out);
     (void)fflush(stderr);
     #endif /* PSRPLIB_DEBUG */
 
@@ -3024,7 +3017,7 @@ _PRIVATE int chan_handler(int signum)
     psrp_endop("chan");
 
     #ifdef PSRPLIB_DEBUG
-    (void)fprintf(stderr,""PSRPLIB SIGCHAN DONE\n");
+    (void)fprintf(stderr,"PSRPLIB SIGCHAN DONE\n");
     (void)fflush(stderr);
     #endif /* PSRPLIB_DEBUG */
 
@@ -3041,12 +3034,12 @@ _PRIVATE int chan_handler(int signum)
 
 _PRIVATE void psrp_homeostat(void *t_info, char *args)
 
-{    int idum  = 0,
-         trys  = 0;
+{    int32_t idum  = 0,
+             trys  = 0;
 
      if(psrp_channel_open == TRUE)
-     {  int i,
-            ret;
+     {   int32_t i,
+                 ret;
 
         char tcode[SSIZE] = "";
 
@@ -3105,13 +3098,11 @@ _PRIVATE void psrp_homeostat(void *t_info, char *args)
 /* Empty FIFO */
 /*------------*/
 
-_PUBLIC void empty_fifo(const int fdes)
+_PUBLIC void psrp_empty_fifo(const des_t fdes)
 
-{   long int bytes_out;
-    _BYTE    ch_buf[512] = "";
+{   ssize_t bytes_out;
+    _BYTE   ch_buf[512] = "";
 
-
-return;
 
     /*----------------------------------*/
     /* Only the root thread can process */
@@ -3145,14 +3136,22 @@ return;
 /* Handler for unexpected PSRP channel timeouts */
 /*----------------------------------------------*/
 
-_PUBLIC int psrp_chbrk_handler(const unsigned int c_index, const int event)
+_PUBLIC  int32_t psrp_chbrk_handler(const uint32_t c_index, const uint32_t event)
 
-{   int  bytes_out,
-         fdes_out = (-1); 
+{   int32_t bytes_out = 0;
+    des_t   fdes_out  = (-1); 
 
-    char channel_name[SSIZE] = "";
+    char psrp_channel_name[SSIZE]  = "";
 
-    (void)snprintf(channel_name,SSIZE,"%s#%s/psrp#%s#%d#%d",appl_name,appl_fifo_dir,appl_ch_name,appl_pid,getuid()); 
+
+    /*-------------------*/
+    /* Ignore if exiting */
+    /*-------------------*/
+
+    if(in_pups_exit == TRUE)
+       return(-1);
+
+    (void)snprintf(psrp_channel_name,SSIZE,"%s#%s/psrp#%s#%d#%d",appl_name,appl_fifo_dir,appl_ch_name,appl_pid,getuid()); 
     if(appl_verbose == TRUE)
     {  strdate(date);
 
@@ -3161,29 +3160,29 @@ _PUBLIC int psrp_chbrk_handler(const unsigned int c_index, const int event)
                                             {  if(psrp_transactions[c_index] == 0)
                                                   (void)fprintf(stderr,
                                                                 "%s %s (%d@%s:%s): connection to client (%s) broken on channel \"%s\" (0 client transactons)\n",
-                                                                              date,appl_name,appl_pid,appl_host,appl_owner,psrp_client_name[c_index],channel_name);
+                                                                              date,appl_name,appl_pid,appl_host,appl_owner,psrp_client_name[c_index],psrp_channel_name);
                                                else if(psrp_transactions[c_index] == 1)
                                                   (void)fprintf(stderr,
                                                         "%s %s (%d@%s:%s): connection to client (%s) broken on channel \"%s\" (1 client transaction)\n",
-                                                                      date,appl_name,appl_pid,appl_host,appl_owner,psrp_client_name[c_index],channel_name);
+                                                                      date,appl_name,appl_pid,appl_host,appl_owner,psrp_client_name[c_index],psrp_channel_name);
                                                else 
                                                   (void)fprintf(stderr,
                                                                "%s %s (%d@%s:%s): connection to client (%s) broken on channel \"%s\" (%d client transactions)\n",
-                                                               date,appl_name,appl_pid,appl_host,appl_owner,psrp_client_name[c_index],channel_name,psrp_transactions[c_index]);
+                                                               date,appl_name,appl_pid,appl_host,appl_owner,psrp_client_name[c_index],psrp_channel_name,psrp_transactions[c_index]);
                                             }
                                             else
                                             {  if(psrp_transactions[c_index] == 0)
                                                   (void)fprintf(stderr,
                                                                 "%s %s (%d@%s:%s): connection to client (%s [via %s]) on channel \"%s\" broken (0 client transactons)\n",
-                                                                date,appl_name,appl_pid,appl_host,appl_owner,psrp_client_name[c_index],psrp_remote_hostpath[c_index],channel_name);
+                                                                date,appl_name,appl_pid,appl_host,appl_owner,psrp_client_name[c_index],psrp_remote_hostpath[c_index],psrp_channel_name);
                                                else if(psrp_transactions[c_index] == 1)
                                                    (void)fprintf(stderr,
                                                                  "%s %s (%d@%s:%s): connection to client (%s [via %s]) on channel \"%s\" broken (1 client transaction)\n",
-                                                                 date,appl_name,appl_pid,appl_host,appl_owner,psrp_client_name[c_index],psrp_remote_hostpath[c_index],channel_name);
+                                                                 date,appl_name,appl_pid,appl_host,appl_owner,psrp_client_name[c_index],psrp_remote_hostpath[c_index],psrp_channel_name);
                                                else
                                                   (void)fprintf(stderr,
                                                                 "%s %s (%d@%s:%s): connection to client (%s [via %s]) on channel \"%s\" broken (%d client transactions)\n",
-                                                                date,appl_name,appl_pid,appl_host,appl_owner,psrp_client_name[c_index],psrp_remote_hostpath[c_index],channel_name,psrp_transactions[c_index]);
+                                                                date,appl_name,appl_pid,appl_host,appl_owner,psrp_client_name[c_index],psrp_remote_hostpath[c_index],psrp_channel_name,psrp_transactions[c_index]);
                                             }
 
                                             if(c_index == c_client)
@@ -3207,7 +3206,7 @@ _PUBLIC int psrp_chbrk_handler(const unsigned int c_index, const int event)
 
                                                if(psrp_in != (FILE *)NULL)
                                                {  (void)fflush(psrp_in);
-                                                  empty_fifo(fileno(psrp_in));
+                                                  (void)psrp_empty_fifo(fileno(psrp_in));
                                                   psrp_in  = pups_fclose(psrp_in); 
                                                }
 
@@ -3218,7 +3217,7 @@ _PUBLIC int psrp_chbrk_handler(const unsigned int c_index, const int event)
 
                                                if(psrp_out != (FILE *)NULL)
                                                {  (void)fflush(psrp_out);
-                                                  (void)empty_fifo(fileno(psrp_out));
+                                                  (void)psrp_empty_fifo(fileno(psrp_out));
                                                   psrp_out = pups_fclose(psrp_out); 
                                                }
 
@@ -3226,7 +3225,7 @@ _PUBLIC int psrp_chbrk_handler(const unsigned int c_index, const int event)
                                                {  strdate(date);
                                                   (void)fprintf(stderr,
                                                   "%s %s (%d@%s:%s): channel lock released (accepting new PSRP connections on channel \"%s\")\n",
-                                                                                       date,appl_name,appl_pid,appl_host,appl_owner,channel_name);
+                                                                                       date,appl_name,appl_pid,appl_host,appl_owner,psrp_channel_name);
                                                }
                                             }
                                             break;
@@ -3234,13 +3233,13 @@ _PUBLIC int psrp_chbrk_handler(const unsigned int c_index, const int event)
 
             case PSRP_IPC_LOST:             strdate(date);
                                             (void)fprintf(stderr,"%s %s (%d@%s:%s): PSRP input stream on channel \"%s\" lost -- re-establishing\n",
-                                                                                         date,appl_name,appl_pid,appl_host,appl_owner,channel_name);
+                                                                                         date,appl_name,appl_pid,appl_host,appl_owner,psrp_channel_name);
                                             break;
 
 
             case PSRP_OPC_LOST:             strdate(date);
                                             (void)fprintf(stderr,"%s %s (%d@%s:%s): PSRP output stream on channel \"%s\" lost -- re-establishing\n",
-                                                                                          date,appl_name,appl_pid,appl_host,appl_owner,channel_name);
+                                                                                          date,appl_name,appl_pid,appl_host,appl_owner,psrp_channel_name);
                                             break;
 
             default:                        break;
@@ -3287,27 +3286,19 @@ _PUBLIC int psrp_chbrk_handler(const unsigned int c_index, const int event)
 
 _PRIVATE void *psrp_find_action_object(char *fname)
 
-{   int  i;
-    void *ret = (void *)NULL;
+{   int32_t i;
+    void    *ret = (void *)NULL;
 
-
-    /*----------------------------------*/
-    /* Only the root thread can process */
-    /* PSRP requests                    */
-    /*----------------------------------*/
-
-    if(pupsthread_is_root_thread() == FALSE)
-       pups_error("[psrp_find_action_object] attempt by non root thread to perform PUPS/P3 PSRP operation");
 
     if(fname == (char *)NULL)
     {  pups_set_errno(EINVAL);
        return((void *)NULL);
     }
 
-    for(i=0; i<psrp_object_list_used; ++i)
+    for(i=0; i<psrp_object_list_allocated; ++i)
        if(psrp_object_list[i].object_handle != (void *)NULL && psrp_isearch_tag_list(fname,i) >= 0)
-       {   int init,
-               (*func)(int, char **);
+       {  int32_t init,
+                  (*func)(int32_t, char **);
 
 
            /*-----------------------------------------------------------------------*/
@@ -3358,16 +3349,16 @@ _PRIVATE void *psrp_find_action_object(char *fname)
 /* Search object table for requested action */
 /*------------------------------------------*/
 
-_PRIVATE _BOOLEAN psrp_exec_action_object(const int argc, int *status, const char *argv[])
+_PRIVATE _BOOLEAN psrp_exec_action_object(const int32_t argc, int32_t *status, const char *argv[])
 
-{   int i;
+{   uint32_t i;
 
     _BOOLEAN ret = FALSE;
 
-    for(i=0; i<psrp_object_list_used; ++i)
+    for(i=0; i<psrp_object_list_allocated; ++i)
        if(psrp_object_list[i].object_handle != (void *)NULL && psrp_isearch_tag_list(argv[0],i) >= 0)
-       {   int init,
-               (*func)(int, char **) = (void *)NULL;
+       {    int32_t init,
+                    (*func)(const  int32_t, const char *[]) = (void *)NULL;
 
 
            /*-----------------------------------------------------------------------*/
@@ -3384,7 +3375,7 @@ _PRIVATE _BOOLEAN psrp_exec_action_object(const int argc, int *status, const cha
 
                case PSRP_STATIC_FUNCTION:
                case PSRP_DYNAMIC_FUNCTION:  func    = psrp_object_list[i].object_handle;
-                                            *status = (*func)(argc,(char **)argv);
+                                            *status = (*func)(argc, argv);
                                             ret     = TRUE;
                                             break;
 
@@ -3424,7 +3415,7 @@ _PRIVATE _BOOLEAN psrp_exec_action_object(const int argc, int *status, const cha
 /* Dynamically set type for part(s) of MIME message to be saved */
 /*--------------------------------------------------------------*/
 
-_PRIVATE int psrp_builtin_set_mime_type(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_set_mime_type(const uint32_t argc, const char *argv[])
 
 {   _BOOLEAN default_mime_type = FALSE;
 
@@ -3494,7 +3485,7 @@ _PRIVATE int psrp_builtin_set_mime_type(const int argc, const char *argv[])
 /* PSRP request parser                                                 */
 /*---------------------------------------------------------------------*/
 
-_PRIVATE int psrp_parse_requests(char *requests)
+_PRIVATE int32_t psrp_parse_requests(char *requests)
 
 {   char next_request[SSIZE] = "";
 
@@ -3513,7 +3504,7 @@ _PRIVATE int psrp_parse_requests(char *requests)
 /* copy of the PSRP process which they can subsequently modify                */
 /*----------------------------------------------------------------------------*/
 
-_PUBLIC int psrp_new_instance(const _BOOLEAN t_c_instance, const char *instance_name, const char *host_name)
+_PUBLIC int32_t psrp_new_instance(const _BOOLEAN t_c_instance, const char *instance_name, const char *host_name)
 
 {
 
@@ -3591,16 +3582,18 @@ _PUBLIC int psrp_new_instance(const _BOOLEAN t_c_instance, const char *instance_
 
 _PRIVATE char *r_argv[SSIZE] = { [0 ... 255] = (char *)NULL };
     
-_PRIVATE int psrp_parse_request(char *request, int interface)
+_PRIVATE int32_t psrp_parse_request(char *request, const uint32_t interface)
 
-{   int r_argc,
-        status;
+{   uint32_t r_argc;
+    int32_t  status;
     
+
     /*---------------------------------------------*/
     /* Transform request to a vector of arguments. */
     /*---------------------------------------------*/
 
     psrp_argvec(&r_argc,request);
+
 
     /*---------------------------------------------------------------------*/
     /* The only builtins are detach which removes dynamic entries from the */
@@ -3609,8 +3602,10 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /*---------------------------------------------------------------------*/
 
     #ifdef PSRP_AUTHENTICATE
+    /*---------------------------------------------*/
     /* Change (secure) server authentication token */
-    if(psrp_builtin_set_secure(r_argc,(char **)r_argv) == PSRP_OK)
+    /*---------------------------------------------*/
+    if(psrp_builtin_set_secure(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
     #endif /* PSRP_AUTHENTICATE */
 
@@ -3620,7 +3615,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* the response time, but the greater the system loading.            */
     /*-------------------------------------------------------------------*/
 
-    else if(psrp_builtin_set_vitimer_quantum(r_argc,(char **)r_argv) == PSRP_OK)
+    else if(psrp_builtin_set_vitimer_quantum(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -3628,7 +3623,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Show host information */
     /*-----------------------*/
 
-    else if(psrp_builtin_show_hinfo(r_argc,(char **)r_argv) == PSRP_OK)
+    else if(psrp_builtin_show_hinfo(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -3637,7 +3632,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Set/show memory bubble utilisation threshold */
     /*----------------------------------------------*/
 
-    else if(psrp_builtin_set_mbubble_utilisation_threshold(r_argc,(char **)r_argv) == PSRP_OK)
+    else if(psrp_builtin_set_mbubble_utilisation_threshold(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -3645,7 +3640,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Show malloc statistics */
     /*------------------------*/
 
-    else if(psrp_builtin_show_malloc_stats(r_argc,(char **)r_argv) == PSRP_OK)
+    else if(psrp_builtin_show_malloc_stats(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
     #endif /* BUBBLE_MEMORY_SUPPORT */
 
@@ -3655,7 +3650,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Enable/disable (Criu) state saving */
     /*------------------------------------*/
 
-    else if(psrp_builtin_ssave(r_argc,(char **)r_argv) == PSRP_OK)
+    else if(psrp_builtin_ssave(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
     #endif /* CRIU_SUPPORT */
 
@@ -3664,7 +3659,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Enable/disable software watchdog */
     /*----------------------------------*/
 
-    else if(psrp_builtin_softdog(r_argc,(char **)r_argv) == PSRP_OK)
+    else if(psrp_builtin_softdog(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -3672,7 +3667,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Set PSRP server stdio detach on background state */
     /*--------------------------------------------------*/  
 
-    else if(psrp_builtin_set_nodetach(r_argc,(char **)r_argv) == PSRP_OK)
+    else if(psrp_builtin_set_nodetach(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -3680,7 +3675,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Set PSRP servers system context migration status */
     /*--------------------------------------------------*/
 
-    else if(psrp_builtin_set_rooted(r_argc,(char **)r_argv) == PSRP_OK)
+    else if(psrp_builtin_set_rooted(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -3688,7 +3683,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Reset PSRP servers system context migration status */
     /*----------------------------------------------------*/
 
-    else if(psrp_builtin_set_unrooted(r_argc,(char **)r_argv) == PSRP_OK)
+    else if(psrp_builtin_set_unrooted(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -3696,7 +3691,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Set PSRP servers (effective) parent */
     /*-------------------------------------*/
 
-    else if(psrp_builtin_set_parent(r_argc,(char **)r_argv) == PSRP_OK)
+    else if(psrp_builtin_set_parent(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -3704,7 +3699,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Set PSRP servers (effective) parent exit status */
     /*-------------------------------------------------*/
 
-    else if(psrp_builtin_set_pexit(r_argc,(char **)r_argv) == PSRP_OK)
+    else if(psrp_builtin_set_pexit(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;  
 
 
@@ -3712,7 +3707,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Set PSRP servers current working directory */
     /*--------------------------------------------*/
 
-    else if(psrp_builtin_set_cwd(r_argc,(char **)r_argv) == PSRP_OK)
+    else if(psrp_builtin_set_cwd(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -3720,7 +3715,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Set number of times an operation will be retried (before aborting it) */
     /*-----------------------------------------------------------------------*/               
 
-    else if(psrp_builtin_set_trys(r_argc,(char **)r_argv) == PSRP_OK)
+    else if(psrp_builtin_set_trys(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -3728,7 +3723,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Protect a file or files */
     /*-------------------------*/         
 
-    else if(psrp_builtin_file_live(r_argc,(char **)r_argv) == PSRP_OK)
+    else if(psrp_builtin_file_live(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -3736,7 +3731,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Unprotect a file or files */
     /*---------------------------*/
 
-    else if(psrp_builtin_file_dead(r_argc,(char **)r_argv) == PSRP_OK)
+    else if(psrp_builtin_file_dead(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -3744,7 +3739,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Show resource usage for this server */
     /*-------------------------------------*/
 
-    else if(psrp_builtin_show_rusage(r_argc,(char **)r_argv) == PSRP_OK)
+    else if(psrp_builtin_show_rusage(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -3752,7 +3747,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Set resource usage for this server */
     /*------------------------------------*/
 
-    else if(psrp_builtin_set_rlimit(r_argc,(char **)r_argv) == PSRP_OK)
+    else if(psrp_builtin_set_rlimit(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -3760,7 +3755,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Toggle server transaction logging on/off */
     /*------------------------------------------*/
 
-    else if(psrp_builtin_appl_verbose(r_argc,(char **)r_argv) == PSRP_OK)
+    else if(psrp_builtin_appl_verbose(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -3768,7 +3763,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Toggle server side error handling on/off */
     /*------------------------------------------*/
 
-    else if(psrp_builtin_error_handling(r_argc,(char **)r_argv) == PSRP_OK)
+    else if(psrp_builtin_error_handling(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -3776,7 +3771,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Builtin to toggle PSRP status logging */
     /*---------------------------------------*/
 
-    else if(psrp_builtin_transactions(r_argc,(char **)r_argv) == PSRP_OK)
+    else if(psrp_builtin_transactions(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -3784,7 +3779,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Add a scheduling slot to this servers crontab */
     /*-=---------------------------------------------*/
 
-    else if(psrp_builtin_crontab_schedule(r_argc,(char **)r_argv) == PSRP_OK)
+    else if(psrp_builtin_crontab_schedule(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -3792,7 +3787,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Remove a schedulign slot from this servers crontab */
     /*----------------------------------------------------*/
 
-    else if(psrp_builtin_crontab_unschedule(r_argc,(char **)r_argv) == PSRP_OK)
+    else if(psrp_builtin_crontab_unschedule(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -3800,14 +3795,14 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Show crontab */
     /*--------------*/
 
-    else if(psrp_builtin_show_crontab(r_argc,(char **)r_argv) == PSRP_OK)
+    else if(psrp_builtin_show_crontab(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
     /*----------------------------------------------*/
     /* Delete action function bound to PSRP handler */
     /*----------------------------------------------*/
 
-    else if(psrp_builtin_detach_object(r_argc,(char **)r_argv) == PSRP_OK)
+    else if(psrp_builtin_detach_object(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -3815,7 +3810,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Set automatic dispatch table save status */
     /*------------------------------------------*/
 
-    else if(psrp_builtin_autosave_dispatch_table(r_argc,(char **)r_argv) == PSRP_OK)
+    else if(psrp_builtin_autosave_dispatch_table(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -3825,7 +3820,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* new objects will overwrite the old                            */
     /*---------------------------------------------------------------*/
 
-    else if(psrp_builtin_load_dispatch_table(r_argc,(char **)r_argv) == PSRP_OK)
+    else if(psrp_builtin_load_dispatch_table(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -3833,7 +3828,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Save current dispatch table */
     /*-----------------------------*/  
 
-    else if(psrp_builtin_save_dispatch_table(r_argc,(char **)r_argv) == PSRP_OK)
+    else if(psrp_builtin_save_dispatch_table(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -3841,7 +3836,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Show client current PSRP action bindings */ 
     /*------------------------------------------*/  
 
-    else if(psrp_builtin_show_psrp_state(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_builtin_show_psrp_state(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -3849,7 +3844,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Reset dispatch table */
     /*----------------------*/
 
-    else if(psrp_builtin_reset_dispatch_table(r_argc,(char **)r_argv) == PSRP_OK)
+    else if(psrp_builtin_reset_dispatch_table(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -3857,7 +3852,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Tell client process the type of PSRP object bindings permitted */
     /*----------------------------------------------------------------*/
 
-    else if(psrp_builtin_show_psrp_bind_type(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_builtin_show_psrp_bind_type(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -3865,7 +3860,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Display the builtin commands for this handler */
     /*-----------------------------------------------*/
 
-    else if(psrp_builtin_help(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_builtin_help(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -3873,7 +3868,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Show concurrently held link file locks */
     /*----------------------------------------*/
 
-    else if(psrp_builtin_show_link_file_locks(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_builtin_show_link_file_locks(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -3881,7 +3876,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Show (flock) locks */
     /*--------------------*/
 
-    else if(psrp_builtin_show_flock_locks(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_builtin_show_flock_locks(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -3889,7 +3884,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Show non default signal handlers installed for this application */
     /*-----------------------------------------------------------------*/
 
-    else if(psrp_builtin_show_sigstatus(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_builtin_show_sigstatus(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -3897,7 +3892,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Show signal mask/ signals pending for this application */
     /*--------------------------------------------------------*/
 
-    else if(psrp_builtin_show_sigmaskstatus(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_builtin_show_sigmaskstatus(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -3905,7 +3900,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Show streams/file descriptors opened by this application */
     /*----------------------------------------------------------*/
 
-    else if(psrp_builtin_show_open_fdescriptors(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_builtin_show_open_fdescriptors(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -3913,7 +3908,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Show (active) children of this application */
     /*--------------------------------------------*/
 
-    else if(psrp_builtin_show_children(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_builtin_show_children(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -3921,7 +3916,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Show mapped (fast) caches */
     /*---------------------------*/
 
-    else if(psrp_builtin_show_caches(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_builtin_show_caches(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -3930,7 +3925,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Show orifices which are bound to this application */
     /*---------------------------------------------------*/
 
-    else if(psrp_builtin_show_attached_orifices(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_builtin_show_attached_orifices(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
     #endif /* DLL_SUPPORT */
 
@@ -3940,7 +3935,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Show all threads running in this PSRP server instance */
     /*-------------------------------------------------------*/
 
-    else if(psrp_builtin_show_threads(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_builtin_show_threads(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -3948,7 +3943,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Launch a new thread of execution (bound to named function) */
     /*------------------------------------------------------------*/
 
-    else if(psrp_builtin_launch_thread(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_builtin_launch_thread(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -3956,7 +3951,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Terminate a thread of execution */
     /*---------------------------------*/
 
-    else if(psrp_builtin_kill_thread(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_builtin_kill_thread(r_argc,(void *)r_argv) == PSRP_OK)
       goto object_dispatched;
 
 
@@ -3964,7 +3959,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Pause thread of execution */
     /*---------------------------*/
 
-    else if(psrp_builtin_pause_thread(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_builtin_pause_thread(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -3972,7 +3967,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Restart thread of execution */
     /*-----------------------------*/
 
-    else if(psrp_builtin_restart_thread(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_builtin_restart_thread(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
     #endif /* PTHREAD_SUPPORT */
 
@@ -3981,7 +3976,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Show slaved interation client channels open */
     /*---------------------------------------------*/
 
-    else if(psrp_builtin_show_open_sics(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_builtin_show_open_sics(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -3989,7 +3984,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Show entrance functions for this application */
     /*----------------------------------------------*/
 
-    else if(psrp_builtin_pups_show_entrance_f(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_builtin_pups_show_entrance_f(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -3997,7 +3992,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Show exit functions for this application */
     /*------------------------------------------*/
 
-    else if(psrp_builtin_pups_show_exit_f(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_builtin_pups_show_exit_f(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -4005,7 +4000,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Show abort functions for this application */
     /*-------------------------------------------*/
 
-    else if(psrp_builtin_pups_show_abort_f(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_builtin_pups_show_abort_f(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -4013,7 +4008,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Show status entry in /proc filesystem for this application */
     /*------------------------------------------------------------*/
 
-    else if(psrp_builtin_show_procstatus(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_builtin_show_procstatus(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -4021,7 +4016,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Show clients connected to this server */
     /*---------------------------------------*/
 
-    else if(psrp_builtin_show_clients(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_builtin_show_clients(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -4029,7 +4024,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Show status of virtual interval timers associated with this application */
     /*-------------------------------------------------------------------------*/
 
-    else if(psrp_builtin_pups_show_vitimers(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_builtin_pups_show_vitimers(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -4037,7 +4032,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Alias an attached function of the handler */
     /*-------------------------------------------*/
 
-    else if(psrp_builtin_alias(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_builtin_alias(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -4045,7 +4040,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Unalias an attached function of the handler */
     /*---------------------------------------------*/
 
-    else if(psrp_builtin_unalias(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_builtin_unalias(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -4053,7 +4048,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Show the aliases of an attached function of the handler */
     /*---------------------------------------------------------*/   
 
-    else if(psrp_builtin_showaliases(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_builtin_showaliases(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -4061,7 +4056,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Extend child table */
     /*--------------------*/
 
-    else if(psrp_builtin_extend_chtab(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_builtin_extend_chtab(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -4069,7 +4064,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Extend virtual timer table */
     /*----------------------------*/
 
-    else if(psrp_builtin_extend_vitab(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_builtin_extend_vitab(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -4077,7 +4072,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Extend file table */
     /*-------------------*/
 
-    else if(psrp_builtin_extend_ftab(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_builtin_extend_ftab(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -4085,7 +4080,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /*--------------------------*/
     /* Extend persistent heap table */
     /*--------------------------*/
-    else if(psrp_bind_status & PSRP_PERSISTENT_HEAP && psrp_builtin_extend_htab(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_bind_status & PSRP_PERSISTENT_HEAP && psrp_builtin_extend_htab(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
     #endif /* PERSISTENT_HEAP_SUPPORT */
 
@@ -4095,7 +4090,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Extend (DLL) orifice table */
     /*----------------------------*/
 
-    else if(psrp_bind_status & PSRP_DYNAMIC_FUNCTION &&  psrp_builtin_extend_ortab(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_bind_status & PSRP_DYNAMIC_FUNCTION &&  psrp_builtin_extend_ortab(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
     #endif /* DLL_SUPPORT */
 
@@ -4104,7 +4099,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Produce new instance of current process */
     /*-----------------------------------------*/
 
-    else if(psrp_builtin_new_instance(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_builtin_new_instance(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -4112,7 +4107,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Overlay the current process with new command */
     /*----------------------------------------------*/
 
-    else if(psrp_builtin_overlay_server_process(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_builtin_overlay_server_process(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -4120,7 +4115,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Overfork the current process with new command */
     /*-----------------------------------------------*/
 
-    else if(psrp_builtin_overfork_server_process(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_builtin_overfork_server_process(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -4128,7 +4123,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /*----------------------------------------------------*/
     /* Attach a dynamic function to PSRP dispatch handler */
     /*----------------------------------------------------*/
-    else if(psrp_builtin_attach_dynamic_function(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_builtin_attach_dynamic_function(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
     #endif /* DLL_SUPPORT */
 
@@ -4137,7 +4132,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Attach a dynamic databag to PSRP dispatch handler */
     /*---------------------------------------------------*/
 
-    else if(psrp_builtin_attach_dbag(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_builtin_attach_dbag(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -4146,7 +4141,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Attach a persistent heap to PSRP dispatch handler */
     /*---------------------------------------------------*/
 
-    else if(psrp_builtin_attach_persistent_heap(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_builtin_attach_persistent_heap(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -4154,7 +4149,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Show persistent heaps mapped into process address space */
     /*---------------------------------------------------------*/
 
-    else if(psrp_builtin_show_persistent_heaps(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_builtin_show_persistent_heaps(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
     #endif /* PERSISTENT_HEAP_SUPPORT */
 
@@ -4163,7 +4158,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Show tracked heap objects on local heap */
     /*-----------------------------------------*/ 
 
-    else if(psrp_builtin_show_htobjects(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_builtin_show_htobjects(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -4171,7 +4166,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Client termination of server process */
     /*--------------------------------------*/ 
 
-    else if(psrp_builtin_terminate_process(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_builtin_terminate_process(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -4180,7 +4175,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Set ssh compression mode */
     /*--------------------------*/
 
-    else if(psrp_builtin_ssh_compress(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_builtin_ssh_compress(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
 
 
@@ -4188,7 +4183,7 @@ _PRIVATE int psrp_parse_request(char *request, int interface)
     /* Set remote ssh port */
     /*---------------------*/
 
-    else if(psrp_builtin_ssh_port(r_argc,r_argv) == PSRP_OK)
+    else if(psrp_builtin_ssh_port(r_argc,(void *)r_argv) == PSRP_OK)
        goto object_dispatched;
     #endif /* SSH_SUPPORT */
 
@@ -4204,7 +4199,7 @@ re_dispatch:
     /* Process next PSRP command */
     /*---------------------------*/
 
-    if(psrp_exec_action_object(r_argc,&status,r_argv) == TRUE)
+    if(psrp_exec_action_object(r_argc,&status,(void *)r_argv) == TRUE)
     {
 
        /*--------------------------------------*/
@@ -4319,18 +4314,18 @@ object_dispatched:
 /* [PSRP] interrupts                                             */
 /*---------------------------------------------------------------*/
 
-_PRIVATE int psrp_handler(int signum)
+_PRIVATE int32_t psrp_handler(const int32_t signum)
 
-{   int i,
-        idum,
-        r_argc,
-        status;
+{   int32_t  i,
+             idum,
+             r_argc,
+             status;
 
-    char request[SSIZE]             = "",
-         get_object_command[SSIZE]  = "",
-         psrp_channel_name[SSIZE]   = "",
-         request_str[SSIZE]         = "",
-         psrp_ckpt_status[SSIZE]    = "";
+    char     request[SSIZE]             = "",
+             get_object_command[SSIZE]  = "",
+             psrp_channel_name[SSIZE]   = "",
+             request_str[SSIZE]         = "",
+             psrp_ckpt_status[SSIZE]    = "";
 
     sigset_t set;
 
@@ -4371,7 +4366,7 @@ _PRIVATE int psrp_handler(int signum)
     {
  
        #ifdef PSRPLIB_DEBUG
-       (void)fprintf(stderr,""PSRPLIB SIGPSRP3 (ABORT)\n");
+       (void)fprintf(stderr,"PSRPLIB SIGPSRP3 (ABORT)\n");
        (void)fflush(stderr);
        #endif /* PSRPLIB_DEBUG */
 
@@ -4386,12 +4381,12 @@ _PRIVATE int psrp_handler(int signum)
        /*-----------------------*/
 
        if(psrp_in != (FILE *)NULL)
-       {  empty_fifo(fileno(psrp_in));
+       {  (void)psrp_empty_fifo(fileno(psrp_in));
           psrp_in  = pups_fclose(psrp_in);
        }
 
        if(psrp_out != (FILE *)NULL)
-       {  empty_fifo(fileno(psrp_out));
+       {  (void)psrp_empty_fifo(fileno(psrp_out));
           psrp_out = pups_fclose(psrp_out);
        }
 
@@ -4427,7 +4422,7 @@ _PRIVATE int psrp_handler(int signum)
     /*------------------------------------------------------------------------*/
 
     #ifdef PSRPLIB_DEBUG
-    (void)fprintf(stderr,""PSRPLIB SIGPSRP2\n");
+    (void)fprintf(stderr,"PSRPLIB SIGPSRP2\n");
     (void)fflush(stderr);
     #endif /* PSRPLIB_DEBUG */
  
@@ -4443,7 +4438,7 @@ _PRIVATE int psrp_handler(int signum)
     /* its behalf.                                                           */
     /*-----------------------------------------------------------------------*/
 
-    (void)efgets(request,SSIZE,psrp_in);
+    (void)fgets(request,SSIZE,psrp_in);
     (void)strlcpy(request_str,request,SSIZE);
     request_str[pups_strlen(request_str) - 2] = '\0';
 
@@ -4588,7 +4583,6 @@ _PRIVATE int psrp_handler(int signum)
     psrp_out = pups_fclose(psrp_out);
 
     in_psrp_handler = FALSE;
-
     return(0);
 }
 
@@ -4599,13 +4593,13 @@ _PRIVATE int psrp_handler(int signum)
 /* Save dispatch table */
 /*---------------------*/
 
-_PUBLIC int psrp_save_dispatch_table(const char *autoload_file_name)
+_PUBLIC  int32_t psrp_save_dispatch_table(const char *autoload_file_name)
                        
-{   int i,
-        j,
-        objects = 0;
+{   uint32_t i,
+             j,
+             objects          = 0;
 
-    FILE *autoload_stream = (FILE *)NULL;                                 
+    FILE     *autoload_stream = (FILE *)NULL;                                 
 
 
     /*----------------------------------*/
@@ -4649,7 +4643,7 @@ _PUBLIC int psrp_save_dispatch_table(const char *autoload_file_name)
 
     (void)pups_get_link_file_lock(WAIT_FOREVER,autoload_file_name);
 
-    if(psrp_object_list_size == 0)
+    if(psrp_object_list_used == 0)
     {  (void)fclose(autoload_stream);
        (void)unlink(autoload_file_name);
        (void)pups_release_link_file_lock(autoload_file_name);
@@ -4664,14 +4658,14 @@ _PUBLIC int psrp_save_dispatch_table(const char *autoload_file_name)
     /* table slots which are both allocated and used) */
     /*------------------------------------------------*/
 
-    for(i=0; i<psrp_object_list_used; ++i)
+    for(i=0; i<psrp_object_list_allocated; ++i)
     {  if(psrp_object_list[i].object_handle != (void *)NULL && psrp_object_list[i].aliases > 0)
           ++objects;
     }
 
     (void)fprintf(autoload_stream,"#-------------------------------------------------------------------\n");
     (void)fprintf(autoload_stream,"#    PSRP dispatch table resource file version 1.0                  \n");
-    (void)fprintf(autoload_stream,"#    (C) M.A. O'Neill, Tumbling Dice, Gosforth, 2023                \n");
+    (void)fprintf(autoload_stream,"#    (C) M.A. O'Neill, Tumbling Dice, Gosforth, 2024                \n");
     (void)fprintf(autoload_stream,"#-------------------------------------------------------------------\n");
     (void)fprintf(autoload_stream,"\n\n");
 
@@ -4684,7 +4678,7 @@ _PUBLIC int psrp_save_dispatch_table(const char *autoload_file_name)
     /* Save objects in PSRP dispatch table */
     /*-------------------------------------*/
 
-    for(i=0; i<psrp_object_list_used; ++i)     
+    for(i=0; i<psrp_object_list_allocated; ++i)     
     {   if(psrp_object_list[i].aliases > 0)
         {  (void)fprintf(autoload_stream,"\n\n#-------------------------------------------------------------------\n");
            (void)fprintf(autoload_stream,"#    PSRP (root tag) object: %s\n",psrp_object_list[i].object_tag[0]);
@@ -4703,7 +4697,7 @@ _PUBLIC int psrp_save_dispatch_table(const char *autoload_file_name)
               (void)fprintf(autoload_stream,"dynamic_databag\n\n");
 
            if(psrp_object_list[i].object_type == PSRP_STATIC_DATABAG)
-           {  int slot_index;
+           {   int32_t slot_index;
 
               slot_index = pups_fname2index(psrp_object_list[i].object_f_name);
               if(ftab[slot_index].homeostatic == 1)
@@ -4714,11 +4708,11 @@ _PUBLIC int psrp_save_dispatch_table(const char *autoload_file_name)
 
            #ifdef HAVE_DLL_SUPPORT 
            if(psrp_object_list[i].object_type == PSRP_PERSISTENT_HEAP)
-           {  int f_index;
+           {   int32_t f_index;
 
 
               /*--------------------------------*/
-              /* Get index into PUPS file table */
+              /* Get index  int32_to PUPS file table */
               /*--------------------------------*/
 
               f_index = pups_fname2index(psrp_object_list[i].object_f_name);
@@ -4732,12 +4726,11 @@ _PUBLIC int psrp_save_dispatch_table(const char *autoload_file_name)
 
            #ifdef PERSISTENT_HEAP_SUPPORT
            if(psrp_object_list[i].object_type == PSRP_PERSISTENT_HEAP)
-           {  int hdes,
-		  f_index;
+           {   int32_t f_index;
 
 
               /*--------------------------------*/
-	      /* Get index into PUPS file table */
+	      /* Get index  int32_to PUPS file table */
               /*--------------------------------*/
 
               f_index = pups_fname2index(psrp_object_list[i].object_f_name);
@@ -4806,16 +4799,14 @@ _PUBLIC int psrp_save_dispatch_table(const char *autoload_file_name)
 
 
 
-/*-------------------------------------------------*/
-/* Remove communication channel when process exits */
-/*-------------------------------------------------*/
+/*-------------------------------------------------------------*/
+/* Remove communication channel when PSRP server process exits */
+/*-------------------------------------------------------------*/
 
 _PUBLIC void psrp_exit(void)
  
-{   int i,
-        j;
- 
-    char autoload_file_name[SSIZE] = "";
+{   uint32_t i;
+    char     autoload_file_name[SSIZE] = "";
 
 
     /*----------------------------------*/
@@ -4826,13 +4817,14 @@ _PUBLIC void psrp_exit(void)
     if(pupsthread_is_root_thread() == FALSE)
        pups_error("[psrp_exit] attempt by non root thread to perform PUPS/P3 PSRP operation");
 
+
+    /*---------------------------------------------------------------*/
+    /* Save the names of those objects which are to be automatically */
+    /* loaded at the next invocation of this server                  */
+    /*---------------------------------------------------------------*/
+
     if(appl_psrp_save == TRUE)
     {  
-
-       /*---------------------------------------------------------------*/
-       /* Save the names of those objects which are to be automatically */
-       /* loaded at the next invocation of this server                  */
-       /*---------------------------------------------------------------*/
 
        if(getuid() != 0)
           (void)snprintf(autoload_file_name,SSIZE,"%s/.%s.psrp",appl_home,appl_name);
@@ -4854,7 +4846,10 @@ _PUBLIC void psrp_exit(void)
     /* Delete communication channel */
     /*------------------------------*/
 
+    (void)pups_fclose(psrp_in);
     (void)unlink(channel_name_in);
+
+    (void)pups_fclose(psrp_out);
     (void)unlink(channel_name_out);
 
 
@@ -4862,20 +4857,20 @@ _PUBLIC void psrp_exit(void)
     /* Release memory allocated to PSRP server process */
     /*-------------------------------------------------*/
 
-    for(i=0; i<psrp_object_list_used; ++i)
+    for(i=0; i<psrp_object_list_allocated; ++i)
        psrp_destroy_object(i);
 }
 
 
 
 
-/*---------------------------------------*/
-/* Get PSRP dispatch table entry by name */
-/*---------------------------------------*/
+/*--------------------------------*/
+/* Get PSRP handler entry by name */
+/*--------------------------------*/
 
-_PUBLIC int lookup_psrp_object_by_name(const char *name)
+_PUBLIC  int32_t lookup_psrp_object_by_name(const char *name)
 
-{   int i;
+{   uint32_t i;
 
     if(name == (const char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -4890,7 +4885,7 @@ _PUBLIC int lookup_psrp_object_by_name(const char *name)
     if(pupsthread_is_root_thread() == FALSE)
        pups_error("[lookup_psrp_object_by_name] attempt by non root thread to perform PUPS/P3 PSRP operation");
 
-    for(i=0; i<psrp_object_list_used; ++i)
+    for(i=0; i<psrp_object_list_allocated; ++i)
     {  if(psrp_object_list[i].object_handle != (void *)NULL && psrp_isearch_tag_list(name,i) >= 0)
        {  pups_set_errno(OK);
           return(i);
@@ -4904,13 +4899,13 @@ _PUBLIC int lookup_psrp_object_by_name(const char *name)
 
 
 
-/*-----------------------------------------*/
-/* Get PSRP dispatch table entry by handle */
-/*-----------------------------------------*/
+/*---------------------------------------*/
+/* Get PSRP handler list entry by handle */
+/*---------------------------------------*/
 
-_PUBLIC int lookup_psrp_object_by_handle(const void *object_handle)
+_PUBLIC int32_t lookup_psrp_object_by_handle(const void *object_handle)
  
-{   int i; 
+{   uint32_t i; 
  
 
     /*----------------------------------*/
@@ -4926,7 +4921,7 @@ _PUBLIC int lookup_psrp_object_by_handle(const void *object_handle)
        return(-1);
     }
 
-    for(i=0; i<psrp_object_list_used; ++i)
+    for(i=0; i<psrp_object_list_allocated; ++i)
        if(psrp_object_list[i].object_handle == object_handle)
        {  pups_set_errno(OK);
           return(i);
@@ -4939,13 +4934,13 @@ _PUBLIC int lookup_psrp_object_by_handle(const void *object_handle)
 
 
 
-/*----------------------------------*/
-/* Get PSRP object handle from name */
-/*----------------------------------*/
+/*-------------------------------------*/
+/* Get handle of PSRP object from name */
+/*-------------------------------------*/
 
 _PUBLIC void *psrp_get_handle_from_name(const char *name)
 
-{   int d_index;
+{    int32_t d_index;
 
 
     /*----------------------------------*/
@@ -4958,7 +4953,7 @@ _PUBLIC void *psrp_get_handle_from_name(const char *name)
 
     if(name == (const char *)NULL)
     {  pups_set_errno(EINVAL);
-       return(-1);
+       return((void *)NULL);
     }
 
     if((d_index = lookup_psrp_object_by_name(name)) == (-1))
@@ -4971,13 +4966,13 @@ _PUBLIC void *psrp_get_handle_from_name(const char *name)
 
 
 
-/*---------------------------------*/
-/*Get PSRP object name from handle */
-/*---------------------------------*/
+/*------------------------------------*/
+/*Get name of PSRP object from handle */
+/*------------------------------------*/
 
-_PUBLIC int psrp_get_name_from_handle(const void *handle, char *name)
+_PUBLIC  int32_t psrp_get_name_from_handle(const void *handle, char *name)
 
-{   int d_index;
+{    int32_t d_index;
 
 
     /*----------------------------------*/
@@ -5004,13 +4999,13 @@ _PUBLIC int psrp_get_name_from_handle(const void *handle, char *name)
 
 
 
-/*--------------------------------*/
-/* Get PSRP object type from name */
-/*--------------------------------*/
+/*-----------------------------------*/
+/* Get type of PSRP object from name */
+/*-----------------------------------*/
 
-_PUBLIC int psrp_get_type_from_name(const char *name)
+_PUBLIC int32_t psrp_get_type_from_name(const char *name)
 
-{   int d_index;
+{   int32_t d_index;
 
 
     /*----------------------------------*/
@@ -5036,13 +5031,13 @@ _PUBLIC int psrp_get_type_from_name(const char *name)
 
 
 
-/*----------------------------------*/
-/* Get PSRP object type from handle */
-/*----------------------------------*/
+/*-------------------------------------*/
+/* Get type of PSRP object from handle */
+/*-------------------------------------*/
 
-_PUBLIC int psrp_get_type_from_handle(const void *handle)
+_PUBLIC int32_t psrp_get_type_from_handle(const void *handle)
 
-{   int d_index;
+{   int32_t d_index;
 
 
     /*----------------------------------*/
@@ -5068,27 +5063,26 @@ _PUBLIC int psrp_get_type_from_handle(const void *handle)
 
 
 
-/*-------------------------------------------------------------------------------------*/
-/* Parse PSRP dispatch request into UNIX command line format so that it can be further */
-/* processed by the comamnd line decoding utilities                                    */
-/*-------------------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------------------------*/
+/* Parse PSRP dispatch request  int32_to POSIX command line format so that it can be further */
+/* processed by the comamnd line decoding utilities                                     */
+/*--------------------------------------------------------------------------------------*/
 
-_PRIVATE void psrp_argvec(int *r_argc, char *request)
+_PRIVATE void psrp_argvec(uint32_t    *r_argc, const char *request)
 
-{   int  i,
-         ret;
-
-    char next_arg[SSIZE] = "";
+{   uint32_t i;
+    int32_t  ret;
+    char     next_arg[SSIZE]       = "";
 
     _IMMORTAL _BOOLEAN entered = FALSE;
 
-    for(i=0; i<256; ++i)
+    for(i=0; i<MAX_CMD_ARGS; ++i)
     {  if(entered == FALSE)
           r_argv[i] = (char *)pups_malloc(SSIZE);
        (void)strlcpy(r_argv[i],"",SSIZE);
     }
-    entered = TRUE;
 
+    entered = TRUE;
     *r_argc = 0;
 
 
@@ -5102,8 +5096,10 @@ _PRIVATE void psrp_argvec(int *r_argc, char *request)
             (void)strlcpy(r_argv[(*r_argc)],next_arg,SSIZE);
             ++(*r_argc);
 
-            if(*r_argc > 256)
-               pups_error("[psrp_argvec] too man arguments (max 256)");
+            if(*r_argc > MAX_CMD_ARGS)
+            {  (void)snprintf(errstr,SSIZE,"[psrp_argvec] too man arguments (max %d)",MAX_CMD_ARGS);
+               pups_error(errstr);
+            }
 
        } while(ret == TRUE);
 }
@@ -5111,19 +5107,15 @@ _PRIVATE void psrp_argvec(int *r_argc, char *request)
 
 
 
-/*-----------------------------------------------*/
-/* Standard initialisation function for builtins */
-/*-----------------------------------------------*/
+/*-------------------------*/
+/* Initialise PSRP handler */
+/*-------------------------*/
 
-_PUBLIC _BOOLEAN psrp_std_init(const int argc, const char *argv[])
+_PUBLIC _BOOLEAN psrp_std_init(const int32_t argc, const char *argv[])
 
-{   int i,
-        init,
-        ptr;
-
-    char                item[SSIZE] = "";
+{   uint32_t         i;
+    char             item[SSIZE] = "";
     psrp_object_type *psrp_object;
-
 
 
     /*----------------------------------*/
@@ -5153,7 +5145,7 @@ _PUBLIC _BOOLEAN psrp_std_init(const int argc, const char *argv[])
     /*---------------------------------------------------------*/
 
     argd[0] = TRUE;
-    for(i=1; i<255; ++i)
+    for(i=1; i<MAX_CMD_ARGS; ++i)
        argd[i] = FALSE;
 
     return(TRUE);
@@ -5162,13 +5154,13 @@ _PUBLIC _BOOLEAN psrp_std_init(const int argc, const char *argv[])
 
 
  
-/*----------------------------------------*/
-/* PSRP argument decode checking function */
-/*----------------------------------------*/
+/*------------------------------------------------*/
+/* PSRP handler command line parser error handler */
+/*------------------------------------------------*/
 
-_PUBLIC _BOOLEAN psrp_t_arg_errs(const int argc, const _BOOLEAN argd[], const char *args[])
+_PUBLIC _BOOLEAN psrp_t_arg_errs(const  int32_t argc, const _BOOLEAN argd[], const char *args[])
 
-{   int      i;
+{   uint32_t i;
     _BOOLEAN parse_failed = FALSE;
 
 
@@ -5211,7 +5203,7 @@ _PUBLIC _BOOLEAN psrp_t_arg_errs(const int argc, const _BOOLEAN argd[], const ch
 /* Switch error logging on or off from PSRP client */
 /*-------------------------------------------------*/
 
-_PRIVATE int psrp_builtin_appl_verbose(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_appl_verbose(const int32_t argc, const char *argv[])
 
 {   if(strcmp("appl_verbose",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -5255,7 +5247,7 @@ _PRIVATE int psrp_builtin_appl_verbose(const int argc, const char *argv[])
 /* Switch error handling on or off from PSRP client */
 /*--------------------------------------------------*/
 
-_PRIVATE int psrp_builtin_error_handling(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_error_handling(const int32_t argc, const char *argv[])
 
 {   if(strcmp("error_handling",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -5299,7 +5291,7 @@ _PRIVATE int psrp_builtin_error_handling(const int argc, const char *argv[])
 /* Set ssh compression mode for PSRP client */
 /*------------------------------------------*/
 
-_PRIVATE int psrp_builtin_ssh_compress(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_ssh_compress(const uint32_t argc, const char *argv[])
 
 {   if(strcmp("compress",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -5343,7 +5335,7 @@ _PRIVATE int psrp_builtin_ssh_compress(const int argc, const char *argv[])
 /* Set ssh remote host port for PSRP client */
 /*------------------------------------------*/
 
-_PRIVATE int psrp_builtin_ssh_port(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_ssh_port(const uint32_t argc, const char *argv[])
 
 {   char port_id[SSIZE] = "";
 
@@ -5401,7 +5393,7 @@ _PRIVATE int psrp_builtin_ssh_port(const int argc, const char *argv[])
 /* Switch error logging on or off from PSRP client */
 /*-------------------------------------------------*/
 
-_PRIVATE int psrp_builtin_transactions(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_transactions(const uint32_t argc, const char *argv[])
 
 {   if(strcmp("log",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -5447,13 +5439,9 @@ _PRIVATE int psrp_builtin_transactions(const int argc, const char *argv[])
 /* Load new dispatch table */
 /*-------------------------*/
 
-_PRIVATE int psrp_builtin_autosave_dispatch_table(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_autosave_dispatch_table(const uint32_t argc, const char *argv[])
 
-{   int  init,
-         ptr,
-         ret_code;
-
-    char item[SSIZE] = "";
+{   char item[SSIZE] = "";
 
     if(strcmp("autosave",argv[0]) != 0)
         return(PSRP_DISPATCH_ERROR);
@@ -5487,7 +5475,6 @@ _PRIVATE int psrp_builtin_autosave_dispatch_table(const int argc, const char *ar
     (void)fflush(psrp_out);
 
     return(PSRP_OK);
-
 }
 
 
@@ -5497,13 +5484,9 @@ _PRIVATE int psrp_builtin_autosave_dispatch_table(const int argc, const char *ar
 /* Load new dispatch table  */
 /*--------------------------*/
 
-_PRIVATE int psrp_builtin_load_dispatch_table(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_load_dispatch_table(const uint32_t argc, const char *argv[])
 
-{   int  init,
-         ptr,
-         ret_code;
-
-    char item[SSIZE] = "";
+{   char item[SSIZE] = "";
 
     if(strcmp("load",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -5521,7 +5504,6 @@ _PRIVATE int psrp_builtin_load_dispatch_table(const int argc, const char *argv[]
     (void)fflush(psrp_out);
 
     return(PSRP_OK);
-  
 }
 
 
@@ -5530,13 +5512,9 @@ _PRIVATE int psrp_builtin_load_dispatch_table(const int argc, const char *argv[]
 /* Save dispatch table */
 /*---------------------*/
 
-_PRIVATE int psrp_builtin_save_dispatch_table(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_save_dispatch_table(const uint32_t argc, const char *argv[])
 
-{   int  init,
-         ptr,
-         ret_code;
-
-    char item[SSIZE] = "";
+{   char item[SSIZE] = "";
 
     if(strcmp("save",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -5564,13 +5542,9 @@ _PRIVATE int psrp_builtin_save_dispatch_table(const int argc, const char *argv[]
 /* Reset dispatch table */
 /*----------------------*/
 
-_PRIVATE int psrp_builtin_reset_dispatch_table(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_reset_dispatch_table(const uint32_t argc, const char *argv[])
 
-{   int  init,
-         ptr,
-         ret_code;
-
-    char item[SSIZE] = "";
+{   char item[SSIZE] = "";
 
     if(strcmp("reset",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -5591,12 +5565,12 @@ _PRIVATE int psrp_builtin_reset_dispatch_table(const int argc, const char *argv[
 /* Builtin function detach */
 /*-------------------------*/
 
-_PRIVATE int psrp_builtin_detach_object(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_detach_object(const uint32_t argc, const char *argv[])
 
-{   int  i,
-         ret_code;
+{   uint32_t i;
+     int32_t ret_code;
 
-    char item[SSIZE] = "";
+    char     item[SSIZE] = "";
 
     if(strcmp("detach",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -5656,7 +5630,7 @@ _PRIVATE int psrp_builtin_detach_object(const int argc, const char *argv[])
 /* Builtin function to display current PSRP bindings */
 /*---------------------------------------------------*/
 
-_PRIVATE int psrp_builtin_show_hinfo(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_show_hinfo(const uint32_t  argc, const char *argv[])
 
 {   char machtype[SSIZE]  = "",
          ostype[SSIZE]    = "",
@@ -5710,7 +5684,7 @@ _PRIVATE int psrp_builtin_show_hinfo(const int argc, const char *argv[])
 /* Builtin function to display current PSRP bindings */
 /*---------------------------------------------------*/
  
-_PRIVATE int psrp_builtin_show_psrp_state(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_show_psrp_state(const uint32_t argc, const char *argv[])
  
 {   if(strcmp("show",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR); 
@@ -5747,7 +5721,7 @@ _PRIVATE int psrp_builtin_show_psrp_state(const int argc, const char *argv[])
 /* Builtin function to display current object binding types permitted on process */
 /*-------------------------------------------------------------------------------*/
 
-_PRIVATE int psrp_builtin_show_psrp_bind_type(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_show_psrp_bind_type(const uint32_t argc, const char *argv[])
 
 {   if(strcmp("bindtype",argv[0]) != 0) 
        return(PSRP_DISPATCH_ERROR);  
@@ -5812,36 +5786,36 @@ _PRIVATE int psrp_builtin_show_psrp_bind_type(const int argc, const char *argv[]
 /* Builtin function to terminate PSRP server process */
 /*---------------------------------------------------*/
 
-_PRIVATE int psrp_builtin_terminate_process(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_terminate_process(const uint32_t argc, const char *argv[])
  
-{   if(strcmp("terminate",argv[0]) != 0 && strcmp("kill",argv[0]) != 0) 
+{   sigset_t set;
+
+    if(strcmp("terminate",argv[0]) != 0 && strcmp("kill",argv[0]) != 0) 
        return(PSRP_DISPATCH_ERROR); 
 
 
-    /*---------------------------------------------*/
-    /* Set up command tail decoder for this object */
-    /*---------------------------------------------*/
-
-    //(void)pups_malarm(0);
+    (void)sigfillset(&set);
+    (void)pups_sigprocmask(SIG_BLOCK,&set,(sigset_t *)NULL);
 
 
     /*--------------------------------------*/
     /* Client termination of server process */
     /*--------------------------------------*/
 
-    (void)fprintf(psrp_out,"\n%s (%d@%s) terminated by PSRP client\n\n",appl_name,appl_pid,appl_host);
-    (void)fprintf(psrp_out,"CST\n");
-    (void)fflush(psrp_out);
+    if (appl_verbose == TRUE)
+    {  (void)fprintf(stderr,"\n%s (%d@%s) terminated by PSRP client\n\n",appl_name,appl_pid,appl_host);
+       (void)fflush(stderr);
+    }
 
 
     /*------------------------------------------------------------------------------------*/
     /* Commit suicide explicitly to invoke handler - just in case we are a session leader */
     /*------------------------------------------------------------------------------------*/
 
+
     if (appl_pg_leader == TRUE)
        (void)killpg(appl_pid,SIGTERM);
 
-    pups_sleep(1);
     pups_exit(255);
 }
 
@@ -5852,7 +5826,7 @@ _PRIVATE int psrp_builtin_terminate_process(const int argc, const char *argv[])
 /* Builtin function to add an alias the tag list of a PSRP object */
 /*----------------------------------------------------------------*/
  
-_PRIVATE int psrp_builtin_alias(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_alias(const uint32_t argc, const char *argv[])
  
 {   if(strcmp("alias",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -5885,7 +5859,7 @@ _PRIVATE int psrp_builtin_alias(const int argc, const char *argv[])
 /* Builtin function to show clients attached to this server */
 /*----------------------------------------------------------*/
 
-_PRIVATE int psrp_builtin_show_clients(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_show_clients(const uint32_t argc, const char *argv[])
 
 {   if(strcmp("clients",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -5913,10 +5887,10 @@ _PRIVATE int psrp_builtin_show_clients(const int argc, const char *argv[])
 /* Builtin function to add an alias the tag list of a PSRP object */
 /*----------------------------------------------------------------*/
  
-_PRIVATE int psrp_builtin_unalias(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_unalias(const uint32_t argc, const char *argv[])
  
-{   int  ret;
-    char basename[SSIZE] = "";
+{   int32_t ret;
+    char    basename[SSIZE] = "";
  
     if(strcmp("unalias",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -5936,9 +5910,6 @@ _PRIVATE int psrp_builtin_unalias(const int argc, const char *argv[])
        else
        {  (void)fprintf(psrp_out,"\"%s\" is no longer an alias of \"%s\"\n",argv[1],basename);
           (void)fflush(psrp_out);
-
-
-
        }
     }
        
@@ -5953,7 +5924,7 @@ _PRIVATE int psrp_builtin_unalias(const int argc, const char *argv[])
 /* Builtin function to show aliases of tag name */
 /*----------------------------------------------*/
 
-_PRIVATE int psrp_builtin_showaliases(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_showaliases(const uint32_t argc, const char *argv[])
 
 {   if(strcmp("showaliases",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -5977,11 +5948,10 @@ _PRIVATE int psrp_builtin_showaliases(const int argc, const char *argv[])
 /* without effecting the parent                                      */
 /*-------------------------------------------------------------------*/
 
-_PRIVATE int psrp_builtin_new_instance(const int r_argc, const char *r_argv[])
+_PRIVATE int32_t psrp_builtin_new_instance(const uint32_t r_argc, const char *r_argv[])
 
 { 
-
-    int ret;
+     int32_t ret;
 
     char n_i_name[SSIZE] = "",
          n_i_host[SSIZE] = "notset"; 
@@ -6185,12 +6155,12 @@ _PRIVATE int psrp_builtin_new_instance(const int r_argc, const char *r_argv[])
 
 
 /*---------------------------------*/
-/* Get state of the current object */
+/* Get state of PSRP object by tag */
 /*---------------------------------*/
 
-_PUBLIC int psrp_ostate(const char *object_tag)
+_PUBLIC int32_t psrp_ostate(const char *object_tag)
 
-{   int i;
+{   uint32_t i;
 
 
     /*----------------------------------*/
@@ -6206,7 +6176,7 @@ _PUBLIC int psrp_ostate(const char *object_tag)
        return(-1);
     }
 
-    for(i=0; i<psrp_object_list_used; ++i)
+    for(i=0; i<psrp_object_list_allocated; ++i)
        if(psrp_object_list[i].object_handle != (void *)NULL && psrp_isearch_tag_list(object_tag,i) >= 0)
        {  pups_set_errno(OK);
           return(psrp_object_list[i].object_state);
@@ -6223,7 +6193,7 @@ _PUBLIC int psrp_ostate(const char *object_tag)
 /* Builtin help function (displays server builtin functions) */
 /*-----------------------------------------------------------*/
  
-_PRIVATE int psrp_builtin_help(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_help(const uint32_t argc, const char *argv[])
  
 {   if(strcmp("shelp",argv[0]) != 0) 
        return(PSRP_DISPATCH_ERROR); 
@@ -6250,7 +6220,7 @@ _PRIVATE int psrp_builtin_help(const int argc, const char *argv[])
     /*-------------------------------------------*/  
 
     (void)fprintf(psrp_out,"\n\n    PSRP request handler version 2.17 (protocol %5.2F)\n",PSRP_PROTOCOL_VERSION);
-    (void)fprintf(psrp_out,"    (C) M.A. O'Neill, Tumbling Dice, 1995-2023\n\n");
+    (void)fprintf(psrp_out,"    (C) M.A. O'Neill, Tumbling Dice, 1995-2024\n\n");
     (void)fprintf(psrp_out,"    Builtin commands\n");
     (void)fprintf(psrp_out,"    ================\n\n");
     (void)fflush(psrp_out);
@@ -6325,21 +6295,21 @@ _PRIVATE int psrp_builtin_help(const int argc, const char *argv[])
     #ifdef CRIU_SUPPORT
     (void)fprintf(psrp_out,"    P3 server (Criu) state save control/status functions\n");
     (void)fprintf(psrp_out,"    ====================================================\n\n");
-    (void)fprintf(psrp_out,"    ssave                       |   :   Report state saving status\n");
-    (void)fprintf(psrp_out,"             [sspoll <seconds>]     :   Save state every <poll time> seconds (default 60 seconds)\n");
-    (void)fprintf(psrp_out,"                [enable       ] |   :   Enable state saving\n");
-    (void)fprintf(psrp_out,"                [disable      ] |   :   Disable state saving\n");
-    (void)fprintf(psrp_out,"                [cd <criu dir>]     :   Set Criu directory (default /tmp)\n\n\n");
+    (void)fprintf(psrp_out,"    ssave                       |    :   Report state saving status\n");
+    (void)fprintf(psrp_out,"             [sspoll <seconds>]      :   Save state every <poll time> seconds (default 60 seconds)\n");
+    (void)fprintf(psrp_out,"                [enable       ] |    :   Enable state saving\n");
+    (void)fprintf(psrp_out,"                [disable      ] |    :   Disable state saving\n");
+    (void)fprintf(psrp_out,"                [cd <criu dir>]      :   Set Criu directory (default /tmp)\n\n\n");
     (void)fflush(psrp_out);
     #endif /* CRIU_SUPPORT */
 
 
     (void)fprintf(psrp_out,"    P3 sofware watchdog functions\n");
     (void)fprintf(psrp_out,"    =============================\n\n");
-    (void)fprintf(psrp_out,"    softdog                         :   Report software watchdog status\n");
-    (void)fprintf(psrp_out,"           [timoeout <seconds>]     :   Save state every <poll time> seconds (default 60 seconds)\n");
-    (void)fprintf(psrp_out,"                [enable       ] |   :   Enable software watchdog\n");
-    (void)fprintf(psrp_out,"                [disable      ]     :   Disable software watchdog\n\n\n");
+    (void)fprintf(psrp_out,"    softdog                          :   Report software watchdog status\n");
+    (void)fprintf(psrp_out,"                [timeout  <secs>]    :   Save state every <poll time> seconds (default 60 seconds)\n");
+    (void)fprintf(psrp_out,"                [enable       ] |    :   Enable software watchdog\n");
+    (void)fprintf(psrp_out,"                [disable      ]      :   Disable software watchdog\n\n\n");
 
 
     #ifdef BUBBLE_MEMORY_SUPPORT
@@ -6367,7 +6337,7 @@ _PRIVATE int psrp_builtin_help(const int argc, const char *argv[])
 
     (void)fprintf(psrp_out,"    P3 server (attached) fast cache status\n");
     (void)fprintf(psrp_out,"    ======================================\n\n");
-    (void)fprintf(psrp_out,"    cachestat                        :   display (fast) caches mapped into process address space\n\n\n");
+    (void)fprintf(psrp_out,"    cachestat                        :   display (fast) caches mapped  int32_to process address space\n\n\n");
     (void)fflush(psrp_out);
 
     (void)fprintf(psrp_out,"    P3 server process cron scheduler control/status functions\n");
@@ -6460,7 +6430,7 @@ _PRIVATE int psrp_builtin_help(const int argc, const char *argv[])
 /* Show orifices which are bound to this application */
 /*---------------------------------------------------*/
 
-_PRIVATE int psrp_builtin_show_attached_orifices(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_show_attached_orifices(const uint32_t argc, const char *argv[])
 
 {   if(strcmp("ostat",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -6485,7 +6455,7 @@ _PRIVATE int psrp_builtin_show_attached_orifices(const int argc, const char *arg
 /* Show threads of execution running in this application */
 /*-------------------------------------------------------*/
 
-_PRIVATE int psrp_builtin_show_threads(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_show_threads(const uint32_t argc, const char *argv[])
 
 {   if(strcmp("tstat",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -6497,7 +6467,7 @@ _PRIVATE int psrp_builtin_show_threads(const int argc, const char *argv[])
        return(PSRP_OK);
     }
     else if(argc == 2)
-    {  int nid;
+    {  int32_t nid;
 
 
        /*--------------------------------*/
@@ -6505,7 +6475,7 @@ _PRIVATE int psrp_builtin_show_threads(const int argc, const char *argv[])
        /*--------------------------------*/
 
        if(sscanf(argv[1],"%d",&nid) != 1 || nid < 0)
-       {  (void)fprintf(psrp_out,"expecting integer value (>= 0) for (thread) nid\n");
+       {  (void)fprintf(psrp_out,"expecting  integer value (>= 0) for (thread) nid\n");
           (void)fflush(psrp_out);
 
           return(PSRP_OK);
@@ -6522,8 +6492,6 @@ _PRIVATE int psrp_builtin_show_threads(const int argc, const char *argv[])
        
           return(PSRP_OK);
        }
-
-
     }
     else
        (void)pupsthread_show_ttab(psrp_out);
@@ -6538,10 +6506,10 @@ _PRIVATE int psrp_builtin_show_threads(const int argc, const char *argv[])
 /* Start a new thread of execution (using dispatch table object) */
 /*---------------------------------------------------------------*/
 
-_PRIVATE int psrp_builtin_launch_thread(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_launch_thread(const uint32_t argc, const char *argv[])
 
-{   int i,
-        d_index;
+{   uint32_t i;
+    int32_t  d_index;
 
     char tname[SSIZE] = "";
 
@@ -6609,13 +6577,13 @@ _PRIVATE int psrp_builtin_launch_thread(const int argc, const char *argv[])
                                 tfunc,                       /* Payload function to be run by thread         */
                                 targs)) != (pthread_t)NULL)  /* Payload arguments                            */
                                                              /*----------------------------------------------*/
-    {  int tpid,
-           t_index;
+    {   int32_t tpid,
+                t_index;
 
        t_index = pupsthread_tid2nid(tid);
        tpid    = pupsthread_nid2tpid(t_index);
        (void)fprintf(psrp_out,"Thread %d (LWP: %d, payload function: \"%-32s\") launched (at %016lx virtual)\n",
-                                                                      t_index,tpid,tname,(unsigned long int)tid);
+                                                                               t_index,tpid,tname,(uint64_t)tid);
        (void)fflush(psrp_out);
     }
     else
@@ -6633,7 +6601,7 @@ _PRIVATE int psrp_builtin_launch_thread(const int argc, const char *argv[])
 /* Pause thread executing in this application */
 /*--------------------------------------------*/
 
-_PRIVATE int psrp_builtin_pause_thread(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_pause_thread(const uint32_t argc, const char *argv[])
 
 {   pthread_t tid;
 
@@ -6661,13 +6629,13 @@ _PRIVATE int psrp_builtin_pause_thread(const int argc, const char *argv[])
        }
 
        if(pupsthread_pause(tid) == (-1))
-       {  (void)fprintf(psrp_out,"Thread (%lx, name \"%s\") failed to stop\n",(unsigned long int)tid,argv[1]);
+       {  (void)fprintf(psrp_out,"Thread (%lx, name \"%s\") failed to stop\n",(uint64_t)tid,argv[1]);
           (void)fflush(psrp_out);
 
           return(PSRP_OK);
        }
 
-       (void)fprintf(psrp_out,"Thread (%lx, name \"%s\") paused\n",(unsigned long int)tid,argv[1]);
+       (void)fprintf(psrp_out,"Thread (%lx, name \"%s\") paused\n",(uint64_t)tid,argv[1]);
        (void)fflush(psrp_out);
 
        return(PSRP_OK);
@@ -6679,10 +6647,10 @@ _PRIVATE int psrp_builtin_pause_thread(const int argc, const char *argv[])
     /*-------------------*/
 
     else
-    {  int i,
-           t_cnt = 0;
+    {   int32_t i,
+                t_cnt = 0;
 
-       char tmpname[SSIZE] = "";
+       char     tmpname[SSIZE] = "";
 
        (void)pthread_mutex_lock(&ttab_mutex);
 
@@ -6696,11 +6664,11 @@ _PRIVATE int psrp_builtin_pause_thread(const int argc, const char *argv[])
           {  tid = ttab[i].tid;
              (void)strlcpy(tmpname,ttab[i].tfuncname,SSIZE);
              if(pupsthread_pause(tid) == (-1))
-             {  (void)fprintf(psrp_out,"Thread (%lx, name \"%s\") failed to stop\n",(unsigned long int)tid,tmpname);
+             {  (void)fprintf(psrp_out,"Thread (%lx, name \"%s\") failed to stop\n",(uint64_t)tid,tmpname);
                 (void)fflush(psrp_out);
              }
              else
-             {  (void)fprintf(psrp_out,"Thread (%lx, name \"%s\") stopped\n",(unsigned long int)tid,tmpname);
+             {  (void)fprintf(psrp_out,"Thread (%lx, name \"%s\") stopped\n",(uint64_t)tid,tmpname);
                 (void)fflush(psrp_out);
 
                 ++t_cnt;
@@ -6728,7 +6696,7 @@ _PRIVATE int psrp_builtin_pause_thread(const int argc, const char *argv[])
 /* Restart thread executing in this application */
 /*----------------------------------------------*/
 
-_PRIVATE int psrp_builtin_restart_thread(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_restart_thread(const uint32_t argc, const char *argv[])
 
 {   pthread_t tid;
 
@@ -6756,13 +6724,13 @@ _PRIVATE int psrp_builtin_restart_thread(const int argc, const char *argv[])
        }
 
        if(pupsthread_cont(tid) == (-1))
-       {  (void)fprintf(psrp_out,"Thread (%lx, name \"%s\") failed to restart\n",(unsigned long int)tid,argv[1]);
+       {  (void)fprintf(psrp_out,"Thread (%lx, name \"%s\") failed to restart\n",(uint64_t)tid,argv[1]);
           (void)fflush(psrp_out);
 
           return(PSRP_OK);
        }
 
-       (void)fprintf(psrp_out,"Thread (%lx, name \"%s\") restarted\n",(unsigned long int)tid,argv[1]);
+       (void)fprintf(psrp_out,"Thread (%lx, name \"%s\") restarted\n",(uint64_t)tid,argv[1]);
        (void)fflush(psrp_out);
 
        return(PSRP_OK);
@@ -6774,10 +6742,10 @@ _PRIVATE int psrp_builtin_restart_thread(const int argc, const char *argv[])
     /*---------------------*/
 
     else
-    {  int i,
-           t_cnt = 0;
+    {  uint32_t i,
+                t_cnt          = 0;
 
-       char tmpname[SSIZE] = "";
+       char     tmpname[SSIZE] = "";
 
        (void)pthread_mutex_lock(&ttab_mutex);
 
@@ -6791,11 +6759,11 @@ _PRIVATE int psrp_builtin_restart_thread(const int argc, const char *argv[])
           {  tid = ttab[i].tid;
              (void)strlcpy(tmpname,ttab[i].tfuncname,SSIZE);
              if(pupsthread_cont(tid) == (-1))
-             {  (void)fprintf(psrp_out,"Thread (%lx, name \"%s\") failed to restart\n",(unsigned long int)tid,tmpname);
+             {  (void)fprintf(psrp_out,"Thread (%lx, name \"%s\") failed to restart\n",(uint64_t)tid,tmpname);
                 (void)fflush(psrp_out);
              }
              else
-             {  (void)fprintf(psrp_out,"Thread (%lx, name \"%s\") restarted\n",(unsigned long int)tid,tmpname);
+             {  (void)fprintf(psrp_out,"Thread (%lx, name \"%s\") restarted\n",(uint64_t)tid,tmpname);
                 (void)fflush(psrp_out);
 
                 ++t_cnt;
@@ -6822,7 +6790,7 @@ _PRIVATE int psrp_builtin_restart_thread(const int argc, const char *argv[])
 /* Kill thread executing in this application */
 /*-------------------------------------------*/
 
-_PRIVATE int psrp_builtin_kill_thread(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_kill_thread(const uint32_t argc, const char *argv[])
 
 {   pthread_t tid;
 
@@ -6850,13 +6818,13 @@ _PRIVATE int psrp_builtin_kill_thread(const int argc, const char *argv[])
        }
 
        if(pupsthread_cancel(tid) == (-1))
-       {  (void)fprintf(psrp_out,"Thread (%lx, name \"%s\") failed to terminate\n",(unsigned long int)tid,argv[1]);
+       {  (void)fprintf(psrp_out,"Thread (%lx, name \"%s\") failed to terminate\n",(uint64_t)tid,argv[1]);
           (void)fflush(psrp_out);
 
           return(PSRP_OK);
        }
     
-       (void)fprintf(psrp_out,"Thread (%lx, name \"%s\") terminated\n",(unsigned long int)tid,argv[1]);
+       (void)fprintf(psrp_out,"Thread (%lx, name \"%s\") terminated\n",(uint64_t)tid,argv[1]);
        (void)fflush(psrp_out);
 
        return(PSRP_OK);
@@ -6868,10 +6836,10 @@ _PRIVATE int psrp_builtin_kill_thread(const int argc, const char *argv[])
     /*------------------*/
 
     else
-    {  int i,
-           t_cnt = 0;
+    {  uint32_t i,
+                t_cnt          = 0;
 
-       char tmpname[SSIZE] = "";
+       char     tmpname[SSIZE] = "";
 
        (void)pthread_mutex_lock(&ttab_mutex);
 
@@ -6885,11 +6853,11 @@ _PRIVATE int psrp_builtin_kill_thread(const int argc, const char *argv[])
           {  tid = ttab[i].tid;
              (void)strlcpy(tmpname,ttab[i].tfuncname,SSIZE);
              if(pupsthread_cancel(tid) == (-1))
-             {  (void)fprintf(psrp_out,"Thread (%lx, name \"%s\") failed to terminate\n",(unsigned long int)tid,tmpname);
+             {  (void)fprintf(psrp_out,"Thread (%lx, name \"%s\") failed to terminate\n",(uint64_t)tid,tmpname);
                 (void)fflush(psrp_out);
              }
              else
-             {  (void)fprintf(psrp_out,"Thread (%lx, name \"%s\") terminated\n",(unsigned long int)tid,tmpname);
+             {  (void)fprintf(psrp_out,"Thread (%lx, name \"%s\") terminated\n",(uint64_t)tid,tmpname);
                 (void)fflush(psrp_out);
 
                 ++t_cnt;
@@ -6918,7 +6886,7 @@ _PRIVATE int psrp_builtin_kill_thread(const int argc, const char *argv[])
 /* Show /proc filesystem entries for this process */
 /*------------------------------------------------*/
 
-_PRIVATE int psrp_builtin_show_procstatus(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_show_procstatus(const uint32_t argc, const char *argv[])
 
 {   char appl_procstatus[SSIZE] = "",
          line[SSIZE]            = "";
@@ -6965,7 +6933,7 @@ _PRIVATE int psrp_builtin_show_procstatus(const int argc, const char *argv[])
 /* Show link file locks held by this application */
 /*-----------------------------------------------*/
 
-_PRIVATE int psrp_builtin_show_link_file_locks(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_show_link_file_locks(const uint32_t argc, const char *argv[])
 
 {   if(strcmp("lflstat",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -6977,11 +6945,11 @@ _PRIVATE int psrp_builtin_show_link_file_locks(const int argc, const char *argv[
 
 
 
-/*------------------------------------------------------------------------------------------
-    Show flock locks held by this application ...
-------------------------------------------------------------------------------------------*/
+/*-------------------------------------------*/
+/* Show flock locks held by this application */
+/*-------------------------------------------*/
 
-_PRIVATE int psrp_builtin_show_flock_locks(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_show_flock_locks(const uint32_t argc, const char *argv[])
 
 {   if(strcmp("flstat",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -6997,7 +6965,7 @@ _PRIVATE int psrp_builtin_show_flock_locks(const int argc, const char *argv[])
 /* Show non-default signal handlers installed for this application */
 /*-----------------------------------------------------------------*/
 
-_PRIVATE int psrp_builtin_show_sigstatus(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_show_sigstatus(const uint32_t argc, const char *argv[])
 
 {   if(strcmp("sigstat",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -7008,7 +6976,7 @@ _PRIVATE int psrp_builtin_show_sigstatus(const int argc, const char *argv[])
     /*------------------------------------------*/
 
     if(argc > 1)
-    {  int i;
+    {  uint32_t i;
 
        for(i=1; i<argc; ++i)
        {  if(pups_show_siglstatus(pups_signametosigno(argv[i]),psrp_out) == (-1))
@@ -7036,7 +7004,7 @@ _PRIVATE int psrp_builtin_show_sigstatus(const int argc, const char *argv[])
 /* Show signal mask and signals pending for this application */
 /*-----------------------------------------------------------*/
 
-_PRIVATE int psrp_builtin_show_sigmaskstatus(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_show_sigmaskstatus(const uint32_t argc, const char *argv[])
 
 {   if(strcmp("maskstat",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -7052,7 +7020,7 @@ _PRIVATE int psrp_builtin_show_sigmaskstatus(const int argc, const char *argv[])
 /* Show file descriptors opened by this application */
 /*--------------------------------------------------*/
 
-_PRIVATE int psrp_builtin_show_open_fdescriptors(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_show_open_fdescriptors(const uint32_t argc, const char *argv[])
 
 {   if(strcmp("fstat",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -7068,7 +7036,7 @@ _PRIVATE int psrp_builtin_show_open_fdescriptors(const int argc, const char *arg
 /* Show (active) children of current process */
 /*-------------------------------------------*/
 
-_PRIVATE int psrp_builtin_show_children(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_show_children(const uint32_t argc, const char *argv[])
 
 {   if(strcmp("cstat",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -7083,7 +7051,7 @@ _PRIVATE int psrp_builtin_show_children(const int argc, const char *argv[])
 /* Show (fast) caches curently mapped into the address space of this application */
 /*-------------------------------------------------------------------------------*/
 
-_PRIVATE int psrp_builtin_show_caches(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_show_caches(const uint32_t argc, const char *argv[])
 
 {   if(strcmp("cachestat",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -7095,9 +7063,9 @@ _PRIVATE int psrp_builtin_show_caches(const int argc, const char *argv[])
     }
 
     if(argc == 2)
-    {  int c_index; 
+    {  int32_t c_index; 
 
-       c_index = cache_name2index(argv[1]);
+       c_index = cache_name2index(FALSE,argv[1]);
        if(cache_display_statistics(FALSE,psrp_out,c_index) == (-1))
        {  (void)fprintf(psrp_out,"\ncache \"%s\" is not mapped into addrees space of \"%s\"\n",argv[1],appl_name);
           (void)fflush(psrp_out);
@@ -7120,7 +7088,7 @@ _PRIVATE int psrp_builtin_show_caches(const int argc, const char *argv[])
 /* form hstat <heap> show the object map of that heap                        */
 /*---------------------------------------------------------------------------*/
 
-_PRIVATE int psrp_builtin_show_persistent_heaps(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_show_persistent_heaps(const uint32_t argc, const char *argv[])
 
 {   if(strcmp("hstat",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -7142,8 +7110,8 @@ _PRIVATE int psrp_builtin_show_persistent_heaps(const int argc, const char *argv
     /*---------------------------------------------*/
 
     if(argc >= 2)
-    {  int  h_index;
-       char heapname[SSIZE] = "";
+    {   int32_t h_index;
+       char     heapname[SSIZE] = "";
 
 
        /*--------------*/
@@ -7181,7 +7149,7 @@ _PRIVATE int psrp_builtin_show_persistent_heaps(const int argc, const char *argv
        /*------------------------------------*/
 
        else
-       {  int o_index;
+       {  int32_t o_index;
 
           if(sscanf(argv[2],"%d",&o_index) != 1 ||  o_index < 0)
           {  if((o_index = msm_map_objectname2index(h_index,argv[2])) == (-1))
@@ -7221,7 +7189,7 @@ _PRIVATE int psrp_builtin_show_persistent_heaps(const int argc, const char *argv
 /* Show slaved interation client channels opened by this application */
 /*-------------------------------------------------------------------*/
 
-_PRIVATE int psrp_builtin_show_open_sics(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_show_open_sics(const uint32_t argc, const char *argv[])
 
 {   if(strcmp("sicstat",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -7237,7 +7205,7 @@ _PRIVATE int psrp_builtin_show_open_sics(const int argc, const char *argv[])
 /* Show (PUPS) entrance functions bound to application */
 /*-----------------------------------------------------*/
 
-_PRIVATE int psrp_builtin_pups_show_entrance_f(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_pups_show_entrance_f(const uint32_t argc, const char *argv[])
 
 {   if(strcmp("atentrance",argv[0]) != 0) 
        return(PSRP_DISPATCH_ERROR); 
@@ -7253,7 +7221,7 @@ _PRIVATE int psrp_builtin_pups_show_entrance_f(const int argc, const char *argv[
 /* Show (PUPS) exit functions bound to application */
 /*-------------------------------------------------*/
 
-_PRIVATE int psrp_builtin_pups_show_exit_f(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_pups_show_exit_f(const uint32_t argc, const char *argv[])
 
 {   if(strcmp("atexit",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -7268,7 +7236,7 @@ _PRIVATE int psrp_builtin_pups_show_exit_f(const int argc, const char *argv[])
 /* Show (PUPS) exit functions bound to application */
 /*-------------------------------------------------*/
 
-_PRIVATE int psrp_builtin_pups_show_abort_f(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_pups_show_abort_f(const uint32_t argc, const char *argv[])
 
 {   if(strcmp("atabort",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -7286,7 +7254,7 @@ _PRIVATE int psrp_builtin_pups_show_abort_f(const int argc, const char *argv[])
 /* Show (PUPS) virtual interval timers associated with application */
 /*-----------------------------------------------------------------*/
 
-_PRIVATE int psrp_builtin_pups_show_vitimers(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_pups_show_vitimers(const uint32_t argc, const char *argv[])
 
 {   if(strcmp("vitstat",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -7302,9 +7270,9 @@ _PRIVATE int psrp_builtin_pups_show_vitimers(const int argc, const char *argv[])
 /* Show tracked heap memory objects */
 /*----------------------------------*/
 
-_PRIVATE int psrp_builtin_show_htobjects(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_show_htobjects(const uint32_t argc, const char *argv[])
 
-{   int objects;
+{   uint32_t objects;
 
     if(strcmp("hostat",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -7317,13 +7285,14 @@ _PRIVATE int psrp_builtin_show_htobjects(const int argc, const char *argv[])
     }
 
     if(sscanf(argv[1],"%d",&objects) == 1)
-       pups_tshowobjects(psrp_out,objects);
+       pups_tshowobjects(psrp_out,&objects);
     else
-    {  int i;
+    {  uint32_t    i,
+                    pos;
 
        if(argc >= 2)
        {  for(i=1; i<argc; ++i)
-          {  int cnt          = 0;
+          {  int32_t  cnt          = 0;
              _BOOLEAN is_name = FALSE;
              void     *ptr    = (void *)NULL;
 
@@ -7332,8 +7301,8 @@ _PRIVATE int psrp_builtin_show_htobjects(const int argc, const char *argv[])
              /* Search matab by (partial) name */ 
              /*--------------------------------*/ 
 
-             (void)pups_tpartnametoptr("RESET");
-             while((ptr = pups_tpartnametoptr(argv[i])) != (void *)NULL)
+             pos = 0;
+             while((ptr = pups_tpartnametoptr(&pos, argv[i])) != (void *)NULL)
              {    is_name = TRUE;
 
                   pups_tshowobject(psrp_out,ptr);
@@ -7346,8 +7315,8 @@ _PRIVATE int psrp_builtin_show_htobjects(const int argc, const char *argv[])
              /*-----------------------------------*/
 
              if(is_name == FALSE)
-             {  (void)pups_ttypetoptr("RESET");
-                while((ptr = pups_ttypetoptr(argv[i])) != (void *)NULL)
+             {  pos = 0;
+                while((ptr = pups_ttypetoptr(&pos ,argv[i])) != (void *)NULL)
                 {    pups_tshowobject(psrp_out,ptr);
                      ++cnt;
                 }
@@ -7369,10 +7338,10 @@ _PRIVATE int psrp_builtin_show_htobjects(const int argc, const char *argv[])
 
 
 /*--------------------------------------------*/
-/* Destroy psrp object (releasing its memory) */
+/* Destroy PSRP object by handler table index */
 /*--------------------------------------------*/
 
-_PUBLIC void psrp_destroy_object(const unsigned int slot_index)
+_PUBLIC void psrp_destroy_object(const uint32_t slot_index)
 
 {   
 
@@ -7402,7 +7371,16 @@ _PUBLIC void psrp_error(const char *error_string)
        return;
     }
 
-    (void)fprintf(psrp_out,"[psrp ERROR] %s\n",error_string);
+    /*----------------------------------*/
+    /* Only the root thread can process */
+    /* PSRP requests                    */
+    /*----------------------------------*/
+
+    if(pupsthread_is_root_thread() == FALSE)
+       pups_error("[psrp_destroy_object] attempt by non root thread to perform PUPS/P3 PSRP operation");
+
+
+    (void)fprintf(psrp_out,"[psrp %sERROR%s] %s\n",boldOn,boldOff,error_string);
     (void)fflush(psrp_out);
 
     pups_set_errno(OK);
@@ -7411,23 +7389,22 @@ _PUBLIC void psrp_error(const char *error_string)
 
 
 
-/*-----------------------------------------------------------------------------------------*/
-/* Do a name to pid conversion if user has given the name of the PSRP server process to be */
-/* contacted                                                                               */                                                         
-/*-----------------------------------------------------------------------------------------*/
+/*-----------------------------------*/
+/* Get process pid from process name */
+/*-----------------------------------*/
 
-_PUBLIC int psrp_pname_to_pid(const char *process_name)
+_PUBLIC pid_t psrp_pname_to_pid(const char *process_name)
 
-{   int  pid,
-         cnt        = 0,
-         target_pid = PSRP_TERMINATED;
+{   int32_t       target_pid         = PSRP_TERMINATED;
+    pid_t         pid;
+    uint32_t      cnt                = 0;
 
-    char cmd_line[SSIZE]    = "",
-         procpidpath[SSIZE] = "";
+    char          cmd_line[SSIZE]    = "",
+                  procpidpath[SSIZE] = "";
 
-    FILE          *stream    = (FILE *)NULL;
-    DIR           *dirp      = (DIR *)NULL;
-    struct dirent *next_item = (struct dirent *)NULL;
+    FILE          *stream            = (FILE *)NULL;
+    DIR           *dirp              = (DIR *)NULL;
+    struct dirent *next_item         = (struct dirent *)NULL;
 
     if(process_name == (const char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -7446,7 +7423,7 @@ _PUBLIC int psrp_pname_to_pid(const char *process_name)
     /*----------------------------------*/
 
     if(pupsthread_is_root_thread() == FALSE)
-       error("[psrp_pname_to_pid] attempt by non root thread to perform PUPS/P3 PSRP operation");
+       pups_error("[psrp_pname_to_pid] attempt by non root thread to perform PUPS/P3 PSRP operation");
 
 
     /*----------------------------*/
@@ -7485,17 +7462,15 @@ _PUBLIC int psrp_pname_to_pid(const char *process_name)
     return(target_pid);
 }
 
-            
                
             
                                         
 
-/*----------------------------------------------------------------------------------------*/
-/* Do a pid to name conversion if user has given the pid of the PSRP server process to be */
-/* contacted                                                                              */
-/*----------------------------------------------------------------------------------------*/
+/*---------------------------*/
+/* Get process name from pid */
+/*---------------------------*/
 
-_PUBLIC _BOOLEAN psrp_pid_to_pname(const int pid, char *process_name) 
+_PUBLIC _BOOLEAN psrp_pid_to_pname(const pid_t pid, char *process_name) 
 
 {   FILE *stream = (FILE *)NULL;
 
@@ -7514,7 +7489,7 @@ _PUBLIC _BOOLEAN psrp_pid_to_pname(const int pid, char *process_name)
     /*----------------------------------*/
 
     if(pupsthread_is_root_thread() == FALSE)
-       error("[psrp_pid_to_pname] attempt by non root thread to perform PUPS/P3 PSRP operation");
+       pups_error("[psrp_pid_to_pname] attempt by non root thread to perform PUPS/P3 PSRP operation");
 
 
     /*-------------------------*/
@@ -7545,25 +7520,27 @@ _PUBLIC _BOOLEAN psrp_pid_to_pname(const int pid, char *process_name)
 
 
 
-/*---------------------------------------------------------------------------*/
-/* Get pid from psrp channel name (given process name running on given host) */
-/*---------------------------------------------------------------------------*/
+/*--------------------------------*/
+/* Get pid from PSRP channel name */
+/*--------------------------------*/
 
-_PUBLIC int psrp_channelname_to_pid(const char *patchboard_path,  // Patchboard containing channel information
-                                    char       *process_name,     // Name of process for which corresponding pid required
-                                    char       *process_host)     // Name of host running process
+_PUBLIC pid_t psrp_channelname_to_pid(const char *patchboard_path,  // Patchboard containing channel information
+                                      const char *process_name,     // Name of process for which corresponding pid required
+                                      const char *process_host)     // Name of host running process
 
-{   int  i,
-         entry_cnt,
-         d_cnt           = 0,
-         old_target_pid  = PSRP_TERMINATED,
-         target_pid      = PSRP_TERMINATED,
-         target_uid      = (-1);
+{   uint32_t i,
+             entry_cnt,
+             d_cnt                       = 0;
+
+    pid_t    old_target_pid              = PSRP_TERMINATED,
+             target_pid                  = PSRP_TERMINATED;
+
+    uid_t    target_uid                  = (-1);
          
-    char strdum[SSIZE]               = "",
-         tmpstr[SSIZE]               = "",
-         channel_process_name[SSIZE] = "",
-         **entries                   = (char **)NULL;
+    char     strdum[SSIZE]               = "",
+             tmpstr[SSIZE]               = "",
+             channel_process_name[SSIZE] = "",
+             **entries                   = (char **)NULL;
 
 
     /*----------------------------------*/
@@ -7601,7 +7578,7 @@ _PUBLIC int psrp_channelname_to_pid(const char *patchboard_path,  // Patchboard 
     {  (void)mchrep(' ',"#",entries[i]);
 
        if(strin(entries[i],"psrp") == TRUE && strin(entries[i],"in") == TRUE)
-       {  int tmp_pid;
+       {  int32_t tmp_pid;
 
           (void)sscanf(entries[i],"%s%s%s%s%s%d%d",strdum,channel_process_name,process_host,strdum,strdum,&tmp_pid,&target_uid);
 
@@ -7623,6 +7600,7 @@ _PUBLIC int psrp_channelname_to_pid(const char *patchboard_path,  // Patchboard 
                 pups_set_errno(EEXIST);
                 return(PSRP_DUPLICATE_PROCESS_NAME);
              }
+
              else
              {  target_pid     = tmp_pid;
                 old_target_pid = target_pid;
@@ -7657,23 +7635,24 @@ _PUBLIC int psrp_channelname_to_pid(const char *patchboard_path,  // Patchboard 
 
 
 
-/*----------------------------------------------------------*/
-/* Get psrp channel name from psrp channel name (given pid) */
-/*----------------------------------------------------------*/
+/*---------------------------------------------*/
+/* Resolve process name from PSRP channel name */
+/*---------------------------------------------*/
 
 _PUBLIC _BOOLEAN psrp_pid_to_channelname(const char *patchboard_path,  // Patchboard containing channel information
-                                         const int               pid,  // Pid for which corresponding channelname is required
+                                         const pid_t             pid,  // Pid for which corresponding channelname is required
                                          char          *process_name,  // Name of process corresponding to pid
                                          char          *process_host)  // Name of host running process corresponding to pid
 
-{  int  i,
-        uid,
-        entry_cnt,
-        d_cnt = 0;
+{  uint32_t i,
+            entry_cnt,
+            d_cnt          = 0;
 
-   char strdum[SSIZE]  = "",
-        pid_str[SSIZE] = "",
-        **entries      = (char **)NULL;
+   uid_t    uid;
+
+   char     strdum[SSIZE]  = "",
+            pid_str[SSIZE] = "",
+            **entries      = (char **)NULL;
 
 
     /*----------------------------------*/
@@ -7724,7 +7703,7 @@ _PUBLIC _BOOLEAN psrp_pid_to_channelname(const char *patchboard_path,  // Patchb
     if(d_cnt > 0)
     {  for(i=0; i<d_cnt; ++i)    
        {  if(strin(entries[i],"psrp") == TRUE)
-          {  int tmp_pid;
+          {  int32_t tmp_pid;
 
              (void)mchrep(' ',"#",entries[i]);
              (void)sscanf(entries[i],"%s%s%s%s%s%d%d",strdum,process_name,process_host,strdum,strdum,&tmp_pid,&uid);
@@ -7782,15 +7761,16 @@ _PUBLIC _BOOLEAN psrp_pid_to_channelname(const char *patchboard_path,  // Patchb
 
 _PRIVATE void psrp_initsic(void)
 
-{   int  i;
+{   uint32_t i;
 
     for(i=0; i<PSRP_MAX_SIC_CHANNELS; ++i)
-    {  channel[i].in_name    = (char *)NULL;
-       channel[i].out_name   = (char *)NULL;
-       channel[i].host_name  = (char *)NULL;
-       channel[i].ssh_port   = (char *)NULL;
-       channel[i].pen        = (char *)NULL;
-       channel[i].index      = FREE;
+    {  (void)strlcpy(channel[i].in_name,  "",SSIZE);
+       (void)strlcpy(channel[i].out_name, "",SSIZE);
+       (void)strlcpy(channel[i].host_name,"",SSIZE);
+       (void)strlcpy(channel[i].ssh_port, "",SSIZE);
+       (void)strlcpy(channel[i].pen,      "",SSIZE);
+
+       channel[i].index      = FREE; 
        channel[i].in_stream  = (FILE *)NULL;
        channel[i].out_stream = (FILE *)NULL;
     }
@@ -7798,7 +7778,7 @@ _PRIVATE void psrp_initsic(void)
     if(appl_verbose == TRUE)
     {  strdate(date);
 
-       (void)fprintf(stderr,"%s %s (%d@%s:%s): PSRP slaved interaction clients (%d channels available)\n",
+       (void)fprintf(stderr,"%s %s (%d@%s:%s): PSRP slaved  interaction clients (%d channels available)\n",
                                        date,appl_name,appl_pid,appl_host,appl_owner,PSRP_MAX_SIC_CHANNELS);
        (void)fflush(stderr);
     }
@@ -7808,14 +7788,14 @@ _PRIVATE void psrp_initsic(void)
 
 
 #ifdef PERSISTENT_HEAP_SUPPORT
-/*----------------------------------------------------*/
-/* Show persistent heaps attached to this PSRP server */
-/*----------------------------------------------------*/
+/*---------------------------------------------------------*/
+/* Show persistent heaps mapped into process address space */
+/*---------------------------------------------------------*/
 
 _PUBLIC void psrp_show_persistent_heaps(const FILE *stream)
 
-{   int i,
-        heaps = 0;
+{   uint32_t i,
+             heaps = 0;
 
 
     /*----------------------------------*/
@@ -7871,7 +7851,7 @@ _PUBLIC void psrp_show_persistent_heaps(const FILE *stream)
 
           (void)fprintf(stream,"    %04d: \"%-32s\"  mapped at %016lx virtual (size %016lx bytes)\n",i,
                                                                                         htable[i].name,
-                                                                     (unsigned long int)htable[i].addr,
+                                                                     (uint64_t         )htable[i].addr,
                                                                      htable[i].edata - htable[i].sdata);
           (void)fflush(stream);
 
@@ -7889,9 +7869,9 @@ _PUBLIC void psrp_show_persistent_heaps(const FILE *stream)
        (void)fflush(stream);
     }
     else if(heaps == 1)
-       (void)fprintf(stream,"\n\n    %04d persistent heap mapped into process address space (%04d slots free)\n\n",1,appl_max_pheaps,appl_max_pheaps - 1);
+       (void)fprintf(stream,"\n\n    %04d persistent heap mapped  int32_to process address space (%04d slots free)\n\n",1,appl_max_pheaps,appl_max_pheaps - 1);
     else if(heaps > 1)
-       (void)fprintf(stream,"\n\n    %04d persistent heaps mapped into process address space (%04d slots free)\n\n",heaps,appl_max_pheaps,appl_max_pheaps - heaps);
+       (void)fprintf(stream,"\n\n    %04d persistent heaps mapped  int32_to process address space (%04d slots free)\n\n",heaps,appl_max_pheaps,appl_max_pheaps - heaps);
 
     (void)fflush(stream);
 
@@ -7906,14 +7886,14 @@ _PUBLIC void psrp_show_persistent_heaps(const FILE *stream)
 
 
 
-/*------------------------------------------------------*/
-/* Show PSRP slaved client channels open on this server */
-/*------------------------------------------------------*/
+/*----------------------------------*/
+/* Show open slaved client channels */
+/*----------------------------------*/
 
 _PUBLIC void psrp_show_open_sics(const FILE *stream)
 
-{   int i,
-        sics = 0;
+{   uint32_t i,
+             sics = 0;
 
 
     /*----------------------------------*/
@@ -7976,11 +7956,9 @@ _PUBLIC void psrp_show_open_sics(const FILE *stream)
                                                         
 
 
-
-
-/*----------------------------------------------*/
-/* Send a single command to PSRP server process */
-/*----------------------------------------------*/
+/*-------------------------------------------------*/
+/* Create connection to slaved PSRP client process */
+/*-------------------------------------------------*/
 
 #ifdef SSH_SUPPORT
 _PUBLIC psrp_channel_type *psrp_create_slaved_interaction_client(const char  *host_name,  // Host to create client on 
@@ -7989,24 +7967,25 @@ _PUBLIC psrp_channel_type *psrp_create_slaved_interaction_client(const char  *ho
 #else
 _PUBLIC psrp_channel_type *psrp_create_slaved_interaction_client(const char  *psrp_pen)   // PEN of client
 #endif /* SSH_SUPPORT */
-{   int  i,
-         ssh_portNo                   = (-1), 
-         sic_index,
-         scp,
-         ft_index,
-         get_items;
+{   uint32_t i,
+             sic_index;
 
-    char eff_psrp_pen[SSIZE]          = "psrp",
-         sic_channel_in_name[SSIZE]   = "",
-         sic_channel_out_name[SSIZE]  = "",
-         psrp_command[SSIZE]          = "",
-         psrp_pathname[SSIZE]         = "",
-         pwd_file_name[SSIZE]         = "",
-         slaved_psrp_client_ok[SSIZE] = "";
+    int32_t  ssh_portNo                   = (-1), 
+             scp,
+             ft_index,
+             get_items;
 
-    _BOOLEAN local_client             = TRUE,
-             channel_in_use           = FALSE,
-             channel_allocated        = FALSE;
+    char     eff_psrp_pen[SSIZE]          = "psrp",
+             sic_channel_in_name[SSIZE]   = "",
+             sic_channel_out_name[SSIZE]  = "",
+             psrp_command[SSIZE]          = "",
+             psrp_pathname[SSIZE]         = "",
+             pwd_file_name[SSIZE]         = "",
+             slaved_psrp_client_ok[SSIZE] = "";
+
+    _BOOLEAN local_client                 = TRUE,
+             channel_in_use               = FALSE,
+             channel_allocated            = FALSE;
 
 
     /*----------------------------------*/
@@ -8101,18 +8080,10 @@ _PUBLIC psrp_channel_type *psrp_create_slaved_interaction_client(const char  *ps
     /* Fill in (common) fields of SIC channel descriptor */
     /*---------------------------------------------------*/
 
-    channel[sic_index].index   = sic_index;
+    channel[sic_index].index = sic_index;
 
-    if(channel[sic_index].in_name == (char *)NULL)
-       channel[sic_index].in_name = (char *)pups_malloc(SSIZE);
     (void)strlcpy(channel[sic_index].in_name, sic_channel_in_name,SSIZE);
-
-    if(channel[sic_index].out_name == (char *)NULL)
-       channel[sic_index].out_name  = (char *)pups_malloc(SSIZE);
     (void)strlcpy(channel[sic_index].out_name,sic_channel_out_name,SSIZE);
-
-    if(channel[sic_index].host_name == (char *)NULL)
-       channel[sic_index].host_name = (char *)pups_malloc(SSIZE);
 
     if(host_name == (char *)NULL)
     {  (void)strlcpy(channel[sic_index].host_name,appl_host,SSIZE);
@@ -8131,13 +8102,7 @@ _PUBLIC psrp_channel_type *psrp_create_slaved_interaction_client(const char  *ps
     /*----------------------*/
 
     if(ssh_portNo >  0)
-    {  if(channel[sic_index].ssh_port == (char *)NULL)
-          channel[sic_index].ssh_port = (char *)pups_malloc(SSIZE); 
        (void)strlcpy(channel[sic_index].ssh_port,ssh_port,SSIZE);
-    }
-
-    if(channel[sic_index].pen  == (char *)NULL)
-       channel[sic_index].pen  = (char *)pups_malloc(SSIZE);
     (void)strlcpy(channel[sic_index].pen,eff_psrp_pen,SSIZE);
 
 
@@ -8147,11 +8112,11 @@ _PUBLIC psrp_channel_type *psrp_create_slaved_interaction_client(const char  *ps
 
     (void)mkfifo(sic_channel_in_name,0600);
     channel[sic_index].in_stream  = pups_fopen(sic_channel_in_name, "w",LIVE);
-    (void)empty_fifo(fileno(channel[sic_index].in_stream));
+    (void)psrp_empty_fifo(fileno(channel[sic_index].in_stream));
 
     (void)mkfifo(sic_channel_out_name,0600);
     channel[sic_index].out_stream = pups_fopen(sic_channel_out_name,"r",LIVE);
-    (void)empty_fifo(fileno(channel[sic_index].out_stream));
+    (void)psrp_empty_fifo(fileno(channel[sic_index].out_stream));
 
 
     /*-----------------------------------------------------------------*/
@@ -8160,10 +8125,12 @@ _PUBLIC psrp_channel_type *psrp_create_slaved_interaction_client(const char  *ps
     /*-----------------------------------------------------------------*/
 
     ft_index = pups_get_ftab_index(fileno(channel[sic_index].in_stream));
-    ftab[ft_index].psrp = TRUE;
+    ftab[ft_index].psrp    = TRUE;
+    ftab[ft_index].creator = TRUE;
 
     ft_index = pups_get_ftab_index(fileno(channel[sic_index].out_stream));
-    ftab[ft_index].psrp = TRUE;
+    ftab[ft_index].psrp    = TRUE;
+    ftab[ft_index].creator = TRUE;
 
 
     /*----------------------------------------*/
@@ -8209,12 +8176,12 @@ _PUBLIC psrp_channel_type *psrp_create_slaved_interaction_client(const char  *ps
        strcmp(host_name,"notset")    != 0             &&
        strcmp(host_name,"")          != 0              )
     {  (void)snprintf(psrp_command,SSIZE,"%s -slaved -on %s -from %s %s %d -pen %s -noprompt",
-                                                                         psrp_pathname,
-                                                                             host_name,
-                                                                             appl_host,
-                                                                             appl_name,
-                                                                              appl_pid,
-                                                                          eff_psrp_pen);
+                                                                                psrp_pathname,
+                                                                                    host_name,
+                                                                                    appl_host,
+                                                                                    appl_name,
+                                                                                     appl_pid,
+                                                                                 eff_psrp_pen);
        local_client = FALSE;
     }
 
@@ -8224,8 +8191,8 @@ _PUBLIC psrp_channel_type *psrp_create_slaved_interaction_client(const char  *ps
 
     else
        (void)snprintf(psrp_command,SSIZE,"%s -slaved -pen %s -noprompt",
-                                                   psrp_pathname,
-                                                    eff_psrp_pen);
+                                                          psrp_pathname,
+                                                           eff_psrp_pen);
 
 
     /*---------------------------------------------*/
@@ -8315,11 +8282,7 @@ _PUBLIC psrp_channel_type *psrp_create_slaved_interaction_client(const char  *ps
 
     #ifdef SSH_SUPPORT
     else
-    {  int nb,
-           ret,
-           trys                        = 0;
-
-       char absolute_pathname[SSIZE]     = "";
+    {  char absolute_pathname[SSIZE] = "";
 
 
        /*------------------------------------------------------*/
@@ -8345,7 +8308,7 @@ _PUBLIC psrp_channel_type *psrp_create_slaved_interaction_client(const char  *ps
           (void)strlcpy(psrp_command,absolute_pathname,SSIZE);
        }
 
-       ssh_sic_index = index;
+       ssh_sic_index = (int)sic_index;
 
        #ifdef PSRPLIB_DEBUG
        (void)fprintf(stderr,"REMOTE PSRP COMMAND: \"%s\"\n",psrp_command);
@@ -8451,8 +8414,8 @@ _PUBLIC psrp_channel_type *psrp_create_slaved_interaction_client(const char  *ps
        /* Clear SIC channel */
        /*-------------------*/   
 
-       (void)empty_fifo(fileno(channel[sic_index].in_stream));
-       (void)empty_fifo(fileno(channel[sic_index].out_stream));
+       (void)psrp_empty_fifo(fileno(channel[sic_index].in_stream));
+       (void)psrp_empty_fifo(fileno(channel[sic_index].out_stream));
 
        scp           = (-1);
        ssh_sic_index = (-1);
@@ -8508,7 +8471,7 @@ _PUBLIC psrp_channel_type *psrp_create_slaved_interaction_client(const char  *ps
 
 
        #ifdef PSRPLIB_DEBUG
-       int cnt = 0;
+       int32_t cnt = 0;
        while(1)
        {   (void)fputs("test\n",channel[sic_index].in_stream);
            (void)fflush(channel[index].in_stream);
@@ -8547,20 +8510,20 @@ _PUBLIC psrp_channel_type *psrp_create_slaved_interaction_client(const char  *ps
 
 
 /*---------------------------------------------------------*/
-/* Send a request to slaved psrp client and wait for reply */
+/* Send a request to slaved PSRP client and wait for reply */
 /*---------------------------------------------------------*/
 
-_PUBLIC char *psrp_slaved_client_transaction(const _BOOLEAN          do_reply, // Log reply
-                                             const psrp_channel_type     *sic, // SIC channel
-                                             const char              *request) // Request to send
+_PUBLIC char *psrp_slaved_client_transaction(const _BOOLEAN          log_reply, // Log reply
+                                             const psrp_channel_type      *sic, // SIC channel
+                                             const char               *request) // Request to send
 
-{   int ret,
-        size = 0;
+{   int32_t  ret;
+    size_t   size           = 0;
 
     _BOOLEAN looper;
 
-    char tmp_str[512]   = "",    
-         *reply         = (char *)NULL;;
+    char     tmp_str[512]   = "",    
+             *reply         = (char *)NULL;;
 
 
     /*----------------------------------*/
@@ -8601,7 +8564,7 @@ _PUBLIC char *psrp_slaved_client_transaction(const _BOOLEAN          do_reply, /
     do {    (void)psrp_set_current_sic(sic); 
             if((looper = psrp_read_sic(sic,tmp_str)) == PSRP_MORE)
             {  
-               if(do_reply == TRUE)
+               if(log_reply == TRUE)
                {  size += strlen(tmp_str);
                   reply = (char *)realloc((void *)reply,size);
                   (void)strlcat(reply,tmp_str,SSIZE);
@@ -8631,20 +8594,11 @@ _PRIVATE void psrp_clear_channel_slot(psrp_channel_type *channel)
 
 {   channel->in_stream   = channel->out_stream = (FILE *)NULL;
 
-    if(channel->in_name != (char *)NULL)
-      channel->in_name = (char *)pups_free((void *)channel->in_name);
-
-    if(channel->out_name != (char *)NULL)
-       channel->out_name = (char *)pups_free((void *)channel->out_name);
-
-    if(channel->host_name != (char *)NULL)
-       channel->host_name   = (char *)pups_free((void *)channel->host_name);
-
-    if(channel->ssh_port  != (char *)NULL)
-       channel->ssh_port = (char *)pups_free((void *)channel->ssh_port);
-
-    if(channel->pen != (char *)NULL)
-       channel->pen = (char *)pups_free((void *)channel->pen);
+    (void)strlcpy(channel->in_name,  "",SSIZE);
+    (void)strlcpy(channel->out_name, "",SSIZE);
+    (void)strlcpy(channel->host_name,"",SSIZE);
+    (void)strlcpy(channel->ssh_port, "",SSIZE);
+    (void)strlcpy(channel->pen,      "",SSIZE);
 
     channel->index       = FREE;
     channel->scp         = 0;
@@ -8655,15 +8609,14 @@ _PRIVATE void psrp_clear_channel_slot(psrp_channel_type *channel)
 
 
 
-/*-----------------------------------------------------------*/
-/* Routine to close a link to slaved PSRP interaction client */
-/*-----------------------------------------------------------*/
+/*---------------------------------------*/
+/* Destroy slaved PSRP client connection */
+/*---------------------------------------*/
 
 _PUBLIC psrp_channel_type *psrp_destroy_slaved_interaction_client(const psrp_channel_type        *channel,   // SIC to destroy
                                                                   const _BOOLEAN           channel_client)   // Force slaved client termination
 
-{   int  i;
-    char reply[SSIZE] = "";
+{   char reply[SSIZE] = "";
 
 
     /*----------------------------------*/
@@ -8729,7 +8682,7 @@ _PUBLIC psrp_channel_type *psrp_destroy_slaved_interaction_client(const psrp_cha
           (void)fflush(stderr);
        }
 
-       (void)pups_system("mktty",shell,PUPS_ERROR_EXIT,(int *)NULL);
+       (void)pups_system("mktty",shell,PUPS_ERROR_EXIT,(int32_t *)NULL);
     }
 
     pups_set_errno(OK);
@@ -8739,16 +8692,16 @@ _PUBLIC psrp_channel_type *psrp_destroy_slaved_interaction_client(const psrp_cha
 
 
 
-/*----------------------------------------------------------------*/
-/* Support routine for stream I/O required by PSRP task functions */
-/*----------------------------------------------------------------*/
+/*------------------------------------------*/
+/* Assign stdio descriptors for PSRP server */
+/*------------------------------------------*/
 
-_PUBLIC int psrp_assign_stdio(const FILE  *psrp_out,   // PSRP output channel
-                              const int       *argc,   // Number of arguments
-                              const char    *argv[],   // Argument vector
-                              int           *in_des,   // Input descriptor
-                              int          *out_des,   // Output descriptor
-                              int          *err_des)   // Error/status logging descriptor
+_PUBLIC int32_t psrp_assign_stdio(const FILE     *psrp_out,   // PSRP output channel
+                                  const  int32_t     *argc,   // Number of arguments
+                                  const char       *argv[],   // Argument vector
+                                  des_t            *in_des,   // Input descriptor
+                                  des_t           *out_des,   // Output descriptor
+                                  des_t           *err_des)   // Error/status logging descriptor
 
 {    char in_name[SSIZE]  = "",
           out_name[SSIZE] = "",
@@ -8763,18 +8716,18 @@ _PUBLIC int psrp_assign_stdio(const FILE  *psrp_out,   // PSRP output channel
     if(pupsthread_is_root_thread() == FALSE)
        pups_error("[psrp_assign_stdio] attempt by non root thread to perform PUPS/P3 PSRP operation");
 
-    if(psrp_out == (const FILE *)NULL     ||
-       argc     == (const int *) NULL     ||
-       argv     == (const char **)NULL    ||
-       in_des   == (const int *)  NULL    ||
-       out_des  == (const int *)  NULL    ||
-       err_des  == (const int *)  NULL     )
+    if(psrp_out == (const FILE *)   NULL    ||
+       argc     == (const int32_t *)NULL    ||
+       argv     == (const char **)  NULL    ||
+       in_des   == (const int32_t *)NULL    ||
+       out_des  == (const int32_t *)NULL    ||
+       err_des  == (const int32_t *)NULL     )
     {  pups_set_errno(EINVAL);
        return(PSRP_STDIO_ERROR);
     }
 
-    if((ptr = pups_locate(&init,"in",argc,argv,0)) != NOT_FOUND    ||
-       (ptr = pups_locate(&init,"i", argc,argv,0)) != NOT_FOUND     )
+    if((ptr = pups_locate(&init,"in",argc,(char **)argv,0)) != NOT_FOUND    ||
+       (ptr = pups_locate(&init,"i", argc,(char **)argv,0)) != NOT_FOUND     )
     {  if(strccpy(in_name,pups_str_dec(&ptr,argc,args)) == (char *)NULL)
        {  (void)fprintf(psrp_out,"assign_psrp_stdio: expecting input file name");
           (void)fflush(psrp_out);
@@ -8794,8 +8747,8 @@ _PUBLIC int psrp_assign_stdio(const FILE  *psrp_out,   // PSRP output channel
     else
        *in_des = open("/dev/null",2);   
 
-    if((ptr = pups_locate(&init,"out",argc,argv,0)) != NOT_FOUND    ||
-       (ptr = pups_locate(&init,"o"  ,argc,argv,0)) != NOT_FOUND     )
+    if((ptr = pups_locate(&init,"out",argc,(char **)argv,0)) != NOT_FOUND    ||
+       (ptr = pups_locate(&init,"o"  ,argc,(char **)argv,0)) != NOT_FOUND     )
     {  if(strccpy(out_name,pups_str_dec(&ptr,argc,args)) == (char *)NULL)
        {  (void)fprintf(psrp_out,"assign_psrp_stdio: expecting output file name");
           (void)fflush(psrp_out);
@@ -8815,8 +8768,8 @@ _PUBLIC int psrp_assign_stdio(const FILE  *psrp_out,   // PSRP output channel
     else
        *out_des = open("/dev/null",2);   
 
-    if((ptr = pups_locate(&init,"err",argc,argv,0)) != NOT_FOUND    ||
-       (ptr = pups_locate(&init,"e"  ,argc,argv,0))  != NOT_FOUND    )
+    if((ptr = pups_locate(&init,"err",argc,(char **)argv,0)) != NOT_FOUND    ||
+       (ptr = pups_locate(&init,"e"  ,argc,(char **)argv,0))  != NOT_FOUND    )
     {  if(strccpy(err_name,pups_str_dec(&ptr,argc,args)) == (char *)NULL)
        {  (void)fprintf(psrp_out,"assign_psrp_stdio: expecting error (log) file name");
            (void)fflush(psrp_out);
@@ -8842,21 +8795,21 @@ _PUBLIC int psrp_assign_stdio(const FILE  *psrp_out,   // PSRP output channel
 
 
 
-/*-------------------------------------------------------*/
-/* Assign a set of input, output and error (log) streams */
-/*-------------------------------------------------------*/
+/*--------------------------------------*/
+/* Assign stdio streams for PSRP server */
+/*--------------------------------------*/
 
-_PUBLIC int psrp_assign_fstdio(const FILE    *psrp_out, // PSRP output channel
-                               const int         *argc, // Number of arguments
-                               const char      *argv[], // Argument vector
-                               FILE         *in_stream, // Input stream
-                               FILE        *out_stream, // Output stream
-                               FILE        *err_stream) // Error/logging stream
+_PUBLIC int32_t psrp_assign_fstdio(const FILE    *psrp_out, // PSRP output channel
+                                   const int32_t     *argc, // Number of arguments
+                                   const char      *argv[], // Argument vector
+                                   FILE         *in_stream, // Input stream
+                                   FILE        *out_stream, // Output stream
+                                   FILE        *err_stream) // Error/logging stream
 
-{   int in,
-        out,
-        err,
-        ret; 
+{    des_t in,
+           out,
+           err,
+           ret; 
 
 
     /*----------------------------------*/
@@ -8867,12 +8820,12 @@ _PUBLIC int psrp_assign_fstdio(const FILE    *psrp_out, // PSRP output channel
     if(pupsthread_is_root_thread() == FALSE)
        pups_error("[psrp_assign_fstdio] attempt by non root thread to perform PUPS/P3 PSRP operation");
 
-    if(psrp_out    == (const FILE *) NULL    ||
-       argc        == (const int *)  NULL    ||
-       argv        == (const char **)NULL    ||
-       in_stream   == (const FILE *) NULL    ||
-       out_stream  == (const FILE *) NULL    ||
-       err_stream  == (const FILE *) NULL     )
+    if(psrp_out    == (const FILE *)   NULL    ||
+       argc        == (const int32_t *)NULL    ||
+       argv        == (const char **)  NULL    ||
+       in_stream   == (const FILE *)   NULL    ||
+       out_stream  == (const FILE *)   NULL    ||
+       err_stream  == (const FILE *)   NULL     )
     {  pups_set_errno(EINVAL);
        return(PSRP_STDIO_ERROR);
     }
@@ -8896,7 +8849,7 @@ _PUBLIC int psrp_assign_fstdio(const FILE    *psrp_out, // PSRP output channel
 /* Wait for data on nominated descriptor */
 /*---------------------------------------*/
 
-_PUBLIC int psrp_wait_for_data(const int fdes)
+_PUBLIC int32_t psrp_wait_for_data(const des_t fdes)
 
 {   fd_set readfds,
            excepfds;
@@ -8959,13 +8912,13 @@ _PUBLIC int psrp_wait_for_data(const int fdes)
 
 
 
-/*-----------------------------------------*/
-/* Search tag list for the first free slot */
-/*-----------------------------------------*/
+/*---------------------------------------------*/
+/* Search PSRP handler list for the first slot */
+/*---------------------------------------------*/
 
-_PUBLIC int psrp_get_tag_index(const unsigned int tag_index)
+_PUBLIC int32_t psrp_get_tag_index(const uint32_t tag_index)
 
-{   int i;
+{   uint32_t i;
 
 
     /*----------------------------------*/
@@ -8976,31 +8929,38 @@ _PUBLIC int psrp_get_tag_index(const unsigned int tag_index)
     if(pupsthread_is_root_thread() == FALSE)
        pups_error("[psrp_get_tag_index] attempt by non root thread to perform PUPS/P3 PSRP operation");
 
-    if(tag_index > psrp_object_list_used)
+    if(tag_index > psrp_object_list_allocated)
     {  pups_set_errno(EINVAL);
        return(PSRP_DISPATCH_ERROR);
     }
 
     if(psrp_object_list[tag_index].aliases == psrp_object_list[tag_index].aliases_allocated)
     {  psrp_object_list[tag_index].aliases_allocated += PSRP_ALLOCATION_QUANTUM;
-       psrp_object_list[tag_index].object_tag         = (char **)pups_realloc((void *)psrp_object_list[tag_index].object_tag,
-                                                                              psrp_object_list[tag_index].aliases_allocated*sizeof(char **));
 
-       ++psrp_object_list[tag_index].aliases;
+       if(psrp_object_list[tag_index].object_tag == (char **)NULL)
+         psrp_object_list[tag_index].object_tag = (char **)pups_calloc(psrp_object_list[tag_index].aliases_allocated,sizeof(char **));
+      else
+         psrp_object_list[tag_index].object_tag = (char **)pups_realloc((void *)psrp_object_list[tag_index].object_tag,
+                                                                        psrp_object_list[tag_index].aliases_allocated*sizeof(char **));
+
+
        for(i=psrp_object_list[tag_index].aliases; i<psrp_object_list[tag_index].aliases_allocated; ++i)
           psrp_object_list[tag_index].object_tag[i] = (char *)NULL;
+
+       ++psrp_object_list[tag_index].aliases; 
 
        pups_set_errno(OK);
        return(psrp_object_list[tag_index].aliases - 1);
     }
 
     for(i=0; i<psrp_object_list[tag_index].aliases_allocated; ++i)
-       if(psrp_object_list[tag_index].object_tag[i] == (char *)NULL)
+    {  if(psrp_object_list[tag_index].object_tag[i] == (char *)NULL)
        {  ++psrp_object_list[tag_index].aliases;
 
           pups_set_errno(OK);
           return(i);
        }
+    }
 
     pups_set_errno(ESRCH);
     return(PSRP_OK);
@@ -9009,13 +8969,13 @@ _PUBLIC int psrp_get_tag_index(const unsigned int tag_index)
 
  
  
-/*---------------------------------------*/
-/* Free resources allocated to tag index */
-/*---------------------------------------*/
+/*-----------------------------------------------*/
+/* Free resources allocated to PSRP handler slot */
+/*-----------------------------------------------*/
 
-_PUBLIC int psrp_ifree_tag_list(const unsigned int tag_index)
+_PUBLIC int32_t psrp_ifree_tag_list(const uint32_t tag_index)
 
-{   int i;
+{   uint32_t i;
 
 
     /*----------------------------------*/
@@ -9026,7 +8986,7 @@ _PUBLIC int psrp_ifree_tag_list(const unsigned int tag_index)
     if(pupsthread_is_root_thread() == FALSE)
        pups_error("[psrp_ifree_tag_list] attempt by non root thread to perform PUPS/P3 PSRP operation");
 
-    if(tag_index > psrp_object_list_used)
+    if(tag_index > psrp_object_list_allocated)
     {  pups_set_errno(EINVAL);
        return(PSRP_DISPATCH_ERROR);
     }
@@ -9039,8 +8999,8 @@ _PUBLIC int psrp_ifree_tag_list(const unsigned int tag_index)
         }
  
         psrp_object_list[tag_index].object_tag = (char **)NULL; 
-
         pups_set_errno(OK);
+
         return(0);
     }
 
@@ -9052,13 +9012,13 @@ _PUBLIC int psrp_ifree_tag_list(const unsigned int tag_index)
 
 
 
-/*--------------------------*/
-/* Search tag list by index */
-/*--------------------------*/
+/*-----------------------------------*/
+/* Search PSRP handler list by index */
+/*-----------------------------------*/
 
-_PUBLIC int psrp_isearch_tag_list(const char *object_tag, const unsigned int tag_index)
+_PUBLIC int32_t psrp_isearch_tag_list(const char *object_tag, const uint32_t tag_index)
 
-{   int i;
+{   uint32_t i;
 
 
     /*----------------------------------*/
@@ -9069,7 +9029,7 @@ _PUBLIC int psrp_isearch_tag_list(const char *object_tag, const unsigned int tag
     if(pupsthread_is_root_thread() == FALSE)
        pups_error("[psrp_isearch_tag_list] attempt by non root thread to perform PUPS/P3 PSRP operation");
 
-    if(object_tag == (const char *)NULL || tag_index > psrp_object_list_used)
+    if(object_tag == (const char *)NULL || tag_index > psrp_object_list_allocated)
     {  pups_set_errno(EINVAL);
        return(PSRP_DISPATCH_ERROR);
     }
@@ -9089,15 +9049,14 @@ _PUBLIC int psrp_isearch_tag_list(const char *object_tag, const unsigned int tag
 
 
 
-/*-----------------------------------*/
-/* Create an alias for a PSRP object */
-/*-----------------------------------*/
+/*--------------------------------*/
+/* Create alias for a PSRP object */
+/*--------------------------------*/
 
-_PUBLIC int psrp_alias(const char *name, const char *alias)
+_PUBLIC int32_t psrp_alias(const char *name, const char *alias)
 
-{   int i,
-        j,
-        alias_index;
+{   uint32_t i;
+    int32_t  alias_index;
 
 
     /*----------------------------------*/
@@ -9117,7 +9076,7 @@ _PUBLIC int psrp_alias(const char *name, const char *alias)
     /* Search dispatch table for object to alias */
     /*-------------------------------------------*/
 
-    for(i=0; i<psrp_object_list_used; ++i)
+    for(i=0; i<psrp_object_list_allocated; ++i)
     {  if(psrp_object_list[i].object_handle != NULL)
        {
 
@@ -9169,16 +9128,14 @@ _PUBLIC int psrp_alias(const char *name, const char *alias)
 
 
 
-
-/*--------------------------------------------*/
-/* Remove alias associated with a PSRP object */
-/*--------------------------------------------*/
+/*--------------------------*/
+/* Remove PSRP object alias */
+/*--------------------------*/
  
-_PUBLIC int psrp_unalias(const char *alias, const char *base_tag_name)
+_PUBLIC int32_t psrp_unalias(const char *alias, const char *base_tag_name)
  
-{   int i,
-        j,
-        alias_index;
+{   uint32_t i;
+     int32_t alias_index;
  
 
     /*----------------------------------*/
@@ -9199,7 +9156,7 @@ _PUBLIC int psrp_unalias(const char *alias, const char *base_tag_name)
     /* Search dispatch table for object to unalias */
     /*---------------------------------------------*/
 
-    for(i=0; i<psrp_object_list_used; ++i)
+    for(i=0; i<psrp_object_list_allocated; ++i)
     {   if(psrp_object_list[i].object_handle != NULL)
         {  if((alias_index = psrp_isearch_tag_list(alias,i)) >= 0)
            {
@@ -9247,15 +9204,16 @@ _PUBLIC int psrp_unalias(const char *alias, const char *base_tag_name)
 
 
 
-/*------------------------------------------------------------------*/
-/* Routine to display tag names associated with a given PSRP object */
-/*------------------------------------------------------------------*/
+/*-----------------------------*/
+/* Display PSRP object aliases */
+/*-----------------------------*/
  
-_PUBLIC int psrp_show_aliases(const char *basename)
+_PUBLIC int32_t psrp_show_aliases(const char *basename)
  
-{   int i,
-        j,
-        alias_index;
+{   uint32_t i,
+             j;
+
+    int32_t  alias_index;
  
 
     /*----------------------------------*/
@@ -9271,7 +9229,7 @@ _PUBLIC int psrp_show_aliases(const char *basename)
        return(PSRP_DISPATCH_ERROR);
     }
 
-    for(i=0; i<psrp_object_list_used; ++i)
+    for(i=0; i<psrp_object_list_allocated; ++i)
     {  if(psrp_object_list[i].object_handle != (void *)NULL)
        {  alias_index = psrp_isearch_tag_list(basename,i);
  
@@ -9282,7 +9240,7 @@ _PUBLIC int psrp_show_aliases(const char *basename)
                {  if(j == 0)
                      (void)fprintf(psrp_out,"%04d:    \"%-32s\" (root tag of PSRP object at %016lx virtual)\n",j,
                                                                                psrp_object_list[i].object_tag[j],
-                                                            (unsigned long int)psrp_object_list[i].object_handle);
+                                                            (uint64_t         )psrp_object_list[i].object_handle);
                   else
                      (void)fprintf(psrp_out,"%04d:    \"%-32s\"\n",j,psrp_object_list[i].object_tag[j]);
                }
@@ -9306,9 +9264,9 @@ _PUBLIC int psrp_show_aliases(const char *basename)
 
 
 
-/*---------------------------------------------------------*/
-/* Routine to check if a channel has a client locked on it */
-/*---------------------------------------------------------*/
+/*-------------------------------------------------*/
+/* Check if named PSRP channel is locked by client */
+/*-------------------------------------------------*/
 
 _PUBLIC _BOOLEAN psrp_channel_locked(const FILE *stream, const char *channel_name)
 
@@ -9345,16 +9303,16 @@ _PUBLIC _BOOLEAN psrp_channel_locked(const FILE *stream, const char *channel_nam
 
 
 
-/*----------------------------------------------------------------------*/
-/* Attach a dynamic databag to the dispatch list of the current process */
-/*----------------------------------------------------------------------*/
+/*-----------------------------------------------*/
+/* Attach a dynamic databag to PSRP handler list */
+/*-----------------------------------------------*/
  
-_PRIVATE int psrp_builtin_attach_dbag(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_attach_dbag(const uint32_t argc, const char *argv[])
  
-{   char databag_file_name[SSIZE] = "",
-         bag_tag[SSIZE]           = "";
+{   char    databag_file_name[SSIZE] = "",
+            bag_tag[SSIZE]           = "";
 
-    int h_mode; 
+    int32_t h_mode; 
 
     if(strcmp(argv[0],"bag") != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -9431,7 +9389,7 @@ _PRIVATE int psrp_builtin_attach_dbag(const int argc, const char *argv[])
            /*--------------------------------------------------------------------*/
  
            (void)fprintf(psrp_out,"\nfailed to attach dynamic databag \"%s\" (from %s) to PSRP handler action list\n\n",
-                                                                                               argv[1],databag_file_name);
+                                                                                              argv[1],databag_file_name);
            (void)fflush(psrp_out);
        }
        else
@@ -9459,18 +9417,18 @@ _PRIVATE int psrp_builtin_attach_dbag(const int argc, const char *argv[])
 /*-----------------------------------------------------------------------*/
 
 
-_PRIVATE int psrp_builtin_attach_persistent_heap(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_attach_persistent_heap(const uint32_t argc, const char *argv[])
 
-{   char heap_file_name[SSIZE] = "",
-         heap_tag[SSIZE]       = "";
+{   char    heap_file_name[SSIZE] = "",
+            heap_tag[SSIZE]       = "";
 
-    int h_mode   = DEAD;
+    int32_t h_mode   = DEAD;
  
     if(strcmp(argv[0],"heap") != 0)
        return(PSRP_DISPATCH_ERROR);
  
     if(!(psrp_bind_status & PSRP_PERSISTENT_HEAP))
-    {  int  h_mode;
+    {   int32_t h_mode;
 
        (void)strdate(date);
        (void)fprintf(psrp_out,"Permision denied (attach persistent heap)\n");
@@ -9521,7 +9479,6 @@ _PRIVATE int psrp_builtin_attach_persistent_heap(const int argc, const char *arg
 
     return(PSRP_OK);
 }
-
 #endif /* PERSISTENT_HEAP_SUPPORT */
 
  
@@ -9532,9 +9489,9 @@ _PRIVATE int psrp_builtin_attach_persistent_heap(const int argc, const char *arg
 /* Attach a dynamic function to the dispatch list of the current process */
 /*-----------------------------------------------------------------------*/
 
-_PRIVATE int psrp_builtin_attach_dynamic_function(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_attach_dynamic_function(const uint32_t argc, const char *argv[])
 
-{   char object_tag[SSIZE]      = "",
+{   char object_tag[SSIZE]     = "",
          object_tag_DLL[SSIZE] = "";
 
     if(strcmp(argv[0],"dll") != 0)
@@ -9585,41 +9542,37 @@ _PRIVATE int psrp_builtin_attach_dynamic_function(const int argc, const char *ar
                                                             object_tag,object_tag_DLL);
     return(PSRP_OK);
 }
-
 #endif /* DLL_SUPPORT */
 
 
 
 
-/*----------------------------------------------------------------------------*/
-/* Start the next segment of a multisegment server - If host is non null then */
-/* start the new segment on that host and call it name. If we have a          */
-/* checkpoint file restart using the checkpoint stored in that file           */
-/*----------------------------------------------------------------------------*/
+/*--------------------------*/
+/* Start new server segmant */
+/*--------------------------*/
 
 #ifdef SSH_SUPPORT
-_PUBLIC int psrp_new_segment(const char *name,             // Name of process
-                             const char *host_name,        // Name of new host
-                             const char *ssh_port,         // Ssh port number to use 
-                             const char *ckpt_file_name)   // CRIU checkpoint associated with process
+_PUBLIC int32_t psrp_new_segment (const char *name,             // Name of process
+                                  const char *host_name,        // Name of new host
+                                  const char *ssh_port,         // Ssh port number to use 
+                                  const char *ckpt_file_name)   // CRIU checkpoint associated with process
 #else
-_PUBLIC int psrp_new_segment(const char *name,             // Name of process
-                             const char *host_name,        // Name of new host
-                             const char *ckpt_file_name)   // CRIU checkpoint associated with process
+_PUBLIC  int32_t psrp_new_segment(const char *name,             // Name of process
+                                  const char *host_name,        // Name of new host
+                                  const char *ckpt_file_name)   // CRIU checkpoint associated with process
 #endif /* SSH_SUPPORT */
-{   int i,
-        ssh_pid;
 
+{   pid_t    ssh_pid;
     sigset_t set;
 
-    char line[SSIZE]               = "",
-         command_line[SSIZE]       = "",
-         cmd_tail[SSIZE]           = "",
-         p_name[SSIZE]             = "",
-         autoload_file_name[SSIZE] = "",
-         exec_pathname[SSIZE]      = "",
-         ckpt_restart[SSIZE]       = "",
-         errstr[SSIZE]             = "";
+    char     line[SSIZE]               = "",
+             command_line[SSIZE]       = "",
+             cmd_tail[SSIZE]           = "",
+             p_name[SSIZE]             = "",
+             autoload_file_name[SSIZE] = "",
+             exec_pathname[SSIZE]      = "",
+             ckpt_restart[SSIZE]       = "",
+             errstr[SSIZE]             = "";
 
 
     /*----------------------------------*/
@@ -9677,8 +9630,6 @@ _PUBLIC int psrp_new_segment(const char *name,             // Name of process
     /* Make sure that we don't catch any signals until the new segment of the PSRP */
     /* server is up and running.                                                   */
     /*-----------------------------------------------------------------------------*/
-
-
     /*-----------------------------------------------------*/
     /* Don't raise SIGALRM during the segmentation process */
     /*-----------------------------------------------------*/
@@ -9809,10 +9760,10 @@ _PUBLIC int psrp_new_segment(const char *name,             // Name of process
        /*-------------------------------------*/
 
        (void)snprintf(command_line,SSIZE,"%s -pen %s %s -psrp_segment %d %s >& /dev/null",exec_pathname, 
-                                                                                          p_name,
-                                                                                    ckpt_restart,
-                                                                                  ++psrp_seg_cnt,
-                                                                                        cmd_tail);
+                                                                                                 p_name,
+                                                                                           ckpt_restart,
+                                                                                         ++psrp_seg_cnt,
+                                                                                               cmd_tail);
 
 
 
@@ -9869,7 +9820,7 @@ _PUBLIC int psrp_new_segment(const char *name,             // Name of process
        /*---------------------*/
  
        else 
-       {  int status = 0;
+       {  int32_t status = 0;
 
 
           /*-----------------------------------------------------*/
@@ -9998,12 +9949,12 @@ _PUBLIC int psrp_new_segment(const char *name,             // Name of process
           /*------------------------------------------------------------------------------*/
 
           (void)snprintf(command_line,SSIZE,"%s -pen %s %s -psrp_segment %d -psrp_reactivate_client %d %s",
-                                                                                      exec_pathname,
-                                                                                             p_name,
-                                                                                       ckpt_restart,
-                                                                                     ++psrp_seg_cnt,
-                                                                                          chlockdes,
-                                                                                           cmd_tail);
+                                                                                             exec_pathname,
+                                                                                                    p_name,
+                                                                                              ckpt_restart,
+                                                                                            ++psrp_seg_cnt,
+                                                                                                 chlockdes,
+                                                                                                  cmd_tail);
        }
        else
        {
@@ -10013,10 +9964,10 @@ _PUBLIC int psrp_new_segment(const char *name,             // Name of process
           /*---------------------*/
 
           (void)snprintf(command_line,SSIZE,"%s -pen %s %s -psrp_segment %d",
-	                                                exec_pathname,
-					                       p_name,
-					                 ckpt_restart,
-						       ++psrp_seg_cnt);
+	                                                       exec_pathname,
+					                              p_name,
+					                        ckpt_restart,
+						              ++psrp_seg_cnt);
        }
  
 
@@ -10032,10 +9983,10 @@ _PUBLIC int psrp_new_segment(const char *name,             // Name of process
           /*-------------------------------------------------*/
 
           if(psrp_in != (FILE *)NULL)
-             (void)empty_fifo(fileno(psrp_in));
+             (void)psrp_empty_fifo(fileno(psrp_in));
 
           if(psrp_out != (FILE *)NULL)
-             (void)empty_fifo(fileno(psrp_out));
+             (void)psrp_empty_fifo(fileno(psrp_out));
 
 
           /*-------------------------------------*/
@@ -10078,7 +10029,7 @@ _PUBLIC int psrp_new_segment(const char *name,             // Name of process
           }
 
           #ifdef PSRPLIB_DEBUG
-          (void)fprintf(stderr,""PSRPLIB EXECLS: %s\n",command_line);
+          (void)fprintf(stderr,"PSRPLIB EXECLS: %s\n",command_line);
           (void)fflush(stderr);
           #endif /* PSRPLIB_DEBUG */
 
@@ -10093,7 +10044,7 @@ _PUBLIC int psrp_new_segment(const char *name,             // Name of process
           pups_error(errstr);
        }
        else
-       {  int child_pid = (-1);
+       {   int32_t child_pid = (-1);
 
 
           /*-------------------------------------*/
@@ -10101,10 +10052,10 @@ _PUBLIC int psrp_new_segment(const char *name,             // Name of process
           /*-------------------------------------*/
 
           (void)snprintf(command_line,SSIZE,"%s -pen %s %s -psrp_segment %d",
-                                                        exec_pathname,
-                                                               p_name,
-                                                         ckpt_restart,
-                                                       ++psrp_seg_cnt);
+                                                               exec_pathname,
+                                                                      p_name,
+                                                                ckpt_restart,
+                                                              ++psrp_seg_cnt);
 
           #ifdef PSRPLIB_DEBUG
           (void)fprintf(stderr,"PSRPLIB NEW INSTANCE COMAMND LINE is: %s\n",command_line);
@@ -10221,10 +10172,10 @@ _PRIVATE void psrp_endop(char *op_tag)
 /* Return number of clients connected to server */
 /*----------------------------------------------*/
 
-_PRIVATE int psrp_connected_clients(void)
+_PRIVATE int32_t psrp_connected_clients(void)
 
-{   int i,
-        cnt = 0;
+{    int32_t i,
+             cnt = 0;
 
 
     /*----------------------------*/
@@ -10249,9 +10200,9 @@ _PRIVATE int psrp_connected_clients(void)
 /* is not full return a new index, otherwise return error (ENOCH)            */
 /*---------------------------------------------------------------------------*/
 
-_PRIVATE int psrp_get_client_slot(int pid)
+_PRIVATE int32_t psrp_get_client_slot(pid_t pid)
 
-{   int i;
+{   uint32_t i;
 
 
     /*----------------------------*/
@@ -10290,7 +10241,7 @@ _PRIVATE int psrp_get_client_slot(int pid)
 /* Clear current client entry in client table */
 /*--------------------------------------------*/
 
-_PRIVATE int psrp_clear_client_slot(int slot_index)
+_PRIVATE int32_t psrp_clear_client_slot(int32_t slot_index)
 
 {  if(slot_index < 0 || slot_index > MAX_CLIENTS)
       return(-1);
@@ -10316,16 +10267,16 @@ _PRIVATE int psrp_clear_client_slot(int slot_index)
 /* Show clients connected to this server */
 /*---------------------------------------*/
 
-_PRIVATE int psrp_show_clients(void)
+_PRIVATE  int32_t psrp_show_clients(void)
 
-{   int i;
+{   uint32_t i;
 
     (void)fprintf(psrp_out,"\n\n    Clients attached to %s (%d@%s)\n\n",appl_name,appl_pid,appl_host);
     (void)fflush(psrp_out);
 
     for(i=0; i<MAX_CLIENTS; ++i)
     {  if(psrp_client_pid[i] > 0)
-       {  (void)fprintf(psrp_out,"%d: %s (%d@%s)",i,psrp_client_name[i],psrp_client_pid[i],psrp_client_host[i]);
+       {  (void)fprintf(psrp_out,"    %d: %s (%d@%s)",i,psrp_client_name[i],psrp_client_pid[i],psrp_client_host[i]);
 
           if(psrp_client_pid[i] == psrp_client_pid[c_client])
              (void)fprintf(psrp_out,"    [*** me, your client]");
@@ -10336,7 +10287,7 @@ _PRIVATE int psrp_show_clients(void)
           if((void *)psrp_client_exitf[i] != (void *)NULL)
              (void)fprintf(psrp_out,"    (exit function \"%032s\" installed at %016lx virtual)",
                                                                           psrp_client_efname[i],
-                                                        (unsigned long int)psrp_client_exitf[i]);
+                                                        (uint64_t         )psrp_client_exitf[i]);
     
           (void)fprintf(psrp_out,"\n");
           (void)fflush(psrp_out);
@@ -10351,11 +10302,11 @@ _PRIVATE int psrp_show_clients(void)
 
 
 
-/*----------------------------------------------------*/
-/* Read reply over slaved interaction clients channel */
-/*----------------------------------------------------*/
+/*--------------------------------------------*/
+/* Read reply over slaved PSRP client channel */
+/*--------------------------------------------*/
 
-_PUBLIC int psrp_read_sic(const psrp_channel_type *sic, char *reply)
+_PUBLIC int32_t psrp_read_sic(const psrp_channel_type *sic, char *reply)
 
 {   
 
@@ -10389,8 +10340,6 @@ _PUBLIC int psrp_read_sic(const psrp_channel_type *sic, char *reply)
     /* caller is responsible for freeing up the memory   */
     /* used                                              */
     /*---------------------------------------------------*/
-
-
     /*-----------------------------------------------*/
     /* Read data from channel until we get an EOT or */
     /* other error condition                         */
@@ -10436,12 +10385,11 @@ _PUBLIC int psrp_read_sic(const psrp_channel_type *sic, char *reply)
 
 
 
+/*-----------------------------------------*/
+/* Send request over slaved client channel */
+/*-----------------------------------------*/
 
-/*------------------------------------------------------*/
-/* Send request over slaved interaction clients channel */
-/*------------------------------------------------------*/
-
-_PUBLIC int psrp_write_sic(const psrp_channel_type *sic, const char *request)
+_PUBLIC  int32_t psrp_write_sic(const psrp_channel_type *sic, const char *request)
 
 {   char toxic_1[SSIZE] = "",
          toxic_2[SSIZE] = "",
@@ -10476,8 +10424,8 @@ _PUBLIC int psrp_write_sic(const psrp_channel_type *sic, const char *request)
     /*--------------------------------------------------------*/
 
     if(strin(request,toxic_1) == TRUE || strin(request,toxic_2) == TRUE)
-    {  int  ret;
-       char reply[SSIZE] = "";
+    {   int32_t ret;
+       char     reply[SSIZE] = "";
 
        (void)fputs("end\n",sic->in_stream);
        (void)fflush(sic->in_stream);
@@ -10516,11 +10464,11 @@ _PUBLIC int psrp_write_sic(const psrp_channel_type *sic, const char *request)
 
 
 
-/*--------------------------------------*/
-/* Set current PSRP interaction channel */
-/*--------------------------------------*/
+/*----------------------------------------*/
+/* Set current PSRP slaved client channel */
+/*----------------------------------------*/
 
-_PUBLIC int psrp_set_current_sic(const psrp_channel_type *sic)
+_PUBLIC int32_t psrp_set_current_sic(const psrp_channel_type *sic)
 
 {
     /*----------------------------------*/
@@ -10537,8 +10485,8 @@ _PUBLIC int psrp_set_current_sic(const psrp_channel_type *sic)
     }
 
     psrp_current_sic = sic;
-
     pups_set_errno(OK);
+
     return(0);
 }
 
@@ -10567,9 +10515,9 @@ _PUBLIC void psrp_unset_current_sic(void)
 
 
 
-/*-----------------------------*/
-/* Send break to remote server */
-/*-----------------------------*/
+/*--------------------------------------*/
+/* Send interrupt to slaved PSRP client */
+/*--------------------------------------*/
 
 _PUBLIC void psrp_int_sic(const psrp_channel_type *sic)
 
@@ -10602,11 +10550,11 @@ _PUBLIC void psrp_int_sic(const psrp_channel_type *sic)
 
 
 
-/*--------------------------------------------*/
-/* Install an exit function for a PSRP client */
-/*--------------------------------------------*/
+/*---------------------------------------*/
+/* Install exit function for PSRP client */
+/*---------------------------------------*/
 
-_PUBLIC int psrp_set_client_exitf(const unsigned int chid, const char *fname, int (*func)(int))
+_PUBLIC int32_t psrp_set_client_exitf(const uint32_t chid, const char *fname,  int32_t (*func)(int32_t))
 
 {
 
@@ -10633,11 +10581,11 @@ _PUBLIC int psrp_set_client_exitf(const unsigned int chid, const char *fname, in
 
 
 
-/*----------------------------------------------*/
-/* Deinstall an exit function for a PSRP client */ 
-/*----------------------------------------------*/
+/*----------------------------------------*/
+/* Remove exit function for a PSRP client */ 
+/*----------------------------------------*/
 
-_PUBLIC int psrp_reset_client_exitf(const unsigned int chid)
+_PUBLIC int32_t psrp_reset_client_exitf(const uint32_t chid)
 
 {
 
@@ -10668,9 +10616,9 @@ _PUBLIC int psrp_reset_client_exitf(const unsigned int chid)
 /* Overlay the current process with a new comamnd */
 /*------------------------------------------------*/
 
-_PRIVATE int psrp_builtin_overlay_server_process(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_overlay_server_process(const uint32_t argc, const char *argv[])
 
-{   int  i;
+{   uint32_t i;
 
     char overlay_command_name[SSIZE] = "",
          overlay_command_tail[SSIZE] = "";
@@ -10723,10 +10671,10 @@ _PRIVATE int psrp_builtin_overlay_server_process(const int argc, const char *arg
 /* Overlay the current process with a new command */
 /*------------------------------------------------*/
 
-_PRIVATE int psrp_builtin_overfork_server_process(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_overfork_server_process(const uint32_t argc, const char *argv[])
 
-{   int  i,
-         ret;
+{   uint32_t i;
+    int32_t  ret;
 
     char overlay_command_name[SSIZE] = "",
          overlay_command_tail[SSIZE] = "";
@@ -10772,11 +10720,11 @@ _PRIVATE int psrp_builtin_overfork_server_process(const int argc, const char *ar
 
 
 
-/*-----------------------------------------------*/
-/* Overlay server process with specified command */
-/*-----------------------------------------------*/
+/*----------------------------------------------------*/
+/* Overlay PSRP server process with specified command */
+/*----------------------------------------------------*/
 
-_PUBLIC int psrp_overlay_server_process(const _BOOLEAN over_fork, const char *command_name, const char *command_tail)
+_PUBLIC int32_t psrp_overlay_server_process(const _BOOLEAN over_fork, const char *command_name, const char *command_tail)
 
 {   char command_path[SSIZE]      = "",
          command_tail_path[SSIZE] = "";
@@ -10817,12 +10765,18 @@ _PUBLIC int psrp_overlay_server_process(const _BOOLEAN over_fork, const char *co
        (void)pupshold(PSRP_SIGS);
 
        if(over_fork == TRUE)
-       {  int status;
+       {  int32_t status;
 
           char channel_wait_in[SSIZE]  = "",
                channel_wait_out[SSIZE] = "";
 
           overforking = TRUE;
+
+
+          /*-----------------------------*/
+          /* Child (overforking process) */
+          /*-----------------------------*/
+
           if((overforked_child_pid = pups_fork(FALSE,FALSE)) == 0)
           {  (void)pups_execls(command_tail_path);
 
@@ -10835,14 +10789,24 @@ _PUBLIC int psrp_overlay_server_process(const _BOOLEAN over_fork, const char *co
              exit(255);
           }
 
+
+          /*----------------------*/
+          /* Parent (psrp server) */
+          /*----------------------*/
+
           (void)snprintf(channel_wait_in,SSIZE,"%s.wait",channel_name_in);
           (void)rename(channel_name_in,channel_wait_in);
           (void)snprintf(channel_wait_out,SSIZE,"%s.wait",channel_name_out);
           (void)rename(channel_name_out,channel_wait_out);
 
+
+          /*-----------------------------*/
+          /* Wait for child to terminate */
+          /*-----------------------------*/
+
           while(kill(overforked_child_pid,SIGALIVE) != (-1))
           {    (void)pups_usleep(100);
-               (void)pupswaitpid(FALSE,overforked_child_pid,&status);
+               (void)pupswaitpid(TRUE,overforked_child_pid,&status);
           }
 
           overforking          = FALSE;
@@ -10923,10 +10887,10 @@ _PUBLIC int psrp_overlay_server_process(const _BOOLEAN over_fork, const char *co
 /*-----------------------------*/
 
 
-_PRIVATE int psrp_builtin_extend_ftab(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_extend_ftab(const uint32_t argc, const char *argv[])
 
-{   int i,
-        n_files;
+{   uint32_t i,
+             n_files;
 
     if(strcmp(argv[0],"ftab") != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -10966,7 +10930,7 @@ _PRIVATE int psrp_builtin_extend_ftab(const int argc, const char *argv[])
 
        for(i=appl_max_files-1; i>0; --i)
        {  if(ftab[i].fdes != (-1))
-          {  int j;
+          {  uint32_t j;
 
 
              /*-----------------------------------------------------*/
@@ -10980,7 +10944,7 @@ _PRIVATE int psrp_builtin_extend_ftab(const int argc, const char *argv[])
              ftab = (ftab_type *)pups_realloc((void *)ftab,appl_max_files*sizeof(ftab_type));
 
              (void)fprintf(psrp_out,"\n%d PUPS file table slots now allocated for PSRP server \"%s\"\n\n",
-                                                                                  appl_max_files,appl_name); 
+                                                                                 appl_max_files,appl_name); 
              (void)fflush(psrp_out);
 
              #ifdef PTHREAD_SUPPORT
@@ -11003,14 +10967,14 @@ _PRIVATE int psrp_builtin_extend_ftab(const int argc, const char *argv[])
        return(PSRP_OK);
     }
 
-    ftab           = (ftab_type *)pups_realloc((void *)ftab,n_files*sizeof(ftab_type));
+    ftab = (ftab_type *)pups_realloc((void *)ftab,n_files*sizeof(ftab_type));
     for(i=appl_max_files; i<n_files; ++i)
         (void)pups_clear_ftab_slot(FALSE,i);
     appl_max_files = n_files;
 
 
     (void)fprintf(psrp_out,"\n%d PUPS file table slots now allocated for PSRP server \"%s\"\n\n",
-                                                                         appl_max_files,appl_name);
+                                                                        appl_max_files,appl_name);
     (void)fflush(psrp_out); 
 
 
@@ -11028,10 +10992,10 @@ _PRIVATE int psrp_builtin_extend_ftab(const int argc, const char *argv[])
 /* Set size of PUPS virtual timer table */
 /*--------------------------------------*/
 
-_PRIVATE int psrp_builtin_extend_vitab(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_extend_vitab(const uint32_t argc, const char *argv[])
 
-{   int i,
-        n_vtimers;
+{   uint32_t i,
+             n_vtimers;
 
     if(strcmp(argv[0],"vitab") != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -11045,7 +11009,7 @@ _PRIVATE int psrp_builtin_extend_vitab(const int argc, const char *argv[])
 
     if(argc == 1)
     {  (void)fprintf(psrp_out,"\n%d PUPS virtual timer table slots available for PSRP server \"%s\"\n\n",
-                                                                               appl_max_vtimers,appl_name);
+                                                                              appl_max_vtimers,appl_name);
        (void)fflush(psrp_out);
 
        return(PSRP_OK);
@@ -11067,7 +11031,7 @@ _PRIVATE int psrp_builtin_extend_vitab(const int argc, const char *argv[])
 
        for(i=appl_max_vtimers-1; i>0; --i)
        {  if(vttab[i].interval_time != (-1))
-          {  int j;
+          {  uint32_t j;
 
 
              /*-----------------------------------------------------*/
@@ -11076,12 +11040,12 @@ _PRIVATE int psrp_builtin_extend_vitab(const int argc, const char *argv[])
              /*-----------------------------------------------------*/
 
              for(j=i; j<appl_max_vtimers; ++j)
-                (void)pups_clear_vitimer(TRUE,j);
+                (void)pups_clear_vitimer(j);
              appl_max_vtimers = i + 1;
              vttab = (vttab_type *)pups_realloc((void *)vttab,appl_max_vtimers*sizeof(vttab_type));
 
              (void)fprintf(psrp_out,"\n%d PUPS virtual timer table slots now allocated for PSRP server \"%s\"\n\n",
-                                                                                         appl_max_vtimers,appl_name);
+                                                                                        appl_max_vtimers,appl_name);
              (void)fflush(psrp_out);
 
              return(PSRP_OK);
@@ -11089,18 +11053,18 @@ _PRIVATE int psrp_builtin_extend_vitab(const int argc, const char *argv[])
        }
 
        (void)fprintf(psrp_out,"\n%d PUPS virtual timer table slots allocated for PSRP server (unchanged) \"%s\"\n\n",
-                                                                                           appl_max_vtimers,appl_name);
+                                                                                          appl_max_vtimers,appl_name);
        (void)fflush(psrp_out);
        return(PSRP_OK);
     }
 
     vttab = (vttab_type *)pups_realloc((void *)vttab,n_vtimers*sizeof(vttab_type));
     for(i=appl_max_vtimers; i<n_vtimers; ++i)
-        (void)pups_clear_vitimer(FALSE,i);
+        (void)pups_clear_vitimer(i);
     appl_max_vtimers = n_vtimers;
 
     (void)fprintf(psrp_out,"\n%d PUPS virtual timer table slots now allocated for PSRP server \"%s\"\n\n",
-                                                                                appl_max_vtimers,appl_name);
+                                                                               appl_max_vtimers,appl_name);
     (void)fflush(psrp_out);
     return(PSRP_OK);
 }
@@ -11112,10 +11076,10 @@ _PRIVATE int psrp_builtin_extend_vitab(const int argc, const char *argv[])
 /* Set size of PUPS child table */
 /*------------------------------*/
 
-_PRIVATE int psrp_builtin_extend_chtab(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_extend_chtab(const uint32_t argc, const char *argv[])
 
-{   int i,
-        n_children;
+{   uint32_t i,
+             n_children;
 
     if(strcmp(argv[0],"chtab") != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -11129,7 +11093,7 @@ _PRIVATE int psrp_builtin_extend_chtab(const int argc, const char *argv[])
 
     if(argc == 1)
     {  (void)fprintf(psrp_out,"\n%d PUPS child table slots available for PSRP server \"%s\"\n\n",
-                                                                         appl_max_child,appl_name);
+                                                                        appl_max_child,appl_name);
        (void)fflush(psrp_out);
 
        return(PSRP_OK);
@@ -11155,7 +11119,7 @@ _PRIVATE int psrp_builtin_extend_chtab(const int argc, const char *argv[])
 
        for(i=appl_max_child-1; i>0; --i)
        {  if(chtab[i].pid != (-1))
-          {  int j; 
+          {  uint32_t j; 
 
 
              /*-----------------------------------------------------*/
@@ -11169,7 +11133,7 @@ _PRIVATE int psrp_builtin_extend_chtab(const int argc, const char *argv[])
              chtab = (chtab_type *)pups_realloc((void *)chtab,appl_max_child*sizeof(chtab_type));
 
              (void)fprintf(psrp_out,"\n%d PUPS child table slots now allocated for PSRP server \"%s\"\n\n",
-                                                                                   appl_max_child,appl_name);
+                                                                                  appl_max_child,appl_name);
              (void)fflush(psrp_out);
 
              #ifdef PTHREAD_SUPPORT
@@ -11181,7 +11145,7 @@ _PRIVATE int psrp_builtin_extend_chtab(const int argc, const char *argv[])
        }
 
        (void)fprintf(psrp_out,"\n%d PUPS child table slots allocated for PSRP server (unchanged) \"%s\"\n\n",
-                                                                                     appl_max_child,appl_name);
+                                                                                    appl_max_child,appl_name);
        (void)fflush(psrp_out);
 
        #ifdef PTHREAD_SUPPORT
@@ -11197,7 +11161,7 @@ _PRIVATE int psrp_builtin_extend_chtab(const int argc, const char *argv[])
     appl_max_child = n_children;
 
     (void)fprintf(psrp_out,"\n%d PUPS child table slots now allocated for PSRP server \"%s\"\n\n",
-                                                                          appl_max_child,appl_name);
+                                                                         appl_max_child,appl_name);
     (void)fflush(psrp_out);
 
     #ifdef PTHREAD_SUPPORT
@@ -11215,9 +11179,9 @@ _PRIVATE int psrp_builtin_extend_chtab(const int argc, const char *argv[])
 /* Extend PUPS persistent heap table */
 /*-----------------------------------*/
 
-_PRIVATE int psrp_builtin_extend_htab(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_extend_htab(const uint32_t argc, const char *argv[])
 
-{   int n_pheaps;
+{   uint32_t n_pheaps;
 
     if(strcmp(argv[1],"htab") != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -11270,10 +11234,10 @@ _PRIVATE int psrp_builtin_extend_htab(const int argc, const char *argv[])
 /* Extend PUPS orifice [DLL] table */
 /*---------------------------------*/
 
-_PRIVATE int psrp_builtin_extend_ortab(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_extend_ortab(const uint32_t argc, const char *argv[])
 
-{   int i,
-        n_orifices;
+{   uint32_t i,
+             n_orifices;
 
     if(strcmp(argv[0],"ortab") != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -11309,7 +11273,7 @@ _PRIVATE int psrp_builtin_extend_ortab(const int argc, const char *argv[])
 
        for(i=appl_max_orifices-1; i>0; --i)
        {  if(ortab[i].orifice_handle == (void *)NULL)
-          {  int j;
+          {  uint32_t    j;
 
 
              /*-----------------------------------------------------*/
@@ -11319,29 +11283,30 @@ _PRIVATE int psrp_builtin_extend_ortab(const int argc, const char *argv[])
 
              for(j=i; j<appl_max_orifices; ++j)
                  (void)clear_ortab_slot(TRUE,j);
+
              appl_max_orifices = i + 1;
              ortab = (ortab_type *)pups_realloc((void *)ortab,appl_max_orifices*sizeof(ortab_type));
 
              (void)fprintf(psrp_out,"\n%d PUPS orifice [DLL] table slots now allocated for PSRP server \"%s\"\n\n",
-                                                                                        appl_max_orifices,appl_name);
+                                                                                       appl_max_orifices,appl_name);
              (void)fflush(psrp_out);
              return(PSRP_OK);
           }
        }
 
        (void)fprintf(psrp_out,"\n%d PUPS orifice [DLL] table slots allocated for PSRP server (unchanged) \"%s\"\n\n",
-                                                                                          appl_max_orifices,appl_name);
+                                                                                         appl_max_orifices,appl_name);
        (void)fflush(psrp_out);
        return(PSRP_OK);
     }
 
-    ortab           = (ortab_type *)pups_realloc((void *)ortab,n_orifices*sizeof(ortab_type));
+    ortab = (ortab_type *)pups_realloc((void *)ortab,n_orifices*sizeof(ortab_type));
     for(i=appl_max_orifices; i<n_orifices; ++i)
         clear_ortab_slot(FALSE,i);
     appl_max_orifices = n_orifices;
 
     (void)fprintf(psrp_out,"\n%d PUPS orifice [DLL] slots now allocated for PSRP server \"%s\"\n\n",
-                                                                         appl_max_orifices,appl_name);
+                                                                        appl_max_orifices,appl_name);
     (void)fflush(psrp_out);
     return(PSRP_OK);
 }
@@ -11356,13 +11321,13 @@ _PRIVATE int psrp_builtin_extend_ortab(const int argc, const char *argv[])
 
 _PRIVATE void psrp_crontab_checkschedule(char *args)
 
-{   int i,
-        local_s;
+{   uint32_t i;
+     int32_t local_s;
 
-    time_t t,
-           tdum;
+    time_t   t,
+             tdum;
 
-    struct tm *local_time = (struct tm *)NULL;
+    struct   tm *local_time = (struct tm *)NULL;
 
     for(i=0; i<MAX_CRON_SLOTS; ++i)
     {  if(crontab[i].from != (-1) && crontab[i].to != (-1)) 
@@ -11424,7 +11389,7 @@ _PRIVATE void psrp_crontab_checkschedule(char *args)
              if(appl_verbose == TRUE)
              {  (void)strdate(date);
                 (void)fprintf(stderr,"%s %s ($d@%s:%s): crontab event %d (%s) finished\n",
-                        date,appl_name,appl_pid,appl_host,appl_owner,i,crontab[i].fname);
+                              date,appl_name,appl_pid,appl_host,appl_owner,i,crontab[i].fname);
                 (void)fflush(stderr);
              }
           }
@@ -11435,32 +11400,33 @@ _PRIVATE void psrp_crontab_checkschedule(char *args)
 
 
 
-/*-----------------------------------------------*/
-/* Enter a scheduled activity into crontab table */
-/*-----------------------------------------------*/
+/*--------------------------------------------------*/
+/* Schedule activity in (PSRP server) crontab table */
+/*--------------------------------------------------*/
 
-_PUBLIC int psrp_crontab_schedule(const char *from, const char *to, const char *fname, const void *func)
+_PUBLIC int32_t psrp_crontab_schedule(const char *from, const char *to, const char *fname, const void *func)
 
-{   int i,
-        to_h,
-        to_m,
-        to_d,
-        from_h,
-        from_m,
-        from_d,
-        to_s,
-        from_s,
-        ctab_index;
+{   uint32_t  i,
+              ctab_index;
 
-    _BOOLEAN do_from_now = FALSE;
+     int32_t  to_h,
+              to_m,
+              to_d,
+              from_h,
+              from_m,
+              from_d,
+              to_s,
+              from_s;
 
-    time_t t,
-           tdum;
+    _BOOLEAN  do_from_now  = FALSE;
 
-    struct tm *local_time = (struct tm *)NULL;
+    time_t    t,
+              tdum;
 
-    char sfrom[SSIZE] = "",
-         sto[SSIZE]   = "";
+    struct tm *local_time  = (struct tm *)NULL;
+
+    char      sfrom[SSIZE] = "",
+              sto[SSIZE]   = "";
 
 
     /*----------------------------------*/
@@ -11485,10 +11451,11 @@ _PUBLIC int psrp_crontab_schedule(const char *from, const char *to, const char *
     /*------------------------------------------------*/
 
     for(i=0; i<MAX_CRON_SLOTS; ++i)
-       if(strcmp(crontab[i].fname,"notset") == 0)
+    {  if(strcmp(crontab[i].fname,"notset") == 0)
        {  ctab_index = i;
           goto cronslot_found;
        }
+    }
 
     pups_set_errno(ENOMEM);
     return(-1);
@@ -11502,13 +11469,14 @@ cronslot_found:
     /*---------------------------------------------------------*/
 
     for(i=0; i<strlen(from); ++i)
-       if(from[i] == ':')
+    {  if(from[i] == ':')
           sfrom[i] = ' ';
        else
           sfrom[i] = from[i];
+    }
 
     if(strcmp(sfrom,"now") == 0)
-    {  t = time(&tdum);
+    {  t          = time(&tdum);
        local_time = localtime(&t);
 
        from_d = local_time->tm_mday;
@@ -11562,10 +11530,10 @@ cronslot_found:
     }
 
     if(from_h > to_h)
-    {  t = time(&tdum);
+    {  t          = time(&tdum);
        local_time = localtime(&t);
-       from_d = local_time->tm_mday;
-       to_d   = from_d + 1;
+       from_d     = local_time->tm_mday;
+       to_d       = from_d + 1;
 
        crontab[ctab_index].overnight = TRUE;
     }
@@ -11590,11 +11558,11 @@ cronslot_found:
     if(appl_verbose == TRUE)
     {  (void)strdate(date);
        if(crontab[ctab_index].func  == (void *)NULL)
-          (void)fprintf(stderr,"%s %s (%d@%s:%s): [crontab slot %d] inactivity scheduled between %s and %s\n\n",
-                                                date,appl_name,appl_pid,appl_host,appl_owner,ctab_index,from,to);
+          (void)fprintf(stderr,"%s %s (%d@%s:%s): [crontab slot %d] no activity scheduled between %s and %s\n\n",
+                                                 date,appl_name,appl_pid,appl_host,appl_owner,ctab_index,from,to);
        else
           (void)fprintf(stderr,"%s %s (%d@%s:%s): [crontab slot %d]  \"%-32s\" (at %016lx virtual) scheduled between %s and %s\n\n",
-                                      date,appl_name,appl_pid,appl_host,appl_owner,ctab_index,fname,(unsigned long int)func,from,to);
+                                      date,appl_name,appl_pid,appl_host,appl_owner,ctab_index,fname,(uint64_t         )func,from,to);
 
        (void)fflush(stderr);
     }
@@ -11606,13 +11574,13 @@ cronslot_found:
 
 
 
-/*---------------------------*/
-/* Unschedule a crontab slot */
-/*---------------------------*/
+/*-------------------------------------------*/
+/* Unschedule PSRP server (crontab) activity */
+/*-------------------------------------------*/
 
-_PUBLIC int psrp_crontab_unschedule(const unsigned int ctab_index)
+_PUBLIC int32_t psrp_crontab_unschedule(const uint32_t ctab_index)
 
-{   int i;
+{   uint32_t i;
 
 
     /*----------------------------------*/
@@ -11641,7 +11609,7 @@ _PUBLIC int psrp_crontab_unschedule(const unsigned int ctab_index)
        if(appl_verbose == TRUE)
        {  (void)strdate(date);
           (void)fprintf(stderr,"%s %s (%d@%s:%s): crontab slot [%d] cleared\n",
-                      date,appl_name,appl_pid,appl_host,appl_owner,ctab_index);
+                        date,appl_name,appl_pid,appl_host,appl_owner,ctab_index);
           (void)fflush(stderr);
        }
 
@@ -11656,13 +11624,13 @@ _PUBLIC int psrp_crontab_unschedule(const unsigned int ctab_index)
 
 
 
-/*--------------------*/
-/* Initialise crontab */
-/*--------------------*/
+/*----------------------------------*/
+/* Initialise (PSRP server) crontab */
+/*----------------------------------*/
 
 _PUBLIC void psrp_crontab_init(void)
 
-{   int i;
+{   uint32_t i;
 
 
     /*----------------------------------*/
@@ -11699,7 +11667,7 @@ _PUBLIC void psrp_crontab_init(void)
     if(appl_verbose == TRUE)
     {  (void)strdate(date);
        (void)fprintf(stderr,"%s %s (%d@%s:%s): PUPS/P3 cron service started\n",
-                           date,appl_name,appl_pid,appl_host,appl_owner);
+                                  date,appl_name,appl_pid,appl_host,appl_owner);
        (void)fflush(stderr);
     }
 
@@ -11709,14 +11677,14 @@ _PUBLIC void psrp_crontab_init(void)
 
 
 
-/*--------------------------------------------------*/
-/* Display schedule of activities for this function */
-/*--------------------------------------------------*/
+/*------------------------------------------------------------------*/
+/* Display scheduled (PSRP crontab) activities for this PSRP server */
+/*------------------------------------------------------------------*/
 
-_PUBLIC int psrp_show_crontab(const FILE *stream)
+_PUBLIC  int32_t psrp_show_crontab(const FILE *stream)
 
-{   int i,
-        cront = 0;
+{   uint32_t i,
+             cront = 0;
 
 
     /*----------------------------------*/
@@ -11742,7 +11710,7 @@ _PUBLIC int psrp_show_crontab(const FILE *stream)
              (void)fprintf(stream,"    %04d: (payload \"%-32s\" at %016lx virtual) start: %-32s, stop %-32s\n",
                                                                                                              i,
                                                                                               crontab[i].fname,
-                                                                            (unsigned long int)crontab[i].func,
+                                                                            (uint64_t         )crontab[i].func,
                                                                                            crontab[i].fromdate,
                                                                                             crontab[i].todate);
           else
@@ -11777,7 +11745,7 @@ _PUBLIC int psrp_show_crontab(const FILE *stream)
 /* Add scheduling slot to PSRP crontab */
 /*-------------------------------------*/
 
-_PRIVATE int psrp_builtin_crontab_schedule(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_crontab_schedule(const uint32_t argc, const char *argv[])
 
 {   if(strcmp("schedule",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -11790,8 +11758,8 @@ _PRIVATE int psrp_builtin_crontab_schedule(const int argc, const char *argv[])
     }
 
     if(argc > 3)
-    {  int  slot_index;
-       void *func = (void *)NULL;
+    {  int32_t slot_index;
+       void    *func = (void *)NULL;
 
        slot_index = psrp_find_action_slot_index(argv[3]);
        if(slot_index != (-1)                                                   &&
@@ -11804,7 +11772,7 @@ _PRIVATE int psrp_builtin_crontab_schedule(const int argc, const char *argv[])
        }
     }
     else
-       psrp_crontab_schedule(argv[1],argv[2],"notset",(void *)NULL);
+       (void)psrp_crontab_schedule(argv[1],argv[2],"notset",(void *)NULL);
 
     return(PSRP_OK);
 }
@@ -11816,9 +11784,9 @@ _PRIVATE int psrp_builtin_crontab_schedule(const int argc, const char *argv[])
 /* Remove scheduling slot from PSRP crontab */
 /*------------------------------------------*/
 
-_PRIVATE int psrp_builtin_crontab_unschedule(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_crontab_unschedule(const uint32_t argc, const char *argv[])
 
-{   int ctab_index;
+{   uint32_t ctab_index;
 
     if(strcmp("unschedule",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -11835,7 +11803,7 @@ _PRIVATE int psrp_builtin_crontab_unschedule(const int argc, const char *argv[])
        (void)fflush(psrp_out);
     }
 
-    psrp_crontab_unschedule(ctab_index);
+    (void)psrp_crontab_unschedule(ctab_index);
     return(PSRP_OK);
 }
 
@@ -11846,7 +11814,7 @@ _PRIVATE int psrp_builtin_crontab_unschedule(const int argc, const char *argv[])
 /* Display PSRP crontab */
 /*----------------------*/
 
-_PRIVATE int psrp_builtin_show_crontab(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_show_crontab(const uint32_t argc, const char *argv[])
 
 {   if(strcmp("cronstat",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -11858,15 +11826,15 @@ _PRIVATE int psrp_builtin_show_crontab(const int argc, const char *argv[])
        return(PSRP_OK);
     }
 
-    psrp_show_crontab(psrp_out);
+    (void)psrp_show_crontab(psrp_out);
     return(PSRP_OK);
 }
 
 
 
-/*-------------------------------------------------*/
-/* Set PSRP function condition (error/status) code */
-/*-------------------------------------------------*/
+/*------------------------------------------------*/
+/* Set PSRP handler condition (error/status) code */
+/*------------------------------------------------*/
 
 _PUBLIC void psrp_set_c_code(const char *c_code)
 
@@ -11883,7 +11851,6 @@ _PUBLIC void psrp_set_c_code(const char *c_code)
     {  pups_set_errno(EINVAL);
        return;
     }
-
     (void)strlcpy(psrp_c_code,c_code,SSIZE);
 
     pups_set_errno(OK);
@@ -11896,7 +11863,7 @@ _PUBLIC void psrp_set_c_code(const char *c_code)
 /* Toggle PSRP server background standard I/O autodetach  */
 /*--------------------------------------------------------*/
 
-_PRIVATE int psrp_builtin_set_nodetach(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_set_nodetach(const uint32_t argc, const char *argv[])
 
 {   if(strcmp("nodetach",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -11944,7 +11911,7 @@ _PRIVATE int psrp_builtin_set_nodetach(const int argc, const char *argv[])
 /* Display process resources */
 /*---------------------------*/
 
-_PRIVATE int psrp_builtin_show_rusage(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_show_rusage(const uint32_t argc, const char *argv[])
 
 {   struct rusage buf;
     struct rlimit rlim;
@@ -12034,10 +12001,10 @@ _PRIVATE int psrp_builtin_show_rusage(const int argc, const char *argv[])
 /* Dynamically set process resources */
 /*-----------------------------------*/
 
-_PRIVATE int psrp_builtin_set_rlimit(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_set_rlimit(const uint32_t argc, const char *argv[])
 
-{   int    cnt = 1;
-    struct rlimit buf;
+{   uint32_t        cnt = 1;
+    struct   rlimit buf;
 
     if(strcmp("rset",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -12064,7 +12031,7 @@ _PRIVATE int psrp_builtin_set_rlimit(const int argc, const char *argv[])
     /*------------------------------------------------*/ 
 
     if(strcmp(argv[cnt],"cpu") == 0)
-    {  int cpu_time;
+    {   int64_t  cpu_time;
 
        ++cnt;
        (void)getrlimit(RLIMIT_CORE,&buf);
@@ -12113,7 +12080,7 @@ _PRIVATE int psrp_builtin_set_rlimit(const int argc, const char *argv[])
     /*-----------------------------------------------------*/
 
     if(strcmp(argv[cnt],"core") == 0)
-    {  int core_size;
+    {   int64_t  core_size;
 
        ++cnt;
        (void)getrlimit(RLIMIT_CORE,&buf);
@@ -12163,7 +12130,7 @@ _PRIVATE int psrp_builtin_set_rlimit(const int argc, const char *argv[])
     /*-----------------------------------------*/
 
     if(strcmp(argv[cnt],"stack") == 0)
-    {  int stack_size;
+    {   int64_t  stack_size;
       
        ++cnt; 
        (void)getrlimit(RLIMIT_STACK,&buf);
@@ -12213,7 +12180,7 @@ _PRIVATE int psrp_builtin_set_rlimit(const int argc, const char *argv[])
     /*------------------------------------------------*/
 
     if(strcmp(argv[cnt],"data") == 0)
-    {  int data_size;
+    {   int64_t  data_size;
 
        ++cnt;
        (void)getrlimit(RLIMIT_DATA,&buf);
@@ -12263,7 +12230,7 @@ _PRIVATE int psrp_builtin_set_rlimit(const int argc, const char *argv[])
     /*-------------------------------------------------*/
 
     if(strcmp(argv[cnt],"rss") == 0)
-    {  int rss_size;
+    {   int64_t  rss_size;
 
        ++cnt;
        (void)getrlimit(RLIMIT_RSS,&buf);
@@ -12314,7 +12281,7 @@ _PRIVATE int psrp_builtin_set_rlimit(const int argc, const char *argv[])
     /*--------------------------------------------------------------*/
 
     if(strcmp(argv[cnt],"vmsize") == 0)
-    {  int vm_size;
+    {   int64_t  vm_size;
 
        ++cnt;
        (void)getrlimit(RLIMIT_AS,&buf);
@@ -12364,7 +12331,7 @@ _PRIVATE int psrp_builtin_set_rlimit(const int argc, const char *argv[])
     /*------------------------------------------------*/
 
     if(strcmp(argv[cnt],"fsize") == 0)
-    {  int file_size;
+    {   int64_t  file_size;
 
        ++cnt;
        (void)getrlimit(RLIMIT_FSIZE,&buf);
@@ -12411,7 +12378,7 @@ _PRIVATE int psrp_builtin_set_rlimit(const int argc, const char *argv[])
     /*-----------------------------------------------------------------------------*/
 
     if(strcmp(argv[cnt],"nfiles") == 0)
-    {  int n_files;
+    {   int32_t n_files;
 
        if(strcmp("unlimited",argv[cnt]) == 0)
        {  buf.rlim_cur = buf.rlim_max;
@@ -12456,7 +12423,7 @@ _PRIVATE int psrp_builtin_set_rlimit(const int argc, const char *argv[])
     /*--------------------------------------------------------*/
 
     if(strcmp(argv[cnt],"nproc") == 0)
-    {  int n_children;
+    {   int32_t n_children;
 
        if(strcmp("unlimited",argv[cnt]) == 0)
        {  buf.rlim_cur = buf.rlim_max;
@@ -12509,7 +12476,7 @@ _PRIVATE int psrp_builtin_set_rlimit(const int argc, const char *argv[])
 /* Dynamically set process exit (if effective parent exits) */
 /*----------------------------------------------------------*/
 
-_PRIVATE int psrp_builtin_set_pexit(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_set_pexit(const uint32_t argc, const char *argv[])
 
 {   if(strcmp("pexit",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -12544,7 +12511,7 @@ _PRIVATE int psrp_builtin_set_pexit(const int argc, const char *argv[])
 /* Dynamically unset process exit (if effective parent exits) */
 /*------------------------------------------------------------*/
 
-_PRIVATE int psrp_builtin_set_unpexit(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_set_unpexit(const uint32_t argc, const char *argv[])
 
 {   if(strcmp("unpexit",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -12577,7 +12544,7 @@ _PRIVATE int psrp_builtin_set_unpexit(const int argc, const char *argv[])
 /* Dynamically set PSRP server migration context */
 /*-----------------------------------------------*/
 
-_PRIVATE int psrp_builtin_set_rooted(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_set_rooted(const uint32_t argc, const char *argv[])
 
 {   if(strcmp("rooted",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -12609,7 +12576,7 @@ _PRIVATE int psrp_builtin_set_rooted(const int argc, const char *argv[])
 /* Dynamically unset PSRP server system migration context */
 /*--------------------------------------------------------*/
 
-_PRIVATE int psrp_builtin_set_unrooted(const int argc, const char *argv[])
+_PRIVATE  int32_t psrp_builtin_set_unrooted(const uint32_t argc, const char *argv[])
 
 {   if(strcmp("unrooted",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -12643,10 +12610,10 @@ _PRIVATE int psrp_builtin_set_unrooted(const int argc, const char *argv[])
 /* Dynamically set PSRP server (effective) parent */
 /*------------------------------------------------*/
 
-_PRIVATE int psrp_builtin_set_parent(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_set_parent(const uint32_t argc, const char *argv[])
 
-{   int  i_tmp;
-    char pname[SSIZE] = "";
+{   pid_t i_tmp;
+    char  pname[SSIZE] = "";
 
     if(strcmp("parent",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -12697,7 +12664,7 @@ _PRIVATE int psrp_builtin_set_parent(const int argc, const char *argv[])
     if(appl_verbose == TRUE)
     {  (void)strdate(date);
        (void)fprintf(stderr,"%s %s (%d@%s:%s): effective parent is %d (%s@%s)\n",
-               date,appl_name,appl_pid,appl_host,appl_owner,appl_ppid,pname,appl_host);
+                     date,appl_name,appl_pid,appl_host,appl_owner,appl_ppid,pname,appl_host);
        (void)fflush(stderr);
     }             
 
@@ -12735,7 +12702,7 @@ _PRIVATE int psrp_builtin_set_parent(const int argc, const char *argv[])
 /* Dynamically set PSRP server current working directory */
 /*-------------------------------------------------------*/
 
-_PRIVATE int psrp_builtin_set_cwd(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_set_cwd(const uint32_t argc, const char *argv[])
 
 {   char cwd[SSIZE]     = "",
          cwdpath[SSIZE] = "",
@@ -12815,9 +12782,9 @@ _PRIVATE int psrp_builtin_set_cwd(const int argc, const char *argv[])
 /* Dynamically set number of times psrp function is (re)-tryed */ 
 /*-------------------------------------------------------------*/
 
-_PRIVATE int psrp_builtin_set_trys(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_set_trys(const uint32_t argc, const char *argv[])
 
-{   int i;
+{   uint32_t i;
 
     if(strcmp("strys",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -12836,7 +12803,7 @@ _PRIVATE int psrp_builtin_set_trys(const int argc, const char *argv[])
        return(PSRP_OK);
     }
     else if(argc == 2)
-    {  int itmp;
+    {  int32_t itmp;
 
        if(sscanf(argv[1],"%d",&itmp) != 1 || itmp < 0)
        {  (void)fprintf(psrp_out,"\n\nnumber of tries must be a positive integer\n\n");
@@ -12867,11 +12834,10 @@ _PRIVATE int psrp_builtin_set_trys(const int argc, const char *argv[])
 /* Dynamically protect a file or files) from accidental deletion */
 /*---------------------------------------------------------------*/
 
-_PRIVATE int psrp_builtin_file_live(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_file_live(const uint32_t argc, const char *argv[])
 
-{   int i,
-        f_index,
-        slot_index;
+{   uint32_t i;
+    int32_t  f_index;
 
     if(strcmp("live",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -12896,10 +12862,10 @@ _PRIVATE int psrp_builtin_file_live(const int argc, const char *argv[])
        /* Do we have a slot identifier? */
        /*-------------------------------*/
 
-       if(sscanf(argv[i],"%d",&slot_index) == 1)
-       {  if(slot_index < 0 || slot_index > appl_max_files)
-          {  (void)fprintf(stderr,"\nindex %d is not avalid slot id (must lie between 0 and %d)\n",
-                                                                         slot_index,appl_max_files);
+       if(sscanf(argv[i],"%d",&f_index) == 1)
+       {  if(f_index < 0 || f_index > appl_max_files)
+          {  (void)fprintf(stderr,"\nindex %d is not a valid file identifier (must lie between 0 and %d)\n",
+                                                                                     f_index,appl_max_files);
              (void)fflush(stderr);
           }
        }
@@ -12926,7 +12892,6 @@ _PRIVATE int psrp_builtin_file_live(const int argc, const char *argv[])
 
        if(f_index != (-1))
        {  char homeostat_name[SSIZE] = "";
-
 
 
           /*-------------------*/
@@ -12961,10 +12926,10 @@ _PRIVATE int psrp_builtin_file_live(const int argc, const char *argv[])
 /* Dynamically unprotect a file or files) from accidental deletion */ 
 /*-----------------------------------------------------------------*/
 
-_PRIVATE int psrp_builtin_file_dead(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_file_dead(const uint32_t argc, const char *argv[])
 
-{   int i,
-        f_index;
+{   uint32_t i;
+     int32_t f_index;
 
     if(strcmp("dead",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -12990,7 +12955,7 @@ _PRIVATE int psrp_builtin_file_dead(const int argc, const char *argv[])
 
        if(sscanf(argv[i],"%d",&f_index) == 1)
        {  if(f_index < 0 || f_index > appl_max_files)
-          {  (void)fprintf(stderr,"\nindex %d is not a valid slot identifier (must lie between 0 and %d)\n",
+          {  (void)fprintf(stderr,"\nindex %d is not a valid file identifier (must lie between 0 and %d)\n",
                                                                                      f_index,appl_max_files);
              (void)fflush(stderr);
           }
@@ -13037,22 +13002,24 @@ _PRIVATE int psrp_builtin_file_dead(const int argc, const char *argv[])
 
 
 
-/*----------------------------------------------------------------------------------------*/
-/* Fork a PUPS/PSRP server -- this routine will build -- all open files etc are inherited */
-/* along with any homeostats which the parent may have been running                       */
-/*----------------------------------------------------------------------------------------*/
+/*------------------------------------------------------------------*/
+/* Fork a PUPS/PSRP server all open files etc are inherited         */
+/* along with any homeostats which the parent may have been running */
+/*------------------------------------------------------------------*/
 
-_PUBLIC int psrp_fork(const char     *childname,   // Name of forked child
-                      const _BOOLEAN obituary)     // Produce report (of what went wrong) if TRUE
+_PUBLIC pid_t psrp_fork(const char     *childname,   // Name of forked child
+                        const _BOOLEAN obituary)     // Produce report (of what went wrong) if TRUE
 
-{   int  i,
-         ret,
-         cnt = 0;
+{   uint32_t i,
+             cnt                         = 0;
 
-    sigset_t set;
+    pid_t    child_pid;
 
-    char new_channel_name_in[SSIZE]  = "",
-         new_channel_name_out[SSIZE] = "";
+    sigset_t set,
+             old_set;
+
+    char     new_channel_name_in[SSIZE]  = "",
+             new_channel_name_out[SSIZE] = "";
 
 
     /*----------------------------------*/
@@ -13068,30 +13035,24 @@ _PUBLIC int psrp_fork(const char     *childname,   // Name of forked child
        return(-1);
     }
 
+
+    /*---------------------------------------------*/
+    /* Do not fork while processing a PSRP request */
+    /*---------------------------------------------*/
+
     if(in_chan_handler == TRUE || in_psrp_handler == TRUE)
        return(-1);
 
 
-    /*--------------------------------------------------------------------------*/
-    /* Signals are not inherited -- so if we have signals pending simply return */
-    /*--------------------------------------------------------------------------*/
+    /*-----------------------------*/
+    /* Block signals while forking */
+    /*-----------------------------*/
 
-    (void)sigemptyset(&set);
-    (void)sigpending(&set);
-
-    for(i=1; i<MAX_SIGS; ++i)
-    {  if(sigismember(&set,i))
-       {
-
-          #ifdef PSRPLIB_DEBUG
-          (void)fprintf(stderr,"PSRPLIB SIGNALS PENDING\n");
-          (void)fflush(stderr);
-          #endif /* PSRPLIB_DEBUG */
-
-          return(0);
-       }       
-    }
-
+    (void)sigfillset (&set);
+    (void)sigdelset  (&set,SIGINT);
+    (void)sigdelset  (&set,SIGTERM);
+    (void)sigprocmask(SIG_BLOCK,&set,&old_set);
+ 
 
     /*--------------------------------------------*/
     /* First fork() to creat a child process.     */
@@ -13099,8 +13060,16 @@ _PUBLIC int psrp_fork(const char     *childname,   // Name of forked child
     /* the parent process                         */
     /*--------------------------------------------*/
 
-    if((ret = pups_fork(FALSE,obituary)) != 0)
-       return(ret);
+    if((child_pid = pups_fork(FALSE,obituary)) != 0)
+    {  
+
+       /*------------------------------*/
+       /* Restore (parent) signal mask */
+       /*------------------------------*/
+
+       (void)sigprocmask(SIG_SETMASK,&old_set,(sigset_t *)NULL);
+       return(child_pid);
+    }
 
 
     /*-------------------------------------------------------*/
@@ -13108,8 +13077,6 @@ _PUBLIC int psrp_fork(const char     *childname,   // Name of forked child
     /* (pending signals are not inherited) and build ourself */
     /* a communications channel for PSRP interactions        */
     /*-------------------------------------------------------*/
-
-
     /*------------------------------------------------*/
     /* Dissassociate child from parents PSRP channels */
     /* they are not inherited                         */
@@ -13119,7 +13086,7 @@ _PUBLIC int psrp_fork(const char     *childname,   // Name of forked child
     {  if(ftab[i].fdes != (-1) && strncmp(ftab[i].fname,"psrp",4) == 0)
        {  (void)fclose(ftab[i].stream);
 
-           if(cnt ++ > 2)
+           if(cnt++ > 2)
              goto done;
        }
     }
@@ -13127,6 +13094,7 @@ _PUBLIC int psrp_fork(const char     *childname,   // Name of forked child
 done:
 
     (void)strlcpy(appl_name,childname,SSIZE);
+ 
 
     /*-----------------------------------------------------*/
     /* Get (child) PID and update PUPS process information */
@@ -13139,37 +13107,37 @@ done:
     /* Create standard I/O for this process. */
     /*---------------------------------------*/
 
-    (void)pups_free((void *)ftab[0].fname);
-    ftab[0].fname = (char *)pups_malloc(SSIZE);
     if(isatty(0) == 1)
-    {  ftab[0].named = TRUE;
+    {  ftab[0].named   = TRUE;
+       ftab[0].creator = TRUE;
        (void)snprintf(ftab[0].fname,SSIZE,"%s/pups.%s.%s.stdin.pst.%d:%d", appl_fifo_dir,appl_name,appl_host,appl_pid,appl_uid);
        (void)symlink("/dev/tty",ftab[0].fname); 
     }
+
     else
     {  ftab[0].named = FALSE;
        (void)snprintf(ftab[0].fname,SSIZE,"<redirected.0>");
     }
 
-    (void)pups_free((void *)ftab[1].fname);
-    ftab[1].fname = (char *)pups_malloc(SSIZE);
     if(isatty(1) == 1)
-    {  ftab[1].named = TRUE;
+    {  ftab[1].named   = TRUE;
+       ftab[1].creator = TRUE;
        (void)snprintf(ftab[1].fname,SSIZE,"%s/pups.%s.%s.stdout.pst.%d:%d",appl_fifo_dir,appl_name,appl_host,appl_pid,appl_uid);
        (void)symlink("/dev/tty",ftab[1].fname); 
     }
+
     else
     {  ftab[1].named = FALSE;
        (void)snprintf(ftab[1].fname,SSIZE,"<redirected.1>");
     }
 
-    (void)pups_free((void *)ftab[2].fname);
-    ftab[2].fname = (char *)pups_malloc(SSIZE);
     if(isatty(2) == 1)
-    {  ftab[2].named = TRUE;
+    {  ftab[2].named   = TRUE;
+       ftab[2].creator = TRUE;
        (void)snprintf(ftab[2].fname,SSIZE,"%s/pups.%s.%s.stderr.pst.%d:%d",appl_fifo_dir,appl_name,appl_host,appl_pid,appl_uid);
        (void)symlink("/dev/tty",ftab[2].fname); 
     }
+
     else
     {  ftab[2].named = FALSE;
        (void)snprintf(ftab[2].fname,SSIZE,"<redirected.2>");
@@ -13182,8 +13150,22 @@ done:
 
     (void)snprintf(channel_name_out,SSIZE,"%s/psrp#%s#fifo#out#%d#%d",appl_fifo_dir,appl_ch_name,appl_pid,appl_uid);
     (void)snprintf(channel_name_in,SSIZE, "%s/psrp#%s#fifo#in#%d#%d", appl_fifo_dir,appl_ch_name,appl_pid,appl_uid);
-    (void)mkfifo(channel_name_in, 0600);
-    (void)mkfifo(channel_name_out,0600);
+    (void)snprintf(channel_name,SSIZE,    "%s/psrp#%s#fifo#IO#%d#%d", appl_fifo_dir,appl_ch_name,appl_pid,appl_uid);
+
+    if(access((char *)channel_name_in,F_OK | R_OK | W_OK) == (-1))
+    {  (void)mkfifo(channel_name_in,0600);
+       (void)pups_update_psrp_channel_ftab_entry(channel_name_in,"#in");
+    }
+    else
+       pups_error("[psrp_fork] failed to created psrp input channel");
+
+    if(access((char *)channel_name_out,F_OK | R_OK | W_OK) == (-1))
+    {  (void)mkfifo(channel_name_out,0600);
+       (void)pups_update_psrp_channel_ftab_entry(channel_name_out,"#out");
+    }
+
+    else
+       pups_error("[psrp_fork] failed to created psrp output channel");
 
 
     /*---------------------------------------------------------------*/
@@ -13215,13 +13197,26 @@ done:
                                               date,appl_name,appl_pid,appl_host,appl_owner);
        }
 
-       (void)pups_setvitimer("psrp_homeostat",1,VT_CONTINUOUS,1,NULL,(void *)psrp_homeostat);
+       // MAO - was SHORT_DELAY
+       (void)pups_setvitimer("psrp_homeostat",DELAY,VT_CONTINUOUS,1,NULL,(void *)psrp_homeostat);
     }    
+
+
+    /*-----------------------------*/
+    /* Restore (child) signal mask */
+    /*-----------------------------*/
+    
+    (void)sigprocmask(SIG_SETMASK,&old_set,(sigset_t *)NULL);
+
+
+    /*---------------------*/
+    /* Restart homeostasis */
+    /*---------------------*/
 
     (void)pups_vitrestart();
 
     pups_set_errno(OK);
-    return(ret);
+    return(0);
 }
 
 
@@ -13231,13 +13226,13 @@ done:
 /* Create a trailfile and associated delayed destructor processs (lyosome) */
 /*-------------------------------------------------------------------------*/
 
-_PRIVATE void psrp_create_trailfile(char *trail_file_name,
-                                    char *pen,
-                                    char *host,
-                                    char *host_port)
+_PRIVATE void psrp_create_trailfile(const char *trail_file_name,
+                                    const char *pen,
+                                    const char *host,
+                                    const char *host_port)
 
-{   char lyosome_command[SSIZE] = "";
-    FILE *stream = (FILE *)NULL;
+{   char lyosome_command[SSIZE]  = "";
+    FILE *stream                 = (FILE *)NULL;
 
 
     /*----------------------*/
@@ -13256,7 +13251,7 @@ _PRIVATE void psrp_create_trailfile(char *trail_file_name,
 
     (void)fprintf(stream,"#--------------------------------------------------------------------\n");
     (void)fprintf(stream,"#    PSRP migration trail file version 1.02\n");
-    (void)fprintf(stream,"#    (C) M.A. O'Neill, Tumbling Dice 2023\n");
+    (void)fprintf(stream,"#    (C) M.A. O'Neill, Tumbling Dice 2024\n");
     (void)fprintf(stream,"#---------------------------------------------------------------------\n\n");
     (void)fflush(stream);
     (void)fprintf(stream,"%s %s %s\n\n",pen,host,host_port);
@@ -13274,9 +13269,9 @@ _PRIVATE void psrp_create_trailfile(char *trail_file_name,
 
 
 
-/*------------------*/
-/* Read a trailfile */
-/*------------------*/
+/*--------------------------------------------*/
+/* Read trail data from migrated PSRP channel */
+/*--------------------------------------------*/
 
 _PUBLIC _BOOLEAN psrp_read_trailfile(const char *trail_file_name, // Name of trailfile
                                      char       *pen,             // Name of process on new host
@@ -13284,7 +13279,7 @@ _PUBLIC _BOOLEAN psrp_read_trailfile(const char *trail_file_name, // Name of tra
                                      char       *host_port)       // Port for (ssh) access to new host
 
 {   char line[SSIZE] = "";
-    FILE *stream = (FILE *)NULL;
+    FILE *stream     = (FILE *)NULL;
 
 
     /*----------------------------------*/
@@ -13303,14 +13298,14 @@ _PUBLIC _BOOLEAN psrp_read_trailfile(const char *trail_file_name, // Name of tra
     }
 
 
-#ifdef PSRPLIB_DEBUG
+    #ifdef PSRPLIB_DEBUG
     while(access(trail_file_name,F_OK | R_OK | W_OK) == (-1))
     {    (void)fprintf(stderr,"PSRPLIB TFW: %s\n",trail_file_name);
          (void)fflush(stderr);
 
          (void)pups_sleep(1);
     }
-#endif /* PSRPLIB_DEBUG */
+    #endif /* PSRPLIB_DEBUG */
 
 
     /*--------------------------------------------*/
@@ -13346,7 +13341,7 @@ _PUBLIC _BOOLEAN psrp_read_trailfile(const char *trail_file_name, // Name of tra
 /* Set authentication token for (secure) PSRP server */
 /*---------------------------------------------------*/
 
-_PRIVATE int psrp_builtin_set_secure(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_set_secure(const uint32_t argc, const char *argv[])
 
 {    if(strcmp("secure",argv[0]) != 0)
         return(PSRP_DISPATCH_ERROR);
@@ -13379,7 +13374,6 @@ _PRIVATE int psrp_builtin_set_secure(const int argc, const char *argv[])
 
     return(PSRP_OK);
 }
-
 #endif /* PSRP_AUTHENTICATE */
 
 
@@ -13391,9 +13385,9 @@ _PRIVATE int psrp_builtin_set_secure(const int argc, const char *argv[])
 /* (utilisation) threshold is supported                                     */
 /*--------------------------------------------------------------------------*/
 
-_PRIVATE int psrp_builtin_set_mbubble_utilisation_threshold(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_set_mbubble_utilisation_threshold(const uint32_t argc, const char *argv[])
 
-{   int mbubble_utilisation;
+{   uint32_t mbubble_utilisation;
 
     if(strcmp("mset",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -13434,7 +13428,7 @@ _PRIVATE int psrp_builtin_set_mbubble_utilisation_threshold(const int argc, cons
 /* Show malloc statistics */
 /*------------------------*/
 
-_PRIVATE int psrp_builtin_show_malloc_stats(const int argc, const char *argv[])
+_PRIVATE  int32_t psrp_builtin_show_malloc_stats(const uint32_t argc, const char *argv[])
 
 {    if(strcmp("mstat",argv[0]) != 0)
         return(PSRP_DISPATCH_ERROR);
@@ -13442,7 +13436,6 @@ _PRIVATE int psrp_builtin_show_malloc_stats(const int argc, const char *argv[])
      jmalloc_usage(FALSE,psrp_out);
      return(PSRP_OK);
 }
-
 #endif /* BUBBLE_MEMORY_SUPPORT */
 
 
@@ -13452,13 +13445,13 @@ _PRIVATE int psrp_builtin_show_malloc_stats(const int argc, const char *argv[])
 /* Enable/disable (Criu) state saving */
 /*------------------------------------*/
 
-_PRIVATE int psrp_builtin_ssave(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_ssave(const uint32_t argc, const char *argv[])
 
-{   int i,
-        itmp,
-        deconded = 0;
+{    int32_t i,
+             itmp,
+             deconded      = 0;
 
-    unsigned char tmpstr[SSIZE] = "";
+    char     tmpstr[SSIZE] = "";
 
 
     if(strcmp("ssave",argv[0]) != 0)
@@ -13616,7 +13609,7 @@ _PRIVATE int psrp_builtin_ssave(const int argc, const char *argv[])
              /*-----------*/
 
              (void)stat(argv[i],&stat_buf);
-             if (S_ISDIR(argv[i],buf.st_mode)
+             if (S_ISDIR(argv[i],buf.st_mode))
                 (void)strlcpy(appl_criu_dir,tmpstr,SSIZE);
 
 
@@ -13646,7 +13639,7 @@ _PRIVATE int psrp_builtin_ssave(const int argc, const char *argv[])
     /*------------------------------------------------------*/
 
     if (decoded < argc - 1)
-    {  (void)fprintf(stderr,"\n    command line arguments unparsed (got %d, expected %d)\n\n",decoded,argc - 1);
+    {  (void)fprintf(stderr,"\n    command line arguments unparsed (have %d, expected %d)\n\n",decoded,argc - 1);
        (void)fflush(sderr);
 
        return(PSRP_ERROR);
@@ -13663,13 +13656,13 @@ _PRIVATE int psrp_builtin_ssave(const int argc, const char *argv[])
 /* Enable/disable software watchdog */
 /*----------------------------------*/
 
-_PRIVATE int psrp_builtin_softdog(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_softdog(const uint32_t argc, const char *argv[])
 
-{   int i,
-        itmp,
-        decoded = 0;
+{   uint32_t i,
+             itmp,
+             decoded       = 0;
 
-    unsigned char tmpstr[SSIZE] = "";
+    char     tmpstr[SSIZE] = "";
 
     if(strcmp("softdog",argv[0]) != 0)
         return(PSRP_DISPATCH_ERROR);
@@ -13786,7 +13779,7 @@ _PRIVATE int psrp_builtin_softdog(const int argc, const char *argv[])
     /*------------------------------------------------------*/
 
     if (decoded < argc - 1)
-    {  (void)fprintf(stderr,"\n    command line arguments unparsed (got %d, expected %d)\n\n",decoded,argc - 1);
+    {  (void)fprintf(stderr,"\n    command line arguments unparsed (have %d, expected %d)\n\n",decoded,argc - 1);
        (void)fflush(stderr);
 
        return(PSRP_ERROR);
@@ -13801,9 +13794,9 @@ _PRIVATE int psrp_builtin_softdog(const int argc, const char *argv[])
 /* Set vitimer quantum for PSRP handler subsystem */
 /*------------------------------------------------*/
 
-_PRIVATE int psrp_builtin_set_vitimer_quantum(const int argc, const char *argv[])
+_PRIVATE int32_t psrp_builtin_set_vitimer_quantum(const uint32_t argc, const char *argv[])
 
-{   int itmp;
+{   uint32_t itmp;
 
     if(strcmp("quantum",argv[0]) != 0)
        return(PSRP_DISPATCH_ERROR);
@@ -13856,16 +13849,15 @@ _PRIVATE int psrp_builtin_set_vitimer_quantum(const int argc, const char *argv[]
 
 
 
-
 #ifdef MAIL_SUPPORT
 /*----------------------------------------------*/
 /* Extract return address from an incoming mail */
 /*----------------------------------------------*/
 
-_PRIVATE int extract_return_address(char *from_line, char *from_address)
+_PRIVATE int32_t extract_return_address(char *from_line, char *from_address)
 
-{   int i,
-        cnt = 0;
+{   size_t i, 
+           cnt = 0;
 
     _BOOLEAN copy_chars = FALSE;
 
@@ -13889,13 +13881,11 @@ _PRIVATE int extract_return_address(char *from_line, char *from_address)
 
 
 
-/*----------------------------------------------------------------------*/
-/* Read a message from the PSRP process inbox extracting any date which */
-/* is MIME encapsulated. This is a wrapper wqhich calls the mhstore     */
-/* function                                                             */
-/*----------------------------------------------------------------------*/
+/*-------------------------------------------------*/
+/* Store components of a MIME encapsulated message */
+/*-------------------------------------------------*/
 
-_PUBLIC int psrp_mime_storeparts(const char *msg_file, const char *type)
+_PUBLIC int32_t psrp_mime_storeparts(const char *msg_file, const char *type)
 
 {   char inc_command[SSIZE]      = "",
          line[SSIZE]             = "",
@@ -13904,9 +13894,9 @@ _PUBLIC int psrp_mime_storeparts(const char *msg_file, const char *type)
          mhn_command[SSIZE]      = "",
          mhstore_command[SSIZE]  = "";
 
-    int   size;
-    _BYTE buf[512] = "";
-    FILE *pstream  = (FILE *)NULL;
+    size_t size;
+    _BYTE  buf[512] = "";
+    FILE   *pstream  = (FILE *)NULL;
 
 
     /*----------------------------------*/
@@ -13955,14 +13945,15 @@ _PUBLIC int psrp_mime_storeparts(const char *msg_file, const char *type)
     (void)pclose(pstream);
 
     (void)snprintf(address,SSIZE,"%s@%s",appl_name,appl_host);
+
+
+    /*---------------------------------------------------------*/
+    /* Yes someone has sent us a message! Lets find out who it */
+    /* is and read what they have sent to us.                  */
+    /*---------------------------------------------------------*/
+
     if(strin(line,address) == TRUE)
     {  
-
-       /*---------------------------------------------------------*/
-       /* Yes someone has sent us a message! Lets find out who it */
-       /* is and read what they have sent to us.                  */
-       /*---------------------------------------------------------*/
-
 
        /*----------------------------------------------------------------*/
        /* Extract parts of (MIME encapsulated) message into directory    */
@@ -13993,23 +13984,21 @@ _PUBLIC int psrp_mime_storeparts(const char *msg_file, const char *type)
 
 
 /*----------------------------------------------------------------------*/
-/* Extract text (first part) from MIME message. This is assumed to be a */
-/* PSRP command -- if it is not return error condition to caller        */
+/* Extract PSRP requests from text segment of MIME encapsulated message */
 /*----------------------------------------------------------------------*/
 
-_PUBLIC int psrp_msg2requestlist(const char *msg_file, const char *psrp_requestlist)
+_PUBLIC int32_t psrp_msg2requestlist(const char *msg_file, char *psrp_requestlist)
 
-{   _BOOLEAN looper   = TRUE;
+{   _BOOLEAN looper              = TRUE;
 
-    int server_pid,
-        line_cnt     = 0,
-        command_cnt  = 0;
+    uint32_t line_cnt            = 0,
+             command_cnt         = 0;
 
-    char msg_textpath[SSIZE] = "",
-         next_request[SSIZE] = "",
-         server_name[SSIZE]  = "";
+    char     msg_textpath[SSIZE] = "",
+             next_request[SSIZE] = "",
+             server_name[SSIZE]  = "";
 
-    FILE *stream = (FILE *)NULL;
+    FILE     *stream             = (FILE *)NULL;
 
 
     /*----------------------------------*/
@@ -14029,6 +14018,7 @@ _PUBLIC int psrp_msg2requestlist(const char *msg_file, const char *psrp_requestl
     {  pups_set_errno(EINVAL);
        return(-1);
     }
+
 
     /*-------------------------------------------*/
     /* Build path to text part of [MIME] message */
@@ -14098,14 +14088,14 @@ _PUBLIC int psrp_msg2requestlist(const char *msg_file, const char *psrp_requestl
 
 
 
-/*--------------------------------------------*/
-/* Delete MIME message (at end of processing) */
-/*--------------------------------------------*/
+/*----------------------------------*/
+/* Delete MIME encapsulated message */
+/*----------------------------------*/
 
-_PUBLIC int psrp_mime_delete(const char *msg_file)
+_PUBLIC int32_t psrp_mime_delete(const char *msg_file)
 
-{   int  ret;
-    char msg_pathname[SSIZE] = "";
+{   int32_t ret;
+    char    msg_pathname[SSIZE] = "";
 
 
     /*----------------------------------*/
@@ -14131,9 +14121,9 @@ _PUBLIC int psrp_mime_delete(const char *msg_file)
 
 
 
-/*---------------------------------------------*/
-/* Sends one file as MIME encapsulated message */
-/*---------------------------------------------*/
+/*-----------------------------------------------*/
+/* Send single file as MIME encapsulated message */
+/*-----------------------------------------------*/
 
 _PUBLIC void psrp_mime_mail(const char *to,        // Recipient
                             const char *filetype,  // Type of (MIME) file
@@ -14169,17 +14159,17 @@ _PUBLIC void psrp_mime_mail(const char *to,        // Recipient
 
 
 
-/*------------------------------------------------------*/
-/* Send set of files and send as multipart MIME message */
-/*------------------------------------------------------*/
+/*----------------------------------------------------------*/
+/* Send set of files as multipart MIME encapsulated message */
+/*----------------------------------------------------------*/
 
-_PUBLIC int psrp_mime_encapsulate(const char    *recipient, // Recipient (of MIME message)
-                                  const char    *cc_list,   // CC list recipients
-                                  const char    *subject,   // Subject (of message)
-                                  const int     n_files,    // Number of MIME files
-                                  const mc_type *partlist)  // Mime partlist
+_PUBLIC int32_t psrp_mime_encapsulate(const char    *recipient, // Recipient (of MIME message)
+                                      const char    *cc_list,   // CC list recipients
+                                      const char    *subject,   // Subject (of message)
+                                      const  int32_t     n_files,    // Number of MIME files
+                                      const mc_type *partlist)  // Mime partlist
 
-{   int i;
+{   uint32_t i;
 
     char mcf_filename[SSIZE] = "",
          mail_script[SSIZE]  = "";
@@ -14277,17 +14267,17 @@ _PUBLIC int psrp_mime_encapsulate(const char    *recipient, // Recipient (of MIM
 
 
 
-/*-------------------*/
-/* Get reply address */
-/*-------------------*/
+/*-----------------------------------------------*/
+/* Get replyto  address from MIME message header */
+/*-----------------------------------------------*/
 
-_PUBLIC int psrp_get_replyto(const char *msg_file, char *replymailpath)
+_PUBLIC int32_t psrp_get_replyto(const char *msg_file, char *replymailpath)
 
 {   char mhn_command[SSIZE] = "",
          line[SSIZE]        = "";
 
-    _BOOLEAN looper   = TRUE;
-    FILE     *pstream = (FILE *)NULL;
+    _BOOLEAN looper         = TRUE;
+    FILE     *pstream       = (FILE *)NULL;
 
     if(msg_file == (const char *)NULL || replymailpath == (char *)NULL)
     {  pups_set_errno(EINVAL);
@@ -14379,21 +14369,20 @@ _PRIVATE void psrp_restore_channels(void)
 
 
 
-/*-------------------------------------------------------------------------*/
-/* Mail homeostat (checks PSRP process mailbox for mail). If mail is found */
-/* any PSRP commands are extracted from it and passed to the PSRP command  */
-/* parser                                                                  */
-/*-------------------------------------------------------------------------*/
+/*------------------------------------------------------------------------*/
+/* Mail homeostat (allow PSRP process to read mailbox and reply to  mail) */
+/* by convention it is called Pat of course!                              */
+/*------------------------------------------------------------------------*/
 
-_PUBLIC int psrp_mail_homeostat(void *t_info, const char *args)
+_PUBLIC int32_t psrp_mail_homeostat(void *t_info, const char *args)
 
-{   int msg_number;
+{   uint32_t msg_number;
 
-    char mailbox_lock[SSIZE]     = "",
-         reply_cmd[SSIZE]        = "",
-         strmsg_number[SSIZE]    = "",
-         psrp_requestlist[SSIZE] = "",
-         subject[SSIZE]          = "";
+    char     mailbox_lock[SSIZE]     = "",
+             reply_cmd[SSIZE]        = "",
+             strmsg_number[SSIZE]    = "",
+             psrp_requestlist[SSIZE] = "",
+             subject[SSIZE]          = "";
 
     FILE          *reply_stream  = (FILE *)NULL;
     struct dirent *next_item     = (struct dirent *)NULL;
@@ -14410,10 +14399,10 @@ _PUBLIC int psrp_mail_homeostat(void *t_info, const char *args)
        pups_error("[psrp_mail_homeostat] attempt by non root thread to perform PUPS/P3 PSRP operation");
 
 
-    /*-------------------------------------------------------*/
-    /* PSRP command can only be processed from one interface */
-    /* at a time                                             */
-    /*-------------------------------------------------------*/
+    /*--------------------------------------------------------*/
+    /* PSRP commands can only be processed from one interface */
+    /* at a time                                              */
+    /*--------------------------------------------------------*/
 
     if(in_psrp_handler == TRUE)
        return(-1);
@@ -14425,7 +14414,7 @@ _PUBLIC int psrp_mail_homeostat(void *t_info, const char *args)
        /*---------------------------------------------*/
 
        (void)psrp_ignore_requests();
-       (void)psrp_save_channels();
+       //(void)psrp_save_channels(); MAO
     }
 
 
@@ -14439,11 +14428,11 @@ _PUBLIC int psrp_mail_homeostat(void *t_info, const char *args)
     }
 
 
-    /*--------------------------------*/
-    /* Loop over all files in mailbox */
-    /*--------------------------------*/
+    /*---------------------------*/
+    /* Read next file in mailbox */
+    /*---------------------------*/
 
-    while((next_item = readdir(dirp)) != (struct dirent *)NULL)
+    if((next_item = readdir(dirp)) != (struct dirent *)NULL)
     {    
 
          /*------------------------*/
@@ -14458,10 +14447,15 @@ _PUBLIC int psrp_mail_homeostat(void *t_info, const char *args)
             /*------------------------*/
 
             (void)snprintf(strmsg_number,SSIZE,"%d",msg_number);
-
             if(access(strmsg_number,F_OK | R_OK) != (-1))
             {  (void)snprintf(mailbox_lock,SSIZE,"lock.%d.tmp",msg_number);
-               while(pups_creat(mailbox_lock,0600) == (-1))
+
+
+               /*-----------------------------*/
+               /* Error - cannot lock mailbox */
+               /*-----------------------------*/
+
+               if(pups_creat(mailbox_lock,0600) == (-1))
                {     (void)psrp_restore_channels();
                      (void)psrp_accept_requests();
 
@@ -14475,6 +14469,7 @@ _PUBLIC int psrp_mail_homeostat(void *t_info, const char *args)
 
                if(access(strmsg_number,F_OK | R_OK) == (-1))
                {  
+
                   /*----------------*/
                   /* Unlock mailbox */
                   /*----------------*/
@@ -14640,14 +14635,14 @@ _PUBLIC int psrp_mail_homeostat(void *t_info, const char *args)
     }
 
 
-    /*----------------------------------*/
-    /* We have finished processing mail */
-    /*----------------------------------*/
+    /*---------------------------------------*/
+    /* We have finished processing mail item */
+    /*---------------------------------------*/
 
     (void)closedir(dirp);
     dirp = (DIR *)NULL;
 
-    (void)psrp_restore_channels();
+    //(void)psrp_restore_channels(); MAO
     (void)psrp_accept_requests();
 }
 #endif /* MAIL_SUPPORT */
@@ -14655,12 +14650,11 @@ _PUBLIC int psrp_mail_homeostat(void *t_info, const char *args)
 
 
 
-/*--------------------------------------------------------------------------*/
-/* Rename existing PSRP channels (this function expect all appl builtins to */
-/* have been modified appropriately before it is called)                    */
-/*--------------------------------------------------------------------------*/
+/*---------------------*/
+/* Rename PSRP channel */
+/*---------------------*/
 
-_PUBLIC int psrp_rename_channel(const char *psrp_name)
+_PUBLIC  int32_t psrp_rename_channel(const char *psrp_name)
 
 {   char new_channel_name_in[SSIZE]   = "",
          new_channel_name_out[SSIZE]  = "",
@@ -14711,16 +14705,16 @@ _PUBLIC int psrp_rename_channel(const char *psrp_name)
     /* if it is abort the renaming operation               */
     /*-----------------------------------------------------*/
 
-    if(access(new_channel_name_in,F_OK)  == 0 ||
-       access(new_channel_name_out,F_OK) == 0 ||
-       access(new_stdin_pst_name,F_OK)   == 0 ||
-       access(new_stdout_pst_name,F_OK)  == 0 ||
-       access(new_stderr_pst_name,F_OK)  == 0)
+    if(access(new_channel_name_in,F_OK)  == 0    ||
+       access(new_channel_name_out,F_OK) == 0    ||
+       access(new_stdin_pst_name,F_OK)   == 0    ||
+       access(new_stdout_pst_name,F_OK)  == 0    ||
+       access(new_stderr_pst_name,F_OK)  == 0     )
        return(-1);
 
-    /*----------------------------------------------*/
-    /* Tell clients that a server change is pending */
-    /*----------------------------------------------*/
+    /*--------------------------------------------------*/
+    /* Tell clients that channel name change is pending */
+    /*--------------------------------------------------*/
 
     (void)psrp_reactivate_clients();
 
@@ -14767,9 +14761,9 @@ _PUBLIC int psrp_rename_channel(const char *psrp_name)
 /* Reactivate connected clients */
 /*------------------------------*/
 
-_PRIVATE int psrp_reactivate_clients(void)
+_PRIVATE  int32_t psrp_reactivate_clients(void)
 
-{   int i;
+{   uint32_t i;
 
     for(i=0; i<MAX_CLIENTS; ++i)
     {  if(psrp_client_pid[i] != (-1))
@@ -14799,17 +14793,16 @@ _PRIVATE int psrp_reactivate_clients(void)
 
 
 #ifdef SSH_SUPPORT
-/*----------------------------------------------*/
-/* Routine to start server on given target host */
-/*----------------------------------------------*/
+/*----------------------------------*/
+/* Start PSRP server on target host */
+/*----------------------------------*/
 
-_PUBLIC int psrp_remote_start(const char *hostname, const _BOOLEAN bg, const int argc, const char *argv[])
+_PUBLIC  int32_t psrp_cmd_on_host(const char *hostname, const _BOOLEAN bg, uint32_t argc, char *argv[])
 
-{   int i,
-        child_pid       = (-1);
+{   uint32_t i;
 
-    char cmdline[SSIZE] = "",
-         ssh_cmd[SSIZE] = "";
+    char cmdline[SSIZE]    = "",
+         ssh_cmd[SSIZE]    = "";
 
     _BOOLEAN vector_found  = FALSE;
 
@@ -14820,7 +14813,7 @@ _PUBLIC int psrp_remote_start(const char *hostname, const _BOOLEAN bg, const int
     /*----------------------------------*/
 
     if(pupsthread_is_root_thread() == FALSE)
-       pups_error("[psrp_remote_start] attempt by non root thread to perform PUPS/P3 PSRP operation");
+       pups_error("[psrp_cmd_on_host] attempt by non root thread to perform PUPS/P3 PSRP operation");
 
     if(hostname == (const char *) NULL  || 
        argv     == (const char **)NULL   )
@@ -14890,13 +14883,11 @@ _PUBLIC int psrp_remote_start(const char *hostname, const _BOOLEAN bg, const int
     }
 
 
-    /*----------------------------------*/
-    /* Parent side of fork              */
-    /* Parent has to run ssh command    */
-    /* so that it remains in foreground */
-    /*----------------------------------*/
+    /*---------------------*/
+    /* Parent side of fork */
+    /*---------------------*/
 
-    if((child_pid = fork()) != 0)
+    if(fork() != 0)
     {  
 
        /*----------------*/
@@ -14916,14 +14907,15 @@ _PUBLIC int psrp_remote_start(const char *hostname, const _BOOLEAN bg, const int
                               date,appl_name,appl_pid,appl_host,appl_owner,hostname);
           (void)fflush(stderr);
        }
+
+       pups_set_errno(ENOEXEC);
+       return(-1);
     }
 
 
-    /*---------------------*/
-    /* Child side of fork  */
-    /* Remove PSRP channel */
-    /* on launch-host      */
-    /*---------------------*/
+    /*--------------------*/
+    /* Child side of fork */
+    /*--------------------*/
  
     else
        (void)pups_exit(0);
@@ -14937,30 +14929,30 @@ _PUBLIC int psrp_remote_start(const char *hostname, const _BOOLEAN bg, const int
 /*-----------------------------------------*/
 
 #ifdef SSH_SUPPORT
-_PUBLIC char **psrp_process_sic_transaction_list(const char  *hostname, // Host running remote server (and slaved client)
-                                                 const char  *ssh_port, // Port for ssh connection to remote host
-                                                 const int  n_requests, // Number of request to be sent to remote server
-                                                 const char  *requests) // Request list
+_PUBLIC char **psrp_process_sic_transaction_list(const char      *hostname,  // Host running remote server (and slaved client)
+                                                 const char      *ssh_port,  // Port for ssh connection to remote host
+                                                 const int32_t  n_requests,  // Number of request to be sent to remote server
+                                                 const char      *requests)  // Request list
 #else
-_PUBLIC char **psrp_process_sic_transaction_list(const char *hostname,  // Host running remote server (and slaved client)
-						 const int  n_requests, // Number of request to be sent to remote server
-                 				 const       *requests) // Request list
+_PUBLIC char **psrp_process_sic_transaction_list(const char      *hostname,  // Host running remote server (and slaved client)
+						 const int32_t  n_requests,  // Number of request to be sent to remote server
+                 				 const           *requests)  // Request list
 #endif /* SSH_SUPPORT */
 
-{   int  i,
-         ret,
-         size,
-         eff_n_requests;
+{   uint32_t i;
 
-    _BOOLEAN looper           = FALSE,
-             ignore_replys    = FALSE;
+    int32_t  ret,
+             eff_n_requests;
 
-    char sic_name[SSIZE]      = "",
-         next_request[SSIZE]  = "",
-         *reply               = (char *)NULL,
-         **replys             = (char **)NULL;
+    _BOOLEAN looper               = FALSE,
+             ignore_replys        = FALSE;
 
-    psrp_channel_type *sic    = (psrp_channel_type *)NULL;
+    char     sic_name[SSIZE]      = "",
+             next_request[SSIZE]  = "",
+             *reply               = (char *)NULL,
+             **replys             = (char **)NULL;
+
+    psrp_channel_type *sic        = (psrp_channel_type *)NULL;
 
 
     /*----------------------------------*/
@@ -14997,8 +14989,6 @@ _PUBLIC char **psrp_process_sic_transaction_list(const char *hostname,  // Host 
     /*--------------------------------------------*/
     /* Create SIC channels for slaved interaction */
     /*--------------------------------------------*/
-
-
     /*----------------------------*/
     /* Identifier for SIC channel */
     /*----------------------------*/
@@ -15075,7 +15065,7 @@ _PUBLIC char **psrp_process_sic_transaction_list(const char *hostname,  // Host 
     /* Create buffer for replies */
     /*---------------------------*/
 
-    replys = (char **)calloc(eff_n_requests,sizeof(char *));
+    replys = (char **)pups_calloc(eff_n_requests,sizeof(char *));
 
 
     /*----------------------------------*/
@@ -15128,12 +15118,11 @@ _PUBLIC char **psrp_process_sic_transaction_list(const char *hostname,  // Host 
 
 
 
-/*-----------------------------------------------*/
-/* Set up (exec) search paths. This assumes that */
-/* exec is invoking a bash (Bourne again) shell  */
-/*-----------------------------------------------*/
+/*--------------------------------------------*/
+/* Set (bash) environmemt for remote exection */
+/*--------------------------------------------*/
 
-_PUBLIC int psrp_exec_env(const char *remote_env)
+_PUBLIC  int32_t psrp_exec_env(const char *remote_env)
 
 {   char appl_cwd[SSIZE]  = "";
 
@@ -15143,6 +15132,15 @@ _PUBLIC int psrp_exec_env(const char *remote_env)
     }
     else
        pups_set_errno(OK);
+
+
+    /*----------------------------------*/
+    /* Only the root thread can process */
+    /* PSRP requests                    */
+    /*----------------------------------*/
+
+    if(pupsthread_is_root_thread() == FALSE)
+      pups_error("[psrp_process_sic_transaction_list] attempt by non root thread to perform PUPS/P3 PSRP operation");
 
 
     /*-----------------------*/
@@ -15172,9 +15170,19 @@ _PUBLIC int psrp_exec_env(const char *remote_env)
 /* Enable PSRP abort status flag */
 /*-------------------------------*/
 
-_PUBLIC int psrp_enable_abrtflag(void)
+_PUBLIC  int32_t psrp_enable_abrtflag(void)
 
-{   psrp_abrtflag_enable = TRUE;
+{
+
+    /*----------------------------------*/
+    /* Only the root thread can process */
+    /* PSRP requests                    */
+    /*----------------------------------*/
+
+    if(pupsthread_is_root_thread() == FALSE)
+      pups_error("[psrp_process_sic_transaction_list] attempt by non root thread to perform PUPS/P3 PSRP operation");
+
+    psrp_abrtflag_enable = TRUE;
 
     pups_set_errno(OK);
     return(0);
@@ -15187,23 +15195,19 @@ _PUBLIC int psrp_enable_abrtflag(void)
 /* Disable PSRP abort status flag */
 /*--------------------------------*/
 
-_PUBLIC int psrp_disable_abrtflag(void)
+_PUBLIC  int32_t psrp_disable_abrtflag(void)
 
-{   psrp_abrtflag_enable = FALSE;
+{
 
-    pups_set_errno(OK);
-    return(0);
-}
+    /*----------------------------------*/
+    /* Only the root thread can process */
+    /* PSRP requests                    */
+    /*----------------------------------*/
 
+    if(pupsthread_is_root_thread() == FALSE)
+      pups_error("[psrp_process_sic_transaction_list] attempt by non root thread to perform PUPS/P3 PSRP operation");
 
-
-
-/*-----------------------*/
-/* Clear PSRP abort flag */
-/*-----------------------*/
-
-_PUBLIC int psrp_clear_abrtflag(void)
-{   psrp_abrtflag = FALSE;
+    psrp_abrtflag_enable = FALSE;
 
     pups_set_errno(OK);
     return(0);
@@ -15212,26 +15216,70 @@ _PUBLIC int psrp_clear_abrtflag(void)
 
 
 
-/*-----------------------*/
-/* Get PSRP abort status */
-/*-----------------------*/
+/*------------------------------*/
+/* Clear PSRP abort status flag */
+/*------------------------------*/
+
+_PUBLIC  int32_t psrp_clear_abrtflag(void)
+
+{
+    /*----------------------------------*/
+    /* Only the root thread can process */
+    /* PSRP requests                    */
+    /*----------------------------------*/
+
+    if(pupsthread_is_root_thread() == FALSE)
+      pups_error("[psrp_process_sic_transaction_list] attempt by non root thread to perform PUPS/P3 PSRP operation");
+
+    psrp_abrtflag = FALSE;
+
+    pups_set_errno(OK);
+    return(0);
+}
+
+
+
+
+/*----------------------------*/
+/* Get PSRP abort status flag */
+/*----------------------------*/
 
 _PUBLIC _BOOLEAN psrp_get_abrtflag(void)
 
-{   pups_set_errno(OK); 
+{
+
+    /*----------------------------------*/
+    /* Only the root thread can process */
+    /* PSRP requests                    */
+    /*----------------------------------*/
+
+    if(pupsthread_is_root_thread() == FALSE)
+      pups_error("[psrp_process_sic_transaction_list] attempt by non root thread to perform PUPS/P3 PSRP operation");
+
+
+    pups_set_errno(OK); 
     return(psrp_abrtflag);
 }
 
 
 
 
-/*----------------------------------------------------*/
-/* Enable/disable PSRP client interrupt (via SIGABRT) */
-/*----------------------------------------------------*/
+/*------------------------------------------------------------------------*/
+/* Enable/disable PSRP client interrupt in critical PSRP server operation */
+/*------------------------------------------------------------------------*/
 
-_PUBLIC int psrp_critical(const _BOOLEAN critical)
+_PUBLIC int32_t psrp_critical(const _BOOLEAN critical)
 
 {
+
+    /*----------------------------------*/
+    /* Only the root thread can process */
+    /* PSRP requests                    */
+    /*----------------------------------*/
+
+    if(pupsthread_is_root_thread() == FALSE)
+      pups_error("[psrp_process_sic_transaction_list] attempt by non root thread to perform PUPS/P3 PSRP operation");
+
 
     /*------------------------*/
     /* Enter critcial section */
@@ -15266,13 +15314,23 @@ _PUBLIC int psrp_critical(const _BOOLEAN critical)
 
 
 
-/*----------------------------------------------*/
-/* Block/unblock client interrupt (via SIGABRT) */
-/*----------------------------------------------*/
+/*--------------------------------*/
+/* Block/unblock client interrupt */
+/*--------------------------------*/
 
-_PUBLIC int psrp_client_block(const _BOOLEAN block)
+_PUBLIC  int32_t psrp_client_block(const _BOOLEAN block)
 
 {   sigset_t block_set;
+
+
+    /*----------------------------------*/
+    /* Only the root thread can process */
+    /* PSRP requests                    */
+    /*----------------------------------*/
+
+    if(pupsthread_is_root_thread() == FALSE)
+      pups_error("[psrp_process_sic_transaction_list] attempt by non root thread to perform PUPS/P3 PSRP operation");
+
 
     (void)sigemptyset(&block_set);
     (void)sigaddset  (&block_set,SIGABRT);
@@ -15295,6 +15353,15 @@ _PUBLIC int psrp_client_block(const _BOOLEAN block)
 _PUBLIC void psrp_pen_unique(void)
 
 {
+
+    /*----------------------------------*/
+    /* Only the root thread can process */
+    /* PSRP requests                    */
+    /*----------------------------------*/
+
+    if(pupsthread_is_root_thread() == FALSE)
+      pups_error("[psrp_process_sic_transaction_list] attempt by non root thread to perform PUPS/P3 PSRP operation");
+
     if(psrp_pname_to_pid(appl_name) == PSRP_DUPLICATE_PROCESS_NAME)
     {  (void)strlcpy(errstr,"PEN (%s) is not unique",SSIZE);
        pups_error(errstr);

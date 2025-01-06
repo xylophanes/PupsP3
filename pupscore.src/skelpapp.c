@@ -70,7 +70,7 @@
 /* Slot information function */
 /*---------------------------*/ 
 
-_PRIVATE void @APPNAME_slot(int level)
+_PRIVATE void @APPNAME_slot(int32_t level)
 {   (void)fprintf(stderr,"int @APPNAME %s: [ANSI C]\n",VERSION);
  
     if(level > 1)
@@ -113,15 +113,19 @@ _PRIVATE void @APPNAME_usage(void)
     (void)fprintf(stderr,"SICLIENT:                tell client server is about to segment\n");
     (void)fprintf(stderr,"SIGALIVE:                check for existence of client on signal dispatch host\n");
 
-#ifdef FLOAT
+    #ifdef FLOAT
     (void)fprintf(stderr,"\nFloating point representation is \"float\" (%d bytes)\n",sizeof(FTYPE));
-#else
+    #else
     (void)fprintf(stderr,"\nFloating point representation is \"double\" (%d bytes)\n",sizeof(FTYPE));
-#endif /* FLOAT */
+    #endif /* FLOAT */
 
-#ifdef _OPENMP
+    #ifndef SINGLE_THREAD 
+    #ifdef _OPENMP
     (void)fprintf(stderr,"%d parallel (OMP) threads available\n",omp_get_max_threads());
-#endif /* _OPENMP */
+    #endif /* _OPENMP       */
+    #else
+    (void)fprintf(stderr,"OMP disabled\n",omp_get_max_threads());
+    #endif /* SINGLE_THREAD */
 
 }
 
@@ -169,17 +173,17 @@ _EXTERN char appl_build_date[SSIZE] = __DATE__;
 /* checkpoint files and pesistent heaps)            */
 /*--------------------------------------------------*/
 
-#define VTAG     1
-extern int appl_vtag = VTAG;
+#define VTAG    1
+extern  int32_t appl_vtag = VTAG;
 
 
 
 
-/*-------------------------------------------------------------------------------*/
-/* Main - decode command tail then interpolate using parameters supplied by user */
-/*-------------------------------------------------------------------------------*/
+/*------------------------------------------------------------------*/
+/* Main - parse command tail extracting parameters supplied by user */
+/*------------------------------------------------------------------*/
 
-_PUBLIC int pups_main(int argc, char *argv[])
+_PUBLIC int32_t pups_main(int32_t argc, char *argv[])
 
 {
 
@@ -204,7 +208,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
                   "@AUTHOR",
                   "@APPNAME",
                   "@DATE",
-                  argv);
+                  (void *)argv);
 
 
     /*-----------------------------------------------*/
@@ -216,7 +220,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
     /* Complain about any unparsed arguments */
     /*---------------------------------------*/
 
-    pups_t_arg_errs(argd,args);
+    pups_t_arg_errs(argd,(void *)args);
 
 
     #ifdef PSRP_ENABLED
@@ -250,11 +254,11 @@ _PUBLIC int pups_main(int argc, char *argv[])
     #endif /* PSRP_ENABLED */
 
 
-    /*----------------------------------------------------------------------------------------*/
-    /* Any payload functions which attach or create objects like files and persistent heaps   */
-    /* should register an exit function here, so that any temporary objects are destroyed     */
-    /* by pups_exit()                                                                         */
-    /*----------------------------------------------------------------------------------------*/
+    /*--------------------------------------------------------------------------------------*/
+    /* Any payload functions which attach or create objects like files and persistent heaps */
+    /* should register an exit function here, so that any temporary objects are destroyed   */
+    /* by pups_exit()                                                                       */
+    /*--------------------------------------------------------------------------------------*/
 
 
     /*----------------------------------------------------------------------------------*/

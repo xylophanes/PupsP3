@@ -1,5 +1,5 @@
- /*----------------------------------------------------------------------------
-    Purpose: sparse matrix support library.
+ /*---------------------------------------
+    Purpose: sparse matrix support library
 
     Author:  Mark O'Neill
              Tumbling Dice Ltd
@@ -9,9 +9,9 @@
              United Kingdom
 
     Version: 2.00 
-    Dated:   4th January 2023
+    Dated:   10th Decemeber 2024
     E-mail:  mao@tumblingdice.co.uk
------------------------------------------------------------------------------*/
+----------------------------------------*/
 
 
 #include <stdio.h>
@@ -23,6 +23,7 @@
 #include <limits.h>
 #include <errno.h>
 #include <ftype.h>
+#include <bsd/bsd.h>:
 
 #undef   __NOT_LIB_SOURCE__
 #include <larray.h>
@@ -33,7 +34,7 @@
 /* Functions which are private to this library */
 /*---------------------------------------------*/
 
-_PROTOTYPE _PRIVATE int skip_comments(FILE *);
+_PROTOTYPE _PRIVATE int32_t skip_comments(const FILE *);
 
 
 /*---------------------------------------------*/
@@ -42,19 +43,17 @@ _PROTOTYPE _PRIVATE int skip_comments(FILE *);
 /*-------------------------------------------------*/
 /* Slot and usage functions - used by slot manager */
 /*-------------------------------------------------*/
-
-
 /*---------------------*/
 /* Slot usage function */
 /*---------------------*/
 
-_PRIVATE void larray_slot(int level)
+_PRIVATE void larray_slot(int32_t level)
 {   (void)fprintf(stderr,"lib larraylib %s: [ANSI C]\n",LARRAY_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 2013-2023 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 2013-2024 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
-       (void)fprintf(stderr,"PUPS/P3 sparse matrix support library (built %s %s)\n\n",__TIME__,__DATE__);
+       (void)fprintf(stderr,"PUPS/P3 sparse matrix support library (gcc %s: built %s %s)\n\n",__VERSION__,__TIME__,__DATE__);
     }
     else
        (void)fprintf(stderr,"\n");
@@ -74,13 +73,13 @@ _EXTERN void (* SLOT )() __attribute__ ((aligned(16))) = larray_slot;
                           
 
 
-/*------------------------------------------------------------------------------
-    Destroy list vector ...
-------------------------------------------------------------------------------*/
+/*---------------------*/
+/* Destroy list vector */
+/*---------------------*/
 
 _PUBLIC vlist_type *lvector_destroy(vlist_type *vector)
 
-{   int i;
+{   uint32_t i;
 
     if(vector == (vlist_type *)NULL)
     {  pups_set_errno(EINVAL);
@@ -106,14 +105,14 @@ _PUBLIC vlist_type *lvector_destroy(vlist_type *vector)
 
 
 
-/*------------------------------------------------------------------------------
-    Destroy list array ...
-------------------------------------------------------------------------------*/
+/*--------------------*/
+/* Destroy list array */
+/*--------------------*/
 
 _PUBLIC mlist_type *lmatrix_destroy(mlist_type *matrix)
 
-{   int i,
-        j;
+{   uint32_t i,
+             j;
 
     if(matrix == (mlist_type *)NULL)
     {  pups_set_errno(EINVAL);
@@ -138,15 +137,15 @@ _PUBLIC mlist_type *lmatrix_destroy(mlist_type *matrix)
 
 
 
-/*------------------------------------------------------------------------------
-    Create list array (and populate it from pattern array) ...
-------------------------------------------------------------------------------*/
+/*--------------------------------------------------------*/
+/* Create list array (and populate it from pattern array) */
+/*--------------------------------------------------------*/
 
-_PUBLIC mlist_type *lmatrix_create(FILE *stream, int rows, int cols, FTYPE *pattern_array)
+_PUBLIC mlist_type *lmatrix_create(const FILE *stream, const uint32_t rows, const uint32_t cols, const FTYPE *pattern_array)
 
-{   int i,
-        j,
-        size;
+{   uint32_t i,
+             j,
+             size;
 
     FTYPE matrix_compression = 0.0;
     mlist_type *matrix       = (mlist_type *)NULL;
@@ -185,8 +184,8 @@ _PUBLIC mlist_type *lmatrix_create(FILE *stream, int rows, int cols, FTYPE *patt
        }
 
        if(pattern_array != (FTYPE *)NULL)
-       {  int pos,
-              allocated = 0;
+       {   int32_t pos,
+                   allocated = 0;
 
           size      = 0;
           for(j=0; j<cols; ++j)
@@ -202,7 +201,7 @@ _PUBLIC mlist_type *lmatrix_create(FILE *stream, int rows, int cols, FTYPE *patt
              if(size == 0 && allocated == 0)
              {  allocated = LARRAY_ALLOC_QUANTUM;
  
-                if((matrix->vector[i]->index = (int *)pups_calloc(LARRAY_ALLOC_QUANTUM,sizeof(int))) == (int *)NULL)
+                if((matrix->vector[i]->index = (int32_t *)pups_calloc(LARRAY_ALLOC_QUANTUM,sizeof(int32_t))) == (int32_t *)NULL)
                 {   (void)lmatrix_destroy(matrix);
 
                     pups_set_errno(ENOMEM);
@@ -215,12 +214,11 @@ _PUBLIC mlist_type *lmatrix_create(FILE *stream, int rows, int cols, FTYPE *patt
                     pups_set_errno(ENOMEM);
                     return((mlist_type *)NULL);
                 }
-
              }
              else if(size == allocated)
              {  allocated += LARRAY_ALLOC_QUANTUM;
 
-                if((matrix->vector[i]->index = (int *)  pups_realloc((void *)matrix->vector[i]->index,allocated*sizeof(int))) == (int *)NULL)
+                if((matrix->vector[i]->index = (int32_t *)  pups_realloc((void *)matrix->vector[i]->index,allocated*sizeof(int32_t))) == (int32_t *)NULL)
                 {   (void)lmatrix_destroy(matrix);
 
                     pups_set_errno(ENOMEM);
@@ -250,7 +248,12 @@ _PUBLIC mlist_type *lmatrix_create(FILE *stream, int rows, int cols, FTYPE *patt
           {  matrix->vector[i]->state = DEFLATED; 
 
              if(size != 0)
+
+
+                /*-------------------------------------------*/
                 /* Compute compression factor (for this row) */
+                /*-------------------------------------------*/
+
                 matrix_compression += (FTYPE)size/(FTYPE)cols;
           }
           else
@@ -272,15 +275,15 @@ _PUBLIC mlist_type *lmatrix_create(FILE *stream, int rows, int cols, FTYPE *patt
 
 
 
-/*------------------------------------------------------------------------------
-    Create list vector from pattern vector ...
-------------------------------------------------------------------------------*/
+/*----------------------------------------*/
+/* Create list vector from pattern vector */
+/*----------------------------------------*/
 
-_PUBLIC vlist_type *lvector_create(FILE *stream, int components, FTYPE *pattern_vector)
+_PUBLIC vlist_type *lvector_create(const FILE *stream, const uint32_t components, const FTYPE *pattern_vector)
 
-{   int i,
-        size      = 0,
-        allocated = 0;
+{   uint32_t i,
+             size      = 0,
+             allocated = 0;
 
     vlist_type *vector = (vlist_type *)NULL;
 
@@ -297,7 +300,7 @@ _PUBLIC vlist_type *lvector_create(FILE *stream, int components, FTYPE *pattern_
        /* Simply allocate memory for specified vector */
        /*---------------------------------------------*/
 
-       if((vector->index = (int   *)pups_calloc(components,sizeof(int))) == (int *)NULL)
+       if((vector->index = (int32_t *)pups_calloc(components,sizeof(int32_t))) == (int32_t *)NULL)
        {  (void)pups_free((void *)vector);
 
           pups_set_errno(ENOMEM);
@@ -330,7 +333,7 @@ _PUBLIC vlist_type *lvector_create(FILE *stream, int components, FTYPE *pattern_
 
        allocated = LARRAY_ALLOC_QUANTUM;
 
-       if((vector->index = (int *)pups_calloc(allocated,sizeof(int))) == (int *)NULL)
+       if((vector->index = (int32_t *)pups_calloc(allocated,sizeof(int32_t))) == (int32_t *)NULL)
        {  (void)pups_free((void *)vector);
 
           pups_set_errno(ENOMEM);
@@ -349,7 +352,7 @@ _PUBLIC vlist_type *lvector_create(FILE *stream, int components, FTYPE *pattern_
        {  if(size == allocated)
           {  allocated += LARRAY_ALLOC_QUANTUM;
 
-             if((vector->index = (int *)pups_realloc((void *)vector->index,allocated*sizeof(int))) == (int *)NULL)
+             if((vector->index = (int32_t *)pups_realloc((void *)vector->index,allocated*sizeof(int32_t))) == (int32_t *)NULL)
              {  (void)pups_free((void *)vector->index);
                 (void)pups_free((void *)vector->value);
                 (void)pups_free((void *)vector);
@@ -395,13 +398,13 @@ _PUBLIC vlist_type *lvector_create(FILE *stream, int components, FTYPE *pattern_
 
 
 
-/*------------------------------------------------------------------------------
-    Do a fast re-initialisation of a pattern vector ...
-------------------------------------------------------------------------------*/
+/*-------------------------------------------------*/
+/* Do a fast re-initialisation of a pattern vector */
+/*-------------------------------------------------*/
 
-_PUBLIC int fastResetPatternVector(int cols, FTYPE *pattern_vector, vlist_type *vector)
+_PUBLIC int32_t fastResetPatternVector(const uint32_t cols, FTYPE *pattern_vector, const vlist_type *vector)
 
-{   int i;
+{   uint32_t i;
 
     if(cols               <  0                     ||
        cols               != vector->components    ||  
@@ -424,14 +427,14 @@ _PUBLIC int fastResetPatternVector(int cols, FTYPE *pattern_vector, vlist_type *
 
 
 
-/*------------------------------------------------------------------------------
-    Copy list array ...
-------------------------------------------------------------------------------*/
+/*-----------------*/
+/* Copy list array */
+/*-----------------*/
 
-_PUBLIC mlist_type *lmatrix_copy(mlist_type *from)
+_PUBLIC mlist_type *lmatrix_copy(const mlist_type *from)
 
-{   int i,
-        j;
+{   uint32_t i,
+             j;
 
     mlist_type *to = (mlist_type *)NULL;
 
@@ -484,13 +487,13 @@ _PUBLIC mlist_type *lmatrix_copy(mlist_type *from)
 
 
 
-/*------------------------------------------------------------------------------
-    Copy list vector ...
-------------------------------------------------------------------------------*/
+/*------------------*/
+/* Copy list vector */
+/*------------------*/
 
-_PUBLIC vlist_type *lvector_copy(vlist_type *from)
+_PUBLIC vlist_type *lvector_copy(const vlist_type *from)
 
-{   int i;
+{   uint32_t i;
 
     vlist_type *to = (vlist_type *)NULL;
 
@@ -520,21 +523,21 @@ _PUBLIC vlist_type *lvector_copy(vlist_type *from)
 
 
 
-/*------------------------------------------------------------------------------
-    Squeeze zero value elements out of a list vector deflating it ...
-------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------*/
+/* Squeeze zero value elements out of a list vector deflating it */
+/*---------------------------------------------------------------*/
 
-_PUBLIC vlist_type *lvector_deflate(FILE *stream, _BOOLEAN keep_vector, FTYPE *vector_squeeze_percent, vlist_type *vector)
+_PUBLIC vlist_type *lvector_deflate(const FILE *stream, const _BOOLEAN keep_vector, FTYPE *vector_squeeze_percent, vlist_type *vector)
 
-{   int i,
-        size                 = 0,
-        allocated            = 0,
-        vector_zero_elements = 0.0;
+{   uint32_t  i,
+              size                 = 0,
+              allocated            = 0,
+              vector_zero_elements = 0;
 
-    FTYPE squeeze_percent    = 0.0;
+    FTYPE squeeze_percent          = 0.0;
 
-    vlist_type *tmp_vector      = (vlist_type *)NULL,
-               *squeezed_vector = (vlist_type *)NULL;
+    vlist_type *tmp_vector         = (vlist_type *)NULL,
+               *squeezed_vector    = (vlist_type *)NULL;
 
     if(vector == (vlist_type *)NULL)
     {  pups_set_errno(EINVAL);
@@ -547,7 +550,7 @@ _PUBLIC vlist_type *lvector_deflate(FILE *stream, _BOOLEAN keep_vector, FTYPE *v
     }
 
     allocated = LARRAY_ALLOC_QUANTUM;
-    if((squeezed_vector->index = (int *)pups_calloc(allocated,sizeof(int))) == (int *)NULL)
+    if((squeezed_vector->index = (int32_t *)pups_calloc(allocated,sizeof(int32_t))) == (int32_t *)NULL)
     {  (void)lvector_destroy(squeezed_vector);
 
        pups_set_errno(ENOMEM);
@@ -573,7 +576,7 @@ _PUBLIC vlist_type *lvector_deflate(FILE *stream, _BOOLEAN keep_vector, FTYPE *v
        if(size == allocated)
        {  allocated += LARRAY_ALLOC_QUANTUM; 
 
-          if((squeezed_vector->index = (int *)pups_malloc(sizeof(int))) == (int *)NULL)
+          if((squeezed_vector->index = (int32_t *)pups_malloc(sizeof(int32_t))) == (int32_t *)NULL)
           {  (void)lvector_destroy(squeezed_vector); 
 
              pups_set_errno(ENOMEM);
@@ -645,14 +648,14 @@ _PUBLIC vlist_type *lvector_deflate(FILE *stream, _BOOLEAN keep_vector, FTYPE *v
 
 
 
-/*------------------------------------------------------------------------------
-    Squeeze zero value elements out of a list matrix deflating it ...
-------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------*/
+/* Squeeze zero value elements out of a list matrix deflating it */
+/*---------------------------------------------------------------*/
 
-_PUBLIC mlist_type *lmatrix_deflate(FILE *stream, _BOOLEAN keep_matrix, FTYPE *matrix_squeeze_percent, mlist_type *matrix)
+_PUBLIC mlist_type *lmatrix_deflate(const FILE *stream, const _BOOLEAN keep_matrix, FTYPE *matrix_squeeze_percent, mlist_type *matrix)
 
-{   int i,
-        cnt = 0;
+{    int32_t i,
+             cnt = 0;
 
     FTYPE vector_squeeze_percent,
           squeeze_percent = 0.0;
@@ -718,11 +721,11 @@ _PUBLIC mlist_type *lmatrix_deflate(FILE *stream, _BOOLEAN keep_matrix, FTYPE *m
 
 
 
-/*------------------------------------------------------------------------------
-    Get the next element in (deflated) vector ...
-------------------------------------------------------------------------------*/
+/*-------------------------------------------*/
+/* Get the next element in (deflated) vector */
+/*-------------------------------------------*/
 
-_PUBLIC FTYPE lvector_get_list_value(int pos, int *component, vlist_type *vector)
+_PUBLIC FTYPE lvector_get_list_value(const uint32_t pos, uint32_t *component, const vlist_type *vector)
 
 {   if(vector == (vlist_type *)NULL)
     {  pups_set_errno(EINVAL);
@@ -743,13 +746,13 @@ _PUBLIC FTYPE lvector_get_list_value(int pos, int *component, vlist_type *vector
 
 
 
-/*------------------------------------------------------------------------------
-    Get list vector component (can be slow as we need to search for it) ...
-------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------*/
+/* Get list vector component (can be slow as we need to search for it) */
+/*---------------------------------------------------------------------*/
 
-_PUBLIC FTYPE lvector_get_component_value(int component, vlist_type *vector)
+_PUBLIC FTYPE lvector_get_component_value(const uint32_t component, const vlist_type *vector)
 
-{   int i;
+{   uint32_t i;
 
     if(vector == (vlist_type *)NULL)
     {  pups_set_errno(EINVAL);
@@ -774,13 +777,13 @@ _PUBLIC FTYPE lvector_get_component_value(int component, vlist_type *vector)
 
 
 
-/*------------------------------------------------------------------------------
-    Inflate a list vector so zero componets are present ...
-------------------------------------------------------------------------------*/
+/*-----------------------------------------------------*/
+/* Inflate a list vector so zero componets are present */
+/*-----------------------------------------------------*/
 
-_PUBLIC vlist_type *lvector_inflate(_BOOLEAN keep_vector, vlist_type *vector)
+_PUBLIC vlist_type *lvector_inflate(const _BOOLEAN keep_vector, vlist_type *vector)
 
-{   int i;
+{   uint32_t i;
 
     vlist_type *inflated_vector = (vlist_type *)NULL;
 
@@ -830,13 +833,13 @@ _PUBLIC vlist_type *lvector_inflate(_BOOLEAN keep_vector, vlist_type *vector)
 
 
 
-/*------------------------------------------------------------------------------
-    Inflate a list matrix so zero componets are present ...
-------------------------------------------------------------------------------*/
+/*------------------------------------------------------*/
+/* Inflate a list matrix so zero components are present */
+/*------------------------------------------------------*/
 
 _PUBLIC mlist_type *lmatrix_inflate(_BOOLEAN keep_matrix, mlist_type *matrix)
 
-{   int i;
+{   uint32_t i;
 
     mlist_type *inflated_matrix = (mlist_type *)NULL;
 
@@ -894,11 +897,11 @@ _PUBLIC mlist_type *lmatrix_inflate(_BOOLEAN keep_matrix, mlist_type *matrix)
 
 
 
-/*------------------------------------------------------------------------------
-    Get next element in specified row vector of (deflated) matrix ... 
-------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------*/
+/* Get next element in specified row vector of (deflated) matrix */
+/*---------------------------------------------------------------*/
 
-_PUBLIC FTYPE lmatrix_get_list_value(int row, int pos, int *col, mlist_type *matrix)
+_PUBLIC FTYPE lmatrix_get_list_value(const uint32_t row, const uint32_t pos, uint32_t *col, const mlist_type *matrix)
 
 {   if(matrix == (mlist_type *)NULL)
     {  pups_set_errno(EINVAL);
@@ -918,13 +921,13 @@ _PUBLIC FTYPE lmatrix_get_list_value(int row, int pos, int *col, mlist_type *mat
 
 
 
-/*------------------------------------------------------------------------------
-    Get value of matrix element (may be slow as search is required) ...
-------------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------*/
+/* Get value of matrix element (may be slow as search is required) */
+/*-----------------------------------------------------------------*/
 
-_PUBLIC FTYPE lmatrix_get_element_value(int row, int col, mlist_type *matrix)
+_PUBLIC FTYPE lmatrix_get_element_value(const uint32_t row, const uint32_t col, const mlist_type *matrix)
 
-{    int i;
+{    uint32_t i;
 
      if(matrix == (mlist_type *)NULL)
      {  pups_set_errno(EINVAL);
@@ -955,14 +958,14 @@ _PUBLIC FTYPE lmatrix_get_element_value(int row, int col, mlist_type *matrix)
 
 
 
-/*------------------------------------------------------------------------------
-    Normalise list array ...
-------------------------------------------------------------------------------*/
+/*----------------------*/
+/* Normalise list array */
+/*----------------------*/
 
-_PUBLIC int lmatrix_normalise(mlist_type *lmatrix)
+_PUBLIC int32_t lmatrix_normalise(mlist_type *lmatrix)
 
-{   int i,
-        j;
+{   uint32_t i,
+             j;
 
     FTYPE max_val = 0.0;
 
@@ -994,13 +997,13 @@ _PUBLIC int lmatrix_normalise(mlist_type *lmatrix)
 
 
 
-/*------------------------------------------------------------------------------
-    Normalise list vector ...
-------------------------------------------------------------------------------*/
+/*-----------------------*/
+/* Normalise list vector */
+/*-----------------------*/
 
-_PUBLIC int lvector_normalise(vlist_type *vector)
+_PUBLIC int32_t lvector_normalise(vlist_type *vector)
 
-{   int i;
+{   uint32_t i;
 
     FTYPE max_val = 0.0;
 
@@ -1023,14 +1026,15 @@ _PUBLIC int lvector_normalise(vlist_type *vector)
 
 
 
-/*------------------------------------------------------------------------------
-    Print list vector ...
-------------------------------------------------------------------------------*/
 
-_PUBLIC int lvector_print(FILE *stream, int cols, vlist_type *vector)
+/*-------------------*/
+/* Print list vector */
+/*-------------------*/
 
-{    int i,
-         cnt = 0;
+_PUBLIC int32_t lvector_print(const FILE *stream, const uint32_t cols, const vlist_type *vector)
+
+{    uint32_t i,
+              cnt = 0;
 
      if(stream == (FILE *)NULL || vector == (vlist_type *)NULL)
      {  pups_set_errno(EINVAL);
@@ -1134,7 +1138,7 @@ _PUBLIC int lvector_print(FILE *stream, int cols, vlist_type *vector)
 
      for(i=0; i<vector->used; ++i)
      {  if(vector->auxdata != (auxdata_type *)NULL)       
-        {   _PROTOTYPE int (*save)(FILE *, void *); 
+        {   _PROTOTYPE  int32_t (*save)(FILE *, void *); 
 
             if(vector->auxdata[i].save == (void *)NULL || vector->auxdata[i].data == (void *)NULL)
             {  pups_set_errno(EINVAL);
@@ -1158,12 +1162,12 @@ _PUBLIC int lvector_print(FILE *stream, int cols, vlist_type *vector)
 
 
 
-/*------------------------------------------------------------------------------
-    Save list vector to (ASCII) file - note we cannot save auxillary data
-    in ASCII mode ...
-------------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------------*/
+/* Save list vector to (ASCII) file - note we cannot save auxillary data */
+/* in ASCII mode                                                         */
+/*-----------------------------------------------------------------------*/
 
-_PUBLIC int lvector_save_to_file(char *filename, vlist_type *vector)
+_PUBLIC  int32_t lvector_save_to_file(const char *filename, const vlist_type *vector)
 
 {   FILE *stream = (FILE *)NULL;
 
@@ -1173,7 +1177,7 @@ _PUBLIC int lvector_save_to_file(char *filename, vlist_type *vector)
     }
 
     if(access(filename,F_OK | R_OK | W_OK) == (-1))
-    {  int fildes = (-1);
+    {  des_t fildes = (-1);
 
        if(fildes = creat(filename,0600) == (-1))
        {  pups_set_errno(EACCES);
@@ -1190,7 +1194,7 @@ _PUBLIC int lvector_save_to_file(char *filename, vlist_type *vector)
 
     (void)fprintf(stream,"\n#--------------------------------------------------------------------------\n");
     (void)fprintf(stream,"#    List vector (ASCII format 1.00)\n");
-    (void)fprintf(stream,"#    (C) M.A. O'Neill, Tumbling Dice 2023\n");
+    (void)fprintf(stream,"#    (C) M.A. O'Neill, Tumbling Dice 2024\n");
     (void)fprintf(stream,"#--------------------------------------------------------------------------\n\n");
     (void)fflush(stream);
 
@@ -1210,14 +1214,14 @@ _PUBLIC int lvector_save_to_file(char *filename, vlist_type *vector)
 
 
 
-/*------------------------------------------------------------------------------
-    Save list vector to (binary) file ...
-------------------------------------------------------------------------------*/
+/*-----------------------------------*/
+/* Save list vector to (binary) file */
+/*-----------------------------------*/
 
-_PUBLIC int lvector_save_to_binary_file(char *filename, vlist_type *vector)
+_PUBLIC int32_t lvector_save_to_binary_file(const char *filename, const vlist_type *vector)
 
-{   int i,
-        fildes = (-1);
+{   int32_t i;
+    des_t    fildes = (-1);
 
     if(filename == (char *)NULL || strcmp(filename,"") == 0 || vector == (vlist_type *)NULL)
     {  pups_set_errno(EINVAL);
@@ -1225,7 +1229,7 @@ _PUBLIC int lvector_save_to_binary_file(char *filename, vlist_type *vector)
     }
 
     if(access(filename,F_OK | R_OK | W_OK) == (-1))
-    {  int fildes = (-1);
+    {   int32_t fildes = (-1);
 
        if(fildes = creat(filename,0600) == (-1))
        {  pups_set_errno(EACCES);
@@ -1254,13 +1258,13 @@ _PUBLIC int lvector_save_to_binary_file(char *filename, vlist_type *vector)
 
 
 
-/*------------------------------------------------------------------------------
-    Save list vector to open file descriptor ...
-------------------------------------------------------------------------------*/
+/*------------------------------------------*/
+/* Save list vector to open file descriptor */
+/*------------------------------------------*/
 
-_PUBLIC int lvector_save_to_binary_fildes(int fildes, vlist_type *vector)
+_PUBLIC int32_t lvector_save_to_binary_fildes(const des_t fildes, const vlist_type *vector)
 
-{   int i;
+{   uint32_t i;
 
     if(fildes < 0)
     {  pups_set_errno(EBADFD);
@@ -1281,27 +1285,27 @@ _PUBLIC int lvector_save_to_binary_fildes(int fildes, vlist_type *vector)
        return(-1);
     }
 
-    if(write(fildes,&vector->state,sizeof(int))      != sizeof(int))
+    if(write(fildes,&vector->state,sizeof(int32_t)) != sizeof(int32_t))
     {  pups_set_errno(EACCES);
        return(-1);
     }
 
-    if(write(fildes,&vector->components,sizeof(int)) != sizeof(int))
+    if(write(fildes,&vector->components,sizeof(int32_t)) != sizeof(int32_t))
     {  pups_set_errno(EACCES);
        return(-1);
     }
 
-    if(write(fildes,&vector->allocated,sizeof(int))  != sizeof(int))
+    if(write(fildes,&vector->allocated,sizeof(int32_t)) != sizeof(int32_t))
     {  pups_set_errno(EACCES);
        return(-1);
     }
 
-    if(write(fildes,&vector->used,sizeof(int))  != sizeof(int))
+    if(write(fildes,&vector->used,sizeof(int32_t))  != sizeof(int32_t))
     {  pups_set_errno(EACCES);
        return(-1);
     }
 
-    if(write(fildes,vector->index,vector->used*sizeof(int)) != vector->allocated*sizeof(int))
+    if(write(fildes,vector->index,vector->used*sizeof(int32_t)) != vector->allocated*sizeof(int32_t))
     {  pups_set_errno(EACCES);
        return(-1);
     }
@@ -1318,7 +1322,7 @@ _PUBLIC int lvector_save_to_binary_fildes(int fildes, vlist_type *vector)
 
     for(i=0; i<vector->used; ++i)
     {  if(vector->auxdata != (auxdata_type *)NULL)
-       {   _PROTOTYPE int (*bsave)(int, void *);
+       {   _PROTOTYPE int32_t (*bsave)(int, void *);
 
            if(vector->auxdata[i].bsave == (void *)NULL || vector->auxdata[i].data == (void *)NULL)
            {  pups_set_errno(EINVAL);
@@ -1340,16 +1344,16 @@ _PUBLIC int lvector_save_to_binary_fildes(int fildes, vlist_type *vector)
 
 
 
-/*------------------------------------------------------------------------------
-    Scan a list vector ...
-------------------------------------------------------------------------------*/
+/*--------------------*/
+/* Scan a list vector */
+/*--------------------*/
 
-_PUBLIC vlist_type *lvector_scan(FILE *stream)
+_PUBLIC vlist_type *lvector_scan(const FILE *stream)
 
-{   int i,
-        allocated,
-        used,
-        components;
+{   uint32_t i,
+             allocated,
+             used,
+             components;
 
     char strdum[SSIZE] = "",
          state[SSIZE]  = "",
@@ -1418,7 +1422,7 @@ _PUBLIC vlist_type *lvector_scan(FILE *stream)
        return(vector);
     }
 
-    if((vector->index = (int *)pups_calloc(vector->allocated,sizeof(int))) == (int *)NULL)
+    if((vector->index = (int32_t *)pups_calloc(vector->allocated,sizeof(int32_t))) == (int32_t *)NULL)
     {  (void)lvector_destroy(vector);
 
        pups_set_errno(EINVAL);
@@ -1483,11 +1487,11 @@ _PUBLIC vlist_type *lvector_scan(FILE *stream)
 
 
 
-/*------------------------------------------------------------------------------
-    Skip lines starting with '#' or "\n" character ...
-------------------------------------------------------------------------------*/
+/*------------------------------------------------*/
+/* Skip lines starting with '#' or "\n" character */
+/*------------------------------------------------*/
 
-_PRIVATE int skip_comments(FILE *stream)
+_PRIVATE int32_t skip_comments(const FILE *stream)
 
 {   char next_char,
          line[SSIZE] = "";
@@ -1516,15 +1520,15 @@ _PRIVATE int skip_comments(FILE *stream)
 
 
 
-/*------------------------------------------------------------------------------
-    Load list vector from (ASCII) file ...
-------------------------------------------------------------------------------*/
+/*------------------------------------*/
+/* Load list vector from (ASCII) file */
+/*------------------------------------*/
 
-_PUBLIC vlist_type *lvector_load_from_file(char *filename)
+_PUBLIC vlist_type *lvector_load_from_file(const char *filename)
 
-{   int  i;
-    char strdum[SSIZE]   = ""; 
-    FILE *stream       = (FILE *)NULL;
+{   int32_t    i;
+    char       strdum[SSIZE]   = ""; 
+    FILE       *stream       = (FILE *)NULL;
     vlist_type *vector = (vlist_type *)NULL;
 
     if(filename == (char *)NULL || strcmp(filename,"") == 0)
@@ -1560,13 +1564,13 @@ _PUBLIC vlist_type *lvector_load_from_file(char *filename)
 
 
 
-/*------------------------------------------------------------------------------
-    Load list vector from (binary) file ...
-------------------------------------------------------------------------------*/
+/*-------------------------------------*/
+/* Load list vector from (binary) file */
+/*-------------------------------------*/
 
-_PUBLIC vlist_type *lvector_load_from_binary_file(char *filename)
+_PUBLIC vlist_type *lvector_load_from_binary_file(const char *filename)
 
-{   int        fildes  = (-1);
+{   des_t      fildes  = (-1);
     vlist_type *vector = (vlist_type *)NULL;
 
     if(filename == (char *)NULL || strcmp(filename,"") == 0)
@@ -1595,13 +1599,13 @@ _PUBLIC vlist_type *lvector_load_from_binary_file(char *filename)
 
 
 
-/*------------------------------------------------------------------------------
-    Save list vector to (binary) file descriptor  ...
-------------------------------------------------------------------------------*/
+/*----------------------------------------------*/
+/* Save list vector to (binary) file descriptor */
+/*----------------------------------------------*/
 
-_PUBLIC vlist_type *lvector_load_from_binary_fildes(int fildes)
+_PUBLIC vlist_type *lvector_load_from_binary_fildes(const des_t fildes)
 
-{   int i;
+{   uint32_t   i;
 
     char       vector_magic[5] = "";
     vlist_type *vector         = (vlist_type *)NULL;
@@ -1636,35 +1640,35 @@ _PUBLIC vlist_type *lvector_load_from_binary_fildes(int fildes)
        return((vlist_type *)NULL);
     }
 
-    if(read(fildes,&vector->state,sizeof(int)) != sizeof(int))
+    if(read(fildes,&vector->state,sizeof(int32_t)) != sizeof(int32_t))
     {  (void)pups_free((void *)vector);
 
        pups_set_errno(EACCES);
        return((vlist_type *)NULL);
     }
  
-    if(read(fildes,&vector->components,sizeof(int)) != sizeof(int))
+    if(read(fildes,&vector->components,sizeof(int32_t)) != sizeof(int32_t))
     {  (void)pups_free((void *)vector);
 
        pups_set_errno(EACCES);
        return((vlist_type *)NULL);
     }
 
-    if(read(fildes,&vector->allocated,sizeof(int)) != sizeof(int))
+    if(read(fildes,&vector->allocated,sizeof(int32_t)) != sizeof(int32_t))
     {  (void)pups_free((void *)vector);
 
        pups_set_errno(EACCES);
        return((vlist_type *)NULL);
     }
 
-    if(read(fildes,&vector->used,sizeof(int)) != sizeof(int))
+    if(read(fildes,&vector->used,sizeof(int32_t)) != sizeof(int32_t))
     {  (void)pups_free((void *)vector);
 
        pups_set_errno(EACCES);
        return((vlist_type *)NULL);
     }
 
-    if((vector->index = (int *)pups_calloc(vector->used,sizeof(int))) == (int *)NULL)
+    if((vector->index = (int32_t *)pups_calloc(vector->used,sizeof(int32_t))) == (int32_t *)NULL)
     {  (void)pups_free((void *)vector);
 
        pups_set_errno(EACCES);
@@ -1679,7 +1683,7 @@ _PUBLIC vlist_type *lvector_load_from_binary_fildes(int fildes)
        return((vlist_type *)NULL);
     }
 
-    if(read(fildes,vector->index,vector->used*sizeof(int)) != vector->used*sizeof(int))
+    if(read(fildes,vector->index,vector->used*sizeof(int32_t)) != vector->used*sizeof(int32_t))
     {  (void)pups_free((void *)vector->index);
        (void)pups_free((void *)vector->value);
        (void)pups_free((void *)vector);
@@ -1704,7 +1708,7 @@ _PUBLIC vlist_type *lvector_load_from_binary_fildes(int fildes)
 
     for(i=0; i<vector->used; ++i)
     {  if(vector->auxdata != (auxdata_type *)NULL)
-       {   _PROTOTYPE void *(*bload)(int, void *);
+       {   _PROTOTYPE void *(*bload)(int32_t, void *);
 
            if(vector->auxdata[i].bload == (void *)NULL || vector->auxdata[i].data == (void *)NULL)
            {  pups_set_errno(EINVAL);
@@ -1726,13 +1730,13 @@ _PUBLIC vlist_type *lvector_load_from_binary_fildes(int fildes)
 
 
 
-/*------------------------------------------------------------------------------
-    Print list matrix ...
-------------------------------------------------------------------------------*/
+/*-------------------*/
+/* Print list matrix */
+/*-------------------*/
 
-_PUBLIC int lmatrix_print(FILE *stream, int cols, mlist_type *matrix)
+_PUBLIC int32_t lmatrix_print(const FILE *stream, const uint32_t cols, const mlist_type *matrix)
 
-{   int i;
+{   uint32_t i;
 
     if(stream == (FILE *)NULL || matrix == (mlist_type *)NULL)
     {  pups_set_errno(EINVAL);
@@ -1775,11 +1779,11 @@ _PUBLIC int lmatrix_print(FILE *stream, int cols, mlist_type *matrix)
 
 
 
-/*------------------------------------------------------------------------------
-    Save list matrix to (ASCII) file ...
-------------------------------------------------------------------------------*/
+/*----------------------------------*/
+/* Save list matrix to (ASCII) file */
+/*----------------------------------*/
 
-_PUBLIC int lmatrix_save_to_file(char *filename, mlist_type *matrix)
+_PUBLIC int32_t lmatrix_save_to_file(const char *filename, const mlist_type *matrix)
 
 {   FILE *stream = (FILE *)NULL;
 
@@ -1789,7 +1793,7 @@ _PUBLIC int lmatrix_save_to_file(char *filename, mlist_type *matrix)
     }
 
     if(access(filename,F_OK | R_OK | W_OK) == (-1))
-    {  int fildes = (-1);
+    {   int32_t fildes = (-1);
 
        if(fildes = creat(filename,0600) == (-1))
        {  pups_set_errno(EACCES);
@@ -1806,7 +1810,7 @@ _PUBLIC int lmatrix_save_to_file(char *filename, mlist_type *matrix)
 
     (void)fprintf(stream,"\n#--------------------------------------------------------------------------\n");
     (void)fprintf(stream,"#    List matrix (ASCII format 1.00)\n");
-    (void)fprintf(stream,"#    (C) M.A. O'Neill, Tumbling Dice 2023\n");
+    (void)fprintf(stream,"#    (C) M.A. O'Neill, Tumbling Dice 2024\n");
     (void)fprintf(stream,"#--------------------------------------------------------------------------\n\n");
     (void)fflush(stream);
 
@@ -1827,14 +1831,13 @@ _PUBLIC int lmatrix_save_to_file(char *filename, mlist_type *matrix)
 
 
 
-/*------------------------------------------------------------------------------
-    Save list matrix to (binary) file ...
-------------------------------------------------------------------------------*/
+/*-----------------------------------*/
+/* Save list matrix to (binary) file */
+/*-----------------------------------*/
 
-_PUBLIC int lmatrix_save_to_binary_file(char *filename, mlist_type *matrix)
+_PUBLIC int32_t lmatrix_save_to_binary_file(const char *filename, const mlist_type *matrix)
 
-{   int i,
-        fildes = (-1);
+{   des_t fildes = (-1);
 
     if(filename == (char *)NULL || strcmp(filename,"") == 0 || matrix == (mlist_type *)NULL)
     {  pups_set_errno(EINVAL);
@@ -1842,9 +1845,7 @@ _PUBLIC int lmatrix_save_to_binary_file(char *filename, mlist_type *matrix)
     }
 
     if(access(filename,F_OK | R_OK | W_OK) == (-1))
-    {  int fildes = (-1);
-
-       if(fildes = creat(filename,0600) == (-1))
+    {  if(fildes = creat(filename,0600) == (-1))
        {  pups_set_errno(EACCES);
           return(-1);
        }
@@ -1871,13 +1872,13 @@ _PUBLIC int lmatrix_save_to_binary_file(char *filename, mlist_type *matrix)
 
 
 
-/*------------------------------------------------------------------------------
-    Save list matrix to (binary) file descriptor ...
-------------------------------------------------------------------------------*/
+/*----------------------------------------------*/
+/* Save list matrix to (binary) file descriptor */
+/*----------------------------------------------*/
 
-_PUBLIC int lmatrix_save_to_binary_fildes(int fildes, mlist_type *matrix)
+_PUBLIC int32_t lmatrix_save_to_binary_fildes(const des_t fildes, const mlist_type *matrix)
 
-{   int i;
+{   uint32_t i;
 
     if(fildes < 0)
     {  pups_set_errno(EBADFD);
@@ -1898,12 +1899,12 @@ _PUBLIC int lmatrix_save_to_binary_fildes(int fildes, mlist_type *matrix)
        return(-1);
     }
 
-    if(write(fildes,&matrix->rows,sizeof(int)) != sizeof(int))
+    if(write(fildes,&matrix->rows,sizeof(int32_t)) != sizeof(int32_t))
     {  pups_set_errno(EACCES);
        return(-1);
     }
 
-    if(write(fildes,&matrix->cols,sizeof(int)) != sizeof(int))
+    if(write(fildes,&matrix->cols,sizeof(int32_t)) != sizeof(int32_t))
     {  pups_set_errno(EACCES);
        return(-1);
     }
@@ -1921,15 +1922,15 @@ _PUBLIC int lmatrix_save_to_binary_fildes(int fildes, mlist_type *matrix)
 
 
 
-/*------------------------------------------------------------------------------
-    Scan a list matrix ...
-------------------------------------------------------------------------------*/
+/*--------------------*/
+/* Scan a list matrix */
+/*--------------------*/
 
-_PUBLIC mlist_type *lmatrix_scan(FILE *stream)
+_PUBLIC mlist_type *lmatrix_scan(const FILE *stream)
 
-{   int i,
-        rows,
-        cols;
+{   uint32_t i,
+             rows,
+             cols;
 
     char strdum[SSIZE] = "",
          name[SSIZE]   = "",
@@ -2005,16 +2006,16 @@ _PUBLIC mlist_type *lmatrix_scan(FILE *stream)
 
 
 
-/*------------------------------------------------------------------------------
-    Load list matrix from (ASCII) file ...
-------------------------------------------------------------------------------*/
+/*------------------------------------*/
+/* Load list matrix from (ASCII) file */
+/*------------------------------------*/
 
-_PUBLIC mlist_type *lmatrix_load_from_file(char *filename)
+_PUBLIC mlist_type *lmatrix_load_from_file(const char *filename)
 
-{   int   i;
-    char  strdum[SSIZE]  = "";
-    FILE *stream       = (FILE *)NULL;
-    mlist_type *matrix = (mlist_type *)NULL;
+{   uint32_t    i;
+    char        strdum[SSIZE]  = "";
+    FILE        *stream       = (FILE *)NULL;
+    mlist_type  *matrix = (mlist_type *)NULL;
 
     if(filename == (char *)NULL || strcmp(filename,"") == 0)
     {  pups_set_errno(EINVAL);
@@ -2049,16 +2050,13 @@ _PUBLIC mlist_type *lmatrix_load_from_file(char *filename)
 
 
 
+/*-------------------------------------*/
+/* Load list matrix from (binary) file */
+/*-------------------------------------*/
 
+_PUBLIC mlist_type *lmatrix_load_from_binary_file(const char *filename)
 
-
-/*------------------------------------------------------------------------------
-    Load list matrix from (binary) file ...
-------------------------------------------------------------------------------*/
-
-_PUBLIC mlist_type *lmatrix_load_from_binary_file(char *filename)
-
-{   int        fildes  = (-1);
+{   des_t      fildes  = (-1);
     mlist_type *matrix = (mlist_type *)NULL;
 
     if(filename == (char *)NULL || strcmp(filename,"") == 0)
@@ -2087,15 +2085,15 @@ _PUBLIC mlist_type *lmatrix_load_from_binary_file(char *filename)
 
 
 
-/*------------------------------------------------------------------------------
-    Save list matrix to (binary) file descriptor  ...
-------------------------------------------------------------------------------*/
+/*----------------------------------------------*/
+/* Save list matrix to (binary) file descriptor */
+/*----------------------------------------------*/
 
-_PUBLIC mlist_type *lmatrix_load_from_binary_fildes(int fildes)
+_PUBLIC mlist_type *lmatrix_load_from_binary_fildes(const des_t fildes)
 
-{   int        i;
-    char       matrix_magic[5] = "";
-    mlist_type *matrix         = (mlist_type *)NULL;
+{   uint32_t   i;
+    char        matrix_magic[5] = "";
+    mlist_type  *matrix         = (mlist_type *)NULL;
 
     if(fildes < 0)
     {  pups_set_errno(EBADFD);
@@ -2127,14 +2125,14 @@ _PUBLIC mlist_type *lmatrix_load_from_binary_fildes(int fildes)
        return((mlist_type *)NULL);
     }
 
-    if(read(fildes,&matrix->rows,sizeof(int)) != sizeof(int))
+    if(read(fildes,&matrix->rows,sizeof(int32_t)) != sizeof(int32_t))
     {  (void)pups_free((void *)matrix);
 
        pups_set_errno(EACCES);
        return((mlist_type *)NULL);
     }
 
-    if(read(fildes,&matrix->cols,sizeof(int)) != sizeof(int))
+    if(read(fildes,&matrix->cols,sizeof(int32_t)) != sizeof(int32_t))
     {  (void)pups_free((void *)matrix);
 
        pups_set_errno(EACCES);
@@ -2163,11 +2161,11 @@ _PUBLIC mlist_type *lmatrix_load_from_binary_fildes(int fildes)
 
 
 
-/*------------------------------------------------------------------------------
-    Set list vector name ...
-------------------------------------------------------------------------------*/
+/*----------------------*/
+/* Set list vector name */
+/*----------------------*/
 
-_PUBLIC int lvector_set_name(char *name, vlist_type *vector)
+_PUBLIC int32_t lvector_set_name(const char *name, vlist_type *vector)
 
 {   if(name == (char *)NULL || strcmp(name,"") == 0 || vector == (vlist_type *)NULL)
     {  pups_set_errno(EINVAL);
@@ -2182,11 +2180,11 @@ _PUBLIC int lvector_set_name(char *name, vlist_type *vector)
 
 
 
-/*------------------------------------------------------------------------------
-    Set list matrix name ...
-------------------------------------------------------------------------------*/
+/*----------------------*/
+/* Set list matrix name */
+/*----------------------*/
 
-_PUBLIC int lmatrix_set_name(char *name, mlist_type *matrix)
+_PUBLIC int32_t lmatrix_set_name(const char *name, mlist_type *matrix)
 
 {   if(name == (char *)NULL || strcmp(name,"") == 0 || matrix == (mlist_type *)NULL)
     {  pups_set_errno(EINVAL);
@@ -2200,11 +2198,12 @@ _PUBLIC int lmatrix_set_name(char *name, mlist_type *matrix)
 
 
 
-/*------------------------------------------------------------------------------
-    Get list vector inflation state ...
-------------------------------------------------------------------------------*/
 
-_PUBLIC int lvector_get_state(vlist_type *vector)
+/*---------------------------------*/
+/* Get list vector inflation state */
+/*---------------------------------*/
+
+_PUBLIC int32_t lvector_get_state(const vlist_type *vector)
 
 {   if(vector == (vlist_type *)NULL)
     {  pups_set_errno(EINVAL);
@@ -2218,11 +2217,11 @@ _PUBLIC int lvector_get_state(vlist_type *vector)
 
 
 
-/*------------------------------------------------------------------------------
-    Get list vector size ...
-------------------------------------------------------------------------------*/
+/*----------------------*/
+/* Get list vector size */
+/*----------------------*/
 
-_PUBLIC int lvector_get_size(vlist_type *vector)
+_PUBLIC uint32_t lvector_get_size(const vlist_type *vector)
 
 {   if(vector == (vlist_type *)NULL)
     {  pups_set_errno(EINVAL);
@@ -2236,11 +2235,11 @@ _PUBLIC int lvector_get_size(vlist_type *vector)
 
 
 
-/*------------------------------------------------------------------------------
-    Get list matrix size ...
-------------------------------------------------------------------------------*/
+/*----------------------*/
+/* Get list matrix size */
+/*----------------------*/
 
-_PUBLIC int lmatrix_get_size(mlist_type *matrix, int *rows, int *cols)
+_PUBLIC uint32_t lmatrix_get_size(const mlist_type *matrix, uint32_t *rows, uint32_t *cols)
 
 {   if(matrix == (mlist_type *)NULL)
     {  pups_set_errno(EINVAL);
@@ -2257,11 +2256,11 @@ _PUBLIC int lmatrix_get_size(mlist_type *matrix, int *rows, int *cols)
 
 
 
-/*------------------------------------------------------------------------------
-    Get allocated size of list vector ...
-------------------------------------------------------------------------------*/
+/*-----------------------------------*/
+/* Get allocated size of list vector */
+/*-----------------------------------*/
 
-_PUBLIC int lvector_get_allocated(vlist_type *vector)
+_PUBLIC uint32_t lvector_get_allocated(const vlist_type *vector)
 
 {   if(vector == (vlist_type *)NULL)
     {  pups_set_errno(EINVAL);
@@ -2275,11 +2274,11 @@ _PUBLIC int lvector_get_allocated(vlist_type *vector)
 
 
 
-/*------------------------------------------------------------------------------
-    Get size list vector (non zero elements in correspondign vector) ...
-------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------*/
+/* Get size of list vector (non zero elements in correspondign vector) */
+/*---------------------------------------------------------------------*/
 
-_PUBLIC int lvector_get_used(vlist_type *vector)
+_PUBLIC uint32_t lvector_get_used(const vlist_type *vector)
 
 {   if(vector == (vlist_type *)NULL)
     {  pups_set_errno(EINVAL);
@@ -2293,11 +2292,11 @@ _PUBLIC int lvector_get_used(vlist_type *vector)
 
 
 
-/*------------------------------------------------------------------------------
-    Get list vector compression factor ...
-------------------------------------------------------------------------------*/
+/*------------------------------------*/
+/* Get list vector compression factor */
+/*------------------------------------*/
 
-_PUBLIC FTYPE lvector_get_compression_factor(vlist_type *vector)
+_PUBLIC FTYPE lvector_get_compression_factor(const vlist_type *vector)
 
 {   FTYPE compression_factor;
 
@@ -2320,13 +2319,13 @@ _PUBLIC FTYPE lvector_get_compression_factor(vlist_type *vector)
 
 
 
-/*------------------------------------------------------------------------------
-    Get list matrix compression factor ...
-------------------------------------------------------------------------------*/
+/*------------------------------------*/
+/* Get list matrix compression factor */
+/*------------------------------------*/
 
-_PUBLIC FTYPE lmatrix_get_compression_factor(mlist_type *matrix)
+_PUBLIC FTYPE lmatrix_get_compression_factor(const mlist_type *matrix)
 
-{   int i;
+{   uint32_t i;
 
     FTYPE compression_factor,
           sum_compression_factor = 0.0;

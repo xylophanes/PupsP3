@@ -1,0 +1,55 @@
+#----------------------------------------------------------------
+# Configuration file for cluster enabled Linux system [sanitized]
+# M.A. O'Neill, Tumbling Dice, 2010-2024 
+#----------------------------------------------------------------
+#
+TARGET_OS
+linux
+
+TARGET_PHMALLOC_CFLAGS
+-w -Wfatal-errors -g -D$ARCH -DGLIBC -D_GNU_SOURCE -D_XOPEN_SOURCE -DPTHREAD_SUPPORT -DFLOAT -I. -I../include -D__NO_PROTO__
+
+#--------------------------------------
+# Architecture dependent compile flags
+#--------------------------------------
+TARGET_ARCHDEPCFLAGS
+-DBSD_FUNCTION_SUPPORT -DHAVE_CURSES -DSSH_SUPPORT -DHAVE_READLINE -DGLIBC -DZLIB_SUPPORT
+
+#-------
+# CFLAGS
+#-------
+TARGET_CFLAGS
+-w -Wfatal-errors -fsanitize=bounds,address,null -g -rdynamic -I. -I../include.libs -D$ARCH -D_GNU_SOURCE -D_XOPEN_SOURCE -DFTYPE -DPSRP_ENABLED
+-DCHAN_IS_POLL -DSHADOW_SUPPORT -DPERSISTENT_HEAP_SUPPORT -DSOCKET_SUPPORT -DDLL_SUPPORT -DPSRP_AUTHENTICATE -DSANITIZE
+-DPTHREAD_SUPPORT -DIPV6_SUPPORT -DMAIL_SUPPORT
+-D__NO_PROTO__ -DHAVE_PROC_FS 
+
+#-------------------
+# Target load flags
+#-------------------
+TARGET_LDFLAGS
+../lib/cmain.o ../lib/libpups.so ../lib/libphmalloc.so -lbsd -lreadline -lncurses -ltinfo -lm -ltiff -lcrypt -ldl -lz -lpthread
+
+#-----------------------------------
+# Architecture dependent load flags
+#-----------------------------------
+TARGET_ARCHDEPLDFLAGS
+none
+
+TARGET_LIBEXT
+$ARCH.linux.cluster
+
+#------------------
+# Location of libc 
+#------------------
+TARGET_LIBC_LOCATION
+/usr/lib
+
+#---------------------
+# Location of binaries
+#---------------------
+TARGET_INSTALL_DIR
+../bin.$ARCH.linux.cluster
+
+end
+

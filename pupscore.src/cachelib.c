@@ -1,5 +1,5 @@
-/*---------------------------------------------------------------------------
-    Purpose: Fast cache library.
+/*----------------------------------
+    Purpose: Fast cache library
 
     Author:  M.A. O'Neill
              Tumbling Dice Ltd
@@ -7,10 +7,10 @@
              NE3 54RT
              Tyne and Wear
 
-    Version: 4.14
-    Dated:   18th September 2023 
+    Version: 4.19
+    Dated:   10th October 2024 
     Email:   mao@tumblingdice.co.uk
----------------------------------------------------------------------------*/
+----------------------------------*/
 
 #include <me.h>
 #include <utils.h>
@@ -26,6 +26,7 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/utsname.h>
+#include <bsd/bsd.h>
 
 
 /*-------------------------------------------------------------*/
@@ -78,13 +79,13 @@
 /* Slot information function */
 /*---------------------------*/
 
-_PRIVATE void cache_slot(int level)
+_PRIVATE void cache_slot(int32_t level)
 {   (void)fprintf(stderr,"lib cachelib %s: [ANSI C]\n",CACHELIB_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(c) 2001-2023 Tumbling Dice, Gosforth\n");
+    {  (void)fprintf(stderr,"(c) 2001-2024 Tumbling Dice, Gosforth\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
-       (void)fprintf(stderr,"PUPS/P3 fast caching library (built %s %s)\n",__TIME__,__DATE__);
+       (void)fprintf(stderr,"PUPS/P3 fast caching library (gcc %s: built %s %s)\n",__VERSION__,__TIME__,__DATE__);
        (void)fflush(stderr);
     }
 
@@ -121,46 +122,46 @@ _PRIVATE          cache_type cache[MAX_CACHES];
 /*-------------------------------------------*/
 
 // Print number of bytes in cache
-_PRIVATE int print_bytes(FILE *,
-                         const char *,
-                         const unsigned long);
+_PRIVATE int32_t print_bytes(FILE *,
+                             const char *,
+                             const uint64_t);
 
-// Inversely map existing process memory into a
+// Inversely map existing process memory  int32_to a
 // ghost file, synchronising it with memory area
-_PRIVATE void *mmap_invmap_cachememory(unsigned int,
-                                       const char *,
-                                       const int,
-                                       const unsigned long int);
+_PRIVATE void *mmap_invmap_cachememory(uint32_t      ,
+                                       const char   *,
+                                       const  int32_t,
+                                       const uint64_t);
 
 // Memory map cache directly into the address space
 // of the program
-_PRIVATE void *mmap_fwdmap_cachememory(unsigned int,
-                                       const char *,
-                                       const int,
-                                       const unsigned long int);
+_PRIVATE void *mmap_fwdmap_cachememory(uint32_t      ,
+                                       const char   *,
+                                       const  int32_t,
+                                       const uint64_t);
 
 // Map cache memory
-_PRIVATE void *cache_mmap_cachememory (unsigned int,
-                                       const char *,
-                                       const  int,
-                                       const unsigned long int,
-                                       unsigned long int *);
+_PRIVATE void *cache_mmap_cachememory (uint32_t     ,
+                                       const char  *,
+                                       const int32_t,
+                                       const uint64_t,
+                                       uint64_t     *);
 
 
 
 
 /*--------------------------------------------------*/
-/* Memory map cache directly into the address space */
+/* Memory map cache directly  int32_to the address space */
 /* of the program                                   */
 /*--------------------------------------------------*/
 
-_PRIVATE void *mmap_fwdmap_cachememory(const unsigned int                c_index,  // Cache index
-                                       const          char       *cachefile_name,  // Cache file name
-                                       const          int              h_p_state,  // Hoemostatic protection state
-                                       const unsigned long int              size)  // Size of cache
+_PRIVATE void *mmap_fwdmap_cachememory(const uint32_t           c_index,  // Cache index
+                                       const char       *cachefile_name,  // Cache file name
+                                       const  int32_t         h_p_state,  // Hoemostatic protection state
+                                       const uint64_t              size)  // Size of cache
 
-{   int fd,
-        map_flags = 0;
+{   des_t   fd;
+    int32_t map_flags = 0;
 
     void *cache_ptr = (void *)NULL;
 
@@ -168,13 +169,26 @@ _PRIVATE void *mmap_fwdmap_cachememory(const unsigned int                c_index
     /*-------------------------------------------------*/
     /* File permissions must match memory mapping mode */
     /*-------------------------------------------------*/
+    /*---------------------*/
+    /* Error - permissions */
+    /*---------------------*/
 
     if((fd = pups_open(cachefile_name,O_RDWR,h_p_state)) == (-1))
     {  (void)snprintf("[mmap_fwdmap_cachememory] cannot open cachefile \"%s\"",SSIZE,cachefile_name);
        pups_error(errstr);
     }
+
+
+    /*-------------------------*/
+    /* Error - cache is in use */
+    /*-------------------------*/
+
     else
-       (void)flock(fd,LOCK_EX);
+    {  if(lockf(fd,F_TLOCK,0) == (-1))
+       {  (void)snprintf("[mmap_fwdmap_cachememory] cachefile \"%s\" is in use",SSIZE,cachefile_name);
+          pups_error(errstr);
+       }
+    }
 
 
     /*-------------------*/
@@ -207,7 +221,7 @@ _PRIVATE void *mmap_fwdmap_cachememory(const unsigned int                c_index
                          fd,
                          0L)) == (void *)MAP_FAILED)
     {  (void)pups_close(fd);
-       (void)snprintf(errstr,SSIZE,"[mmap_fwdmap_cachememory] cannot map cachfile \"%s\" into process address space",cachefile_name);
+       (void)snprintf(errstr,SSIZE,"[mmap_fwdmap_cachememory] cannot map cachfile \"%s\"  into process address space",cachefile_name);
        pups_error(errstr);  
     }
 
@@ -217,7 +231,7 @@ _PRIVATE void *mmap_fwdmap_cachememory(const unsigned int                c_index
     if(appl_verbose == TRUE)
     {  (void)strdate(date);
        (void)fprintf(stderr,"%s %s (%d@%s:%s): mapping to cachefile \"%s\" (at %016lx virtual), %d\n",
-                     date,appl_name,appl_pid,appl_host,appl_owner,cachefile_name,(unsigned long int)cache_ptr,errno);
+                     date,appl_name,appl_pid,appl_host,appl_owner,cachefile_name,(uint64_t)cache_ptr,errno);
        (void)fflush(stderr);
     }
 
@@ -233,13 +247,13 @@ _PRIVATE void *mmap_fwdmap_cachememory(const unsigned int                c_index
 /* ghost file, synchronising it with memory area */
 /*-----------------------------------------------*/
 
-_PRIVATE void *mmap_invmap_cachememory(const    unsigned int         c_index,  // Cache index
-                                       const    char         *cachefile_name,  // Name of cache file
-                                       const    int                h_p_state,  // Homeostatic protection state
-                                       unsigned long int                size)  // Size of cache
+_PRIVATE void *mmap_invmap_cachememory(const uint32_t          c_index,  // Cache index
+                                       const char      *cachefile_name,  // Name of cache file
+                                       const int32_t         h_p_state,  // Homeostatic protection state
+                                       uint64_t                   size)  // Size of cache
 
-{   int  map_flags = 0,
-         fd        = (-1);
+{   int32_t map_flags = 0;
+    des_t   fd        = (-1);
 
     void *cache_ptr = (void *)NULL;
 
@@ -256,12 +270,27 @@ _PRIVATE void *mmap_invmap_cachememory(const    unsigned int         c_index,  /
        }
     }
 
+
+    /*-------------------*/
+    /* Error permissions */
+    /*-------------------*/
+
     if((fd = pups_open(cachefile_name,O_RDWR,h_p_state)) == (-1))
     {  (void)snprintf(errstr,SSIZE,"[mmap_invmap_cachememory] cannot open cachefile \"%s\"",cachefile_name);
        pups_error(errstr);
     }
+
+
+    /*-------------------------*/
+    /* Error - cache is in use */
+    /*-------------------------*/
+
     else
-       (void)flock(fd,LOCK_EX);
+    {  if(lockf(fd,F_TLOCK,0) == (-1))
+       {  (void)snprintf(errstr,SSIZE,"[mmap_invmap_cachememory] cannot open cachefile \"%s\"",cachefile_name);
+          pups_error(errstr);
+       }
+    }
 
 
     /*---------------*/
@@ -303,7 +332,7 @@ _PRIVATE void *mmap_invmap_cachememory(const    unsigned int         c_index,  /
                          fd,
                          0L)) == (void *)MAP_FAILED)
    {    (void)pups_close(fd);
-        (void)snprintf(errstr,SSIZE,"[mmap_invmap_cachememory] cannot map cachefile \"%s\" into process address space",cachefile_name);
+        (void)snprintf(errstr,SSIZE,"[mmap_invmap_cachememory] cannot map cachefile \"%s\"  into process address space",cachefile_name);
         pups_error(errstr);
    }
 
@@ -320,7 +349,7 @@ _PRIVATE void *mmap_invmap_cachememory(const    unsigned int         c_index,  /
    if(appl_verbose == TRUE)
    {  (void)strdate(date);
       (void)fprintf(stderr,"%s %s (%d@%s:%s): inverse mapping to cachefile \"%s\" (at %016lx virtual)\n",
-                    date,appl_name,appl_pid,appl_host,appl_owner,cachefile_name,(unsigned long int)cache_ptr);
+                    date,appl_name,appl_pid,appl_host,appl_owner,cachefile_name,(uint64_t)cache_ptr);
       (void)fflush(stderr);
    }
 
@@ -335,9 +364,9 @@ _PRIVATE void *mmap_invmap_cachememory(const    unsigned int         c_index,  /
 /* Return the index of a (named) cache */
 /*-------------------------------------*/
 
-_PUBLIC int cache_name2index(const _BOOLEAN have_cache_lock, const char *name)
+_PUBLIC int32_t cache_name2index(const _BOOLEAN have_cache_lock, const char *name)
 
-{   int i;
+{   uint32_t i;
 
     /*--------------*/
     /* Sanity check */
@@ -385,11 +414,11 @@ _PUBLIC int cache_name2index(const _BOOLEAN have_cache_lock, const char *name)
 /* does not exit                */
 /*------------------------------*/
 
-_PRIVATE void *cache_mmap_cachememory(const unsigned int     c_index,  // Cache index
-                                      const char          *file_name,  // Cache file name
-                                      const int            h_p_state,  // Homeostatic protection state
-                                      const unsigned long   int size,  // Cache size
-                                      unsigned long int         *crc)  // Cache (64 bit) CRC 
+_PRIVATE void *cache_mmap_cachememory(const uint32_t     c_index,   // Cache index
+                                      const char      *file_name,   // Cache file name
+                                      const int32_t    h_p_state,   // Homeostatic protection state
+                                      const uint64_t        size,   // Cache size
+                                      uint64_t              *crc)   // Cache (64 bit) CRC 
 
 {   void *cache_ptr = (void *)NULL;
 
@@ -416,8 +445,8 @@ _PRIVATE void *cache_mmap_cachememory(const unsigned int     c_index,  // Cache 
     /*--------------------*/
 
     else
-    {  unsigned long int tmp_crc,
-                         old_size;
+    {  uint64_t tmp_crc,
+                old_size;
 
 
        /*---------------------------------*/
@@ -431,7 +460,7 @@ _PRIVATE void *cache_mmap_cachememory(const unsigned int     c_index,  // Cache 
        /* Check CRC (is cache corrupted?) */
        /*---------------------------------*/
 
-       if(crc != (unsigned long int *)NULL)
+       if(crc != (uint64_t *)NULL)
        {  tmp_crc   = pups_crc_64(size,cache_ptr);
 
           if(tmp_crc != 0x0 && cache[c_index].crc != 0x0 && cache[c_index].crc != tmp_crc)
@@ -471,10 +500,10 @@ _PRIVATE void *cache_mmap_cachememory(const unsigned int     c_index,  // Cache 
 /* Initialise cache */
 /*------------------*/
 
-_PUBLIC int cache_table_init(void)
+_PUBLIC int32_t cache_table_init(void)
 
-{   int i,
-        c_index;
+{    int32_t i,
+             c_index;
 
     char mmap_file_name[SSIZE] = "";
 
@@ -494,7 +523,7 @@ _PUBLIC int cache_table_init(void)
 
     if(cache_table_initialised == FALSE)
     {  for(i=0; i<MAX_CACHES; ++i)
-       {   int j;
+       {   uint32_t j;
            pthread_mutexattr_t attr;
 
            (void)strlcpy(cache[i].path        ,"" ,SSIZE);
@@ -523,13 +552,13 @@ _PUBLIC int cache_table_init(void)
               (void)strlcpy(cache[i].object_desc[i],"none",SSIZE);
            }
 
-           cache[i].blockmap     = (block_mtype      *)NULL;
-           cache[i].cache_ptr    = (void             *)NULL;
-           cache[i].flags        = (_BYTE            *)NULL;
-           cache[i].tag          = (unsigned int     *)NULL;
-           cache[i].lifetime     = (int              *)NULL;
-           cache[i].hubness      = (unsigned int     *)NULL;
-           cache[i].rwlock       = (pthread_rwlock_t *)NULL;
+           cache[i].blockmap     = (block_mtype       *)NULL;
+           cache[i].cache_ptr    = (void              *)NULL;
+           cache[i].flags        = (_BYTE             *)NULL;
+           cache[i].tag          = (uint32_t          *)NULL;
+           cache[i].lifetime     = (uint64_t          *)NULL;
+           cache[i].hubness      = (uint32_t          *)NULL;
+           cache[i].rwlock       = (pthread_rwlock_t  *)NULL;
        }
 
        cache_table_initialised = TRUE;
@@ -546,10 +575,10 @@ _PUBLIC int cache_table_init(void)
 /* Add object to cache */
 /*---------------------*/
 
-_PUBLIC int cache_add_object(const _BOOLEAN          have_cache_lock,  // If TRUE lock on cache held
-                             const char                        *desc,  // Description of object
-                             const unsigned long int            size,  // Size of object (bytes)
-                             const unsigned int              c_index)  // Cache index (identifier)
+_PUBLIC int32_t cache_add_object(const _BOOLEAN  have_cache_lock,  // If TRUE lock on cache held
+                                 const char                *desc,  // Description of object
+                                 const uint64_t             size,  // Size of object (bytes)
+                                 const uint32_t          c_index)  // Cache index (identifier)
 
 {   
 
@@ -616,7 +645,7 @@ _PUBLIC int cache_add_object(const _BOOLEAN          have_cache_lock,  // If TRU
 /* Get machine architecture */
 /*--------------------------*/
 
-_PRIVATE int get_march(char *march)
+_PRIVATE int32_t get_march(char *march)
 
 {    struct utsname buf;
 
@@ -640,17 +669,17 @@ _PRIVATE int get_march(char *march)
 /* objects per block                                  */
 /*----------------------------------------------------*/
 
-_PUBLIC int cache_create(const _BOOLEAN     have_cache_lock,  // Lock held on cache if TRUE
-                         const unsigned int            mmap,  // Memory mapping operation
-                         const char                   *name,  // Cache name
-                         int                       n_blocks,  // Number of blocks in cache
-                         unsigned long int             *crc,  // Cache (64 bit) CRC
-                         const unsigned int         c_index)  // Cache indentifier
+_PUBLIC int32_t cache_create(const _BOOLEAN  have_cache_lock,  // Lock held on cache if TRUE
+                             const uint32_t             mmap,  // Memory mapping operation
+                             const char                *name,  // Cache name
+                             int32_t                n_blocks,  // Number of blocks in cache
+                             uint64_t                   *crc,  // Cache (64 bit) CRC
+                             const uint32_t          c_index)  // Cache indentifier
 
-{   int i,
-        h_p_state = DEAD;
+{    int32_t i,
+             h_p_state      = DEAD;
 
-    unsigned long int current_offset = 0L;
+    uint64_t current_offset = 0L;
 
 
     /*----------------------------------*/
@@ -878,8 +907,8 @@ _PUBLIC int cache_create(const _BOOLEAN     have_cache_lock,  // Lock held on ca
        /* Allocate block tags */
        /*---------------------*/
 
-       if(cache[c_index].tag == (unsigned int *)NULL)
-          cache[c_index].tag = (unsigned int *)pups_calloc(n_blocks,sizeof(unsigned int));
+       if(cache[c_index].tag == (uint32_t *)NULL)
+          cache[c_index].tag = (uint32_t  *)pups_calloc(n_blocks,sizeof(uint32_t));
 
        for(i=0; i<n_blocks; ++i)
            cache[c_index].tag[i] = 0;
@@ -889,8 +918,8 @@ _PUBLIC int cache_create(const _BOOLEAN     have_cache_lock,  // Lock held on ca
        /* Allocate lifetime */
        /*-------------------*/
 
-       if(cache[c_index].lifetime == (int *)NULL)
-          cache[c_index].lifetime = (int *)pups_calloc(n_blocks,sizeof(int));
+       if(cache[c_index].lifetime == (uint64_t *)NULL)
+          cache[c_index].lifetime = (uint64_t  *)pups_calloc(n_blocks,sizeof(uint64_t));
 
        for(i=0; i<n_blocks; ++i)
            cache[c_index].lifetime[i] = BLOCK_IMMORTAL;
@@ -900,8 +929,8 @@ _PUBLIC int cache_create(const _BOOLEAN     have_cache_lock,  // Lock held on ca
        /* Allocate hubness */
        /*------------------*/
 
-       if(cache[c_index].hubness == (unsigned int *)NULL)
-          cache[c_index].hubness = (unsigned int *)pups_calloc(n_blocks,sizeof(unsigned int));
+       if(cache[c_index].hubness == (uint32_t *)NULL)
+          cache[c_index].hubness = (uint32_t  *)pups_calloc(n_blocks,sizeof(uint32_t ));
 
        for(i=0; i<n_blocks; ++i)
            cache[c_index].hubness[i] = 0;
@@ -911,8 +940,8 @@ _PUBLIC int cache_create(const _BOOLEAN     have_cache_lock,  // Lock held on ca
        /* Allocate binding */
        /*------------------*/
 
-       if(cache[c_index].binding == (unsigned int *)NULL)
-          cache[c_index].binding = (unsigned int *)pups_calloc(n_blocks,sizeof(unsigned int));
+       if(cache[c_index].binding == (uint32_t *)NULL)
+          cache[c_index].binding = (uint32_t  *)pups_calloc(n_blocks,sizeof(uint32_t));
 
        for(i=0; i<n_blocks; ++i)
            cache[c_index].binding[i] = 0;
@@ -930,7 +959,7 @@ _PUBLIC int cache_create(const _BOOLEAN     have_cache_lock,  // Lock held on ca
 
 
        /*-----------------------------------------*/
-       /* Get offsets into cache block (in bytes) */
+       /* Get offsets  into cache block (in bytes) */
        /*-----------------------------------------*/
        /*---------------------------------------*/
        /* Size of entire cache block (in bytes) */
@@ -1001,7 +1030,7 @@ _PUBLIC int cache_create(const _BOOLEAN     have_cache_lock,  // Lock held on ca
         /*---------------------------------------*/
 
         if(crc == (void *)NULL)
-           pups_error("[cache_create] failed to map cache into process address space");
+           pups_error("[cache_create] failed to map cache  into process address space");
 
 
         /*----------------------*/
@@ -1028,12 +1057,12 @@ _PUBLIC int cache_create(const _BOOLEAN     have_cache_lock,  // Lock held on ca
     /*-----------------------------------------*/
 
     for(i=0; i<cache[c_index].n_blocks; ++i)
-    {  int j;
+    {  uint32_t j;
 
        for(j=0; j<cache[c_index].n_objects; ++j)                                                          /*----------------------------*/
           cache[c_index].blockmap[i].object_ptr[j] = (void *)(cache[c_index].object_offset[j]          +  /* Object offset within block */
-                                                     (unsigned long int)i*cache[c_index].block_size    +  /* Block offset within cache  */
-                                                     (unsigned long int)cache[c_index].cache_ptr);        /* Base address of cache      */
+                                                     (uint64_t         )i*cache[c_index].block_size    +  /* Block offset within cache  */
+                                                     (uint64_t         )cache[c_index].cache_ptr);        /* Base address of cache      */
                                                                                                           /*----------------------------*/
     }
 
@@ -1053,7 +1082,7 @@ _PUBLIC int cache_create(const _BOOLEAN     have_cache_lock,  // Lock held on ca
 /* Sync cache */
 /*------------*/
 
-_PUBLIC int cache_msync(const _BOOLEAN have_cache_lock, const unsigned int c_index)
+_PUBLIC int32_t cache_msync(const _BOOLEAN have_cache_lock, const uint32_t c_index)
 
 {
     #ifdef PTHREAD_SUPPORT
@@ -1092,10 +1121,10 @@ _PUBLIC int cache_msync(const _BOOLEAN have_cache_lock, const unsigned int c_ind
 /* (i.e. homeostatic)                                   */
 /*------------------------------------------------------*/
 
-_PUBLIC int cache_live(const _BOOLEAN have_cache_lock, const unsigned int c_index)
+_PUBLIC int32_t cache_live(const _BOOLEAN have_cache_lock, const uint32_t c_index)
 
-{   int h_p_level_1,
-        h_p_level_2;
+{    int32_t h_p_level_1,
+             h_p_level_2;
 
 
     /*----------------------------------*/
@@ -1173,10 +1202,10 @@ _PUBLIC int cache_live(const _BOOLEAN have_cache_lock, const unsigned int c_inde
 /* (i.e. non homeostatic)                               */
 /*------------------------------------------------------*/
 
-_PUBLIC int cache_dead(const _BOOLEAN have_cache_lock, const unsigned int c_index)
+_PUBLIC int32_t cache_dead(const _BOOLEAN have_cache_lock, const uint32_t c_index)
 
-{   int h_p_level_1,
-        h_p_level_2;
+{    int32_t h_p_level_1,
+             h_p_level_2;
 
 
     /*----------------------------------*/
@@ -1253,9 +1282,9 @@ _PUBLIC int cache_dead(const _BOOLEAN have_cache_lock, const unsigned int c_inde
 /* Destroy cache (optionally deleting it) */
 /*----------------------------------------*/
 
-_PUBLIC int cache_destroy(const _BOOLEAN have_cache_lock, const _BOOLEAN delete_cache, const unsigned int c_index)
+_PUBLIC int32_t cache_destroy(const _BOOLEAN have_cache_lock, const _BOOLEAN delete_cache, const uint32_t c_index)
 
-{   int i; 
+{   uint32_t i; 
 
 
     /*----------------------------------*/
@@ -1306,7 +1335,7 @@ _PUBLIC int cache_destroy(const _BOOLEAN have_cache_lock, const _BOOLEAN delete_
        /* Release lock on (mapped) file */
        /*-------------------------------*/
 
-       (void)flock(cache[c_index].mmap_fd,LOCK_UN);
+       (void)lockf(cache[c_index].mmap_fd,F_ULOCK,0);
 
 
        /*----------------------------------*/
@@ -1382,9 +1411,9 @@ _PUBLIC int cache_destroy(const _BOOLEAN have_cache_lock, const _BOOLEAN delete_
     /* Free block tags */
     /*-----------------*/
 
-    if(cache[c_index].tag != (unsigned int *)NULL)
+    if(cache[c_index].tag != (uint32_t *)NULL)
     {  (void)pups_free((void *)cache[c_index].tag);
-       cache[c_index].tag = (unsigned int *)NULL;
+       cache[c_index].tag = (uint32_t  *)NULL;
     }
 
 
@@ -1392,9 +1421,9 @@ _PUBLIC int cache_destroy(const _BOOLEAN have_cache_lock, const _BOOLEAN delete_
     /* Free block lifetime */
     /*---------------------*/
 
-    if(cache[c_index].lifetime != (int *)NULL)
+    if(cache[c_index].lifetime != (int64_t *)NULL)
     {  (void)pups_free((void *)cache[c_index].lifetime);
-       cache[c_index].lifetime = (int *)NULL;
+       cache[c_index].lifetime = (uint64_t *)NULL;
     }
 
 
@@ -1402,9 +1431,9 @@ _PUBLIC int cache_destroy(const _BOOLEAN have_cache_lock, const _BOOLEAN delete_
     /* Free block hubness */
     /*--------------------*/
 
-    if(cache[c_index].hubness != (unsigned int *)NULL)
+    if(cache[c_index].hubness != (uint32_t *)NULL)
     {  (void)pups_free((void *)cache[c_index].hubness);
-       cache[c_index].hubness = (unsigned int *)NULL;
+       cache[c_index].hubness = (uint32_t  *)NULL;
     }
 
 
@@ -1412,9 +1441,9 @@ _PUBLIC int cache_destroy(const _BOOLEAN have_cache_lock, const _BOOLEAN delete_
     /* Free block binding */
     /*--------------------*/
 
-    if(cache[c_index].binding != (unsigned int *)NULL)
+    if(cache[c_index].binding != (uint32_t *)NULL)
     {  (void)pups_free((void *)cache[c_index].binding);
-       cache[c_index].binding = (unsigned int *)NULL;
+       cache[c_index].binding = (uint32_t  *)NULL;
     }
 
 
@@ -1445,7 +1474,7 @@ _PUBLIC int cache_destroy(const _BOOLEAN have_cache_lock, const _BOOLEAN delete_
 
 _PUBLIC void cache_exit(void)
 
-{   int i;
+{   uint32_t i;
 
 
     /*---------------------------------------*/
@@ -1468,9 +1497,9 @@ _PUBLIC void cache_exit(void)
 /* Print bytes in appropriate units */
 /*----------------------------------*/
 
-_PRIVATE int print_bytes(FILE             *stream,  // Status/logging stream
-                         const char         *text,  // Test to be printed
-                         const unsigned long size)  // Number of bytes for formatted print
+_PRIVATE  int32_t print_bytes(FILE           *stream,  // Status/logging stream
+                              const char       *text,  // Test to be printed
+                              const uint64_t    size)  // Number of bytes for formatted print
 
 {   char   eff_text[SSIZE] = "";
     double fsize;
@@ -1506,13 +1535,13 @@ _PRIVATE int print_bytes(FILE             *stream,  // Status/logging stream
 /* Display cache statistics */
 /*--------------------------*/
 
-_PUBLIC int cache_display_statistics(const _BOOLEAN   have_cache_lock,  // TRUE if lock held on cache
-                                     FILE                     *stream,  // Status/log stream 
-                                     const unsigned int       c_index)  // Cache index
+_PUBLIC  int32_t cache_display_statistics(const _BOOLEAN  have_cache_lock,  // TRUE if lock held on cache
+                                          FILE                    *stream,  // Status/log stream 
+                                          const uint32_t          c_index)  // Cache index
 
-{   int i,
-        used   = 0,
-        tagged = 0;
+{    int32_t i,
+             used   = 0,
+             tagged = 0;
 
     char blockstr[SSIZE] = "";
 
@@ -1555,7 +1584,7 @@ _PUBLIC int cache_display_statistics(const _BOOLEAN   have_cache_lock,  // TRUE 
     (void)fprintf(stream,"    %-32s:  %016lx\n",                                   "cache 64 bit CRC"             ,cache[c_index].crc);
     (void)fprintf(stream,"    %-32s:  \"%s\"\n",                                   "cache path"                   ,cache[c_index].path);
     (void)fprintf(stream,"    %-32s:  \"%s\"\n",                                   "cache name"                   ,cache[c_index].name);
-    (void)fprintf(stream,"    %-32s:  %016lx virtual\n",                           "cache located at"             ,(unsigned long int)cache[c_index].cache_ptr);
+    (void)fprintf(stream,"    %-32s:  %016lx virtual\n",                           "cache located at"             ,(uint64_t         )cache[c_index].cache_ptr);
     (void)fprintf(stream,"    %-32s:  %s\n",                                       "cache (machine) architecture" ,cache[c_index].march);
 
     if(strcmp(cache[c_index].auxinfo,"") == 0)
@@ -1619,7 +1648,7 @@ _PUBLIC int cache_display_statistics(const _BOOLEAN   have_cache_lock,  // TRUE 
     (void)fprintf(stream,"    ==============\n\n");
     (void)fflush(stream);
 
-    (void)fprintf(stream,"    %-32s:  %d blocks of %d objects (%d used)\n","cache format",cache[c_index].n_blocks,cache[c_index].n_objects,cache[c_index].u_blocks);
+    (void)fprintf    (stream,"    %-32s:  %d blocks of %d objects (%d used)\n","cache format",cache[c_index].n_blocks,cache[c_index].n_objects,cache[c_index].u_blocks);
     (void)print_bytes(stream,"cache size                      ",            cache[c_index].cache_size);
     (void)print_bytes(stream,"block size                      ",            cache[c_index].block_size);
 
@@ -1691,10 +1720,10 @@ _PUBLIC int cache_display_statistics(const _BOOLEAN   have_cache_lock,  // TRUE 
 /* Display cache table */
 /*---------------------*/
 
-_PUBLIC int cache_display(const _BOOLEAN have_cache_lock, const FILE *stream)
+_PUBLIC int32_t cache_display(const _BOOLEAN have_cache_lock, const FILE *stream)
 
-{   int i,
-        mapped_caches    = 0;
+{    int32_t i,
+             mapped_caches    = 0;
 
     char mapoptstr[SSIZE]  = ""; 
 
@@ -1825,7 +1854,7 @@ _PUBLIC int cache_display(const _BOOLEAN have_cache_lock, const FILE *stream)
                                                                                                                                          cache[i].n_blocks,
                                                                                                                                                      fsize,
                                                                                                                                                    unitstr,
-                                                                                                                     (unsigned long int)cache[i].cache_ptr,
+                                                                                                                              (uint64_t)cache[i].cache_ptr,
                                                                                                                                                  mapoptstr);
 
           /*---------------------------*/
@@ -1840,7 +1869,7 @@ _PUBLIC int cache_display(const _BOOLEAN have_cache_lock, const FILE *stream)
                                                                                                                                         cache[i].n_blocks,
                                                                                                                                       cache[i].cache_size,
                                                                                                                                                   unitstr,
-                                                                                                                    (unsigned long int)cache[i].cache_ptr,
+                                                                                                                             (uint64_t)cache[i].cache_ptr,
                                                                                                                                                 mapoptstr);
           (void)fflush(stream);
        }
@@ -1872,12 +1901,12 @@ _PUBLIC int cache_display(const _BOOLEAN have_cache_lock, const FILE *stream)
 /* Return size of object within block */
 /*------------------------------------*/
 
-_PUBLIC int cache_object_size(const _BOOLEAN     have_cache_lock,  // TRUE if lock held on cache
-                              const unsigned int     block_index,  // Block index (within cache) 
-                              const unsigned int    object_index,  // Object index (within block)
-                              const unsigned int         c_index)  // Cache index 
+_PUBLIC int32_t cache_object_size(const _BOOLEAN  have_cache_lock,  // TRUE if lock held on cache
+                                  const uint32_t      block_index,  // Block index (within cache) 
+                                  const uint32_t     object_index,  // Object index (within block)
+                                  const uint32_t          c_index)  // Cache index 
 
-{   unsigned long int object_size;
+{   uint64_t object_size;
 
 
     /*----------------------------------*/
@@ -1936,11 +1965,11 @@ _PUBLIC int cache_object_size(const _BOOLEAN     have_cache_lock,  // TRUE if lo
 /* Return (read only) pointer to object within block */
 /*---------------------------------------------------*/
 
-_PUBLIC const void *cache_access_object(const unsigned int cache_lock_state,  // State of cache lock
-                                        const unsigned int block_locktype,    // Type of lock on accessed object (RDLOCK or WRLOCK)
-                                        const unsigned int block_index,       // Block index of access object 
-                                        const unsigned int object_index,      // Object index of accessed object
-                                        const unsigned int c_index)           // Cache index of accessed object
+_PUBLIC const void *cache_access_object(const uint32_t  cache_lock_state,  // State of cache lock
+                                        const uint32_t  block_locktype,    // Type of lock on accessed object (RDLOCK or WRLOCK)
+                                        const uint32_t  block_index,       // Block index of access object 
+                                        const uint32_t  object_index,      // Object index of accessed object
+                                        const uint32_t  c_index)           // Cache index of accessed object
 
 {   void *object_ptr = (void *)NULL;
 
@@ -2014,7 +2043,7 @@ _PUBLIC const void *cache_access_object(const unsigned int cache_lock_state,  //
 
 
     #ifdef CACHELIB_DEBUG
-    (void)fprintf(stderr,"PTR %016lx CBLOCK %04d OBJECT %04d\n",(unsigned long int)object_ptr,block_index,object_index);
+    (void)fprintf(stderr,"PTR %016lx CBLOCK %04d OBJECT %04d\n",(uint64_t)object_ptr,block_index,object_index);
     (void)fflush(stderr);
     #endif /* CACHELIB_DEBUG */
 
@@ -2029,13 +2058,13 @@ _PUBLIC const void *cache_access_object(const unsigned int cache_lock_state,  //
 /* Map 2D array to object */
 /*------------------------*/
 
-_PUBLIC void **cache_map_2D_array(const void         *object_ptr,  // Pointer to cached object
-                                  const unsigned int        rows,  // Number of rows in (2D) object matrix
-                                  const unsigned int        cols,  // Number of cols in (2D) object matrix
-                                  const unsigned long   int size)  // Size of object
+_PUBLIC void **cache_map_2D_array(const void      *object_ptr,  // Pointer to cached object
+                                  const uint32_t         rows,  // Number of rows in (2D) object matrix
+                                  const uint32_t         cols,  // Number of cols in (2D) object matrix
+                                  const uint64_t         size)  // Size of object
 
-{   int  i;
-    void **array_ptr = (void **)NULL;
+{    int32_t  i;
+    void      **array_ptr = (void **)NULL;
 
 
     /*----------------------------------*/
@@ -2044,7 +2073,7 @@ _PUBLIC void **cache_map_2D_array(const void         *object_ptr,  // Pointer to
     /*----------------------------------*/
 
     if(pupsthread_is_root_thread() == FALSE)
-       error("[cache_map_2D_array] attempt by non root thread to perform PUPS/P3 memory mapped cache operation");
+       pups_error("[cache_map_2D_array] attempt by non root thread to perform PUPS/P3 memory mapped cache operation");
 
 
     /*--------------*/
@@ -2057,7 +2086,7 @@ _PUBLIC void **cache_map_2D_array(const void         *object_ptr,  // Pointer to
     array_ptr = (void **)pups_calloc(rows,sizeof(void *));
 
     for(i=0; i<rows; ++i)
-       array_ptr[i] = (void *)((unsigned long int)object_ptr + (unsigned long int)(i*cols)*size);
+       array_ptr[i] = (void *)((uint64_t)object_ptr + (uint64_t)(i*cols)*size);
 
     pups_set_errno(OK);
     return(array_ptr);
@@ -2069,12 +2098,12 @@ _PUBLIC void **cache_map_2D_array(const void         *object_ptr,  // Pointer to
 /* Write contents of cache to file */
 /*---------------------------------*/
 
-_PUBLIC int cache_write(const int                         fd,  // File descriptor to write to
-                        const _BOOLEAN       have_cache_lock,  // If TRUE lock held on cache
-                        const unsigned int           c_index)  // Index of cache to be written
+_PUBLIC int32_t cache_write(const des_t                  fd,  // File descriptor to write to
+                            const _BOOLEAN  have_cache_lock,  // If TRUE lock held on cache
+                            const uint32_t          c_index)  // Index of cache to be written
 
-{   int  eff_fd;
-    char eff_wcache_file_name[SSIZE] = "";
+{   des_t eff_fd;
+    char  eff_wcache_file_name[SSIZE] = "";
 
 
     /*----------------------------------*/
@@ -2149,11 +2178,11 @@ _PUBLIC int cache_write(const int                         fd,  // File descripto
 /* Get the size of a cached object */
 /*---------------------------------*/
 
-_PUBLIC long int cache_get_object_size(const _BOOLEAN     have_cache_lock,  // If TRUE lock held on cache
-                                       const unsigned int         c_index,  // Cache index
-                                       const unsigned int         o_index)  // Object for which size is required
+_PUBLIC int64_t  cache_get_object_size(const _BOOLEAN   have_cache_lock,  // If TRUE lock held on cache
+                                       const uint32_t           c_index,  // Cache index
+                                       const uint32_t           o_index)  // Object for which size is required
 
-{   long int size;
+{    int64_t  size;
 
 
     /*--------------*/
@@ -2180,7 +2209,7 @@ _PUBLIC long int cache_get_object_size(const _BOOLEAN     have_cache_lock,  // I
        pups_error(errstr);
     }
     else
-       size = (long int)cache[c_index].object_size[o_index];
+       size = (int64_t )cache[c_index].object_size[o_index];
 
     #ifdef PTHREAD_SUPPORT
     if(have_cache_lock == FALSE)
@@ -2198,10 +2227,10 @@ _PUBLIC long int cache_get_object_size(const _BOOLEAN     have_cache_lock,  // I
 /* Get the size of a cache block */
 /*-------------------------------*/
 
-_PUBLIC long int cache_get_block_size(const _BOOLEAN have_cache_lock, const unsigned int c_index)
+_PUBLIC int64_t  cache_get_block_size(const _BOOLEAN have_cache_lock, const uint32_t  c_index)
 
-{   int      i;
-    long int size = 0L;
+{    int32_t  i;
+     int64_t  size = 0L;
 
 
     /*--------------*/
@@ -2219,7 +2248,7 @@ _PUBLIC long int cache_get_block_size(const _BOOLEAN have_cache_lock, const unsi
     #endif /* PTHREAD_SUPPORT */ 
 
     for(i=0; i<cache[c_index].n_objects; ++i)
-       size += (long int)cache[c_index].object_size[i];
+       size += (int64_t )cache[c_index].object_size[i];
 
     #ifdef PTHREAD_SUPPORT
     if(have_cache_lock == FALSE)
@@ -2245,7 +2274,7 @@ _PRIVATE taglist_type taglist[MAX_TAGLIST_SIZE];
 
 _PRIVATE void taglist_init(void)
 
-{   unsigned int i;
+{   uint32_t i;
 
     for(i=0; i<MAX_TAGLIST_SIZE; ++i)
     {  taglist[i].tag           = (-1);
@@ -2258,9 +2287,9 @@ _PRIVATE void taglist_init(void)
 /* Add entry to taglist */
 /*----------------------*/
 
-_PRIVATE int update_taglist(const int tag)
+_PRIVATE  int32_t update_taglist(const int32_t tag)
 
-{   unsigned int i;
+{   uint32_t i;
 
     for(i=0; i<MAX_TAGLIST_SIZE; ++i)
     {  
@@ -2304,11 +2333,11 @@ _PRIVATE int update_taglist(const int tag)
 /* Get statistics for all tags in specified cache */
 /*------------------------------------------------*/
 
-_PUBLIC int cache_show_blocktag_stats(const _BOOLEAN have_cache_lock, FILE *stream, const int c_index)
+_PUBLIC int32_t cache_show_blocktag_stats(const _BOOLEAN have_cache_lock, FILE *stream, const int32_t c_index)
 
-{   unsigned int i,
-                 tags          = 0,
-                 tagged_blocks = 0;
+{   uint32_t i,
+             tags          = 0,
+             tagged_blocks = 0;
 
 
     /*---------------*/
@@ -2392,9 +2421,9 @@ _PUBLIC int cache_show_blocktag_stats(const _BOOLEAN have_cache_lock, FILE *stre
 /* Get number of blocks in cache */
 /*-------------------------------*/
 
-_PUBLIC long int cache_get_blocks(const _BOOLEAN have_cache_lock, const unsigned int c_index)
+_PUBLIC int32_t cache_get_blocks(const _BOOLEAN have_cache_lock, const uint32_t c_index)
 
-{   int cache_blocks;
+{    int32_t cache_blocks;
 
 
     /*--------------*/
@@ -2429,9 +2458,9 @@ _PUBLIC long int cache_get_blocks(const _BOOLEAN have_cache_lock, const unsigned
 /* Get number of objects per block in cache */
 /*------------------------------------------*/
 
-_PUBLIC long int cache_get_objects(const _BOOLEAN have_cache_lock, const unsigned int c_index)
+_PUBLIC int32_t cache_get_objects(const _BOOLEAN have_cache_lock, const uint32_t c_index)
 
-{   int block_objects;
+{    int32_t block_objects;
 
 
     /*--------------*/
@@ -2466,9 +2495,9 @@ _PUBLIC long int cache_get_objects(const _BOOLEAN have_cache_lock, const unsigne
 /* Get cache path */
 /*----------------*/
 
-_PUBLIC int cache_index2path(const _BOOLEAN     have_cache_lock,  // If TRUE lock held on cache
-                             char                   *cache_path,  // Path to cache
-                             const unsigned int         c_index)  // Index of cache
+_PUBLIC int32_t cache_index2path(const _BOOLEAN  have_cache_lock,  // If TRUE lock held on cache
+                                 char                *cache_path,  // Path to cache
+                                 const uint32_t          c_index)  // Index of cache
 
 {
 
@@ -2507,9 +2536,9 @@ _PUBLIC int cache_index2path(const _BOOLEAN     have_cache_lock,  // If TRUE loc
 /* Get cache name */
 /*----------------*/
 
-_PUBLIC int cache_index2name(const _BOOLEAN     have_cache_lock,  // If TRUE lock held on cache
-                             char                   *cache_name,  // Name of cache
-                             const unsigned int         c_index)  // Index of cache
+_PUBLIC int32_t cache_index2name(const _BOOLEAN  have_cache_lock,  // If TRUE lock held on cache
+                                 char                *cache_name,  // Name of cache
+                                 const uint32_t          c_index)  // Index of cache
 
 {
 
@@ -2548,9 +2577,9 @@ _PUBLIC int cache_index2name(const _BOOLEAN     have_cache_lock,  // If TRUE loc
 /* Get mapinfo file name */
 /*-----------------------*/
 
-_PUBLIC int cache_get_mapinfo_name(const _BOOLEAN         have_cache_lock,  // If TRUE lock held on cache
-                                   char               *cache_mapinfo_name,  // Name of cache mapping information file
-                                   const unsigned int             c_index)  // Index of cache
+_PUBLIC int32_t cache_get_mapinfo_name(const _BOOLEAN      have_cache_lock,  // If TRUE lock held on cache
+                                       char            *cache_mapinfo_name,  // Name of cache mapping information file
+                                       const uint32_t              c_index)  // Index of cache
 
 {
 
@@ -2589,9 +2618,9 @@ _PUBLIC int cache_get_mapinfo_name(const _BOOLEAN         have_cache_lock,  // I
 /* Get map file name */
 /*-------------------*/
 
-_PUBLIC int cache_get_mmap_name(const _BOOLEAN      have_cache_lock,  // If TRUE lock held on cache
-                                char               *cache_mmap_name,  // Name of cache mapping file
-                                const unsigned int          c_index)  // Index of cache
+_PUBLIC int32_t cache_get_mmap_name(const _BOOLEAN    have_cache_lock,  // If TRUE lock held on cache
+                                    char             *cache_mmap_name,  // Name of cache mapping file
+                                    const uint32_t            c_index)  // Index of cache
 
 {
 
@@ -2631,7 +2660,7 @@ _PUBLIC int cache_get_mmap_name(const _BOOLEAN      have_cache_lock,  // If TRUE
 /* Is cache memory mapped? */
 /*-------------------------*/
 
-_PUBLIC _BOOLEAN cache_is_mapped(const _BOOLEAN have_cache_lock, const unsigned int c_index)
+_PUBLIC _BOOLEAN cache_is_mapped(const _BOOLEAN have_cache_lock, const uint32_t c_index)
 
 {   _BOOLEAN mapped;
 
@@ -2668,7 +2697,7 @@ _PUBLIC _BOOLEAN cache_is_mapped(const _BOOLEAN have_cache_lock, const unsigned 
 /* Is cache mapped at specified location (in file system)? */
 /*---------------------------------------------------------*/
 
-_PUBLIC _BOOLEAN cache_is_mapped_at(const _BOOLEAN have_cache_lock, const char *cache_pathname, const unsigned int c_index)
+_PUBLIC _BOOLEAN cache_is_mapped_at(const _BOOLEAN have_cache_lock, const char *cache_pathname, const uint32_t c_index)
 
 {   _BOOLEAN mapped = FALSE;
 
@@ -2706,10 +2735,10 @@ _PUBLIC _BOOLEAN cache_is_mapped_at(const _BOOLEAN have_cache_lock, const char *
 /* Is cache (already) loaded? */
 /*----------------------------*/
 
-_PUBLIC _BOOLEAN cache_already_loaded(const _BOOLEAN have_cache_lock, const char *cache_name, const unsigned int c_index, unsigned int *c_l_index)
+_PUBLIC _BOOLEAN cache_already_loaded(const _BOOLEAN have_cache_lock, const char *cache_name, const uint32_t c_index, uint32_t *c_l_index)
 
-{   unsigned int i;
-    _BOOLEAN     ret = FALSE;
+{   uint32_t  i;
+    _BOOLEAN  ret = FALSE;
 
 
     /*---------------*/
@@ -2740,7 +2769,7 @@ _PUBLIC _BOOLEAN cache_already_loaded(const _BOOLEAN have_cache_lock, const char
     {  if(strcmp(cache[i].name,cache_name) == 0)
        {  ret = TRUE;
 
-          if(c_l_index != (unsigned int *)NULL)
+          if(c_l_index != (uint32_t *)NULL)
              *c_l_index = i;
 
           pups_set_errno(EINVAL);
@@ -2763,7 +2792,7 @@ _PUBLIC _BOOLEAN cache_already_loaded(const _BOOLEAN have_cache_lock, const char
 /* Is cache allocated? */
 /*---------------------*/
 
-_PUBLIC void *cache_is_allocated(const _BOOLEAN have_cache_lock, const unsigned int c_index)
+_PUBLIC void *cache_is_allocated(const _BOOLEAN have_cache_lock, const uint32_t c_index)
 
 {   void *cache_ptr = (void *)NULL;
 
@@ -2800,15 +2829,16 @@ _PUBLIC void *cache_is_allocated(const _BOOLEAN have_cache_lock, const unsigned 
 /* Write cache mapping information */
 /*---------------------------------*/
 
-_PUBLIC unsigned long int cache_write_mapinfo(const _BOOLEAN     try_homeostatic_protection,  // Try homeostatic mapfile protection if TRUE
-                                              const _BOOLEAN                have_cache_lock,  // If TRUE lock held on cache
-                                              const char                          *map_name,  // Name of file containing cache mapping info
-                                              const unsigned int                       mmap,  // Memroy mapping flags
-                                              const unsigned int                    c_index)  // Index of cached to be mapped
+_PUBLIC uint64_t cache_write_mapinfo(const _BOOLEAN     try_homeostatic_protection,  // Try homeostatic mapfile protection if TRUE
+                                     const _BOOLEAN                have_cache_lock,  // If TRUE lock held on cache
+                                     const char                          *map_name,  // Name of file containing cache mapping info
+                                     const uint32_t                          mmap,   // Memroy mapping flags
+                                     const uint32_t                       c_index)   // Index of cached to be mapped
 
-{   int i,
-        h_p_state                = DEAD,
-        fd                       = (-1);
+{    int32_t i,
+             h_p_state           = DEAD;
+
+    des_t fd                     = (-1);
 
     char map_path[SSIZE]         = "",
          map_pathname[SSIZE]     = "",
@@ -2957,7 +2987,7 @@ _PUBLIC unsigned long int cache_write_mapinfo(const _BOOLEAN     try_homeostatic
 
     // Cache CRC
     cache[c_index].crc = pups_crc_64(cache[c_index].cache_size,cache[c_index].cache_ptr);
-    if(pups_write(fd,(void *)&cache[c_index].crc,sizeof(unsigned long int)) == (-1))
+    if(pups_write(fd,(void *)&cache[c_index].crc,sizeof(uint64_t)) == (-1))
     {  (void)pups_close(fd);
        goto error_exit;
     }
@@ -3000,43 +3030,43 @@ _PUBLIC unsigned long int cache_write_mapinfo(const _BOOLEAN     try_homeostatic
 
 
     // Memory mapping flags  
-    if(pups_write(fd,(void *)&cache[c_index].mmap,sizeof(unsigned int)) == (-1))
+    if(pups_write(fd,(void *)&cache[c_index].mmap,sizeof(uint32_t)) == (-1))
     {  (void)pups_close(fd);
        goto error_exit;
     }
 
     // Number of used blocks in cache
-    if(pups_write(fd,(void *)&cache[c_index].u_blocks,sizeof(int)) == (-1))
+    if(pups_write(fd,(void *)&cache[c_index].u_blocks,sizeof(int32_t)) == (-1))
     {  (void)pups_close(fd);
        goto error_exit;
     }
  
     // Number of blocks in cache
-    if(pups_write(fd,(void *)&cache[c_index].n_blocks,sizeof(int)) == (-1))
+    if(pups_write(fd,(void *)&cache[c_index].n_blocks,sizeof(int32_t)) == (-1))
     {  (void)pups_close(fd);
        goto error_exit;
     }
 
     // Number of objects per block
-    if(pups_write(fd,(void *)&cache[c_index].n_objects,sizeof(int)) == (-1))
+    if(pups_write(fd,(void *)&cache[c_index].n_objects,sizeof(int32_t)) == (-1))
     {  (void)pups_close(fd);
        goto error_exit;
     }
 
     // Cache size (bytes)
-    if(pups_write(fd,(void *)&cache[c_index].cache_size,sizeof(unsigned long int)) == (-1))
+    if(pups_write(fd,(void *)&cache[c_index].cache_size,sizeof(uint64_t)) == (-1))
     {  (void)pups_close(fd);
        goto error_exit;
     }
 
     // Block size (bytes)
-    if(pups_write(fd,(void *)&cache[c_index].block_size,sizeof(unsigned long int)) == (-1))
+    if(pups_write(fd,(void *)&cache[c_index].block_size,sizeof(uint64_t)) == (-1))
     {  (void)pups_close(fd);
        goto error_exit;
     }
 
-    // Co-ordination lsit size
-    if(pups_write(fd,(void *)&cache[c_index].colsize,sizeof(unsigned int)) == (-1))
+    // Co-ordination list size
+    if(pups_write(fd,(void *)&cache[c_index].colsize,sizeof(uint32_t)) == (-1))
     {  (void)pups_close(fd);
        goto error_exit;
     }
@@ -3051,7 +3081,7 @@ _PUBLIC unsigned long int cache_write_mapinfo(const _BOOLEAN     try_homeostatic
 
     // Write offsets of objects in cache blocks (bytes)
     for(i=0; i<cache[c_index].n_objects; ++i)
-    {   if(pups_write(fd,(void *)&cache[c_index].object_offset[i],sizeof(unsigned long int)) == (-1))
+    {   if(pups_write(fd,(void *)&cache[c_index].object_offset[i],sizeof(uint64_t)) == (-1))
         {  (void)pups_close(fd);
            goto error_exit;
         }
@@ -3059,7 +3089,7 @@ _PUBLIC unsigned long int cache_write_mapinfo(const _BOOLEAN     try_homeostatic
  
     // Write sizes of objects in cache blocks (bytes)
     for(i=0; i<cache[c_index].n_objects; ++i) 
-    {   if(pups_write(fd,(void *)&cache[c_index].object_size[i],sizeof(unsigned long int)) == (-1))
+    {   if(pups_write(fd,(void *)&cache[c_index].object_size[i],sizeof(uint64_t)) == (-1))
         {  (void)pups_close(fd);
            goto error_exit;
         }
@@ -3075,7 +3105,7 @@ _PUBLIC unsigned long int cache_write_mapinfo(const _BOOLEAN     try_homeostatic
 
     // Write cache tags
     for(i=0; i<cache[c_index].n_blocks; ++i)
-    {   if(pups_write(fd,(void *)&cache[c_index].tag[i],sizeof(unsigned int)) == (-1))
+    {   if(pups_write(fd,(void *)&cache[c_index].tag[i],sizeof(uint32_t)) == (-1))
         {  (void)pups_close(fd);
            goto error_exit;
         }
@@ -3083,7 +3113,7 @@ _PUBLIC unsigned long int cache_write_mapinfo(const _BOOLEAN     try_homeostatic
 
     // Write cache lifetimes 
     for(i=0; i<cache[c_index].n_blocks; ++i)
-    {   if(pups_write(fd,(void *)&cache[c_index].lifetime[i],sizeof(int)) == (-1))
+    {   if(pups_write(fd,(void *)&cache[c_index].lifetime[i],sizeof(int32_t)) == (-1))
         {  (void)pups_close(fd);
            goto error_exit;
         }
@@ -3091,7 +3121,7 @@ _PUBLIC unsigned long int cache_write_mapinfo(const _BOOLEAN     try_homeostatic
 
     // Write cache hubnesses 
     for(i=0; i<cache[c_index].n_blocks; ++i)
-    {   if(pups_write(fd,(void *)&cache[c_index].hubness[i],sizeof(unsigned int)) == (-1))
+    {   if(pups_write(fd,(void *)&cache[c_index].hubness[i],sizeof(uint32_t   )) == (-1))
         {  (void)pups_close(fd);
            goto error_exit;
         }
@@ -3099,7 +3129,7 @@ _PUBLIC unsigned long int cache_write_mapinfo(const _BOOLEAN     try_homeostatic
 
     // Write cache binding
     for(i=0; i<cache[c_index].n_blocks; ++i)
-    {   if(pups_write(fd,(void *)&cache[c_index].binding[i],sizeof(unsigned int)) == (-1))
+    {   if(pups_write(fd,(void *)&cache[c_index].binding[i],sizeof(uint32_t)) == (-1))
         {  (void)pups_close(fd);
            goto error_exit;
         }
@@ -3128,20 +3158,20 @@ error_exit:
 
 
 /*----------------------------------*/
-/* Compress cache and map file into */
+/* Compress cache and map file  int32_to */
 /* tar/xz archive                   */
 /*----------------------------------*/
 
-_PUBLIC int cache_archive(const _BOOLEAN    compress,  // Compress archive file if TRUE
-                          const _BOOLEAN      delete,  // Delete .mmc and .map files when archived
-                          const char     *cache_name)  // Basename of ,mmc and .map file to archive
+_PUBLIC int32_t cache_archive(const _BOOLEAN    compress,  // Compress archive file if TRUE
+                              const _BOOLEAN      delete,  // Delete .mmc and .map files when archived
+                              const char     *cache_name)  // Basename of ,mmc and .map file to archive
 
-{   int ret;
+{   int32_t ret;
 
-    char tar_cmd[SSIZE]   = "",
-         basename[SSIZE]  = "",
-         mapname[SSIZE]   = "",
-         cachename[SSIZE] = "";
+    char    tar_cmd[SSIZE]   = "",
+            basename[SSIZE]  = "",
+            mapname[SSIZE]   = "",
+            cachename[SSIZE] = "";
 
 
     /*--------------*/
@@ -3214,13 +3244,13 @@ _PUBLIC int cache_archive(const _BOOLEAN    compress,  // Compress archive file 
 /* Uncompress cache archive */
 /*--------------------------*/
 
-_PUBLIC int cache_extract(const char *cache_archive)
+_PUBLIC int32_t cache_extract(const char *cache_archive)
 
-{   int ret;
+{   int32_t ret;
 
-    char tar_cmd[SSIZE]           = "",
-         basename[SSIZE]          = "",
-         eff_cache_archive[SSIZE] = "";
+    char    tar_cmd[SSIZE]           = "",
+            basename[SSIZE]          = "",
+            eff_cache_archive[SSIZE] = "";
 
 
     /*--------------*/
@@ -3317,15 +3347,16 @@ _PUBLIC int cache_extract(const char *cache_archive)
 /* Read cache mapping information */
 /*--------------------------------*/
 
-_PUBLIC unsigned long int cache_read_mapinfo(const _BOOLEAN     try_homeostatic_protection,  // If TRUE enable homeostatic protection for map file
-                                             const _BOOLEAN                have_cache_lock,  // If TRUE lock held on cache
-                                             const char                          *map_name,  // Name of cache map info file
-                                             const unsigned int                       mmap,  // Memory mapping flags
-                                             const unsigned int                    c_index)  // Cache index (to map cache into)
+_PUBLIC uint64_t  cache_read_mapinfo(const _BOOLEAN     try_homeostatic_protection,  // If TRUE enable homeostatic protection for map file
+                                     const _BOOLEAN                have_cache_lock,  // If TRUE lock held on cache
+                                     const char                          *map_name,  // Name of cache map info file
+                                     const uint32_t                          mmap,   // Memory mapping flags
+                                     const uint32_t                       c_index)   // Cache index (to map cache  int32_to)
 
-{   int i,
-        h_p_state            = DEAD,
-        fd                   = (-1);
+{    int32_t i,
+             h_p_state       = DEAD;
+
+    des_t fd                 = (-1);
 
     char map_path[SSIZE]     = "",
          map_pathname[SSIZE] = "",
@@ -3453,7 +3484,7 @@ _PUBLIC unsigned long int cache_read_mapinfo(const _BOOLEAN     try_homeostatic_
 
 
     // Cache CRC
-    if(pups_read(fd,(void *)&cache[c_index].crc,sizeof(unsigned long int)) == (-1))
+    if(pups_read(fd,(void *)&cache[c_index].crc,sizeof(uint64_t)) == (-1))
     {  (void)pups_close(fd);
        goto error_exit;
     }
@@ -3495,43 +3526,43 @@ _PUBLIC unsigned long int cache_read_mapinfo(const _BOOLEAN     try_homeostatic_
     }
 
     // Cache mapping flags
-    if(pups_read(fd,(void *)&cache[c_index].mmap,sizeof(unsigned int)) == (-1))
+    if(pups_read(fd,(void *)&cache[c_index].mmap,sizeof(uint32_t)) == (-1))
     {  (void)pups_close(fd);
        goto error_exit;
     }
 
     // Number of used blocks in cache
-    if(pups_read(fd,(void *)&cache[c_index].u_blocks,sizeof(int)) == (-1))
+    if(pups_read(fd,(void *)&cache[c_index].u_blocks,sizeof(int32_t)) == (-1))
     {  (void)pups_close(fd);
        goto error_exit;
     }
 
     // Number of blocks in cache
-    if(pups_read(fd,(void *)&cache[c_index].n_blocks,sizeof(int)) == (-1))
+    if(pups_read(fd,(void *)&cache[c_index].n_blocks,sizeof(int32_t)) == (-1))
     {  (void)pups_close(fd);
        goto error_exit;
     }
 
     // Number of objects per block
-    if(pups_read(fd,(void *)&cache[c_index].n_objects,sizeof(int)) == (-1))
+    if(pups_read(fd,(void *)&cache[c_index].n_objects,sizeof(int32_t)) == (-1))
     {  (void)pups_close(fd);
        goto error_exit;
     }
 
     // Size of cache (bytes)
-    if(pups_read(fd,(void *)&cache[c_index].cache_size,sizeof(unsigned long int)) == (-1))
+    if(pups_read(fd,(void *)&cache[c_index].cache_size,sizeof(uint64_t)) == (-1))
     {  (void)pups_close(fd);
        goto error_exit;
     }
 
     // Size of cache block (bytes)
-    if(pups_read(fd,(void *)&cache[c_index].block_size,sizeof(unsigned long int)) == (-1))
+    if(pups_read(fd,(void *)&cache[c_index].block_size,sizeof(uint64_t)) == (-1))
     {  (void)pups_close(fd);
        goto error_exit;
     }
 
     // Co-ordination list size 
-    if(pups_read(fd,(void *)&cache[c_index].colsize,sizeof(unsigned int)) == (-1))
+    if(pups_read(fd,(void *)&cache[c_index].colsize,sizeof(uint32_t)) == (-1))
     {  (void)pups_close(fd);
        goto error_exit;
     }
@@ -3546,7 +3577,7 @@ _PUBLIC unsigned long int cache_read_mapinfo(const _BOOLEAN     try_homeostatic_
 
     // Read offsets of objects in cache blocks (bytes)
     for(i=0; i<cache[c_index].n_objects; ++i)
-    {   if(pups_read(fd,(void *)&cache[c_index].object_offset[i],sizeof(unsigned long int)) == (-1))
+    {   if(pups_read(fd,(void *)&cache[c_index].object_offset[i],sizeof(uint64_t)) == (-1))
         {  (void)pups_close(fd);
            goto error_exit;
         }
@@ -3554,7 +3585,7 @@ _PUBLIC unsigned long int cache_read_mapinfo(const _BOOLEAN     try_homeostatic_
 
     // Read sizes of objects in cache blocks (bytes)
     for(i=0; i<cache[c_index].n_objects; ++i)
-    {   if(pups_read(fd,(void *)&cache[c_index].object_size[i],sizeof(unsigned long int)) == (-1))
+    {   if(pups_read(fd,(void *)&cache[c_index].object_size[i],sizeof(uint64_t)) == (-1))
         {  (void)pups_close(fd);
            goto error_exit;
         }
@@ -3573,48 +3604,48 @@ _PUBLIC unsigned long int cache_read_mapinfo(const _BOOLEAN     try_homeostatic_
     }
 
     // Allocate space for cache block tags
-    if(cache[c_index].tag == (unsigned int *)NULL)
-       cache[c_index].tag = (unsigned int *)pups_calloc(cache[c_index].n_blocks,sizeof(unsigned int));
+    if(cache[c_index].tag == (uint32_t *)NULL)
+       cache[c_index].tag = (uint32_t  *)pups_calloc(cache[c_index].n_blocks,sizeof(uint32_t));
 
     // Read cache block tags
     for(i=0; i<cache[c_index].n_blocks; ++i)
-    {   if(pups_read(fd,(void *)&cache[c_index].tag[i],sizeof(int)) == (-1))
+    {   if(pups_read(fd,(void *)&cache[c_index].tag[i],sizeof(int32_t)) == (-1))
         {  (void)pups_close(fd);
            goto error_exit;
         }
     }
 
     // Allocate space for cache block lifetimes
-    if(cache[c_index].lifetime == (int *)NULL)
-       cache[c_index].lifetime = (int *)pups_calloc(cache[c_index].n_blocks,sizeof(int));
+    if(cache[c_index].lifetime == (uint64_t *)NULL)
+       cache[c_index].lifetime = (uint64_t  *)pups_calloc(cache[c_index].n_blocks,sizeof(uint64_t));
 
     // Read cache block lifetimes 
     for(i=0; i<cache[c_index].n_blocks; ++i)
-    {   if(pups_read(fd,(void *)&cache[c_index].lifetime[i],sizeof(int)) == (-1))
+    {   if(pups_read(fd,(void *)&cache[c_index].lifetime[i],sizeof(int64_t)) == (-1))
         {  (void)pups_close(fd);
            goto error_exit;
         }
     }
 
     // Allocate space for cache block hubnesses 
-    if(cache[c_index].hubness == (unsigned int *)NULL)
-       cache[c_index].hubness = (unsigned int *)pups_calloc(cache[c_index].n_blocks,sizeof(unsigned int));
+    if(cache[c_index].hubness == (uint32_t *)NULL)
+       cache[c_index].hubness = (uint32_t  *)pups_calloc(cache[c_index].n_blocks,sizeof(uint32_t));
 
     // Read cache block hubnesses 
     for(i=0; i<cache[c_index].n_blocks; ++i)
-    {   if(pups_read(fd,(void *)&cache[c_index].hubness[i],sizeof(unsigned int)) == (-1))
+    {   if(pups_read(fd,(void *)&cache[c_index].hubness[i],sizeof(uint32_t   )) == (-1))
         {  (void)pups_close(fd);
            goto error_exit;
         }
     }
 
     // Allocate space for cache block binding 
-    if(cache[c_index].binding == (unsigned int *)NULL)
-       cache[c_index].binding = (unsigned int *)pups_calloc(cache[c_index].n_blocks,sizeof(unsigned int));
+    if(cache[c_index].binding == (uint32_t *)NULL)
+       cache[c_index].binding = (uint32_t  *)pups_calloc(cache[c_index].n_blocks,sizeof(uint32_t));
 
     // Read cache block bindings 
     for(i=0; i<cache[c_index].n_blocks; ++i)
-    {   if(pups_read(fd,(void *)&cache[c_index].binding[i],sizeof(unsigned int)) == (-1))
+    {   if(pups_read(fd,(void *)&cache[c_index].binding[i],sizeof(uint32_t)) == (-1))
         {  (void)pups_close(fd);
            goto error_exit;
         }
@@ -3661,10 +3692,10 @@ error_exit:
 /* Reset all block (read/write) locks in cache */
 /*---------------------------------------------*/
 
-_PUBLIC int cache_reset_blocklocks(const _BOOLEAN have_cache_lock,  // TRUE if lock held on specified cache 
-                                   const unsigned int     c_index)  // Cache index
+_PUBLIC int32_t cache_reset_blocklocks(const _BOOLEAN have_cache_lock,  // TRUE if lock held on specified cache 
+                                       const uint32_t         c_index)  // Cache index
 
-{   unsigned int i;
+{   uint32_t i;
 
 
     /*--------------*/
@@ -3705,9 +3736,9 @@ _PUBLIC int cache_reset_blocklocks(const _BOOLEAN have_cache_lock,  // TRUE if l
 /* Get number of used blocks in cache */
 /*------------------------------------*/
 
-_PUBLIC int cache_blocks_used(const _BOOLEAN have_cache_lock, const unsigned int c_index)
+_PUBLIC int32_t cache_blocks_used(const _BOOLEAN have_cache_lock, const uint32_t c_index)
 
-{   int blocks_used = 0;
+{    int32_t blocks_used = 0;
 
 
     /*---------------*/
@@ -3741,7 +3772,7 @@ _PUBLIC int cache_blocks_used(const _BOOLEAN have_cache_lock, const unsigned int
 /* Reset number of used blocks in cache */
 /*--------------------------------------*/
 
-_PUBLIC int cache_blocks_reset_used(const _BOOLEAN have_cache_lock, const unsigned int c_index)
+_PUBLIC int32_t cache_blocks_reset_used(const _BOOLEAN have_cache_lock, const uint32_t c_index)
 
 {
 
@@ -3776,10 +3807,10 @@ _PUBLIC int cache_blocks_reset_used(const _BOOLEAN have_cache_lock, const unsign
 /* Lock block */
 /*------------*/
 
-_PUBLIC int cache_lock_block(const unsigned int cache_lock_state, // If TRUE lock held on cache
-                             const unsigned int block_locktype,   // Type of lock (RDLOCK or WRLOCK)
-                             const unsigned int c_index,          // Cache index 
-                             const unsigned int block_index)      // Block index of block locked 
+_PUBLIC int32_t cache_lock_block(const uint32_t  cache_lock_state, // If TRUE lock held on cache
+                                 const uint32_t  block_locktype,   // Type of lock (RDLOCK or WRLOCK)
+                                 const uint32_t  c_index,          // Cache index 
+                                 const uint32_t  block_index)      // Block index of block locked 
 
 {
 
@@ -3831,9 +3862,9 @@ _PUBLIC int cache_lock_block(const unsigned int cache_lock_state, // If TRUE loc
 /* Unlock block */
 /*--------------*/
 
-_PUBLIC int cache_unlock_block(const unsigned int cache_lock_state,  // State of cache lock 
-                               const unsigned int          c_index,  // Cache index
-                               const unsigned int      block_index)  // Block index of block unlocked
+_PUBLIC int32_t cache_unlock_block(const uint32_t    cache_lock_state,  // State of cache lock 
+                                   const uint32_t             c_index,  // Cache index
+                                   const uint32_t         block_index)  // Block index of block unlocked
 
 {
 
@@ -3876,10 +3907,10 @@ _PUBLIC int cache_unlock_block(const unsigned int cache_lock_state,  // State of
 /* Set/reset cache used flag */
 /*---------------------------*/
 
-_PUBLIC int cache_block_set_used(const _BOOLEAN     have_cache_lock,  // If TRUE lock held on cache 
-                                 const unsigned int         c_index,  // Cache index
-                                 const unsigned int     block_index,  // Block index
-                                 const _BOOLEAN                used)  // If TRUE mark block as used
+_PUBLIC int32_t cache_block_set_used(const _BOOLEAN     have_cache_lock,  // If TRUE lock held on cache 
+                                     const uint32_t             c_index,  // Cache index
+                                     const uint32_t         block_index,  // Block index
+                                     const _BOOLEAN                used)  // If TRUE mark block as used
 
 {
 
@@ -3935,8 +3966,8 @@ _PUBLIC int cache_block_set_used(const _BOOLEAN     have_cache_lock,  // If TRUE
 /* Is cache in use? */
 /*------------------*/
 
-_PUBLIC int cache_in_use(const _BOOLEAN     have_cache_lock,  // If TRUE lock held on cache
-                         const unsigned int         c_index)  // Cache index
+_PUBLIC int32_t cache_in_use(const _BOOLEAN  have_cache_lock,  // If TRUE lock held on cache
+                             const uint32_t          c_index)  // Cache index
 {   _BOOLEAN ret = FALSE;
 
 
@@ -3973,9 +4004,9 @@ _PUBLIC int cache_in_use(const _BOOLEAN     have_cache_lock,  // If TRUE lock he
 /* Is block in use? */
 /*------------------*/
 
-_PUBLIC int cache_block_in_use(const _BOOLEAN     have_cache_lock,  // If TRUE lock held on cache
-                               const unsigned int         c_index,  // Cache index
-                               const unsigned int     block_index)  // Block index of block tested
+_PUBLIC int32_t cache_block_in_use(const _BOOLEAN  have_cache_lock,  // If TRUE lock held on cache
+                                   const uint32_t          c_index,  // Cache index
+                                   const uint32_t      block_index)  // Block index of block tested
 
 {   _BOOLEAN ret = FALSE;
 
@@ -4022,7 +4053,7 @@ _PUBLIC int cache_block_in_use(const _BOOLEAN     have_cache_lock,  // If TRUE l
 /* Set/reset cache busy flag */
 /*---------------------------*/
 
-_PUBLIC int cache_set_busy(const _BOOLEAN have_cache_lock, const unsigned int c_index, const _BOOLEAN busy)
+_PUBLIC int32_t cache_set_busy(const _BOOLEAN have_cache_lock, const uint32_t c_index, const _BOOLEAN busy)
 
 {
 
@@ -4061,7 +4092,7 @@ _PUBLIC int cache_set_busy(const _BOOLEAN have_cache_lock, const unsigned int c_
 /* Is cache busy? */
 /*----------------*/
 
-_PUBLIC _BOOLEAN cache_is_busy(const _BOOLEAN have_cache_lock, const unsigned int c_index)
+_PUBLIC _BOOLEAN cache_is_busy(const _BOOLEAN have_cache_lock, const uint32_t c_index)
 
 {   _BOOLEAN busy = FALSE;
 
@@ -4101,20 +4132,20 @@ _PUBLIC _BOOLEAN cache_is_busy(const _BOOLEAN have_cache_lock, const unsigned in
 /* doing this                  */
 /*-----------------------------*/
 
-_PUBLIC int cache_add_block(const void              *data,               // Location of data to cache
-                            const unsigned long int size,                // Size of data (in bytes)
-                            const unsigned int      flags,               // Access flags 
-                            const unsigned int      object_index,        // Object within cache block where data is written 
-                            const int               block_index,         // Cache block where data is written 
-                            const int               tag,                 // Block identifier 
-                            const _BOOLEAN          cache_access_state,  // If TRUE lock held on cache
-                            const unsigned int      c_index)             // Cache index 
+_PUBLIC int32_t cache_add_block(const void              *data,               // Location of data to cache
+                                const uint64_t          size,                // Size of data (in bytes)
+                                const uint32_t          flags,               // Access flags 
+                                const uint32_t          object_index,        // Object within cache block where data is written 
+                                const  int32_t          block_index,         // Cache block where data is written 
+                                const  int32_t          tag,                 // Block identifier 
+                                const _BOOLEAN          cache_access_state,  // If TRUE lock held on cache
+                                const uint32_t          c_index)             // Cache index 
 
-{   unsigned int i,
-                 block_access_flag,
-                 new_block_index;
+{   uint32_t i,
+             block_access_flag,
+             new_block_index;
 
-    void *cache_ptr = (void *)NULL;
+    void     *cache_ptr = (void *)NULL;
 
 
     /*---------------*/
@@ -4162,7 +4193,7 @@ _PUBLIC int cache_add_block(const void              *data,               // Loca
 
 
     /*----------------------------------------------------*/
-    /* Are we inserting data into a specific cache block? */
+    /* Are we inserting data  int32_to a specific cache block? */
     /*----------------------------------------------------*/
 
     if(block_index != ANY_CACHE_BLOCK)
@@ -4335,8 +4366,8 @@ _PUBLIC int cache_add_block(const void              *data,               // Loca
 
 _PUBLIC _BOOLEAN cache_delete_block(const _BOOLEAN     have_cache_lock,  // TRUE if lock held on cache
                                     const _BOOLEAN     have_block_lock,  // TRUE if lock held on block
-                                    const unsigned int         c_index,  // Cache index 
-                                    const unsigned int     block_index)  // Block to be deleted
+                                    const uint32_t             c_index,  // Cache index 
+                                    const uint32_t         block_index)  // Block to be deleted
 
 {   _BOOLEAN ret = FALSE;
 
@@ -4401,8 +4432,8 @@ _PUBLIC _BOOLEAN cache_delete_block(const _BOOLEAN     have_cache_lock,  // TRUE
 
 _PUBLIC _BOOLEAN cache_restore_block(const _BOOLEAN     have_cache_lock,  // TRUE if lock held on cache
                                      const _BOOLEAN     have_block_lock,  // TRUE if lock held on block
-                                     const unsigned int         c_index,  // Cache index
-                                     const unsigned int     block_index)  // Block to be restored 
+                                     const uint32_t             c_index,  // Cache index
+                                     const uint32_t         block_index)  // Block to be restored 
 
 {   _BOOLEAN ret = FALSE;
 
@@ -4463,12 +4494,12 @@ _PUBLIC _BOOLEAN cache_restore_block(const _BOOLEAN     have_cache_lock,  // TRU
 /* Clear cache */
 /*-------------*/
 
-_PUBLIC int cache_clear(const _BOOLEAN have_cache_lock,  // If TRUE lock held on cache
-                        const unsigned int     c_index,  // Cache index
-                        const          int         tag)  // Tag i.d. (which must tag i.d. of blocks cleared)
+_PUBLIC int32_t cache_clear(const _BOOLEAN have_cache_lock,  // If TRUE lock held on cache
+                            const uint32_t         c_index,  // Cache index
+                            const int32_t              tag)  // Tag i.d. (which must tag i.d. of blocks cleared)
 
-{   int i,
-        n_cleared = 0;
+{    int32_t i,
+             n_cleared = 0;
 
 
     /*---------------*/
@@ -4542,15 +4573,15 @@ _PUBLIC int cache_clear(const _BOOLEAN have_cache_lock,  // If TRUE lock held on
 /* Merge pair of caches */
 /*----------------------*/
 
-_PUBLIC int cache_merge(const _BOOLEAN have_cache_locks,  // If TRUE locks held on caches
-                        const unsigned int    c_index_1,  // Cache index 1
-                        const unsigned int    c_index_2,  // Cache index 2
-                        const          int          tag)  // Tag i.d. (of merged blocks in cache 1)
+_PUBLIC int32_t cache_merge(const _BOOLEAN have_cache_locks,  // If TRUE locks held on caches
+                            const uint32_t        c_index_1,  // Cache index 1
+                            const uint32_t        c_index_2,  // Cache index 2
+                            const int32_t               tag)  // Tag i.d. (of merged blocks in cache 1)
 
-{   unsigned int i,
-                 n_merged   = 0,
-                 n_blocks_1 = 0,
-                 n_blocks_2 = 0;
+{   uint32_t i,
+             n_merged   = 0,
+             n_blocks_1 = 0,
+             n_blocks_2 = 0;
 
 
     /*----------------*/
@@ -4671,7 +4702,7 @@ _PUBLIC int cache_merge(const _BOOLEAN have_cache_locks,  // If TRUE locks held 
 /* Get string repesentation of blockag i.d. */
 /*------------------------------------------*/
 
-_PUBLIC int cache_get_blocktag_id_str(const unsigned int blocktag_id, char *blocktag_id_str)
+_PUBLIC int32_t cache_get_blocktag_id_str(const uint32_t blocktag_id, char *blocktag_id_str)
 
 {
 
@@ -4712,11 +4743,11 @@ _PUBLIC int cache_get_blocktag_id_str(const unsigned int blocktag_id, char *bloc
 /* Show tag of specified cache block   */
 /*-------------------------------------*/
 
-_PUBLIC int cache_get_blocktag(const _BOOLEAN      have_cache_lock,  // If TRUE lock held on cache
-                               const unsigned int          c_index,  // Cache index
-                               const unsigned int      block_index)  // Cache block index
+_PUBLIC int32_t cache_get_blocktag(const _BOOLEAN  have_cache_lock,  // If TRUE lock held on cache
+		                   const uint32_t          c_index,  // Cache index
+                                   const uint32_t      block_index)  // Cache block index
 
-{   int tag;
+{    int32_t tag;
 
 
     /*--------------*/
@@ -4762,10 +4793,10 @@ _PUBLIC int cache_get_blocktag(const _BOOLEAN      have_cache_lock,  // If TRUE 
 /* Set tag of specified cache block */
 /*----------------------------------*/
 
-_PUBLIC int cache_set_blocktag(const _BOOLEAN      have_cache_lock,  // If TRUE lock held on cache
-                               const unsigned int              tag,  // Block tag identifier
-                               const unsigned int          c_index,  // Cache index
-                               const unsigned int      block_index)  // Cache block index
+_PUBLIC int32_t cache_set_blocktag(const _BOOLEAN  have_cache_lock,  // If TRUE lock held on cache
+                                   const uint32_t              tag,  // Block tag identifier
+                                   const uint32_t          c_index,  // Cache index
+                                   const uint32_t      block_index)  // Cache block index
 
 { 
 
@@ -4812,13 +4843,13 @@ _PUBLIC int cache_set_blocktag(const _BOOLEAN      have_cache_lock,  // If TRUE 
 /* Change tags of specified cache blocks */
 /*---------------------------------------*/
 
-_PUBLIC int cache_change_blocktag(const _BOOLEAN     have_cache_lock,  // If TRUE lock held on cache
-                                  const unsigned int         c_index,  // Cache index
-                                  const          int        from_tag,  // Tag i.d. to be replaced
-                                  const          int          to_tag)  // Replacement tag i.d.
+_PUBLIC int32_t cache_change_blocktag(const _BOOLEAN  have_cache_lock,  // If TRUE lock held on cache
+                                      const uint32_t          c_index,  // Cache index
+                                      const int32_t          from_tag,  // Tag i.d. to be replaced
+                                      const int32_t            to_tag)  // Replacement tag i.d.
 
-{   int i,
-        n_tags = 0;
+{    int32_t i,
+             n_tags = 0;
 
 
     /*---------------*/
@@ -4880,11 +4911,11 @@ _PUBLIC int cache_change_blocktag(const _BOOLEAN     have_cache_lock,  // If TRU
 /* Show lifetime of specified cache block */
 /*----------------------------------------*/
 
-_PUBLIC int cache_get_blocklifetime(const _BOOLEAN      have_cache_lock,  // If TRUE lock held on cache
-                                    const unsigned int          c_index,  // Cache index
-                                    const unsigned int      block_index)  // Cache block index
+_PUBLIC int64_t cache_get_blocklifetime(const _BOOLEAN  have_cache_lock,  // If TRUE lock held on cache
+                                        const uint32_t          c_index,  // Cache index
+                                        const uint32_t      block_index)  // Cache block index
 
-{   int lifetime = 0;
+{    int32_t lifetime = 0;
 
 
     /*--------------*/
@@ -4930,10 +4961,10 @@ _PUBLIC int cache_get_blocklifetime(const _BOOLEAN      have_cache_lock,  // If 
 /* Set lifetime of specified cache block */
 /*---------------------------------------*/
 
-_PUBLIC int cache_set_blocklifetime(const _BOOLEAN      have_cache_lock,  // If TRUE lock held on cache
-                                    const int                  lifetime,  // Block lifetime
-                                    const unsigned int          c_index,  // Cache index
-                                    const unsigned int      block_index)  // Cache block index
+_PUBLIC int32_t cache_set_blocklifetime(const _BOOLEAN  have_cache_lock,  // If TRUE lock held on cache
+                                        const int64_t          lifetime,  // Block lifetime MAO - query should this be int64_t was int32_t ?
+                                        const uint32_t          c_index,  // Cache index
+                                        const uint32_t      block_index)  // Cache block index
 
 { 
 
@@ -4981,11 +5012,11 @@ _PUBLIC int cache_set_blocklifetime(const _BOOLEAN      have_cache_lock,  // If 
 /* Get hubness of specified cache block */
 /*--------------------------------------*/
 
-_PUBLIC unsigned int cache_get_blockhubness(const _BOOLEAN      have_cache_lock,  // If TRUE lock held on cache
-                                            const unsigned int          c_index,  // Cache index
-                                            const unsigned int      block_index)  // Cache block index
+_PUBLIC uint32_t cache_get_blockhubness(const _BOOLEAN  have_cache_lock,  // If TRUE lock held on cache
+                                        const uint32_t          c_index,  // Cache index
+                                        const uint32_t      block_index)  // Cache block index
 
-{   unsigned int hubness = 0;
+{   uint32_t hubness = 0;
 
 
     /*--------------*/
@@ -5031,10 +5062,10 @@ _PUBLIC unsigned int cache_get_blockhubness(const _BOOLEAN      have_cache_lock,
 /* Set hubness of specified cache block */
 /*--------------------------------------*/
 
-_PUBLIC int cache_set_blockhubness(const _BOOLEAN      have_cache_lock,  // If TRUE lock held on cache
-                                   const unsigned int         hubness,   // Block hubness
-                                   const unsigned int         c_index,   // Cache index
-                                   const unsigned int     block_index)   // Cache block index
+_PUBLIC int32_t cache_set_blockhubness(const _BOOLEAN  have_cache_lock,  // If TRUE lock held on cache
+                                       const uint32_t          hubness,   // Block hubness
+                                       const uint32_t          c_index,   // Cache index
+                                       const uint32_t      block_index)   // Cache block index
 
 { 
 
@@ -5082,11 +5113,11 @@ _PUBLIC int cache_set_blockhubness(const _BOOLEAN      have_cache_lock,  // If T
 /* Get binding of specified cache block */
 /*--------------------------------------*/
 
-_PUBLIC unsigned int cache_get_blockbinding(const _BOOLEAN      have_cache_lock,  // If TRUE lock held on cache
-                                            const unsigned int          c_index,  // Cache index
-                                            const unsigned int      block_index)  // Cache block index
+_PUBLIC uint32_t cache_get_blockbinding(const _BOOLEAN  have_cache_lock,  // If TRUE lock held on cache
+                                        const uint32_t          c_index,  // Cache index
+                                        const uint32_t      block_index)  // Cache block index
 
-{   unsigned int binding = 0;
+{   uint32_t binding = 0;
 
 
     /*--------------*/
@@ -5132,10 +5163,10 @@ _PUBLIC unsigned int cache_get_blockbinding(const _BOOLEAN      have_cache_lock,
 /* Set binding of specified cache block */
 /*--------------------------------------*/
 
-_PUBLIC int cache_set_blockbinding(const _BOOLEAN      have_cache_lock,  // If TRUE lock held on cache
-                                   const unsigned int         binding,   // Block binding 
-                                   const unsigned int         c_index,   // Cache index
-                                   const unsigned int     block_index)   // Cache block index
+_PUBLIC int32_t cache_set_blockbinding(const _BOOLEAN  have_cache_lock,   // If TRUE lock held on cache
+                                       const uint32_t          binding,   // Block binding 
+                                       const uint32_t          c_index,   // Cache index
+                                       const uint32_t      block_index)   // Cache block index
 
 { 
 
@@ -5183,10 +5214,10 @@ _PUBLIC int cache_set_blockbinding(const _BOOLEAN      have_cache_lock,  // If T
 /* Get co-ordination list size for cache */
 /*---------------------------------------*/
 
-_PUBLIC unsigned int cache_get_colsize(const _BOOLEAN      have_cache_lock,  // If TRUE lock held on cache
-                                       const unsigned int          c_index)  // Cache index
+_PUBLIC uint32_t cache_get_colsize(const _BOOLEAN  have_cache_lock,  // If TRUE lock held on cache
+                                   const uint32_t          c_index)  // Cache index
 
-{   unsigned int colsize = 0;
+{   uint32_t colsize = 0;
 
 
     /*--------------*/
@@ -5221,9 +5252,9 @@ _PUBLIC unsigned int cache_get_colsize(const _BOOLEAN      have_cache_lock,  // 
 /* Set co-ordination list-size for cache */
 /*---------------------------------------*/
 
-_PUBLIC int cache_set_colsize(const _BOOLEAN     have_cache_lock,  // If TRUE lock held on cache
-                              unsigned int       colsize,          // Co-ordination list size 
-                              const unsigned int c_index)          // Cache index
+_PUBLIC int32_t cache_set_colsize(const _BOOLEAN  have_cache_lock,  // If TRUE lock held on cache
+                                  uint32_t                colsize,  // Co-ordination list size 
+                                  const uint32_t          c_index)  // Cache index
 
 { 
 
@@ -5259,9 +5290,9 @@ _PUBLIC int cache_set_colsize(const _BOOLEAN     have_cache_lock,  // If TRUE lo
 /* Swap cache table entries */
 /*--------------------------*/
 
-_PRIVATE void swap_cache_table_entries(int c_index, const int index_1, const int index_2)
+_PRIVATE void swap_cache_table_entries(int c_index, const int32_t index_1, const int32_t index_2)
 
-{   unsigned int     tmp_int;
+{   uint32_t         tmp_int;
     pthread_rwlock_t tmp_rwlock;
     block_mtype      tmp_blockmap;
 
@@ -5309,27 +5340,27 @@ _PRIVATE void swap_cache_table_entries(int c_index, const int index_1, const int
 /* Move block (to fill hole) */
 /*---------------------------*/
 
-_PRIVATE void move_block(const int c_index, const int block_index, const int hole_index)
+_PRIVATE void move_block(const int32_t c_index, const int32_t block_index, const int32_t hole_index)
 
-{   unsigned int i;
+{   uint32_t i;
 
-    void *to_ptr   = (void *)NULL,
-         *from_ptr = (void *)NULL;
+    void     *to_ptr   = (void *)NULL,
+             *from_ptr = (void *)NULL;
                                                                                        /*-------------------------------------*/
     to_ptr   = (void *)(cache[c_index].cache_ptr                                   +   /* Base of cache                       */
-                       (unsigned long int)hole_index  * cache[c_index].block_size  );  /* Location of hole to file in cache   */
+                       (uint64_t         )hole_index  * cache[c_index].block_size  );  /* Location of hole to file in cache   */
                                                                                        /*-------------------------------------*/
 
                                                                                         /*------------------------------------*/ 
     from_ptr = (void *)(cache[c_index].cache_ptr                                    +   /* Base of cache                      */
-                       (unsigned long int)block_index * cache[c_index].block_size   );  /* Location of block to move in cache */
+                       (uint64_t         )block_index * cache[c_index].block_size   );  /* Location of block to move in cache */
                                                                                         /*------------------------------------*/
 
     /*------------*/
     /* Move block */
     /*------------*/
 
-    (void)memcpy(to_ptr,from_ptr,(unsigned long int)cache[c_index].block_size);
+    (void)memcpy(to_ptr,from_ptr,(uint64_t         )cache[c_index].block_size);
 
 
     /*----------------------------*/
@@ -5350,16 +5381,16 @@ _PRIVATE void move_block(const int c_index, const int block_index, const int hol
 /* Compact cache */
 /*---------------*/
 
-_PUBLIC int cache_compact(const _BOOLEAN have_cache_lock,  // If TRUE we hold lock on cache
-                          const int              c_index)  // Cache index
+_PUBLIC int32_t cache_compact(const _BOOLEAN have_cache_lock,  // If TRUE we hold lock on cache
+                              const  int32_t         c_index)  // Cache index
 
-{   unsigned int i,
-                 n_blocks,
-                 freed_blocks = 0,
-                 hole_index   = 0,
-                 used_blocks  = 0,
-                 free_blocks  = 0,
-                 shrink_size  = 0;
+{   uint32_t i,
+             n_blocks,
+             freed_blocks = 0,
+             hole_index   = 0,
+             used_blocks  = 0,
+             free_blocks  = 0,
+             shrink_size  = 0;
 
     _BOOLEAN hole_fill = FALSE;
 
@@ -5465,16 +5496,17 @@ _PUBLIC int cache_compact(const _BOOLEAN have_cache_lock,  // If TRUE we hold lo
 /* Resize cache */
 /*--------------*/
 
-_PUBLIC int cache_resize(const _BOOLEAN     have_cache_lock,  // Lock on cache held if TRUE
-                         const unsigned int        n_blocks,  // New size of cache (in blocks)
-                         const unsigned int         c_index)  // Cache index
+_PUBLIC int32_t cache_resize(const _BOOLEAN  have_cache_lock,  // Lock on cache held if TRUE
+                             const uint32_t         n_blocks,  // New size of cache (in blocks)
+                             const uint32_t          c_index)  // Cache index
 
-{   int i,
-        map_flags = 0,
-        fd        = (-1);
+{    int32_t i,
+             map_flags  = 0;
 
-    unsigned long int new_size;
-    void              *cache_ptr = (void *)NULL;
+    des_t    fd         = (-1);
+
+    uint64_t new_size;
+    void     *cache_ptr = (void *)NULL;
  
 
     /*--------------*/
@@ -5585,8 +5617,8 @@ _PUBLIC int cache_resize(const _BOOLEAN     have_cache_lock,  // Lock on cache h
     /*-----------------------------*/
 
     cache[c_index].flags       = (_BYTE            *)pups_realloc((void *)cache[c_index].flags,   n_blocks*sizeof(_BYTE));
-    cache[c_index].tag         = (unsigned int     *)pups_realloc((void *)cache[c_index].tag,     n_blocks*sizeof(unsigned int));
-    cache[c_index].lifetime    = (int              *)pups_realloc((void *)cache[c_index].lifetime,n_blocks*sizeof(int));
+    cache[c_index].tag         = (uint32_t         *)pups_realloc((void *)cache[c_index].tag,     n_blocks*sizeof(uint32_t   ));
+    cache[c_index].lifetime    = (uint64_t         *)pups_realloc((void *)cache[c_index].lifetime,n_blocks*sizeof(int));
     cache[c_index].rwlock      = (pthread_rwlock_t *)pups_realloc((void *)cache[c_index].rwlock,  n_blocks*sizeof(pthread_rwlock_t));
     cache[c_index].blockmap    = (block_mtype      *)pups_realloc((void *)cache[c_index].blockmap,n_blocks*sizeof(block_mtype));
     cache[c_index].n_blocks    = n_blocks;
@@ -5599,12 +5631,12 @@ _PUBLIC int cache_resize(const _BOOLEAN     have_cache_lock,  // Lock on cache h
     /*-------------------------------------------------------*/
 
     for(i=0;  i<n_blocks; ++i)
-    {  int j;
+    {  uint32_t    j;
 
        for(j=0; j<cache[c_index].n_objects; ++j)                                                          /*----------------------------*/
        {  cache[c_index].blockmap[i].object_ptr[j] = (void *)(cache[c_index].object_offset[j]          +  /* Object offset within block */
-                                                     (unsigned long int)i*cache[c_index].block_size    +  /* Block offset within cache  */
-                                                     (unsigned long int)cache[c_index].cache_ptr);        /* Base address of cache      */
+                                                     (uint64_t         )i*cache[c_index].block_size    +  /* Block offset within cache  */
+                                                     (uint64_t         )cache[c_index].cache_ptr);        /* Base address of cache      */
        }                                                                                                  /*----------------------------*/
 
        #ifdef DEBUG
@@ -5665,7 +5697,7 @@ _PUBLIC int cache_resize(const _BOOLEAN     have_cache_lock,  // Lock on cache h
 /* Lock cache */
 /*------------*/
 
-_PUBLIC int cache_lock(const unsigned int c_index)
+_PUBLIC int32_t cache_lock(const uint32_t  c_index)
 
 { 
 
@@ -5689,7 +5721,7 @@ _PUBLIC int cache_lock(const unsigned int c_index)
 /* Unlock cache */
 /*--------------*/
 
-_PUBLIC int cache_unlock(const unsigned int c_index)
+_PUBLIC int32_t cache_unlock(const uint32_t c_index)
 
 {
 
@@ -5714,9 +5746,10 @@ _PUBLIC int cache_unlock(const unsigned int c_index)
 /* Is cache private (read only)? */
 /*-------------------------------*/
 
-_PUBLIC _BOOLEAN cache_is_private(const _BOOLEAN have_cache_lock, const unsigned int c_index)
+_PUBLIC _BOOLEAN cache_is_private(const _BOOLEAN have_cache_lock, const uint32_t c_index)
 
 {   _BOOLEAN ret = FALSE;
+
 
     /*--------------*/
     /* Sanity check */
@@ -5751,9 +5784,10 @@ _PUBLIC _BOOLEAN cache_is_private(const _BOOLEAN have_cache_lock, const unsigned
 /* Is cache preloaded? */
 /*---------------------*/
 
-_PUBLIC _BOOLEAN cache_is_preloaded(const _BOOLEAN have_cache_lock, const unsigned int c_index)
+_PUBLIC _BOOLEAN cache_is_preloaded(const _BOOLEAN have_cache_lock, const uint32_t c_index)
 
 {   _BOOLEAN ret = FALSE;
+
 
     /*--------------*/
     /* Sanity check */
@@ -5786,7 +5820,7 @@ _PUBLIC _BOOLEAN cache_is_preloaded(const _BOOLEAN have_cache_lock, const unsign
 /* Set cache auxilliary data field */
 /*---------------------------------*/
 
-_PUBLIC int cache_set_auxinfo(const _BOOLEAN have_cache_lock, const char *auxinfo, const unsigned int c_index)
+_PUBLIC int32_t cache_set_auxinfo(const _BOOLEAN have_cache_lock, const char *auxinfo, const uint32_t c_index)
 
 { 
 
@@ -5825,7 +5859,7 @@ _PUBLIC int cache_set_auxinfo(const _BOOLEAN have_cache_lock, const char *auxinf
 /* Get cache auxilliary data field */
 /*---------------------------------*/
 
-_PUBLIC int cache_get_auxinfo(const _BOOLEAN have_cache_lock, char *auxinfo, const unsigned int c_index)
+_PUBLIC int32_t cache_get_auxinfo(const _BOOLEAN have_cache_lock, char *auxinfo, const uint32_t c_index)
 
 { 
 

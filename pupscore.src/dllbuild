@@ -1,0 +1,123 @@
+#!/bin/bash
+#
+#-------------------------------------------------------------------------
+# Make a shared libary module from source - details from Johnson and Troan
+# LINUX Application Development.
+# (C) M.A. O'Neill, Tumbling Dice 2000-2024
+#-------------------------------------------------------------------------
+
+
+PATH="$PATH:..:."
+echo ""                                               >&2
+echo "    PUPSP3 shared object builder"               >&2
+echo "    (C) M.A. O'Neill, Tumbling Dice 2000-2024"  >&2
+echo ""                                               >&2
+
+
+#-------------------
+# Parse command line
+#-------------------
+#------
+# Error
+#------
+
+if [[ $# == 0  || $# > 2 ]] ; then
+	echo ""                                                                  >&2
+	echo "    usage: dllbuild [usage | help]                             |"  >&2
+        echo "                    !<sourcefile file name>! [list of libraries]"  >&2
+	echo ""                                                                  >&2
+
+	exit 255
+
+
+#------
+# Usage
+#------
+
+elif [ $1 = usage ] || [ $1 = help ] ; then
+	echo ""                                                              >&2
+	echo "    usage: dllbuild [usage | help]                         |"  >&2
+        echo "                    !<source file name>! [list of libraries]"  >&2
+	echo ""                                                              >&2
+
+	exit 255
+
+
+#----------------
+# Set source file
+#----------------
+
+else
+	sourcefile=$1
+fi
+
+
+#----------------------
+# Get list of libraries 
+#----------------------
+
+if [ "$2" != "" ] ; then
+	libraries=$2
+else
+	libraries=""
+fi
+
+
+#-----------------------
+# Source filename prefix
+#-----------------------
+
+prefix="${sourcefile%%.*}"
+
+
+#-----------------
+# Compile DLL code
+#-----------------
+
+gcc -fPIC -I/usr/include/p3 -c $sourcefile
+
+
+#------------------
+# Compilation error
+#------------------
+#------
+# Error
+#------
+
+if [[ "$?" != 0 ]] ; then
+	echo ""                                                   >&2
+	echo "  ERROR dllbuild: failed to compile '$sourcefile'"  >&2
+	echo ""                                                   >&2 
+
+	exit 255
+fi
+
+
+#----------------------------
+# Generate the shared library
+#----------------------------
+
+\rm $sharename 2> /dev/null
+gcc -shared -fPIC -Wl,-soname,$prefix.so -o $prefix.so $prefix.o -lc $libraries
+
+
+#---
+# Ok
+#---
+
+if [[ $? == 0 ]] ; then
+	echo "    dllbuild: shared library [$prefix.so] generated"  >&2
+	echo ""                                                     >&2
+
+
+#------
+# Error
+#------
+
+else
+	echo ""                                                     >&2
+	echo "  ERROR dllbuild: failed to compile '$sourcefile'"    >&2
+	echo ""                                                     >&2 
+fi
+
+exit 0

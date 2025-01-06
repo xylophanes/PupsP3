@@ -9,7 +9,7 @@
              United Kingdom
 
     Version: 3.00 
-    Dated:   4th January 2023
+    Dated:   27th February 2024
     E-Mail:  mao@tumblingdice.co.uk
 ------------------------------------------------------------------------------*/
 
@@ -19,8 +19,6 @@
 /*----------------------------------*/
 /* Defines used by the hash library */
 /*----------------------------------*/
-
-
 /*------------------*/
 /* Keep c2man happy */
 /*------------------*/
@@ -57,12 +55,12 @@
 /* Hash entry datastructure */
 /*--------------------------*/
 
-typedef struct {    int       size;          // Number of slots in hash entry 
-                    int       used;          // Number of used slots in hash entry
-                    int       *index;        // List of indices (for object list)
-                    int       *object_size;  // List of object sizes
-                    char      **object_type; // List of object types at hash entry
-                    void      **object;      // List of objects at hash entry
+typedef struct {    uint32_t      size;          // Number of slots in hash entry 
+                    uint32_t      used;          // Number of used slots in hash entry
+                    uint32_t      *index;        // List of indices (for object list)
+                    size_t        *object_size;  // List of object sizes
+                    char          **object_type; // List of object types at hash entry
+                    void          **object;      // List of objects at hash entry
                } hash_type;
 
 
@@ -70,9 +68,9 @@ typedef struct {    int       size;          // Number of slots in hash entry
 /* Hash table datastructure */
 /*--------------------------*/
 
-typedef struct {    int       size;          // Size of hash table 
-                    char      name[SSIZE];   // Name of hash table
-                    hash_type *hashentry;    // Hash table entries
+typedef struct {    int32_t   size;              // Size of hash table 
+                    char      name[SSIZE];       // Name of hash table
+                    hash_type *hashentry;        // Hash table entries
                } hash_table_type;
 
 #ifdef __NOT_LIB_SOURCE__
@@ -88,22 +86,22 @@ typedef struct {    int       size;          // Size of hash table
 /*-------------------------------------------*/
 
 // Create hash table object
-_PUBLIC hash_table_type *hash_table_create(int, char *);
+_PUBLIC hash_table_type *hash_table_create(const uint32_t   , const char *);
 
 // Destroy hash table object
 _PROTOTYPE _EXPORT hash_table_type *hash_table_destroy(hash_table_type *);
 
 //  Return object at a given location
-_PROTOTYPE _EXPORT int hash_get_object(int, void *, char *, hash_table_type *);
+_PROTOTYPE _EXPORT  int32_t hash_get_object(const uint32_t   , void *, const char *, hash_table_type *);
 
 // Add object to hashed object list
-_PROTOTYPE _EXPORT int hash_put_object(int, void *, char *, int, hash_table_type *);
+_PROTOTYPE _EXPORT  int32_t hash_put_object(const uint32_t   , const void *, const char *, const size_t, hash_table_type *);
 
 // Routine to delete object from hash table
-_PROTOTYPE _EXPORT int hash_delete_object(int, hash_table_type *);
+_PROTOTYPE _EXPORT  int32_t hash_delete_object(const uint32_t   , hash_table_type *);
 
-// Report on hash table accesses
-_PROTOTYPE _EXPORT int hash_show_stats(FILE *, _BOOLEAN,  hash_table_type *);
+// Show hash statistics [root thread]
+_PROTOTYPE _EXPORT  int32_t hash_show_stats(const FILE *, const _BOOLEAN,  hash_table_type *);
 
 #ifdef _CPLUSPLUS
 #   undef  _EXPORT

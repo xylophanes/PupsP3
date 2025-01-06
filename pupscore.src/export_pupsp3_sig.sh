@@ -2,12 +2,12 @@
 #
 #####################################
 # Export P3 signal mappings for bash 
-# (C) M.A O'Neill, Tumbling Dice 2023
+# (C) M.A O'Neill, Tumbling Dice 2025
 #####################################
 
-#-------------------------------------
-# This might be appliocation dependent
-#-------------------------------------
+#------------------------------------
+# This might be application dependent
+#------------------------------------
 
 SIGRTMIN=34
 

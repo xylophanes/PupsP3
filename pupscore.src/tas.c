@@ -1,4 +1,4 @@
-/*------------------------------------------------------------------
+/*-------------------------------------------------------------
      Purpose: tests for a lock file in a directory which can be
               accessed by multiple processes.
 
@@ -9,10 +9,10 @@
               NE3 4RT
               United Kingdom
 
-     Version: 2.01 
-     Dated:   24th January 2023
+     Version: 2.02 
+     Dated:   11th December 2024
      e-mail:  mao@tumblingdice.co.uk
--------------------------------------------------------------------*/
+-------------------------------------------------------------*/
 
 #include <stdio.h>
 #include <signal.h>
@@ -20,40 +20,44 @@
 #include <stdlib.h>
 #include <string.h>
 #include <bsd/string.h>
+#include <sys/stat.h>
+#include <ctype.h>
+#include <stdint.h>
 
 
+/*---------*/
+/* Defines */
+/*---------*/
+/*---------*/
+/* Version */
+/*---------*/
 
-
-/*----------------*/
-/* Version of tas */
-/*----------------*/
-
-#define TAS_VERSION    "2.01"
+#define TAS_VERSION            "2.02"
 
 
 /*-------------*/
 /* String size */
 /*-------------*/
 
-#define SSIZE          2048 
+#define SSIZE                   2048 
 
 
-/*-------------------------------------------------------------------
-    Variables which are global to this application ...
--------------------------------------------------------------------*/
+/*-----------------*/
+/* Local Variables */
+/*-----------------*/
 
-static int  lock_pid         = (-1);
-static int  n_args           = (-1);
-static char lock_name[SSIZE] = "";
-
-
+static int32_t  lock_pid      = (-1);
+static int32_t  n_args        = (-1);
+static char lock_name[SSIZE]  = "";
 
 
-/*-------------------------------------------------------------------
-   Remove lock on exit ...
--------------------------------------------------------------------*/
 
-static int exit_handler(int signum)
+
+/*---------------------*/
+/* Remove lock on exit */
+/*---------------------*/
+
+static int32_t exit_handler(const  int32_t signum)
 
 {
 
@@ -80,12 +84,17 @@ static int exit_handler(int signum)
 /* Main entry point */
 /*------------------*/
 
-int main(int argc, char *argv[])
+int32_t main(int32_t argc, char *argv[])
 
-{   int entered = 0;
+{   int32_t entered = 0;
+
+
+    /*--------------------*/
+    /* Parse command line */
+    /*--------------------*/
 
     if(argc != 2 || strcmp(argv[1],"-usage") == 0 || strcmp(argv[1],"-help") == 0)
-    {  (void)fprintf(stderr,"\ntas version %s, (C) Tumbling Dice 2002-2023 (built %s %s)\n\n",TAS_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\ntas version %s, (C) Tumbling Dice 2002-2024 (gcc %s: built %s %s)\n\n",TAS_VERSION,__VERSION__,__TIME__,__DATE__);
        (void)fprintf(stderr,"TAS is free software, covered by the GNU General Public License, and you are\n");
        (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
        (void)fprintf(stderr,"See the GPL and LGPL licences at www.gnu.org for further details\n");
@@ -128,7 +137,7 @@ int main(int argc, char *argv[])
 
 
     /*----------------------------------------------------*/
-    /* Lock intelligently -- if we lose the process which */
+    /* Lock  int32_telligently -- if we lose the process which */
     /* asked for the lock -- delete lock                  */
     /*----------------------------------------------------*/
 

@@ -1,7 +1,7 @@
-/*------------------------------------------------------------------------------
+/*----------------------------------------------------------------------
     Purpose: Numerical function support for scientific programming. This
              version contains fixes for the bugs discovered by Mike Cook
-             of Laserscan Laboratories [mikec@uk.co.lsl]
+             of Laserscan Laboratories [mikec@lsl.co.uk]
 
     Author:  M.A. O'Neill
              Tumbling Dice Ltd
@@ -10,10 +10,10 @@
              NE3 4RT
              United Kingdom
 
-    Version: 2.00
-    Dated:   4th January 2023
+    Version: 3.02 
+    Dated:   29th December 2024
     E-Mail:  mao@tumblingdice.co.uk 
-------------------------------------------------------------------------------*/
+----------------------------------------------------------------------*/
 
 #include <me.h>
 #include <utils.h>
@@ -22,22 +22,20 @@
 #include <stdlib.h>
 
 
-/*------------------------------------------------------------------------------
-    Slot and usage functions - used by slot manager ...
-------------------------------------------------------------------------------*/
-
-
+/*-------------------------------------------------*/
+/* Slot and usage functions - used by slot manager */
+/*-------------------------------------------------*/
 /*---------------------*/
 /* Slot usage function */
 /*---------------------*/
 
-_PRIVATE void nfolib_slot(int level)
+_PRIVATE void nfolib_slot(int32_t level)
 {   (void)fprintf(stderr,"int lib nfolib %s: [ANSI C]\n",NFO_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 1985-2023 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 1985-2024 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
-       (void)fprintf(stderr,"PUPS/P3 numerical function library (built %s %s)\n\n",__TIME__,__DATE__);
+       (void)fprintf(stderr,"PUPS/P3 numerical function library (gcc %s: built %s %s)\n\n",__VERSION__,__TIME__,__DATE__);
     }
     else
        (void)fprintf(stderr,"\n");
@@ -106,14 +104,14 @@ _PRIVATE _CONST FTYPE ZEPS   = 1.0e-10;
 /* Minimum cut off value */
 /*-----------------------*/
 
-_PRIVATE _CONST FTYPE TINY  = 1.0e-20;
+_PRIVATE _CONST FTYPE   TINY  = 1.0e-20;
 
 
 /*------------------------------------*/
 /* Maximum iterations Brent Minimiser */
 /*------------------------------------*/
 
-_PRIVATE _CONST int BR_ITMAX = 100;
+_PRIVATE _CONST int32_t BR_ITMAX = 100;
 
 
 /*-------------------------------------*/
@@ -133,19 +131,17 @@ _PRIVATE _CONST FTYPE TOL     = 2.0e-4;
 
 
 
-/*-----------------------------------------------------------------------------
-    Static functions which are local to this library ...
------------------------------------------------------------------------------*/
-
-
+/*--------------------------------------------------*/
+/* Static functions which are local to this library */
+/*--------------------------------------------------*/
 /*----------------------------------------*/
 /* Linear minimisation routine for Powell */
 /*----------------------------------------*/
 
-_PROTOTYPE _PRIVATE void linmin  (FTYPE [],       \
-                                  FTYPE [],       \
-                                  int,            \
-                                  FTYPE *,        \
+_PROTOTYPE _PRIVATE void linmin  (FTYPE [], 
+                                  FTYPE [],
+                                  uint32_t, 
+                                  FTYPE *,
                                   FTYPE (* )());
 
 
@@ -153,9 +149,9 @@ _PROTOTYPE _PRIVATE void linmin  (FTYPE [],       \
 /* Support routines for least squares fitting */
 /*--------------------------------------------*/
 
-_PROTOTYPE _PRIVATE FTYPE xtran(FTYPE, int);
-_PROTOTYPE _PRIVATE FTYPE ytran(FTYPE, int);
-_PROTOTYPE _PRIVATE FTYPE atran(FTYPE, int); 
+_PROTOTYPE _PRIVATE FTYPE xtran(FTYPE, uint32_t);
+_PROTOTYPE _PRIVATE FTYPE ytran(FTYPE, uint32_t);
+_PROTOTYPE _PRIVATE FTYPE atran(FTYPE, uint32_t); 
 
 
 /*----------------------------*/
@@ -166,9 +162,9 @@ _PROTOTYPE _PRIVATE FTYPE f1dim(FTYPE);
 
 
 
-/*------------------------------------------------------------------------------
-    Standard macros used by nfolib ...
-------------------------------------------------------------------------------*/
+/*--------------------------------*/
+/* Standard macros used by nfolib */
+/*--------------------------------*/
 
 _EXTERN FTYPE sqrarg;
 
@@ -189,23 +185,23 @@ _EXTERN FTYPE sqrarg;
 
 
 
-/*-----------------------------------------------------------------------------
-    Least squares regression package.
+/*-----------------------------------------------------------------*/
+/* Least squares regression package.                               */
+/*                                                                 */
+/* Linear, Inverse, Log, Power and Exponential least squares fits. */
+/* See Micro User, Educational suppliment for further details.     */
+/* ----------------------------------------------------------------*/
 
-    Linear, Inverse, Log, Power and Exponential least squares fits.
-    See Micro User, Educational suppliment for further details.
------------------------------------------------------------------------------*/
-
-_PUBLIC void least_squares(int            fit,  // Type of fit required 
-                           int          n_pts,  // Number of data points 
+_PUBLIC void least_squares(uint32_t       fit,  // Type of fit required 
+                           uint32_t     n_pts,  // Number of data points 
                            FTYPE      x_arr[],  // Array of X data 
-                           FTYPE     y_arr[],   // Array of Y data
-                           FTYPE         *r1,   // Goodness of fit
-                           FTYPE         *r2,   // Coeff of determination
-                           FTYPE lsq_coeff[])   // Least squares coeffs
+                           FTYPE      y_arr[],  // Array of Y data
+                           FTYPE          *r1,  // Goodness of fit
+                           FTYPE          *r2,  // Coeff of determination
+                           FTYPE  lsq_coeff[])  // Least squares coeffs
 
-{   int i,
-        numpts = 0;
+{   uint32_t i,
+             numpts = 0;
 
     FTYPE divisor = 0.0,
           a       = 0.0,
@@ -250,12 +246,11 @@ _PUBLIC void least_squares(int            fit,  // Type of fit required
 
 
 
+/*-------------------------*/
+/* Transform X co-ordinate */
+/*-------------------------*/
 
-/*------------------------------------------------------------------------------
-    Transform X co-ordinate ...
-------------------------------------------------------------------------------*/
-
-_PRIVATE FTYPE xtran(FTYPE x, int fit)
+_PRIVATE FTYPE xtran(FTYPE x, uint32_t fit)
 
 {  if(fit == LOGFIT || fit == EXPNFIT)
       return(LOG(x));
@@ -266,12 +261,11 @@ _PRIVATE FTYPE xtran(FTYPE x, int fit)
 
 
 
+/*-------------------------*/
+/* Transform Y co-ordinate */
+/*-------------------------*/
 
-/*-----------------------------------------------------------------------------
-    Transform Y co-ordinate ...
------------------------------------------------------------------------------*/
-
-_PRIVATE FTYPE ytran(FTYPE y, int fit)
+_PRIVATE FTYPE ytran(FTYPE y,  uint32_t fit)
 
 {  if(fit == PWRFIT || fit == EXPNFIT)
       return(LOG(y));
@@ -286,12 +280,11 @@ _PRIVATE FTYPE ytran(FTYPE y, int fit)
 
 
 
+/*-------------*/
+/* Transform a */
+/*-------------*/
 
-/*------------------------------------------------------------------------------
-    Transform a ...
-------------------------------------------------------------------------------*/
-
-_PRIVATE FTYPE atran(FTYPE a, int fit)
+_PRIVATE FTYPE atran(FTYPE a, uint32_t fit)
 
 {  if(fit == PWRFIT || fit == EXPNFIT)
       return(LOG(a));
@@ -302,20 +295,19 @@ _PRIVATE FTYPE atran(FTYPE a, int fit)
 
 
 
+/*-------------------------------------------------*/
+/* Routine to generate a cubic interpolation table */
+/*-------------------------------------------------*/
 
-/*------------------------------------------------------------------------------
-    Routine to generate a cubic  interpolation table ...
-------------------------------------------------------------------------------*/
+_PUBLIC void spline(FTYPE     x[],   // Array of X values
+                    FTYPE     y[],   // Array of Y values
+                    uint32_t  n,     // Number of points
+                    FTYPE     yp1,   // Boundary condition 1
+                    FTYPE     ypn,   // Boundary condition 2
+                    FTYPE     y2[])  // Array of Y derivatives dy/dx
 
-_PUBLIC void spline(FTYPE  x[],    // Array of X values
-                    FTYPE  y[],    // Array of Y values
-                    int      n,    // Number of points
-                    FTYPE  yp1,    // Boundary condition 1
-                    FTYPE  ypn,    // Boundary condition 2
-                    FTYPE  y2[])   // Array of Y derivatives dy/dx
-
-{   int i,
-        k;
+{   uint32_t i,
+             k;
 
     FTYPE p,
           qn,
@@ -323,10 +315,11 @@ _PUBLIC void spline(FTYPE  x[],    // Array of X values
           un,
           *u  = (FTYPE *)NULL;
 
+
     /*----------------------------------------------------------------------*/
     /* Given the arrays x[1..n] and y[1..n] containing a tabulated function */
     /* i.e. yi = f(xi) with x1 < x2 < .. < xn, and given values yp1 and ypn */
-    /* for the first derivative of the interpolating function at points     */
+    /* for the first derivative of the intterpolating function at points    */
     /* 1 and n respectively, this routine returns an array y2[1..n] that    */
     /* contains the second derivatives of the interpolating function at     */
     /* the tabulated points xi. If y1 and/or ypn are equal to 1e30 or       */
@@ -373,8 +366,7 @@ _PUBLIC void spline(FTYPE  x[],    // Array of X values
 
 
        y2[i] = (sig - (FTYPE)1.0) / p;
-       u[i]  = (y[i+1] - y[i]) / (x[i+1] - x[i]) -
-                                 (y[i] - y[i-1]) / (x[i] - x[i-1]);
+       u[i]  = (y[i+1] - y[i])    / (x[i+1] - x[i]) - (y[i] - y[i-1]) / (x[i] - x[i-1]);
        u[i]  = ((FTYPE)6.0*u[i] / (x[i+1] - x[i-1]) - sig*u[i-1]) / p;
     }
 
@@ -393,9 +385,9 @@ _PUBLIC void spline(FTYPE  x[],    // Array of X values
     /*-------------------------------------------------------------*/
 
     {  qn = (FTYPE)0.5;
-       un = ((FTYPE)3.0 / (x[n-1] - x[n-2]))*(ypn - (y[n-1] - y[n-2]) /
-                                                     (x[n-1] - x[n-2]));
+       un = ((FTYPE)3.0 / (x[n-1] - x[n-2]))*(ypn - (y[n-1] - y[n-2]) / (x[n-1] - x[n-2]));
     }
+
     y2[n-1] = (un - qn*u[n-2]) / (qn*y2[n-2] + (FTYPE)1.0);
 
 
@@ -407,18 +399,18 @@ _PUBLIC void spline(FTYPE  x[],    // Array of X values
     for(k = n - 2; k >= 0; k--)
         y2[k] = y2[k]*y2[k+1] + u[k];
 
-    free((char *)u);
+    (void)free((void *)u);
 }
 
 
 
 
 
-/*------------------------------------------------------------------------------
-    Routine to generate fitted function from least squares parameters ...
-------------------------------------------------------------------------------*/
+/*-------------------------------------------------------------------*/
+/* Routine to generate fitted function from least squares parameters */
+/*-------------------------------------------------------------------*/
 
-_PUBLIC FTYPE lsq_fgen(FTYPE tr, int fit, FTYPE lsq_coeff[])
+_PUBLIC FTYPE lsq_fgen(FTYPE tr, uint32_t fit, FTYPE lsq_coeff[])
 
 {  if(fit == LINFIT)
       tr = lsq_coeff[0] + lsq_coeff[1]*tr;
@@ -444,21 +436,21 @@ _PUBLIC FTYPE lsq_fgen(FTYPE tr, int fit, FTYPE lsq_coeff[])
 
 
 
-/*------------------------------------------------------------------------------
-    Linear interpolation routine ...
-------------------------------------------------------------------------------*/
+/*------------------------------*/
+/* Linear interpolation routine */
+/*------------------------------*/
 
-_PUBLIC FTYPE lint(FTYPE xa[],    // Array of X values
-                   FTYPE ya[],    // Array of Y values
-                   int      n,    // Number of points
-                   FTYPE    x)    // Point to interpolate
+_PUBLIC FTYPE lint(FTYPE     xa[],  // Array of X values
+                   FTYPE     ya[],  // Array of Y values
+                   uint32_t  n,     // Number of points
+                   FTYPE     x)     // Point to interpolate
 
-{   int klo,
-        khi,
-          k;
+{   uint32_t klo,
+             khi,
+             k;
 
-    FTYPE h,
-          ret;
+    FTYPE    h,
+             ret;
 
     /*-----------------------------------------------------------------------*/
     /* We will find the correct place in the table by means of a bisection.  */
@@ -506,16 +498,16 @@ _PUBLIC FTYPE lint(FTYPE xa[],    // Array of X values
 
 
 
-/*-----------------------------------------------------------------------------
-    Cubic spline interpolation. For further details see
-    "Numerical Recipes in C" pp96-97 ...
------------------------------------------------------------------------------*/
+/*-----------------------------------------------------*/
+/* Cubic spline interpolation. For further details see */
+/* "Numerical Recipes in C" pp96-97                    */
+/*-----------------------------------------------------*/
 
-_PUBLIC FTYPE splint(FTYPE  xa[],     // Array of X values 
-                     FTYPE  ya[],     // Array of Y values 
-                     FTYPE y2a[],     // Array of derivatives dy/dx 
-                     int       n,     // Number of points 
-                     FTYPE     x)     // Point to interpolate 
+_PUBLIC FTYPE splint(FTYPE     xa[],   // Array of X values 
+                     FTYPE     ya[],   // Array of Y values 
+                     FTYPE     y2a[],  // Array of derivatives dy/dx 
+                     uint32_t  n,      // Number of points 
+                     FTYPE     x)      // Point to interpolate 
 
 {
 
@@ -527,10 +519,10 @@ _PUBLIC FTYPE splint(FTYPE  xa[],     // Array of X values
     /* returns a cubic spline interpolated y                                */
     /* ---------------------------------------------------------------------*/
 
-    int k;
+    uint32_t   k;
 
-    _IMMORTAL int klo,
-                  khi;
+    _IMMORTAL  int32_t klo,
+                       khi;
 
     _IMMORTAL _BOOLEAN init = TRUE;
 
@@ -538,6 +530,7 @@ _PUBLIC FTYPE splint(FTYPE  xa[],     // Array of X values
           b,
           a,
           ret;
+
 
     /*-----------------------------------------------------------------------*/
     /* We will find the correct place in the table by means of a bisection.  */
@@ -593,21 +586,20 @@ _PUBLIC FTYPE splint(FTYPE  xa[],     // Array of X values
 
 
 
+/*--------------------------------------------------------------------*/
+/* Routine to integrate a numerical function using the Trapezium rule */
+/*--------------------------------------------------------------------*/
 
-/*------------------------------------------------------------------------------
-    Routine to integrate a numerical function using the Trapezium rule ...
-------------------------------------------------------------------------------*/
+_PUBLIC FTYPE trapspl(FTYPE     t_1,    // Integral lower limit 
+                      FTYPE     t_2,    // Integral upper limit
+                      FTYPE     h,      // Trapezium size h 
+                      FTYPE     y[],    // Array of Y values 
+                      FTYPE     y2[],   // Array of derivatives dy/dx 
+                      FTYPE     x[],    // Array of Y values 
+                      uint32_t  n_pts)  // Number of pts in num function 
 
-_PUBLIC FTYPE trapspl(FTYPE    t_1,    // Integral lower limit 
-                      FTYPE    t_2,    // Integral upper limit
-                      FTYPE      h,    // Trapezium size h 
-                      FTYPE    y[],    // Array of Y values 
-                      FTYPE   y2[],    // Array of derivatives dy/dx 
-                      FTYPE    x[],    // Array of Y values 
-                      int    n_pts)    // Number of pts in num function 
-
-{   int i,
-        i_pts;
+{   uint32_t i,
+             i_pts;
 
     FTYPE sum,
          comp,
@@ -664,7 +656,7 @@ _PUBLIC FTYPE trapspl(FTYPE    t_1,    // Integral lower limit
        h = FABS(t_2 - t_1) / i_pts;
     }
     else
-       i_pts = (int)(t_pts);
+       i_pts = (int32_t)(t_pts);
 
 
 
@@ -699,25 +691,26 @@ _PUBLIC FTYPE trapspl(FTYPE    t_1,    // Integral lower limit
 
 
 
-/*------------------------------------------------------------------------------
-    Integration routine using Simpsons rule ...
-------------------------------------------------------------------------------*/
+/*-----------------------------------------*/
+/* Integration routine using Simpsons rule */
+/*-----------------------------------------*/
 
-_PUBLIC FTYPE Simpson_spl(FTYPE        from,   // Integral lower limit
-                          FTYPE          to,   // Integral upper limit
-                          FTYPE        step,   // Simpson step length
-                          FTYPE   y_table[],   // Array of Y values
-                          FTYPE  yd_table[],   // Array of derivatives
-                          FTYPE   x_table[],   // Array of X values
-                          int         n_pts)   // Number of pts in function
+_PUBLIC FTYPE Simpson_spl(FTYPE    from,         // Integral lower limit
+                          FTYPE     to,          // Integral upper limit
+                          FTYPE     step,        // Simpson step length
+                          FTYPE     y_table[],   // Array of Y values
+                          FTYPE     yd_table[],  // Array of derivatives
+                          FTYPE     x_table[],   // Array of X values
+                          uint32_t  n_pts)       // Number of pts in function
 
-{  int i,
-       s_pts;
+{  uint32_t i,
+            s_pts;
 
-   FTYPE sum,
-         sume,
-         sumo,
-         val;
+   FTYPE    sum,
+            sume,
+            sumo,
+            val;
+
 
     /*-------------------------------------------------------------------------*/
     /* Get number of points over which integration will take place, if this is */
@@ -740,9 +733,9 @@ _PUBLIC FTYPE Simpson_spl(FTYPE        from,   // Integral lower limit
     /* Sum odd points */
     /*----------------*/
 
-    i   = 0;
+    i    = 0;
     sumo = 0.0;
-    val = from + step;
+    val  = from + step;
 
     do {  sumo += 4*splint(x_table,y_table,yd_table,n_pts,val);
           val  += 2*step;
@@ -754,9 +747,9 @@ _PUBLIC FTYPE Simpson_spl(FTYPE        from,   // Integral lower limit
     /* Sum even points */
     /* ----------------*/
 
-    i = 2;
+    i    = 2;
     sume = 0.0;
-    val = from + 2*step;
+    val  = from + 2*step;
 
     do {  sume += 2*splint(x_table,y_table,yd_table,n_pts,val);
           val += 2*step;
@@ -776,11 +769,12 @@ _PUBLIC FTYPE Simpson_spl(FTYPE        from,   // Integral lower limit
 
 
 
-/*------------------------------------------------------------------------------
-    Routine to differentiate using Milnes' method ...
-------------------------------------------------------------------------------*/
 
-_PUBLIC FTYPE Milne_diff(int el, FTYPE h, FTYPE y_arr[])
+/*-----------------------------------------------*/
+/* Routine to differentiate using Milne's method */
+/*-----------------------------------------------*/
+
+_PUBLIC FTYPE Milne_diff(uint32_t el, FTYPE h, FTYPE y_arr[])
 
 {   return((-3 * y_arr[el - 1] + 4*y_arr[el] - y_arr[el + 1]) / (2*h));
 }
@@ -788,35 +782,36 @@ _PUBLIC FTYPE Milne_diff(int el, FTYPE h, FTYPE y_arr[])
 
 
 
-/*------------------------------------------------------------------------------
-    Global definitions required by linmin/f1dim routines ...
-------------------------------------------------------------------------------*/
+/*------------------------------------------------------*/
+/* Global definitions required by linmin/f1dim routines */
+/*------------------------------------------------------*/
 
-int ncom = 0;
+_PRIVATE int32_t ncom = 0;
 
-FTYPE pcom[MAX_D]  = { 0.0 },
-      xicom[MAX_D] = { 0.0 },
-      (*nrfunc)()  = (FTYPE *)NULL;
+_PRIVATE FTYPE   pcom[MAX_D]  = { 0.0 },
+                 xicom[MAX_D] = { 0.0 },
+                 (*nrfunc)()  = (FTYPE (*)())NULL;
 
-/*------------------------------------------------------------------------------
-    Linear minimisation routine ...
-------------------------------------------------------------------------------*/
+
+/*-----------------------------*/
+/* Linear minimisation routine */
+/*-----------------------------*/
 
 _PRIVATE void linmin(FTYPE        p[],
                      FTYPE       xi[],
-                     int            n,
+                     uint32_t       n,
                      FTYPE      *fret,
                      FTYPE  (* func)())
 
-{   int j;
+{   uint32_t j;
 
-    FTYPE xx,
-          xmin,
-          fx,
-          fb,
-          fa,
-          bx,
-          ax;
+    FTYPE    xx,
+             xmin,
+             fx,
+             fb,
+             fa,
+             bx,
+             ax;
 
 
     /*---------------------------------------------------------------------*/
@@ -847,8 +842,8 @@ _PRIVATE void linmin(FTYPE        p[],
     xx = 1.0;
     bx = 2.0;
 
-    mnbrak(&ax,&xx,&bx,&fa,&fx,&fb,f1dim);
-    *fret = Brent(ax,xx,bx,f1dim,TOL,&xmin);
+    mnbrak(&ax,&xx,&bx,&fa,&fx,&fb,(void *)f1dim);
+    *fret = Brent(ax,xx,bx,(void *)f1dim,TOL,&xmin);
 
 
     /*----------------------------*/
@@ -863,13 +858,13 @@ _PRIVATE void linmin(FTYPE        p[],
 
 
 
-/*------------------------------------------------------------------------------
-    This function MUST accompany linmin ...
-------------------------------------------------------------------------------*/
+/*-------------------------------------*/
+/* This function MUST accompany linmin */
+/*-------------------------------------*/
 
 _PRIVATE FTYPE f1dim(FTYPE x)
 
-{   int j;
+{   uint32_t j;
 
     FTYPE f,
           xt[32] = { 0.0 };
@@ -884,9 +879,9 @@ _PRIVATE FTYPE f1dim(FTYPE x)
 
 
 
-/*------------------------------------------------------------------------------
-    Routine to minimise a linear function using Brent's method ...
-------------------------------------------------------------------------------*/
+/*------------------------------------------------------------*/
+/* Routine to minimise a linear function using Brent's method */
+/*------------------------------------------------------------*/
 
 _PUBLIC FTYPE Brent(FTYPE      ax,    // Bracket 1
                     FTYPE      bx,    // Bracket 2
@@ -894,6 +889,7 @@ _PUBLIC FTYPE Brent(FTYPE      ax,    // Bracket 1
                     FTYPE ( *f)(),    // Function to be minimised
                     FTYPE     tol,    // Relaxation tolerance
                     FTYPE   *xmin)    // X co-ordinate of minimum
+
 
     /*-------------------------------------------------------------------------*/
     /* Given a function f, and given a bracketing triplet of abiscissas ax,    */
@@ -904,27 +900,28 @@ _PUBLIC FTYPE Brent(FTYPE      ax,    // Bracket 1
     /* returned function value                                                 */
     /* ------------------------------------------------------------------------*/
 
-{   int iter;
+{   uint32_t iter;
 
-    FTYPE a,
-          b,
-          d,
-          etemp,
-          fu,
-          fv,
-          fw,
-          fx,
-          p,
-          q,
-          r,
-          tol1,
-          tol2,
-          u,
-          v,
-          w,
-          x,
-          xm,
-          e = 0.0;
+    FTYPE    a,
+             b,
+             d,
+             etemp,
+             fu,
+             fv,
+             fw,
+             fx,
+             p,
+             q,
+             r,
+             tol1,
+             tol2,
+             u,
+             v,
+             w,
+             x,
+             xm,
+             e      = 0.0;
+
 
     /*---------------------------------------------------------------------*/
     /* a and b must be in ascending order, though the input abscissas need */
@@ -1043,6 +1040,7 @@ _PUBLIC FTYPE Brent(FTYPE      ax,    // Bracket 1
    }
    pups_error("[Brent] too many iterations");
 
+  
    /*---------------------------------------------*/
    /* Stop compiler from producing error messages */
    /*---------------------------------------------*/
@@ -1052,20 +1050,21 @@ _PUBLIC FTYPE Brent(FTYPE      ax,    // Bracket 1
 
 
 
-/*------------------------------------------------------------------------------
-    Minimisation in N dimesions using Powells' method ...
-------------------------------------------------------------------------------*/
 
-_PUBLIC void Powell(FTYPE          p[],  // Co-ordinate of minimum
-                    FTYPE  xi[][MAX_D],  // Direction set matrix
-                    int              n,  // Number of dimensions
-                    int        maxiter,  // Iteration limit
-                    FTYPE         ftol,  // Relaxation tolerance
-                    int          *iter,  // Actual iterations
-                    FTYPE        *fret,  // Value of minimum
-                    FTYPE   (* func)(),  // Function to minimise
-                    FTYPE   (* m_f1)(),
-                    FTYPE   (* m_f2)())
+/*----------------------------------------------------*/
+/* Minimisation in N dimensions using Powells' method */
+/*----------------------------------------------------*/
+
+_PUBLIC void Powell(FTYPE      p[],          // Co-ordinate of minimum
+                    FTYPE      xi[][MAX_D],  // Direction set matrix
+                    uint32_t   n,            // Number of dimensions
+                    uint32_t   maxiter,      // Iteration limit
+                    FTYPE      ftol,         // Relaxation tolerance
+                    uint32_t   *iter,        // Actual iterations
+                    FTYPE      *fret,        // Value of minimum
+                    FTYPE      (* func)(),   // Function to minimise
+                    FTYPE      (* m_f1)(),
+                    FTYPE      (* m_f2)())
 
 
     /*-------------------------------------------------------------------------*/
@@ -1082,17 +1081,18 @@ _PUBLIC void Powell(FTYPE          p[],  // Co-ordinate of minimum
     /* "Numerical Recipes in C, pp.314-316                                     */
     /* ------------------------------------------------------------------------*/
 
-{   int i,
-        j,
-        ibig;
+{    int32_t i,
+             j,
+             ibig;
 
-    FTYPE t,
-          fptt,
-          fp,
-          del,
-          pt[MAX_D]  = { 0.0 },
-          ptt[MAX_D] = { 0.0 },
-          xit[MAX_D] = { 0.0 };
+    FTYPE    t,
+             fptt,
+             fp,
+             del,
+             pt[MAX_D]  = { 0.0 },
+             ptt[MAX_D] = { 0.0 },
+             xit[MAX_D] = { 0.0 };
+
 
     /*-----------------------*/
     /* Compute initial point */
@@ -1105,7 +1105,7 @@ _PUBLIC void Powell(FTYPE          p[],  // Co-ordinate of minimum
 
 
     /*-------------------*/
-    /* Save intial point */
+    /* Save  int32_tial point */
     /*-------------------*/
 
     for(j=0; j<n; ++j)
@@ -1232,9 +1232,9 @@ _PUBLIC void Powell(FTYPE          p[],  // Co-ordinate of minimum
 
 
 
-/*------------------------------------------------------------------------------
-    Routine to bracket a minimum in 1 dimension ...
-------------------------------------------------------------------------------*/
+/*---------------------------------------------*/
+/* Routine to bracket a minimum in 1 dimension */
+/*---------------------------------------------*/
 
 _PUBLIC void mnbrak(FTYPE         *ax,   // Bracket 1 
                     FTYPE         *bx,   // Bracket 2
@@ -1242,7 +1242,7 @@ _PUBLIC void mnbrak(FTYPE         *ax,   // Bracket 1
                     FTYPE         *fa,   // f(bracket 1)
                     FTYPE         *fb,   // f(bracket 2)
                     FTYPE         *fc,   // f(bracket 3)
-                    FTYPE  (* func)())   // Function to minimise 
+                    FTYPE   (*func)())   // Function to minimise 
 
 {   FTYPE u,
           r,
@@ -1297,9 +1297,7 @@ _PUBLIC void mnbrak(FTYPE         *ax,   // Bracket 1
         /* prevent possible devision by zero                                    */
         /*----------------------------------------------------------------------*/
 
-        u = (*bx) - ((*bx - *cx)*q - (*bx - *ax)*r) /
-                    (2.0*SIGN(MAX(FABS(q - r),TINY),q - r));
-
+        u    = (*bx) - ((*bx - *cx)*q - (*bx - *ax)*r) / (2.0*SIGN(MAX(FABS(q - r),TINY),q - r));
         ulim = (*bx) + GLIMIT*(*cx - *bx);
 
 
@@ -1403,10 +1401,9 @@ _PUBLIC void mnbrak(FTYPE         *ax,   // Bracket 1
 
 
 
-/*------------------------------------------------------------------------------
-    Find the minimum of a function of one dimension using the Golden
-    section search ...
-------------------------------------------------------------------------------*/
+/*------------------------------------------------------------------------------*/
+/* Find the minimum of one dimensional function using the Golden section search */
+/*------------------------------------------------------------------------------*/
 
 _PUBLIC FTYPE golden(FTYPE       ax,   // Guess [bracket 1 co-ordinate] 
                      FTYPE       bx,   // Guess [bracket 2 co-ordinate]
@@ -1495,22 +1492,22 @@ _PUBLIC FTYPE golden(FTYPE       ax,   // Guess [bracket 1 co-ordinate]
 
 
 
-/*------------------------------------------------------------------------------
-    Routine to minimise a function of N dimesions stochatically using
-    simulated annealing ...
-------------------------------------------------------------------------------*/
+/*-----------------------------------------------*/
+/* Minimise N dimentional function stochatically */
+/* using simulated annealing                     */
+/*-----------------------------------------------*/
 
-_PUBLIC void anneal(FTYPE          p[],   // Co-ordinate of minimum 
-                    FTYPE  delta_range,   // Delta range for random jumping 
-                    int              n,   // Number of dimensions in function
-                    FTYPE         ftol,   // Relaxation tolerance
-                    int          *iter,   // Number of iterations
-                    FTYPE        *fret,   // Value of minimum
-                    FTYPE   (* func)(),   // Function to minimise
-                    FTYPE   (* m_f1)(),   // Loop monitor function
-                    FTYPE   (* m_f2)())   // Exit monitor function
+_PUBLIC void anneal(FTYPE                 p[],   // Co-ordinate of minimum 
+                    FTYPE         delta_range,   // Delta range for random jumping 
+                    uint32_t                n,   // Number of dimensions in function
+                    FTYPE                ftol,   // Relaxation tolerance
+                    uint32_t            *iter,   // Number of iterations
+                    FTYPE               *fret,   // Value of minimum
+                    FTYPE          (* func)(),   // Function to minimise
+                    FTYPE          (* m_f1)(),   // Loop monitor function
+                    FTYPE          (* m_f2)())   // Exit monitor function
 
-{   int i;
+{   uint32_t i;
 
     _BOOLEAN looper = TRUE;
 

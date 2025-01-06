@@ -1,9 +1,9 @@
 #-------------------------------------------------------------------------
 # Makefile for compatibility library (when bubble memory is not being use) 
-# M.A. O'Neill, Tumbling Dice 04/01/2022
+# M.A. O'Neill, Tumbling Dice 12/12/2024
 #-------------------------------------------------------------------------
 
-CFLAGS  = 	TARGET_CFLAGS TARGET_ARCHDEPCFLAGS -fPIC -finline-functions -c
+CFLAGS  = 	TARGET_CFLAGS TARGET_ARCHDEPCFLAGS -fPIC -finline-functions -funsafe-math-optimizations -c
 CC	=	gcc
 
 ALL	=	nobubble.o

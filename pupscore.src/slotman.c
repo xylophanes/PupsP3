@@ -1,5 +1,5 @@
-/*-----------------------------------------------------------------------------
-    Purpose: Library slot manager.
+/*---------------------------------
+    Purpose: Library slot manager
 
     Author:  M.A. O'Neill
              Tumbling Dice Ltd
@@ -8,10 +8,10 @@
              NE3 4RT
              United Kingdom
 
-    Version: 2.00 
-    Dated:   4th January 2023
+    Version: 2.02 
+    Dated:   11th December 2024
     E-Mail:  mao@tumblingdice.co.uk
------------------------------------------------------------------------------*/
+---------------------------------*/
 
 #include <me.h>
 #include <dlfcn.h>
@@ -23,31 +23,29 @@
 #define  __NOT_LIB_SOURCE__
 
 
-/*------------------------------------------------------------------------------
-    Slot manager build date ...
------------------------------------------------------------------------------*/
+/*------------*/
+/* Build date */
+/*------------*/
 
 _PUBLIC char appl_build_time[SSIZE] = "";
 _PUBLIC char appl_build_date[SSIZE] = "";
 
 
+/*-------------------*/
+/* Private variables */
+/*-------------------*/
 
-
-/*-----------------------------------------------------------------------------
-    Variables which are private to this library ...
------------------------------------------------------------------------------*/
-
-_PRIVATE unsigned int max_slots     = 0;  // Slots used 
-_PRIVATE unsigned int max_use_slots = 0;  // Usage slots used 
+_PRIVATE uint32_t  max_slots     = 0;  // Slots used 
+_PRIVATE uint32_t  max_use_slots = 0;  // Usage slots used 
 
 
 
-/*-----------------------------------------------------------------------------
-    Public variables exported by this library ...
------------------------------------------------------------------------------*/
+/*-------------------------------------------*/
+/* Public variables exported by this library */
+/*-------------------------------------------*/
 
 // Segment slot identifier functions -- initialised to NULL
-_PUBLIC void (*seg_slot[MAX_SLOTS])(int); 
+_PUBLIC void (*seg_slot[MAX_SLOTS])(const int32_t); 
 
 
 // Usage functions -- initialised to NULL 
@@ -58,70 +56,70 @@ _PUBLIC void (*usage_slot[MAX_SLOTS])(void);
 /* Segment slot function pointers -- initialised to NULL */
 /*-------------------------------------------------------*/
 
-_PUBLIC void  (*seg_slot_1)(int)  , 
-              (*seg_slot_2)(int)  , 
-              (*seg_slot_3)(int)  , 
-              (*seg_slot_4)(int)  , 
-              (*seg_slot_5)(int)  , 
-              (*seg_slot_6)(int)  , 
-              (*seg_slot_7)(int)  , 
-              (*seg_slot_8)(int)  , 
-              (*seg_slot_9)(int)  , 
-              (*seg_slot_10)(int) , 
-              (*seg_slot_11)(int) , 
-              (*seg_slot_12)(int) , 
-              (*seg_slot_13)(int) , 
-              (*seg_slot_14)(int) , 
-              (*seg_slot_15)(int) , 
-              (*seg_slot_16)(int) ,
-              (*seg_slot_17)(int) ,
-              (*seg_slot_18)(int) , 
-              (*seg_slot_19)(int) , 
-              (*seg_slot_20)(int) , 
-              (*seg_slot_21)(int) , 
-              (*seg_slot_22)(int) ,
-              (*seg_slot_23)(int) ,
-              (*seg_slot_24)(int) , 
-              (*seg_slot_25)(int) , 
-              (*seg_slot_26)(int) , 
-              (*seg_slot_27)(int) , 
-              (*seg_slot_28)(int) ,
-              (*seg_slot_29)(int) ,
-              (*seg_slot_30)(int) ,
-              (*seg_slot_31)(int) ,
-              (*seg_slot_32)(int) ;
-              (*seg_slot_33)(int) ;
-              (*seg_slot_34)(int) ;
-              (*seg_slot_35)(int) ;
-              (*seg_slot_36)(int) ;
-              (*seg_slot_37)(int) ;
-              (*seg_slot_38)(int) ;
-              (*seg_slot_39)(int) ;
-              (*seg_slot_40)(int) ;
-              (*seg_slot_41)(int) ;
-              (*seg_slot_42)(int) ;
-              (*seg_slot_43)(int) ;
-              (*seg_slot_44)(int) ;
-              (*seg_slot_45)(int) ;
-              (*seg_slot_46)(int) ;
-              (*seg_slot_47)(int) ;
-              (*seg_slot_48)(int) ;
-              (*seg_slot_49)(int) ;
-              (*seg_slot_50)(int) ;
-              (*seg_slot_51)(int) ;
-              (*seg_slot_52)(int) ;
-              (*seg_slot_53)(int) ;
-              (*seg_slot_54)(int) ;
-              (*seg_slot_55)(int) ;
-              (*seg_slot_56)(int) ;
-              (*seg_slot_57)(int) ;
-              (*seg_slot_58)(int) ;
-              (*seg_slot_59)(int) ;
-              (*seg_slot_60)(int) ;
-              (*seg_slot_61)(int) ;
-              (*seg_slot_62)(int) ;
-              (*seg_slot_63)(int) ;
-              (*seg_slot_64)(int) ;
+_PUBLIC void  (*seg_slot_1) (int32_t) , 
+              (*seg_slot_2) (int32_t) , 
+              (*seg_slot_3) (int32_t) , 
+              (*seg_slot_4) (int32_t) , 
+              (*seg_slot_5) (int32_t) , 
+              (*seg_slot_6) (int32_t) , 
+              (*seg_slot_7) (int32_t) , 
+              (*seg_slot_8) (int32_t) , 
+              (*seg_slot_9) (int32_t) , 
+              (*seg_slot_10)(int32_t) , 
+              (*seg_slot_11)(int32_t) , 
+              (*seg_slot_12)(int32_t) , 
+              (*seg_slot_13)(int32_t) , 
+              (*seg_slot_14)(int32_t) , 
+              (*seg_slot_15)(int32_t) , 
+              (*seg_slot_16)(int32_t) ,
+              (*seg_slot_17)(int32_t) ,
+              (*seg_slot_18)(int32_t) , 
+              (*seg_slot_19)(int32_t) , 
+              (*seg_slot_20)(int32_t) , 
+              (*seg_slot_21)(int32_t) , 
+              (*seg_slot_22)(int32_t) ,
+              (*seg_slot_23)(int32_t) ,
+              (*seg_slot_24)(int32_t) , 
+              (*seg_slot_25)(int32_t) , 
+              (*seg_slot_26)(int32_t) , 
+              (*seg_slot_27)(int32_t) , 
+              (*seg_slot_28)(int32_t) ,
+              (*seg_slot_29)(int32_t) ,
+              (*seg_slot_30)(int32_t) ,
+              (*seg_slot_31)(int32_t) ,
+              (*seg_slot_32)(int32_t) ,
+              (*seg_slot_33)(int32_t) ,
+              (*seg_slot_34)(int32_t) ,
+              (*seg_slot_35)(int32_t) ,
+              (*seg_slot_36)(int32_t) ,
+              (*seg_slot_37)(int32_t) ,
+              (*seg_slot_38)(int32_t) ,
+              (*seg_slot_39)(int32_t) ,
+              (*seg_slot_40)(int32_t) ,
+              (*seg_slot_41)(int32_t) ,
+              (*seg_slot_42)(int32_t) ,
+              (*seg_slot_43)(int32_t) ,
+              (*seg_slot_44)(int32_t) ,
+              (*seg_slot_45)(int32_t) ,
+              (*seg_slot_46)(int32_t) ,
+              (*seg_slot_47)(int32_t) ,
+              (*seg_slot_48)(int32_t) ,
+              (*seg_slot_49)(int32_t) ,
+              (*seg_slot_50)(int32_t) ,
+              (*seg_slot_51)(int32_t) ,
+              (*seg_slot_52)(int32_t) ,
+              (*seg_slot_53)(int32_t) ,
+              (*seg_slot_54)(int32_t) ,
+              (*seg_slot_55)(int32_t) ,
+              (*seg_slot_56)(int32_t) ,
+              (*seg_slot_57)(int32_t) ,
+              (*seg_slot_58)(int32_t) ,
+              (*seg_slot_59)(int32_t) ,
+              (*seg_slot_60)(int32_t) ,
+              (*seg_slot_61)(int32_t) ,
+              (*seg_slot_62)(int32_t) ,
+              (*seg_slot_63)(int32_t) ,
+              (*seg_slot_64)(int32_t) ;
 
 
 
@@ -129,15 +127,15 @@ _PUBLIC void  (*seg_slot_1)(int)  ,
 /* Segment slot identifier functions -- initialised to NULL */
 /*----------------------------------------------------------*/
 
-_PUBLIC void  (*usage_slot_1)(void)  , 
-              (*usage_slot_2)(void)  , 
-              (*usage_slot_3)(void)  , 
-              (*usage_slot_4)(void)  , 
-              (*usage_slot_5)(void)  , 
-              (*usage_slot_6)(void)  , 
-              (*usage_slot_7)(void)  , 
-              (*usage_slot_8)(void)  , 
-              (*usage_slot_9)(void)  , 
+_PUBLIC void  (*usage_slot_1) (void) , 
+              (*usage_slot_2) (void) , 
+              (*usage_slot_3) (void) , 
+              (*usage_slot_4) (void) , 
+              (*usage_slot_5) (void) , 
+              (*usage_slot_6) (void) , 
+              (*usage_slot_7) (void) , 
+              (*usage_slot_8) (void) , 
+              (*usage_slot_9) (void) , 
               (*usage_slot_10)(void) , 
               (*usage_slot_11)(void) , 
               (*usage_slot_12)(void) , 
@@ -160,49 +158,49 @@ _PUBLIC void  (*usage_slot_1)(void)  ,
               (*usage_slot_29)(void) ,
               (*usage_slot_30)(void) ,
               (*usage_slot_31)(void) ,
-              (*usage_slot_32)(void) ;
-              (*usage_slot_33)(void) ;
-              (*usage_slot_34)(void) ;
-              (*usage_slot_35)(void) ;
-              (*usage_slot_36)(void) ;
-              (*usage_slot_37)(void) ;
-              (*usage_slot_38)(void) ;
-              (*usage_slot_39)(void) ;
-              (*usage_slot_40)(void) ;
-              (*usage_slot_41)(void) ;
-              (*usage_slot_42)(void) ;
-              (*usage_slot_43)(void) ;
-              (*usage_slot_44)(void) ;
-              (*usage_slot_45)(void) ;
-              (*usage_slot_46)(void) ;
-              (*usage_slot_47)(void) ;
-              (*usage_slot_48)(void) ;
-              (*usage_slot_49)(void) ;
-              (*usage_slot_50)(void) ;
-              (*usage_slot_51)(void) ;
-              (*usage_slot_52)(void) ;
-              (*usage_slot_53)(void) ;
-              (*usage_slot_54)(void) ;
-              (*usage_slot_55)(void) ;
-              (*usage_slot_57)(void) ;
-              (*usage_slot_58)(void) ;
-              (*usage_slot_59)(void) ;
-              (*usage_slot_60)(void) ;
-              (*usage_slot_61)(void) ;
-              (*usage_slot_62)(void) ;
-              (*usage_slot_63)(void) ;
+              (*usage_slot_32)(void) ,
+              (*usage_slot_33)(void) ,
+              (*usage_slot_34)(void) ,
+              (*usage_slot_35)(void) ,
+              (*usage_slot_36)(void) ,
+              (*usage_slot_37)(void) ,
+              (*usage_slot_38)(void) ,
+              (*usage_slot_39)(void) ,
+              (*usage_slot_40)(void) ,
+              (*usage_slot_41)(void) ,
+              (*usage_slot_42)(void) ,
+              (*usage_slot_43)(void) ,
+              (*usage_slot_44)(void) ,
+              (*usage_slot_45)(void) ,
+              (*usage_slot_46)(void) ,
+              (*usage_slot_47)(void) ,
+              (*usage_slot_48)(void) ,
+              (*usage_slot_49)(void) ,
+              (*usage_slot_50)(void) ,
+              (*usage_slot_51)(void) ,
+              (*usage_slot_52)(void) ,
+              (*usage_slot_53)(void) ,
+              (*usage_slot_54)(void) ,
+              (*usage_slot_55)(void) ,
+              (*usage_slot_57)(void) ,
+              (*usage_slot_58)(void) ,
+              (*usage_slot_59)(void) ,
+              (*usage_slot_60)(void) ,
+              (*usage_slot_61)(void) ,
+              (*usage_slot_62)(void) ,
+              (*usage_slot_63)(void) ,
               (*usage_slot_64)(void) ;
 
 
 
 
-/*-----------------------------------------------------------------------------
-    Initialise the slot manager ...
------------------------------------------------------------------------------*/
+/*-----------------------------*/
+/* Initialise the slot manager */
+/*-----------------------------*/
 
 _PUBLIC void slot_manager_init(void)
 
-{   int i;
+{   uint32_t i;
 
     for(i=0; i<MAX_SLOTS; ++i)
     {   seg_slot[i]   = (void *)NULL;
@@ -343,15 +341,15 @@ _PUBLIC void slot_manager_init(void)
 
 
 
-/*-----------------------------------------------------------------------------
-    Display current slot usage ...
------------------------------------------------------------------------------*/
+/*----------------------------*/
+/* Display current slot usage */
+/*----------------------------*/
 
-_PUBLIC void slot_usage(const int level)
+_PUBLIC void slot_usage(const int32_t level)
 
-{   int i;
+{   uint32_t    i;
 
-    (void)fprintf(stderr,"    slot manager %s, (C) Tumbling Dice, 1999-2023 (built %s %s)\n",SLOTMAN_VERSION,__TIME__,__DATE__);
+    (void)fprintf(stderr,"    slot manager %s, (C) Tumbling Dice, 1999-2024 (gcc %s: built %s %s)\n",SLOTMAN_VERSION,__VERSION__,__TIME__,__DATE__);
     (void)fflush(stderr);
 
     (void)fprintf(stderr,"\n");
@@ -372,27 +370,16 @@ _PUBLIC void slot_usage(const int level)
 
 
 
-/*-----------------------------------------------------------------------------
-    Display application usage ...
------------------------------------------------------------------------------*/
+/*---------------------------*/
+/* Display application usage */
+/*---------------------------*/
 
 _PUBLIC void usage(void)
 
-{   int i;
+{   uint32_t i;
 
-    (void)fprintf(stderr,"Slot manager %s (C) Tumbling Dice, 1999-2023 (built %s %s), usage:\n\n",SLOTMAN_VERSION,__TIME__,__DATE__);
+    (void)fprintf(stderr,"Slot manager %s (C) Tumbling Dice, 1999-2024 (gcc %s: built %s %s), usage:\n\n",SLOTMAN_VERSION,__VERSION__,__TIME__,__DATE__);
     (void)fflush(stderr);
-
-
-    #ifdef SECURE
-    #ifdef SINGLE_HOST_LICENSE
-    (void)fprintf(stderr,"    Single copy single host licence\n");
-    #else
-    (void)fprintf(stderr,"    Single copy multi host licence\n");
-    #endif /* SINGLE_HOST_LICENSE */
-    #else /* SECURE */
-    (void)fprintf(stderr,"    Multi copy multi host (unrestricted) licence\n");
-    #endif /* SECURE */
 
 
     #ifdef FLOAT
@@ -401,9 +388,13 @@ _PUBLIC void usage(void)
     (void)fprintf(stderr,"    Floating point representation is double precision (%d bytes)\n",sizeof(FTYPE));
     #endif /* FLOAT */
 
+    #ifndef SINGLE_THREAD
     #ifdef _OPENMP
     (void)fprintf(stderr,"    %d parallel (OMP) threads available\n",omp_get_max_threads());
-    #endif /* _OPENMP */
+    #endif /* _OPENMP       */
+    #else
+    (void)fprintf(stderr,"    OMP is disabled\n");
+    #endif /* SINGLE_THREAD */
 
     (void)fprintf(stderr,"\n");
 
@@ -467,10 +458,10 @@ _PUBLIC void usage(void)
 
 
 #ifdef DLL_SUPPORT
-/*-----------------------------------------------------------------------------
-    Routine to add a slot to the slot manager - this is generally done by
-    a DLL after it has loaded itself ...
------------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------------*/
+/* Routine to add a slot to the slot manager - this is generally done by */
+/* a DLL after loading                                                   */
+/*-----------------------------------------------------------------------*/
 
 _PUBLIC void add_dll_slot(const void *d_l_handle, const char *dll_name)
 
@@ -482,14 +473,14 @@ _PUBLIC void add_dll_slot(const void *d_l_handle, const char *dll_name)
      /*--------------*/
 
      if(d_l_handle == (const void *)NULL || dll_name == (const char *)NULL)
-        error("[add dll slot] incorrect parameter(s)"); 
+        pups_error("[add dll slot] incorrect parameter(s)"); 
 
      if(max_slots > MAX_SLOTS)
-        error("[add_dll_slot] slot manager has no free slots");
+        pups_error("[add_dll_slot] slot manager has no free slots");
 
      (void)snprintf((char *)&slot_name[0],SSIZE,"%s_slot",dll_name);
      if((seg_slot[max_slots++] = (void *)dlsym(d_l_handle,slot_name)) == NULL)
-        error("add_dll_slot: no slot supplied by DLL");  
+        pups_error("add_dll_slot: no slot supplied by DLL");  
 
      (void)fprintf(stderr,"    %-24s [at 0x%010x] registered with slot manager at slot %04d\n",
                                                                                       dll_name,
@@ -501,24 +492,25 @@ _PUBLIC void add_dll_slot(const void *d_l_handle, const char *dll_name)
 
 
 
-/*-----------------------------------------------------------------------------
-    Routine to add a usage slot to the slot manager - this is generally done
-    by a DLL after it has been loaded ...
------------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------------*/
+/* Routine to add a usage slot to the slot manager - this is generally done */
+/* by a DLL after loading                                                   */
+/*--------------------------------------------------------------------------*/
 
 _PUBLIC void add_dll_usage_slot(const void *d_l_handle, const char *dll_usage_name)
 
 {    char usage_slot_name[SSIZE] = ""; 
+
 
      /*--------------*/
      /* Sanity check */
      /*--------------*/
 
      if(d_l_handle == (const void *)NULL || dll_usage_name == (const char *)NULL)
-        error("[add dll slot] incorrect parameter(s)"); 
+        pups_error("[add dll slot] incorrect parameter(s)"); 
 
      if(max_use_slots > MAX_SLOTS)
-        error("[add_dll_usage_slot] slot manager has no free usage slots");
+        pups_error("[add_dll_usage_slot] slot manager has no free usage slots");
 
      (void)snprintf(usage_slot_name,SSIZE,"%s_use_slot",dll_usage_name);
      if((usage_slot[max_slots] = (void *)dlsym(d_l_handle,
@@ -530,4 +522,3 @@ _PUBLIC void add_dll_usage_slot(const void *d_l_handle, const char *dll_usage_na
      }
 }
 #endif /* DLL_SUPPORT */
-

@@ -1,4 +1,4 @@
-/*-----------------------------------------------------------------------------
+/*----------------------------------------------------------------------------
     Copyright (C) 1991, 1992, 1993, 1994 Free Software Foundation, Inc.
     This file is part of the GNU C Library.
 
@@ -17,8 +17,8 @@
     the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
 
     Persistent heap modifications by Mark O'Neill (mao@tumblingdice.co.uk)
-    (C) 1998-2023 M.A. O'Neill, Tumbling Dice
-----------------------------------------------------------------------------*/
+    (C) 1998-2024 M.A. O'Neill, Tumbling Dice
+---------------------------------------------------------------------------*/
 
 #include <pheap.h>
 
@@ -35,7 +35,7 @@
 /* systems with potentially hostile include files.                         */
 /*-------------------------------------------------------------------------*/
 
-extern void *msm_sbrk __P ((const unsigned int hdes, size_t increment));
+extern void *msm_sbrk __P ((const uint32_t hdes, size_t increment));
 #endif /* __GNU_LIBRARY__ */
 
 #ifndef NULL
@@ -52,13 +52,13 @@ extern void *msm_sbrk __P ((const unsigned int hdes, size_t increment));
 #ifdef __STDC__
 _PUBLIC __ptr_t __default_phmorecore (int hdes,  ptrdiff_t increment)
 #else
-_PUBLIC __ptr_t __default_phmorecore (int hdes,  int increment)
+_PUBLIC __ptr_t __default_phmorecore (int hdes,  int32_t   increment)
 #endif /* __STDC__ */
 {
-  __ptr_t result = (__ptr_t)msm_sbrk(hdes, increment);
+    __ptr_t result = (__ptr_t)msm_sbrk(hdes, increment);
 
-  if(result == (__ptr_t) -1)
-    return NULL;
+    if(result == (__ptr_t) -1)
+      return NULL;
 
-  return result;
+    return result;
 }

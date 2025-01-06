@@ -1,4 +1,4 @@
-/*---------------------------------------------------------------------------------------
+/*---------------------------------------------------------------------------
     Purpose: tty homeostat - recreates /dev/tty if something has destroyed it
 
     Author:  M.A. O'Neill
@@ -8,10 +8,10 @@
              NE3 4RT
              United Kingdom
 
-    Version: 3.00 
-    Dated:   6th October 2023 
+    Version: 3.02 
+    Dated:   10th October 2024 
     E-mail:  mao@tumblingdice.co.uk
----------------------------------------------------------------------------------------*/
+---------------------------------------------------------------------------*/
 
 #include <stdio.h>
 #include <string.h>
@@ -22,13 +22,17 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <sys/sysmacros.h>
+#include <stdint.h>
 
 
+/*---------*/
+/* Defines */
+/*---------*/
 /*------------------*/
 /* Version of mktty */
 /*------------------*/
 
-#define MKTTY_VERSION   "3.00"
+#define MKTTY_VERSION   "3.02"
 
 
 /*-------------------*/
@@ -36,7 +40,7 @@
 /*-------------------*/
 
 #define _PUBLIC
-#define _BOOLEAN short int
+#define _BOOLEAN int16_t
 #define FALSE 0
 #define TRUE  255
 
@@ -45,21 +49,22 @@
 /* Main entry point */
 /*------------------*/
 
-_PUBLIC int main(int argc, char *argv[])
+_PUBLIC int32_t main(int32_t argc, char *argv[])
 
 {   _BOOLEAN verbose = FALSE;
 
     errno = 0;
 
-    /*---------------*/
-    /* Display usage */
-    /*---------------*/
+
+    /*--------------------*/
+    /* Parse command line */
+    /*--------------------*/
 
     if(argc == 2)
     {  if(strcmp(argv[1],"-verbose") == 0)
           verbose = TRUE;
        else
-       {  (void)fprintf(stderr,"\nmktty version %s, (C) Tumbling Dice 2004-2023 (built %s)\n\n",MKTTY_VERSION,__TIME__,__DATE__);
+       {  (void)fprintf(stderr,"\nmktty version %s, (C) Tumbling Dice 2004-2024 (gcc %s: built %s)\n\n",MKTTY_VERSION,__VERSION__,__TIME__,__DATE__);
           (void)fprintf(stderr,"MKTTY is free software, covered by the GNU General Public License, and you are\n");
           (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
           (void)fprintf(stderr,"See the GPL and LGPL licences at www.gnu.org for further details\n");
@@ -73,7 +78,7 @@ _PUBLIC int main(int argc, char *argv[])
     }
 
     else if(argc > 2)
-    {  (void)fprintf(stderr,"\nmktty version %s, (C) Tumbling Dice 2004-2023 (built %s %s)\n\n",MKTTY_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nmktty version %s, (C) Tumbling Dice 2004-2024 (gcc %s: built %s %s)\n\n",MKTTY_VERSION,__VERSION__,__TIME__,__DATE__);
        (void)fprintf(stderr,"MKTTY is free software, covered by the GNU General Public License, and you are\n");
        (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
        (void)fprintf(stderr,"See the GPL and LGPL licences at www.gnu.org for further details\n");

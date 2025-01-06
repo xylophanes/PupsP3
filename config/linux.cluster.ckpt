@@ -1,7 +1,7 @@
-#------------------------------------------------------------------------
-# Configuration file for cluster enabled Linux system with checkpointing
-# M.A. O'Neill, Tumblng Dice, 2010-2022
-#------------------------------------------------------------------------
+#------------------------------------------------------------------------------------
+# Configuration file for cluster enabled Linux system with checkpointing [production]
+# M.A. O'Neill, Tumblng Dice, 2010-2024
+#------------------------------------------------------------------------------------
 
 TARGET_OS
 linux
@@ -13,25 +13,22 @@ TARGET_PHMALLOC_CFLAGS
 # Architecture dependent compile flags
 #--------------------------------------
 TARGET_ARCHDEPCFLAGS
--DBSD_FUNCTION_SUPPORT -DHAVE_CURSES -DSSH_SUPPORT -DHAVE_READLINE -DGLIBC -DTIFF_SUPPORT -DIMG_SUPPORT -DZLIB_SUPPORT
+-DBSD_FUNCTION_SUPPORT -DHAVE_CURSES -DSSH_SUPPORT -DHAVE_READLINE -DGLIBC -DZLIB_SUPPORT
 
-#-------------------------------------------------------------------------------------------------------------
-# Comment -DESCURE line if you DON'T want a secure installation (which is disk specific)
-# Vendor mail address is set appropriately for the vendor of the end application
-# Comment out pthread support if you don't want it (process migration for example cannot handle threads yet)
-#-------------------------------------------------------------------------------------------------------------
+#-------
+# CFLAGS
+#-------
 TARGET_CFLAGS
 -w -Wfatal-errors -O3 -rdynamic -I. -I../include.libs -D$ARCH -D_GNU_SOURCE -D_XOPEN_SUPPORT -DFTYPE -DPSRP_ENABLED
 -DCHAN_IS_POLL -DSHADOW_SUPPORT -DPERSISTENT_HEAP_SUPPORT -DSOCKET_SUPPORT -DDLL_SUPPORT -DPSRP_AUTHENTICATE
--DPTHREAD_SUPPORT -DIPV6_SUPPORT -DCRIU_SUPPORT -DBUBBLE_MEMORY_SUPPORT -DMAIL_SUPPORT -DZLIB_SUPPORT -DTIFF_SUPPORT
+-DPTHREAD_SUPPORT -DIPV6_SUPPORT -DCRIU_SUPPORT -DBUBBLE_MEMORY_SUPPORT -DMAIL_SUPPORT
 -D__NO_PROTO__ -DHAVE_PROC_FS 
-#-DSECURE -DSEQUENCE_SEED=9999 -DDISK_SERIAL='\"DSN\"' -DVENDOR_MAIL_ADDRESS='\"mao@tumblingdice.co.uk\"'
 
 #-------------------
 # Target load flags
 #-------------------
 TARGET_LDFLAGS
-../lib/libpups.so ../lib/libphmalloc.so ../lib/libbubble.a -lbsd -lreadline -lncurses -ltinfo -lm -ltiff -lcrypt -ldl -lz -lpthread
+../lib/cmain.o ../lib/libpups.so ../lib/libphmalloc.so ../lib/libbubble.a -lbsd -lreadline -lncurses -ltinfo -lm -ltiff -lcrypt -ldl -lz -lpthread
 
 #-----------------------------------
 # Architecture dependent load flags

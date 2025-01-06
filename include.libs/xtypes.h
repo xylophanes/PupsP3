@@ -1,5 +1,5 @@
-/*----------------------------------------------------------------------------- 
-    Header for extended type definitions used by PUPS.
+/*--------------------------------------------------- 
+    Header for extended type definitions used by PUPS
 
     Author:  M.A. O'Neill
              Tumbling Dice Ltd
@@ -9,13 +9,20 @@
              United Kingdom
 
     Version: 2.00 
-    Dated:   4th January 2023
+    Dated:    2024
+    12th December 2024
     E-Mail:  mao@tumblingdice.co.uk
-------------------------------------------------------------------------------*/
+---------------------------------------------------*/
 
 #ifndef XTYPES_H
 #define XTYPES_H
 
+
+/*-------------------------------------------*/
+/* Make sure we havr standard interger types */
+/*-------------------------------------------*/
+
+#include <stdint.h>
 
 /*-----------------------------------------------------------------*/
 /* The definitions that follow enable the PUPS libraries and other */
@@ -38,13 +45,12 @@ typedef enum {    FALSE,
 /*------------------------------------------------------*/
 
 
-#ifndef FALSE
-#    define FALSE 0
-#endif /* FALSE */
+#undef FALSE
+#define FALSE 0
 
-#ifndef TRUE
-#    define TRUE  1 
-#endif /*TRUE */
+#undef TRUE
+#define TRUE  255 
+
 #endif /* __BOOLEAN__ */
 
 #define NO_CHECKPOINTING (-1234)
@@ -62,7 +68,7 @@ typedef enum {    FALSE,
 #define _IMMORTAL static              // Variable exists between function calls
 #define _EXTERN   extern              // Define a variable as external
 #define _EXPORT   extern              // Header export variable definition
-#define _BOOLEAN  int                 // Define the Boolean type
+#define _BOOLEAN  int32_t             // Define the Boolean type
 #define _BYTE     unsigned char       // Definition of byte type
 #define _DYNAMIC                      // Dynamic object identifier
 #define _WRITEABLE                    // Writeable protected type modifier
@@ -86,9 +92,9 @@ typedef enum {    FALSE,
 /* Some common type definitions */
 /*------------------------------*/
 
-typedef unsigned long int psize_t;   // Used to set the contents of a pointer
-typedef unsigned int      pindex_t;  // Used for array indexing
-typedef unsigned int      des_t;     // File descriptor type
+typedef uint64_t         psize_t;   // Used to set the contents of a pointer
+typedef uint32_t         pindex_t;  // Used for array indexing
+typedef int32_t          des_t;     // File descriptor type
 
 
 
@@ -98,7 +104,7 @@ typedef unsigned int      des_t;     // File descriptor type
 /*--------------------------------------*/
 
 #define CHDUM '\0'
-#define IDUM  (int)0
+#define IDUM  (int32_t)0
 #define DDUM  (double)0.0
 
 

@@ -9,7 +9,7 @@
              United Kingdom
 
     Version: 2.00 
-    Dated:   4th January 2023
+    Dated:   5th February2024
     E-mail:  mao@tumblingdice.co.uk 
 
     Adapted from public domain ANSI header by J.R. Bammi [jrb@cadence.com]
@@ -47,13 +47,11 @@ typedef enum {    FALSE,
     Define FALSE and TRUE if they are not aready defined ...
 ------------------------------------------------------------------------------*/
 
-#ifndef FALSE 
+#undef FALSE 
 #define FALSE 0
-#endif /* FALSE */
 
-#ifndef TRUE
-#define TRUE  1 
-#endif /* TRUE */
+#undef TRUE
+#define TRUE  255 
 
 #endif /* __BOOLEAN__ */
 
@@ -80,7 +78,7 @@ typedef double real;
 #ifdef __BOOLEAN__
 #define _BOOLEAN       Boolean
 #else
-#define _BOOLEAN       int 
+#define _BOOLEAN       int32_t 
 #endif /* __BOOLEAN__ */
 
 #define _BYTE          unsigned char

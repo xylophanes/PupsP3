@@ -8,8 +8,8 @@
               NE3 4RT
               United Kingdom
 
-     Version: 1.00 
-     Dated:   23rd October 2023 
+     Version: 1.02 
+     Dated:   10th December 2024 
      E-mail:  mao@tumblingdice.co.uk
 -----------------------------------------------------------------*/
 
@@ -24,20 +24,21 @@
 #include <errno.h>
 #include <signal.h>
 #include <ftype.h>
+#include <stdint.h>
 
 
 #define _XOPEN_SOURCE
 #include <unistd.h>
 
 
-/*-----------------------------------------------*/
-/* Defines which are private to this application */
-/*-----------------------------------------------*/
-/*----------------------*/
-/* Version of phagocyte */
-/*----------------------*/
+/*---------*/
+/* Defines */
+/*---------*/
+/*---------*/
+/* Version */
+/*---------*/
 
-#define  PHAGOCYTE_VERSION "1.00"
+#define  PHAGOCYTE_VERSION "1.02"
 
 
 /*-------------*/
@@ -47,24 +48,29 @@
 #define SSIZE               2048 
 
 
-/*-------------------------------------------------*/
-/* Variables which are private to this application */
-/*-------------------------------------------------*/
+/*----------------------*/
+/* Argument vector size */
+/*----------------------*/
+
+#define ARGC                255
+
+
+/*-------------------*/
+/* Private variables */
+/*-------------------*/
 
 _PRIVATE unsigned char hostname[SSIZE]        = "";
 _PRIVATE unsigned char monitor_pname[SSIZE]   = "";
 _PRIVATE unsigned char pname[SSIZE]           = "";
 _PRIVATE unsigned char new_pname[SSIZE]       = "";
 _PRIVATE unsigned char ppath[SSIZE]           = "";
-_PRIVATE unsigned int  pname_pos              = 0;
-_PRIVATE unsigned int  period                 = 0;
-_PRIVATE unsigned int  n_killed               = 0;
+_PRIVATE uint32_t      pname_pos              = 0;
+_PRIVATE uint32_t      period                 = 0;
+_PRIVATE uint32_t      n_killed               = 0;
 _PRIVATE FTYPE         min_cpu_usage          = 10.0;
 _PRIVATE FTYPE         max_cpu_usage          = 90.0;
 _PRIVATE _BOOLEAN      do_daemon              = FALSE;
 _PRIVATE _BOOLEAN      do_verbose             = FALSE;
-
-
 
 
 /*-----------------------------------------------*/
@@ -77,7 +83,7 @@ _PRIVATE _BOOLEAN      do_verbose             = FALSE;
 _PRIVATE void alarm_handler(void)
 
 {   unsigned char  ps_cmd[SSIZE]   = "";
-    int            pid             = (-1);
+    pid_t          pid             = (-1);
     FTYPE          next_cpu_usage  = 0.0;
     FILE           *ps_stream      = (FILE *)NULL;
 
@@ -149,8 +155,6 @@ _PRIVATE void alarm_handler(void)
     /*-----------------------*/
 
     (void)alarm(period);
-
-    return(0);
 }
 
 
@@ -159,7 +163,7 @@ _PRIVATE void alarm_handler(void)
 /* Exit handler */
 /*--------------*/
 
-_PRIVATE int exit_handler(int signum)
+_PRIVATE int32_t exit_handler(const int32_t signum)
 
 {   if (strncmp(ppath,"/tmp",4) == 0)
        (void)unlink(ppath);
@@ -195,10 +199,10 @@ _PRIVATE int exit_handler(int signum)
 /* Status handler */
 /*----------------*/
 
-_PRIVATE int status_handler(int signum)
+_PRIVATE  int32_t status_handler(const  int32_t signum)
 
 
-{  (void)fprintf(stderr,"\nphagocyte abnormal process killer version %s, (C) Tumbling Dice, 2023 (built %s %s)\n\n",PHAGOCYTE_VERSION,__TIME__,__DATE__);
+{  (void)fprintf(stderr,"\nphagocyte abnormal process killer version %s, (C) Tumbling Dice, 2024 (gcc %s: built %s %s)\n\n",PHAGOCYTE_VERSION,__VERSION__,__TIME__,__DATE__);
 
    if (do_verbose == TRUE)
       (void)fprintf(stderr,"    verbose mode                   : on\n");
@@ -230,7 +234,7 @@ _PRIVATE int status_handler(int signum)
 
 _PRIVATE _BOOLEAN strleaf(const unsigned char *pathname, unsigned char *leaf)
 
-{   int i;
+{   uint32_t    i;
 
     for (i=strlen(pathname); i>= 0; --i)
     {  if (pathname[i] == '/')
@@ -252,7 +256,7 @@ _PRIVATE _BOOLEAN strleaf(const unsigned char *pathname, unsigned char *leaf)
 /* Make sure path is absolute */
 /*----------------------------*/
 
-_PRIVATE int absolute_path(const unsigned char *pathname, unsigned char *absolute_pathname)
+_PRIVATE int32_t absolute_path(const unsigned char *pathname, unsigned char *absolute_pathname)
 
 {   unsigned char leaf[SSIZE]         = "",
                   current_path[SSIZE] = "";
@@ -286,16 +290,16 @@ _PRIVATE int absolute_path(const unsigned char *pathname, unsigned char *absolut
 /* Main entry point to this application */
 /*--------------------------------------*/
 
-_PUBLIC int main(int argc, char *argv[])
+_PUBLIC  int32_t main(int argc, char *argv[])
 
-{   unsigned int i,
-                 decoded         = 0,
-                 p_index         = 1;
+{   uint32_t      i,
+                  decoded        = 0,
+                  p_index        = 1;
 
     unsigned char tmpstr[SSIZE]  = "";
     _BOOLEAN      do_daemon      = FALSE;
 
-    sigset_t    set;
+    sigset_t      set;
 
 
     /*----------*/
@@ -309,18 +313,18 @@ _PUBLIC int main(int argc, char *argv[])
     /* Get process name (stripping out branch from path */
     /*--------------------------------------------------*/
 
-    (void)strncpy(ppath,argv[0],SSIZE);
+    (void)strlcpy(ppath,argv[0],SSIZE);
     (void)absolute_path(ppath,tmpstr);
     (void)strlcpy(ppath,tmpstr,SSIZE);
     (void)strleaf(ppath,pname);
 
 
-    /*---------------------*/
-    /* Decode command tail */
-    /*---------------------*/
+    /*--------------------*/
+    /* Parse command line */
+    /*--------------------*/
 
     if (argc == 1 || strcmp(argv[1],"-usage") == 0  || strcmp(argv[1],"-help") == 0)
-    {  (void)fprintf(stderr,"\nphagocyte abnormal process killer version %s, (C) Tumbling Dice, 2023 (built %s %s)\n\n",PHAGOCYTE_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nphagocyte abnormal process killer version %s, (C) Tumbling Dice, 2024 (gcc %s: built %s %s)\n\n",PHAGOCYTE_VERSION,__VERSION__,__TIME__,__DATE__);
 
        (void)fprintf(stderr,"PHAGOCYTE is free software, covered by the GNU General Public License, and you are\n");
        (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
@@ -338,11 +342,6 @@ _PUBLIC int main(int argc, char *argv[])
 
        exit(1);
     }
-
-
-    /*--------------------*/
-    /* Parse command line */
-    /*--------------------*/
 
     for (i=0; i<argc-1; ++i)
     {
@@ -524,8 +523,8 @@ _PUBLIC int main(int argc, char *argv[])
 
     if (do_daemon == TRUE)
     {  unsigned char tmpPathName[SSIZE] = "";
-       unsigned int  nargc              = 1;
-       unsigned char **nargv             = (unsigned char **)NULL;
+       uint32_t      nargc              = 1;
+       char          *nargv[ARGC]       = { (char *)NULL };
 
        if (strcmp(new_pname,"") == 0)
           (void)snprintf(tmpPathName,SSIZE,"/tmp/lyosome"); 
@@ -535,20 +534,6 @@ _PUBLIC int main(int argc, char *argv[])
        if (symlink(ppath,tmpPathName) == (-1))
        {  if (do_verbose == TRUE)
           {  (void)fprintf(stderr,"%s (%d@%s): failed to link (lyosome) binary\n",pname,getpid(),hostname);
-             (void)fflush(stderr);
-          }
-
-          exit(255);
-       }
-
-
-       /*-----------------*/
-       /* Argument vector */
-       /*-----------------*/
-
-       if ((nargv = (unsigned char **)calloc(64,sizeof(unsigned char *))) == (unsigned char *)NULL)
-       {  if (do_verbose == TRUE)
-          {  (void)fprintf(stderr,"%s (%d@%s): failed to allocate argument parameter list\n",pname,getpid(),hostname);
              (void)fflush(stderr);
           }
 

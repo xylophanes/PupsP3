@@ -1,4 +1,4 @@
-/*-----------------------------------------------------------------------------------
+/*-------------------------------------------------------------------------------
     Purpose: Embryonic process - functionality is assigned dynamically using PSRP
              and PSRP components of the PUPS environment 
 
@@ -9,10 +9,10 @@
              NE3 4RT
              United Kingdom
 
-    Version: 3.02 
-    Dated:   26th October 2023
+    Version: 3.03 
+    Dated:   29th Decemeber 2024
     E-mail:  mao@tumblingdice.co.uk
-----------------------------------------------------------------------------------*/
+-------------------------------------------------------------------------------*/
 
 /*-------------------------------------------------------------*/
 /* If we have OpenMP support then we also have pthread support */
@@ -22,7 +22,6 @@
 #if defined(_OPENMP) && !defined(PTHREAD_SUPPORT)
 #define PTHREAD_SUPPORT
 #endif /* PTHREAD_SUPPORT */
-
 
 #define TEST_THREADS
 
@@ -41,8 +40,10 @@
 #include <vstamp.h>
 #include <casino.h>
 #include <hash.h>
+#include <bsd/bsd.h>
 
 #ifdef PERSISTENT_HEAP_SUPPORT
+#include <phmalloc.h>
 #include <pheap.h>
 #endif /* PERSISTENT_HEAP_SUPPORT */
 
@@ -66,7 +67,7 @@
 /* Version of this application */
 /*******************************/
 
-#define EMBRYO_VERSION    "3.02"
+#define EMBRYO_VERSION    "3.03"
 
 #ifdef BUBBLE_MEMORY_SUPPORT
 #include <bubble.h>
@@ -114,10 +115,10 @@ _PRIVATE void ckptfunc(void)
 /* Exit function for testfps() [interrupt when processing transactions to/from remote slave] */ 
 /*-------------------------------------------------------------------------------------------*/
 
-_PRIVATE int testfps_exitf(int chid)
+_PRIVATE int32_t testfps_exitf(int32_t chid)
 
-{   int fdes,
-        index;
+{   des_t fdes,
+          index;
 
     index = pups_get_ftab_index_by_id(chid);
     (void)pups_fcclose(ftab[index].stream);
@@ -132,7 +133,7 @@ _PRIVATE int testfps_exitf(int chid)
 /* Display process status (to attached PSRP client process) */
 /*----------------------------------------------------------*/
 
-_PRIVATE int psrp_process_status(int argc, char *argv[])
+_PRIVATE  int32_t psrp_process_status(int32_t argc, char *argv[])
 {
 
    #ifdef CRIU_SUPPORT
@@ -152,9 +153,10 @@ _PRIVATE int psrp_process_status(int argc, char *argv[])
 /* Kill process which is running remotely */
 /*----------------------------------------*/
 
-_PRIVATE int rkill(int argc, char *argv[])
-{  int i,
-       pid;
+_PRIVATE int32_t rkill(int32_t argc, char *argv[])
+
+{  int32_t i,
+           pid;
 
    char reply[256]   = "",
         command[256] = "";
@@ -173,169 +175,169 @@ _PRIVATE int rkill(int argc, char *argv[])
 
 
 
-/*--------------------------------------------------------*/
-/* Create a slaved interation client (SIC) and talk to it */ 
-/*--------------------------------------------------------*/
+/*---------------------------------------------------------*/
+/* Create a slaved interaction client (SIC) and talk to it */ 
+/*---------------------------------------------------------*/
 
-_PRIVATE int tsic(int argc, char *argv[])
+_PRIVATE int32_t tsic(int32_t argc, char *argv[])
 
-{  int i,
-       j,
-       ret,
-       cnt        = 0,
-       havePort   = (-1),
-       tail_start = 1,
-       n_requests = 0;
+{   uint32_t i,
+             cnt         = 0,
+             n_requests  = 0,
+             tail_start  = 1;
 
-   char reply[256]    = "",
-        rcmd[256]     = "",
-        hostname[256] = "notset",
-        ssh_port[256] = "",
-        **replys      = (char **)NULL;
+    size_t j;
 
-   if(argc == 1)
-   {  (void)fprintf(psrp_out,"Usage: testsic [-server:port] <command list>\n");
-      (void)fflush(psrp_out);
-
-      return(PSRP_OK);
-   }
-
-
-   /*----------------------------------*/
-   /* Extract remote hostname and port */
-   /*----------------------------------*/
-
-   (void)fprintf(psrp_out,"\n\nArgument vector\n");
-   (void)fprintf(psrp_out,"===============\n\n");
-   (void)fflush(psrp_out);
-
-   for(i=tail_start; i<argc; ++i)
-   {  if(argv[1][0] == '-')
-      {  (void)strlcpy(hostname,&argv[1][1],SSIZE);
-         tail_start = 2;
-
-         for(j=0; j<strlen(hostname); ++j)
-         {  if(hostname[j] == ':')
-               havePort = j;
-            else if(havePort != (-1))
-            {  ssh_port[cnt] = hostname[j];
-               ++cnt;
-            }
-         }
-
-         if(havePort != (-1))
-         {  ssh_port[cnt]      = '\0';
-            hostname[havePort] = '\0';
-         }
-
-
-      }
+    int32_t ret,
+            havePort     = (-1);
  
-      (void)fprintf(psrp_out,"argv[%d] = %s\n",i,argv[i]);
-      (void)fflush(psrp_out);
-   }
+
+    char reply[256]      = "",
+         rcmd[256]       = "",
+         hostname[256]   = "notset",
+         ssh_port[256]   = "",
+         **replys        = (char **)NULL;
+ 
+    if(argc == 1)
+    {  (void)fprintf(psrp_out,"Usage: testsic [-server:port] <command list>\n");
+       (void)fflush(psrp_out);
+
+       return(PSRP_OK);
+    }
 
 
+    /*----------------------------------*/
+    /* Extract remote hostname and port */
+    /*----------------------------------*/
 
-   /*----------------------------------------*/
-   /* Extract command list for remote server */
-   /*----------------------------------------*/
+    (void)fprintf(psrp_out,"\n\nArgument vector\n");
+    (void)fprintf(psrp_out,"===============\n\n");
+    (void)fflush(psrp_out);
 
-   for(i=tail_start; i<argc; ++i)
-   {  
+    for(i=tail_start; i<argc; ++i)
+    {  if(argv[1][0] == '-')
+       {  (void)strlcpy(hostname,&argv[1][1],SSIZE);
+          tail_start = 2;
 
-      /*------------------------------------------------------------*/
-      /* We do not need to explictly background anything -- in fact */
-      /* to do so is an error                                       */
-      /*------------------------------------------------------------*/
+          for(j=0; j<strlen(hostname); ++j)
+          {  if(hostname[j] == ':')
+                havePort = j;
+             else if(havePort != (-1))
+             {  ssh_port[cnt] = hostname[j];
+                ++cnt;
+             }
+          }
+ 
+          if(havePort != (-1))
+          {  ssh_port[cnt]      = '\0';
+             hostname[havePort] = '\0';
+          }
+        }
+ 
+        (void)fprintf(psrp_out,"argv[%d] = %s\n",i,argv[i]);
+        (void)fflush(psrp_out);
+    }
+ 
 
-      if(strin(argv[i],"&") == TRUE)
-      {  (void)fprintf(psrp_out,"tsic syntax error: \"&\" found\n");
-         (void)fflush(psrp_out);
+    /*----------------------------------------*/
+    /* Extract command list for remote server */
+    /*----------------------------------------*/
 
-         return(PSRP_OK);
-      }
-      else
-      {
+    for(i=tail_start; i<argc; ++i)
+    {  
 
-         /*--------------------------------------------*/
-         /* Make sure multiple commands are terminated */
-         /* using semi-colon                           */
-         /*--------------------------------------------*/
+       /*------------------------------------------------------------*/
+       /* We do not need to explictly background anything -- in fact */
+       /* to do so is an error                                       */
+       /*------------------------------------------------------------*/
 
-         (void)strlcat(rcmd,argv[i],SSIZE);
-         if(i < argc -1 )
-            (void)strlcat(rcmd,"; ",SSIZE);
-         else
+       if(strin(argv[i],"&") == TRUE)
+       {  (void)fprintf(psrp_out,"tsic syntax error: \"&\" found\n");
+          (void)fflush(psrp_out);
+ 
+          return(PSRP_OK);
+       }
+       else
+       {
+
+          /*--------------------------------------------*/
+          /* Make sure multiple commands are terminated */
+          /* using semi-colon                           */
+          /*--------------------------------------------*/
+
+          (void)strlcat(rcmd,argv[i],SSIZE);
+          if(i < argc -1 )
+             (void)strlcat(rcmd,"; ",SSIZE);
+          else
             (void)strlcat(rcmd,"",  SSIZE);
 
-         ++n_requests;
-      }
-   }
+          ++n_requests;
+       }
+    }
 
 
-   /*-------------------------------*/
-   /* Display information about SIC */
-   /*-------------------------------*/
+    /*-------------------------------*/
+    /* Display information about SIC */
+    /*-------------------------------*/
 
-   (void)fprintf(psrp_out,"\n\nSIC info\n");
-   (void)fprintf(psrp_out,"========\n\n");
-   (void)fflush(psrp_out);
+    (void)fprintf(psrp_out,"\n\nSIC info\n");
+    (void)fprintf(psrp_out,"========\n\n");
+    (void)fflush(psrp_out);
 
-   if(strcmp(hostname,"") != 0)
-   {  (void)fprintf(psrp_out,"host %s\n",hostname);
-      (void)fflush(psrp_out);
-   }
+    if(strcmp(hostname,"") != 0)
+    {  (void)fprintf(psrp_out,"host %s\n",hostname);
+       (void)fflush(psrp_out);
+    }
 
-   if(strcmp(ssh_port,"") != 0)
-   {  (void)fprintf(psrp_out,"port %s\n",ssh_port);
-      (void)fflush(psrp_out);
-   }
+    if(strcmp(ssh_port,"") != 0)
+    {  (void)fprintf(psrp_out,"port %s\n",ssh_port);
+       (void)fflush(psrp_out);
+    }
 
-   (void)fprintf(psrp_out,"command list: \"%s\"\n\n",rcmd);
-   (void)fflush(psrp_out);
+    (void)fprintf(psrp_out,"command list: \"%s\"\n\n",rcmd);
+    (void)fflush(psrp_out);
 
 
-   /*----------------------*/
-   /* Process command list */
-   /*----------------------*/
+    /*----------------------*/
+    /* Process command list */
+    /*----------------------*/
 
-   if(strcmp(hostname,"notset") == 0)
-      replys = psrp_process_sic_transaction_list((char *)NULL,"",n_requests,rcmd);
-   else
-      replys = psrp_process_sic_transaction_list(hostname,ssh_port,n_requests,rcmd);
+    if(strcmp(hostname,"notset") == 0)
+       replys = psrp_process_sic_transaction_list((char *)NULL,"",n_requests,rcmd);
+    else
+       replys = psrp_process_sic_transaction_list(hostname,ssh_port,n_requests,rcmd);
 
-   #ifdef EMBRYO_DEBUG
-   (void)fprintf(psrp_out,"TRANSACTION SENT\n");
-   (void)fflush(psrp_out);
-   #endif /* EMBRYO_DEBUG */
+    #ifdef EMBRYO_DEBUG
+    (void)fprintf(psrp_out,"TRANSACTION SENT\n");
+    (void)fflush(psrp_out);
+    #endif /* EMBRYO_DEBUG */
 
-   (void)fprintf(psrp_out,"\n\nReplys\n");
-   (void)fprintf(psrp_out,"======\n\n");
-   (void)fflush(psrp_out);
+    (void)fprintf(psrp_out,"\n\nReplys\n");
+    (void)fprintf(psrp_out,"======\n\n");
+    (void)fflush(psrp_out);
 
-   if(errno != 0)
-   {  if(strcmp(hostname,"notset") == 0)
-         (void)fprintf(psrp_out,"\nfailed to create (local) [SIC] channel to slaved PSRP client [errno: %d]\n\n",errno);
-      else
-         (void)fprintf(psrp_out,"\nfailed to create (remote) [SIC] channel to slaved PSRP client (on host \"%s\") [errno: %d]\n\n",hostname,errno);
-      (void)fflush(stderr);
-   }
-   else
-   {  for(i=0; i<n_requests; ++i)
-      {  if(replys[i] != (void *)NULL)
-         {  (void)fprintf(psrp_out,"reply[%d]:\n",i); 
-            (void)fputs(replys[i],psrp_out);
-            (void)fprintf(psrp_out,"****\n\n");
+    if(errno != 0)
+    {  if(strcmp(hostname,"notset") == 0)
+          (void)fprintf(psrp_out,"\nfailed to create (local) [SIC] channel to slaved PSRP client [errno: %d]\n\n",errno);
+       else
+          (void)fprintf(psrp_out,"\nfailed to create (remote) [SIC] channel to slaved PSRP client (on host \"%s\") [errno: %d]\n\n",hostname,errno);
+       (void)fflush(stderr);
+    }
+    else
+    {  for(i=0; i<n_requests; ++i)
+       {  if(replys[i] != (void *)NULL)
+          {  (void)fprintf(psrp_out,"reply[%d]:\n",i); 
+             (void)fputs(replys[i],psrp_out);
+             (void)fprintf(psrp_out,"****\n\n");
             (void)fflush(psrp_out);
-         }
-      }
-   }
+          }
+       }
+    }
 
-   if(replys != (char **)NULL)
-      (void)pups_afree(n_requests,(void *)replys);
+    if(replys != (char **)NULL)
+       (void)pups_afree(n_requests,(void *)replys);
 
-   return(PSRP_OK);
+    return(PSRP_OK);
 }
 
 
@@ -344,26 +346,23 @@ _PRIVATE int tsic(int argc, char *argv[])
 /*----------------------------------------------*/
 /* Get application information for slot manager */
 /*----------------------------------------------*/
-
-
 /*---------------------------*/ 
 /* Slot information function */
 /*---------------------------*/ 
 
-_PRIVATE void embryo_slot(int level)
+_PRIVATE void embryo_slot(int32_t level)
 {   (void)fprintf(stderr,"int app (PSRP) embryo %s: [ANSI C, PUPS MTD D]\n",EMBRYO_VERSION);
  
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 1996-2023 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 1996-2024 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. ONeill\n");
-       (void)fprintf(stderr,"Unassigned PSRP dynamic process (built %s %s)\n\n",__TIME__,__DATE__);
+       (void)fprintf(stderr,"Unassigned PSRP dynamic process (gcc %s: built %s %s)\n\n",__VERSION__,__TIME__,__DATE__);
     }
     else
        (void)fprintf(stderr,"\n");
 
     (void)fflush(stderr);
 }
- 
  
  
  
@@ -390,15 +389,11 @@ _PRIVATE void embryo_usage(void)
 }
 
 
-
-
 #ifdef SLOT
 #include <slotman.h>
 _EXTERN void (* SLOT)() __attribute__ ((aligned(16))) = embryo_slot;
 _EXTERN void (* USE )() __attribute__ ((aligned(16))) = embryo_usage;
 #endif /* SLOT */
-
-
 
 
 /*------------------------*/
@@ -407,8 +402,6 @@ _EXTERN void (* USE )() __attribute__ ((aligned(16))) = embryo_usage;
 
 _EXTERN char appl_build_time[256] = __TIME__;
 _EXTERN char appl_build_date[256] = __DATE__;
-
-
 
 
 /*-----------------------------------------------------------------*/
@@ -425,22 +418,22 @@ _PRIVATE _BYTE test_databag[1024] = "";
 /*-------------------------------------------------*/
 
 // Test function 
-_PROTOTYPE _PRIVATE int static_test_function_object(int, char *[]);
+_PROTOTYPE _PRIVATE int32_t static_test_function_object(int32_t, char *[]);
 
 // ASCII text generation function 
-_PROTOTYPE _PRIVATE int ascii(int, char *[]);
+_PROTOTYPE _PRIVATE int32_t ascii(int32_t, char *[]);
 
 // Embryo exit function 
-_PROTOTYPE _PRIVATE int embryo_exit(int, char *[]);
+_PROTOTYPE _PRIVATE int32_t embryo_exit(int32_t, char *[]);
 
 // Createand/or destroy asycnronous (test) threads
-_PROTOTYPE _PRIVATE int tthread(int, char *[]);
+_PROTOTYPE _PRIVATE int32_t tthread(int32_t, char *[]);
 
 // Createand/or destroy asycnronous (test) threads
-_PROTOTYPE _PRIVATE int threadfunc(void *);
+_PROTOTYPE _PRIVATE int32_t threadfunc(void *);
 
 // Simple test function to exercise various psrp functions
-_PROTOTYPE _PRIVATE int static_test_function_object(int, char *[]);
+_PROTOTYPE _PRIVATE int32_t static_test_function_object(int32_t, char *[]);
 
 
 
@@ -458,13 +451,13 @@ _BOOLEAN looper = TRUE;
 /* Software I.D. tag  */
 /*--------------------*/
 
-#define VTAG  7577
+#define VTAG  8139
 
-extern int appl_vtag = VTAG;
+extern int32_t appl_vtag = VTAG;
 
-typedef struct {   int   cnt;
-                   FTYPE x;
-                   char  name[256];
+typedef struct {   uint32_t  cnt;
+                   FTYPE     x;
+                   char      name[256];
                } test_type;
 
 
@@ -474,25 +467,24 @@ typedef struct {   int   cnt;
 /* Main - parse command tail */
 /*---------------------------*/
 
-_PUBLIC int pups_main(int argc, char *argv[])
+_PUBLIC  int32_t pups_main(int32_t argc, char *argv[])
 
-{   int i,
-        j,
-        pheap_flags,
-        loc[256]        = { [0 ... 255] = 0 },
-        iter            = 0,
-        cnt             = 0,
-        tdes            = 0,
-        a,
-        o_index1        = 0,
-        o_index2        = 0,
-        o_index3        = 0,
-        o_index4        = 0,
-        hdes1           = (-1),
-        hdes2           = (-1),
-        hdes3           = (-1);
+{   uint32_t i,
+             iter   = 0,
+             cnt    = 0;
 
-    unsigned long int tsize;
+    int32_t  pheap_flags,
+             loc[256]        = { [0 ... 255] = 0 },
+             a,
+             o_index1        = 0,
+             o_index2        = 0,
+             o_index3        = 0,
+             o_index4        = 0,
+             hdes1           = (-1),
+             hdes2           = (-1),
+             hdes3           = (-1);
+
+    uint64_t tsize;
 
     test_type *h_ptr_1 = (test_type *)NULL;
     FTYPE     *h_ptr_2 = (FTYPE *)    NULL;
@@ -535,8 +527,8 @@ _PUBLIC int pups_main(int argc, char *argv[])
                   EMBRYO_VERSION,
                   "M.A. O'Neill",
                   "(PSRP) embryo",
-                  "2023",
-                  argv);
+                  "2024",
+                  (void *)argv);
 
 
     (void)pups_register_exit_f("retstartfunc",&restartfunc,(char *)NULL);
@@ -577,7 +569,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
     /* Complain about any unparsed arguments */
     /*---------------------------------------*/
 
-    pups_t_arg_errs(argd,args);
+    pups_t_arg_errs(argd,(void *)args);
 
 
     /*------------------------------------------------------------------------------------------------*/
@@ -627,7 +619,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
     {  htab = hash_table_create(128,"hash1");
 
        for(i=0; i<20; ++i)
-       {   loc[i] = (int)(ran1()*1000000.0);
+       {   loc[i] = (int32_t)(ran1()*1000000.0);
            tf = (FTYPE)i + 10;
            (void)hash_put_object(loc[i],(void *)&tf,"FTYPE",sizeof(FTYPE),htab);
        }
@@ -669,7 +661,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
 
     #ifdef PERSISTENT_HEAP_SUPPORT
     if(test_pheaps == TRUE)
-    {  (void)srand48((unsigned long int)getpid()); 
+    {  (void)srand48((uint64_t)getpid()); 
 
        (void)fprintf(stderr,"Persistent heap test\n");
        (void)fprintf(stderr,"=====================\n\n");
@@ -707,7 +699,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
        
        if((hdes3 = msm_heap_attach("heap3",
                                    ATTACH_PHEAP | LIVE_PHEAP)) == (-1))
-       {   (void)fprintf(stderr,"NON EXISTENT HEAP ATTACH ERROR\n");
+       {   (void)fprintf(stderr,"\n%sNON EXISTENT HEAP ATTACH ERROR%s\n\n",boldOn,boldOff);
            (void)fflush(stderr);
        }
 
@@ -717,7 +709,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
        /*--------------------------------------*/
 
        if(phcalloc(hdes1,PHEAP_SIZE,sizeof(test_type),"object1") != (void *)NULL)
-       {  int i;
+       {  uint32_t i;
 
           h_ptr_1 = (test_type *)msm_map_objectname2addr(hdes1,"object1");
 
@@ -771,7 +763,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
           /* Pointer to object on persistent heap */
           /*--------------------------------------*/
 
-          h_ptr_2 = (test_type *)msm_map_objectname2addr(hdes1,"object2");
+          h_ptr_2 = (FTYPE *)msm_map_objectname2addr(hdes1,"object2");
 
 
           /*-----------------------*/
@@ -800,7 +792,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
        /*-------------------------------------*/
 
        else
-          h_ptr_2 = (test_type *)msm_map_objectname2addr(hdes1,"object2");
+          h_ptr_2 = (FTYPE *)msm_map_objectname2addr(hdes1,"object2");
 
 
        /*---------------------------------------*/
@@ -861,7 +853,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
           /* Pointer to object on persistent heap */
           /*--------------------------------------*/
 
-          h_ptr_4 = (test_type *)msm_map_objectname2addr(hdes2,"object4");
+          h_ptr_4 = (FTYPE *)msm_map_objectname2addr(hdes2,"object4");
 
 
           /*-----------------------*/
@@ -890,7 +882,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
        /*-------------------------------------*/
 
        else
-          h_ptr_4 = (test_type *)msm_map_objectname2addr(hdes2,"object4");
+          h_ptr_4 = (FTYPE *)msm_map_objectname2addr(hdes2,"object4");
 
 
        /*---------------------------------------------------------*/
@@ -947,10 +939,10 @@ _PUBLIC int pups_main(int argc, char *argv[])
             /* Get random object indexes within heaps */
             /*----------------------------------------*/
 
-            o_index1 = (int)(drand48() * (FTYPE)(PHEAP_SIZE - 1));
-            o_index2 = (int)(drand48() * (FTYPE)(PHEAP_SIZE - 1));
-            o_index3 = (int)(drand48() * (FTYPE)(PHEAP_SIZE - 1));
-            o_index4 = (int)(drand48() * (FTYPE)(PHEAP_SIZE - 1));
+            o_index1 = (int32_t)(drand48() * (FTYPE)(PHEAP_SIZE - 1));
+            o_index2 = (int32_t)(drand48() * (FTYPE)(PHEAP_SIZE - 1));
+            o_index3 = (int32_t)(drand48() * (FTYPE)(PHEAP_SIZE - 1));
+            o_index4 = (int32_t)(drand48() * (FTYPE)(PHEAP_SIZE - 1));
 
 
             /*-----------------------*/
@@ -1001,7 +993,6 @@ _PUBLIC int pups_main(int argc, char *argv[])
        /*----------------------------------------*/
        /* Detach all (attached) persistent heaps */
        /*----------------------------------------*/
-
        /*--------*/
        /* Heap 1 */
        /*--------*/
@@ -1055,7 +1046,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
 /* Createand/or destroy asycnronous (test) threads */
 /*-------------------------------------------------*/
 
-_PRIVATE int tthread(int argc, char *argv[])
+_PRIVATE int32_t tthread(int32_t argc, char *argv[])
 
 {   pthread_t tid        = (pthread_t)NULL; 
     char      tname[256] = "test_thread";
@@ -1113,19 +1104,18 @@ _PRIVATE int tthread(int argc, char *argv[])
 /* Thread test (payload) function */
 /*--------------------------------*/
 
-_PRIVATE int threadfunc(void *args)
+_PRIVATE int32_t threadfunc(void *args)
 
-{   int t_index,
-        cnt = 0;
+{   int32_t     t_index;
+    uint32_t    cnt = 0;
 
     pthread_mutex_t test_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;    
 
     t_index = pupsthread_tid2nid(pthread_self());
 
     (void)pthread_mutex_lock(&test_mutex);
-
     while(TRUE)
-    {   int i;
+    {   uint32_t i;
 
         (void)pthread_mutex_lock(&ttab_mutex);
 
@@ -1144,7 +1134,6 @@ _PRIVATE int threadfunc(void *args)
 
     return(0);
 }
-
 #endif /* PTHREAD_SUPPORT */
 
 
@@ -1154,12 +1143,9 @@ _PRIVATE int threadfunc(void *args)
 /* Simple test function to exercise various psrp functions */
 /*---------------------------------------------------------*/
 
-_PRIVATE int static_test_function_object(int argc, char *argv[])
+_PRIVATE int32_t static_test_function_object(int32_t argc, char *argv[])
 
-{   int  i,
-         init,
-         ptr, 
-         ret_code;
+{   uint32_t i;
 
     char command[256] = "",
          item[256]    = "";
@@ -1214,7 +1200,7 @@ _PRIVATE int static_test_function_object(int argc, char *argv[])
 /*------------------*/
 
 
-_PRIVATE int embryo_exit(int argc, char *argv[])
+_PRIVATE int32_t embryo_exit(int32_t argc, char *argv[])
 
 {   looper = FALSE;
 
@@ -1231,26 +1217,15 @@ _PRIVATE int embryo_exit(int argc, char *argv[])
 /* Test function to send stream of ASDII text to PSRP client process */
 /*-------------------------------------------------------------------*/
 
-_PRIVATE int ascii(int argc, char *argv[])
+_PRIVATE int32_t ascii(int32_t argc, char *argv[])
 
-{   int i,
-        cnt = 0;
+{   uint32_t cnt = 0;
 
-    #pragma omp parallel reduction(+:cnt)
     while(cnt < 100000)
-    {    int j;
+    {    (void)fprintf(psrp_out,"SLEEP %d\n",cnt);
+         (void)fflush(psrp_out);
 
-         if(omp_get_thread_num() == 0) 
-         {  if(cnt % 10000 == 0)
-            {  
-               {  (void)fprintf(psrp_out,"count is %d\n",cnt);
-                  (void)fflush(psrp_out);
-               }
-            }
-         }
-
-         (void)pups_usleep(10);
-
+         (void)pups_sleep(1);
          ++cnt;
     }
 

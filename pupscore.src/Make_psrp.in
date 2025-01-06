@@ -1,10 +1,19 @@
 #-----------------------------------------
 # Makefile for PSRP client on Linux system
-# M.A. O'Neill, Tumbling Dice 04/01/2022
+# M.A. O'Neill, Tumbling Dice 12/12/2024
 #------------------------------------------
 
-CFLAGS		= TARGET_CFLAGS TARGET_ARCHDEPCFLAGS -DSLAVED_COMMANDS -finline-functions -fopenmp -ffast-math
-LDFLAGS		= TARGET_LDFLAGS TARGET_ARCHDEPLDFLAGS -lgomp
+#-----------------------
+# Fully resourced system
+#-----------------------
+CFLAGS		= TARGET_CFLAGS TARGET_ARCHDEPCFLAGS -DSLAVED_COMMANDS -finline-functions -fopenmp -ffast-math -funsafe-math-optimizations
+
+#----------------
+# Embedded system
+#----------------
+#CFLAGS		= TARGET_CFLAGS TARGET_ARCHDEPCFLAGS -DSLAVED_COMMANDS -DSINGLE_THREAD -finline-functions -ffast-math
+
+LDFLAGS		= TARGET_LDFLAGS TARGET_ARCHDEPLDFLAGS
 CC		= gcc
 
 psrp:		psrp.o $(LIBS)

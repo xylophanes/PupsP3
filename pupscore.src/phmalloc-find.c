@@ -1,4 +1,4 @@
-/*-----------------------------------------------------------------------------
+/*---------------------------------------------------------------------------
    Find the starting address of a malloc'd block, from anywhere inside it.
    Copyright (C) 1995 Free Software Foundation, Inc.
 
@@ -21,14 +21,15 @@
    Cambridge, MA 02139, USA.
 
    Persistent heap modifications by Mark O'Neill (mao@tumblingdice.co.uk)
-   (C) 1998-2023 M.A. O'Neill, Tumbling Dice
-----------------------------------------------------------------------------*/
+   (C) 1998-2024 M.A. O'Neill, Tumbling Dice
+-------------------------------------------------------------------------*/
 
 #ifndef	_PHMALLOC_INTERNAL
 #define _PHMALLOC_INTERNAL
 #include <phmalloc.h>
 #endif /* _PHMALLOC_INTERNAL */
 #include <xtypes.h>
+#include <stdint.h>
 
 
 /*------------------------------------------------------*/
@@ -36,12 +37,12 @@
 /* return the address of the beginning of the object.   */
 /*------------------------------------------------------*/
 
-_PUBLIC __ptr_t malloc_find_object_address(int hdes, __ptr_t ptr)
+_PUBLIC __ptr_t malloc_find_object_address(int32_t hdes, __ptr_t ptr)
 {
 
   __ptr_t         result;
   __malloc_size_t block = BLOCK (hdes, ptr);
-  int             type  = _pheapinfo[hdes][block].busy.type;
+  int32_t         type  = _pheapinfo[hdes][block].busy.type;
 
   #ifdef PTHREAD_SUPPORT
   (void)pthread_mutex_lock(&htab_mutex);

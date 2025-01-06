@@ -1,4 +1,4 @@
-/*----------------------------------------------------------------------------
+/*------------------------------------------
      Purpose: Restarts checkpoint (via Criu) 
 
      Author:  M.A. O'Neill
@@ -8,10 +8,10 @@
               NE3 4RT
               United Kingdom
 
-     Version: 2.01 
-     Dated:   24th May 2023
+     Version: 2.02 
+     Dated:   11th December 2024
      E-mail:  mao@tumblingdice.co.uk
------------------------------------------------------------------------------*/
+---------------0--------------------------*/
 
 #include <stdio.h>
 #include <string.h>
@@ -22,22 +22,26 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <stdint.h>
 
 
-/*-------------*/
-/* Version tag */
-/*-------------*/
+/*---------*/
+/* Version */
+/*---------*/
 
-#define SSAVETAG    20
+#define SSAVETAG            20
 
 
 /*---------------------*/
 /* Version of restarit */
 /*---------------------*/
 
-#define RESTART_VERSION     "2.01"
+#define RESTART_VERSION     "2.02"
 
 
+/*---------*/
+/* Defines */
+/*---------*/
 /*-------------*/
 /* String size */
 /*-------------*/
@@ -60,7 +64,7 @@
 
 #define SIGCHECK             SIGRTMIN + 11
 #define SIGRESTART           SIGRTMIN + 12
-#define DEFAULT_SIGNAL_DELAY 1
+#define DEFAULT_SIGNAL_DELAY 5
 
 
 /*---------------*/
@@ -84,24 +88,24 @@ char buildStr[SSIZE] = "";
 /* Main entry point */
 /*------------------*/
 
-_PUBLIC int main(int argc, char *argv[])
+_PUBLIC int32_t main(int32_t argc, char *argv[])
 
-{   int i,
-        status,
-        child_pid,
-        argd                    = 1;
+{   uint32_t i,
+             signal_delay   = DEFAULT_SIGNAL_DELAY;
 
-    unsigned int signal_delay   = DEFAULT_SIGNAL_DELAY;
+    int32_t  status,
+             child_pid,
+             argd                   = 1;
 
-    char ssave_dir[SSIZE]       = "",
-         ssave_buildpath[SSIZE] = "",
-         criu_cmd[SSIZE]        = "",
-         ssaveBuildStr[SSIZE]   = "";
+    char     ssave_dir[SSIZE]       = "",
+             ssave_buildpath[SSIZE] = "",
+             criu_cmd[SSIZE]        = "",
+             ssaveBuildStr[SSIZE]   = "";
 
-    _BOOLEAN do_verbose         = FALSE,
-             do_detach          = FALSE;
+    _BOOLEAN do_verbose             = FALSE,
+             do_detach              = FALSE;
 
-    FILE *stream              = (FILE *)NULL;
+    FILE     *stream                = (FILE *)NULL;
 
 
     /*------------------------------------*/
@@ -112,12 +116,12 @@ _PUBLIC int main(int argc, char *argv[])
 
 
     /*--------------------*/
-    /* Parse command tail */
+    /* Parse command line */
     /*--------------------*/
 
     if(argc == 1)
-    {  (void)fprintf(stderr,"\n   restart version %s (built %s %s)\n",RESTART_VERSION,__TIME__,__DATE__);
-       (void)fprintf(stderr,"   (C) Tumbling Dice, 2016-2023\n\n");
+    {  (void)fprintf(stderr,"\n   restart version %s (gcc %s: built %s %s)\n",RESTART_VERSION,__VERSION__,__TIME__,__DATE__);
+       (void)fprintf(stderr,"   (C) Tumbling Dice, 2016-2024\n\n");
        (void)fprintf(stderr,"   Usage: restart [-usage | -help] |\n");
        (void)fprintf(stderr,"                  [-detach]\n");
        (void)fprintf(stderr,"                  [-d <SIGRESTART signal delay secs:%d>]\n",DEFAULT_SIGNAL_DELAY);
@@ -136,8 +140,8 @@ _PUBLIC int main(int argc, char *argv[])
        /*--------------------------*/
 
        if(strcmp(argv[i],"-usage") == 0 || strcmp(argv[i],"-help") == 0)
-       {  (void)fprintf(stderr,"\n   restart version %s (built %s)\n",RESTART_VERSION,__TIME__,__DATE__);
-          (void)fprintf(stderr,"   (C) Tumbling Dice, 2016-2023\n\n");
+       {  (void)fprintf(stderr,"\n   restart version %s (gcc %s: built %s)\n",RESTART_VERSION,__VERSION__,__TIME__,__DATE__);
+          (void)fprintf(stderr,"   (C) Tumbling Dice, 2016-2024\n\n");
           (void)fprintf(stderr,"   Usage: restart [-usage | -help] |\n");
           (void)fprintf(stderr,"                  [-detach]\n");
           (void)fprintf(stderr,"                  [-d <SIGRESTART signal delay secs:%d>]\n",DEFAULT_SIGNAL_DELAY);
@@ -326,14 +330,16 @@ _PUBLIC int main(int argc, char *argv[])
     /*-----------------*/
     /* Restart command */
     /*-----------------*/
-
+    /*-------*/
+    /* Child */
+    /*-------*/
     if(fork() == 0)
     {  char signal_cmd[SSIZE] = "";
 
 
        /*-----------------------------------------*/
        /* Give Criu time to do its magic. This is */
-       /* a horrible kludge. Wre should check for */
+       /* a horrible kludge. We should check for  */
        /* reinstated member(s) of process tree    */
        /*-----------------------------------------*/
 
@@ -345,18 +351,23 @@ _PUBLIC int main(int argc, char *argv[])
        /*--------------------------------------------*/
  
        (void)kill(-getppid(),SIGRESTART);
-
        _exit(0);
     }
+
+
+    /*--------*/
+    /* Parent */
+    /*--------*/
+
     else
-       status = system(criu_cmd);
+       status = system("criu_cmd");
 
 
     /*----------------------------------------*/
     /* Checkpointed command has not restarted */
     /*----------------------------------------*/
 
-    if(WEXITSTATUS(status) == (-1))
+    if(WEXITSTATUS(status) != 0)
     {  if(do_verbose == TRUE)
        {  (void)fprintf(stderr,"restart: problem restarting checkpoint\n\n");
           (void)fflush(stderr);

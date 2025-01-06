@@ -1,5 +1,5 @@
-/*------------------------------------------------------------------------------
-    Purpose: Personality module header defines for generic UNIX system.
+/*--------------------------------------------------------------------
+    Purpose: Personality module header defines for generic UNIX system
 
     Author:  M.A. O'Neill
              Tumbling Dice Ltd
@@ -9,9 +9,9 @@
              United Kingdom
 
     Version: 1.00
-    Dated:   4th January 2023
+    Dated:   28th February 2024
     E-Mail:  mao@tumblingdice.co.uk 
-------------------------------------------------------------------------------*/
+-------------------------------------------------------------------*/
 
 #ifndef ME_H
 #define ME_H

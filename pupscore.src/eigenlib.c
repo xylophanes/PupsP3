@@ -1,4 +1,4 @@
-/*-----------------------------------------------------------------------------------
+/*----------------------------------------------------------------------------
     Purpose:  Eigenvector anaylis library
 
     Author:  M.A. O'Neill
@@ -9,12 +9,12 @@
              United Kingdom
 
     Version: 1.05
-    Dated:   4th Janiary 2023
+    Dated:   10th December 2024
     E-mail:  mao@tumblingdice.co.uk
 
     Some routines here are derived from those given in Press et al (Numerical
     Recipes in C).
-----------------------------------------------------------------------------------*/
+---------------------------------------------------------------------------*/
 
 
 #include <me.h>
@@ -54,19 +54,17 @@ _PRIVATE FTYPE sqrarg;
 /*-------------------------------------------------*/
 /* Slot and usage functions - used by slot manager */
 /*-------------------------------------------------*/
-
-
 /*---------------------*/
 /* Slot usage function */
 /*---------------------*/
 
-_PRIVATE void eigenlib_slot(int level)
+_PRIVATE void eigenlib_slot(int32_t level)
 {   (void)fprintf(stderr,"lib eigenlib %s: [ANSI C]\n",EIGEN_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 1985-2023 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 1985-2024 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
-       (void)fprintf(stderr,"PUPS/P3 eigenvector analysis library (built %s %s)\n\n",__TIME__,__DATE__);
+       (void)fprintf(stderr,"PUPS/P3 eigenvector analysis library (gcc %s: built %s %s)\n\n",__VERSION__,__TIME__,__DATE__);
     }
     else
        (void)fprintf(stderr,"\n");
@@ -95,17 +93,17 @@ _EXTERN void (* SLOT )() __attribute__ ((aligned(16))) = eigenlib_slot;
 _PROTOTYPE _PRIVATE FTYPE pythag(FTYPE a, FTYPE b);
 
 
-/*----------------------------------------------------------------------------------
-    Reduce matrix to tridiagonal form ...
-----------------------------------------------------------------------------------*/
+/*-----------------------------------*/
+/* Reduce matrix to tridiagonal form */
+/*-----------------------------------*/
 
-_PUBLIC int tqli(FTYPE *d, FTYPE *e, int n, FTYPE **z)
+_PUBLIC int32_t tqli(FTYPE *d, FTYPE *e, int32_t n, FTYPE **z)
 
-{   int m,
-        l,
-        iter,
-        i,
-        k;
+{    int32_t m,
+             l,
+             iter,
+             i,
+             k;
 
      FTYPE s,
            r,
@@ -184,17 +182,17 @@ _PUBLIC int tqli(FTYPE *d, FTYPE *e, int n, FTYPE **z)
 
 
 
-/*---------------------------------------------------------------------------------------------
-   Get eigenvalues and eigenvectos of a matrix by Householder reduction ...
----------------------------------------------------------------------------------------------*/
+/*----------------------------------------------------------------------*/
+/* Get eigenvalues and eigenvectos of a matrix by Householder reduction */
+/*----------------------------------------------------------------------*/
 
-_PUBLIC void tred2(_BOOLEAN eigenvectors, FTYPE **a, int n, FTYPE *d, FTYPE *e)
+_PUBLIC void tred2(_BOOLEAN eigenvectors, FTYPE **a, int32_t n, FTYPE *d, FTYPE *e)
 
 {
-    int l,
-        k,
-        j,
-        i;
+    int32_t l,
+            k,
+            j,
+            i;
 
     FTYPE scale,
           hh,
@@ -289,9 +287,9 @@ _PUBLIC void tred2(_BOOLEAN eigenvectors, FTYPE **a, int n, FTYPE *d, FTYPE *e)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Support routine for tqli and tred2 ...
-------------------------------------------------------------------------------------------*/
+/*------------------------------------*/
+/* Support routine for tqli and tred2 */
+/*------------------------------------*/
 
 _PRIVATE FTYPE pythag(FTYPE a, FTYPE b)
 {   FTYPE absa,
@@ -309,20 +307,20 @@ _PRIVATE FTYPE pythag(FTYPE a, FTYPE b)
 
 
 
-/*-------------------------------------------------------------------------------------------
-    Jacobi transformation of a symmetric matrix to compute the eigenvalues and
-    eigenvectors ...
--------------------------------------------------------------------------------------------*/
+/*----------------------------------------------------------------------------*/
+/* Jacobi transformation of a symmetric matrix to compute the eigenvalues and */
+/* eigenvectors                                                               */
+/*----------------------------------------------------------------------------*/
 
 #define ROTATE(a,i,j,k,l) g=a[i][j];h=a[k][l];a[i][j]=g-s*(h+g*tau);\
 	a[k][l]=h+s*(g-h*tau);
 
-_PUBLIC int jacobi(FTYPE **a, int n, FTYPE *d, FTYPE **v, int *nrot)
+_PUBLIC int32_t jacobi(FTYPE **a, int32_t n, FTYPE *d, FTYPE **v, int32_t *nrot)
 
-{   int i,
-        j,
-        iq,
-        ip;
+{    int32_t i,
+             j,
+             iq,
+             ip;
     
 	FTYPE thresh,
               theta,
@@ -435,17 +433,18 @@ _PUBLIC int jacobi(FTYPE **a, int n, FTYPE *d, FTYPE **v, int *nrot)
 
 
 
-/*------------------------------------------------------------------------------------------
-     Sort the eigenvalues and eigenvectors calculated by jacobi or tred2 and tqli into
-     descending order ...
-------------------------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------------------------*/
+/* Sort the eigenvalues and eigenvectors calculated by jacobi or tred2 and tqli  int32_to */
+/* descending order                                                                  */
+/*-----------------------------------------------------------------------------------*/
 
-_PUBLIC void eigsrt(FTYPE *d, FTYPE **v, int n)
-{   int k,
-        j,
-        i;
+_PUBLIC void eigsrt(FTYPE *d, FTYPE **v, int32_t n)
 
-    FTYPE p;
+{    int32_t k,
+             j,
+             i;
+
+    FTYPE    p;
 
     for(i=1; i<n; i++)
     {  p = d[k=i];
@@ -470,15 +469,15 @@ _PUBLIC void eigsrt(FTYPE *d, FTYPE **v, int n)
 
 
 
-/*---------------------------------------------------------------------------
-    Generate ATA matrix from input pattern vectors ...
----------------------------------------------------------------------------*/
+/*------------------------------------------------*/
+/* Generate ATA matrix from input pattern vectors */
+/*------------------------------------------------*/
 
-_PUBLIC void get_covariance_matrix(int n_patterns, int pattern_size, FTYPE **cmatrix, FTYPE **pattern_matrix)
+_PUBLIC void get_covariance_matrix(int32_t n_patterns, int32_t pattern_size, FTYPE **cmatrix, FTYPE **pattern_matrix)
 
-{   int i,
-        j,
-        k;
+{   int32_t i,
+            j,
+            k;
 
 
     for(i=0; i<n_patterns; i++)
@@ -496,16 +495,16 @@ _PUBLIC void get_covariance_matrix(int n_patterns, int pattern_size, FTYPE **cma
 
 
 
-/*---------------------------------------------------------------------------
-    Generate eigenvectors ...
----------------------------------------------------------------------------*/
+/*-----------------------*/
+/* Generate eigenvectors */
+/*-----------------------*/
 
-_PUBLIC int get_eigenvectors(FTYPE significance, int n_patterns, FTYPE **cmatrix, FTYPE *d, FTYPE *e)
+_PUBLIC int32_t get_eigenvectors(FTYPE significance, int32_t n_patterns, FTYPE **cmatrix, FTYPE *d, FTYPE *e)
 
-{   int i,
-        nse = 0;
+{    int32_t i,
+             nse = 0;
 
-    FTYPE trace;
+    FTYPE    trace;
 
     tred2(TRUE, cmatrix, n_patterns, d, e );
 
@@ -514,10 +513,11 @@ _PUBLIC int get_eigenvectors(FTYPE significance, int n_patterns, FTYPE **cmatrix
 
     eigsrt(d, cmatrix, n_patterns);
 
-/*---------------------------------------------------------------------------
-    Calculate trace (simply the sum of the eigenvalues of Cov_matrix) and the
-    proportion of variation that each eigenvector accounts for ...
----------------------------------------------------------------------------*/
+
+    /*---------------------------------------------------------------------------*/
+    /* Calculate trace (simply the sum of the eigenvalues of Cov_matrix) and the */
+    /* proportion of variation that each eigenvector accounts for                */
+    /*---------------------------------------------------------------------------*/
 
     trace = 0;
     for(i=1; i<=n_patterns; i++)
@@ -535,15 +535,15 @@ _PUBLIC int get_eigenvectors(FTYPE significance, int n_patterns, FTYPE **cmatrix
 
 
 
-/*---------------------------------------------------------------------------
-    Generate eigenpatterns ...
----------------------------------------------------------------------------*/
+/*------------------------*/
+/* Generate eigenpatterns */
+/*------------------------*/
   
-_PUBLIC FTYPE **get_eigenpatterns(int nse, int n_patterns, int pattern_size, FTYPE **pattern_matrix, FTYPE **eigenvector)
+_PUBLIC FTYPE **get_eigenpatterns(int32_t nse,  int32_t n_patterns, int32_t pattern_size, FTYPE **pattern_matrix, FTYPE **eigenvector)
 
-{   int i,
-        j,
-        k;
+{    int32_t i,
+             j,
+             k;
 
     FTYPE **eigenpattern = (FTYPE **)NULL;
 
@@ -577,15 +577,14 @@ _PUBLIC FTYPE **get_eigenpatterns(int nse, int n_patterns, int pattern_size, FTY
 
 
 
+/*--------------------------------------------------------*/
+/* Generate mapping in eigenspace for given patten vector */
+/*--------------------------------------------------------*/
 
-/*-----------------------------------------------------------------------------
-    Generate mapping in eigenspace for given patten vector ...
------------------------------------------------------------------------------*/
+_PUBLIC FTYPE *generate_weight_vector(int32_t nse,  int32_t pattern_size, FTYPE *pattern, FTYPE **eigenpattern)
 
-_PUBLIC FTYPE *generate_weight_vector(int nse, int pattern_size, FTYPE *pattern, FTYPE **eigenpattern)
-
-{   int i,
-        j;
+{   int32_t i,
+            j;
 
     FTYPE *weight = (FTYPE *)NULL;
 

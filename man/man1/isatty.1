@@ -1,0 +1,64 @@
+.TH ISATTY 1 "21st March 2024" "PUPSP3 build tools" "PUPSP3 build tools"
+
+.SH NAME
+ISATTY \- test to see if specified stdio stream is associated with a terminal 
+.br
+
+.SH SYNOPSIS
+.B isatty 
+[
+.B -help
+]
+|
+.B -usage
+]
+!
+.B stdin
+!
+|
+!
+.B stdout
+!
+|
+!
+.B stderr
+!
+[
+show
+]
+.br
+
+.SH DESCRIPTION
+.I isatty(1)
+test to see if specified standard input/output stream
+.I stdin,
+.I stdout,
+or
+.I stderr
+is connected to a terminal device. If
+.B show
+is specified, print the terminal association status of specified stdio stream to
+.I standard error.
+.br
+
+.SH EXIT STATUS
+
+0: not connected to terminal device
+.br
+1: connected to terminal device
+.br
+255: error
+.br
+
+
+.SH ENVIRONMENT VARIABLES
+None.
+.br
+
+.SH COPYRIGHT
+(C) Tumbling Dice Ltd.
+.br
+
+.SH PROGRAMMER
+M.A. O'Neill.
+.br

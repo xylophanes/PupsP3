@@ -1,4 +1,4 @@
-/*------------------------------------------------------------------------------
+/*--------------------------------------------------------------------
    Purpose: Place marker for monitoring applications in live pipelines 
 
     Author:  M.A. O'Neill
@@ -9,9 +9,9 @@
              United Kingdom
 
     Version: 2.02 
-    Dated:   4th January 2023
+    Dated:   29th December 2024
     E-mail:  mao@tumblingdice.co.uk 
-------------------------------------------------------------------------------*/
+--------------------------------------------------------------------*/
 
 #include <me.h>
 #include <utils.h>
@@ -20,11 +20,12 @@
 #include <psrp.h>
 #include <unistd.h>
 #include <vstamp.h>
+#include <bsd/bsd.h>
 
 
-/*-----------------*/
-/* Version of xcat */
-/*-----------------*/
+/*---------*/
+/* Version */
+/*---------*/
 
 #define XCAT_VERSION    "2.02"
 
@@ -66,9 +67,9 @@
 #include <vstamp.h>
 
 
-/*------------------------------------------------------------------------------
-    Get application information for slot manager ...
-------------------------------------------------------------------------------*/
+/*----------------------------------------------*/
+/* Get application information for slot manager */
+/*----------------------------------------------*/
 /*---------------------------*/
 /* Slot information function */
 /*---------------------------*/
@@ -77,9 +78,9 @@ _PRIVATE void xcat_slot(int level)
 {   (void)fprintf(stderr,"int app xcat %s: [ANSI C]\n",XCAT_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 2005-2023 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 2005-2024 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
-       (void)fprintf(stderr,"Pipeline insertion marker for dynamic pipeline monitors (built %s %s)\n\n",__TIME__,__DATE__);
+       (void)fprintf(stderr,"Pipeline insertion marker for dynamic pipeline monitors (gcc %s: built %s %s)\n\n",__VERSION__,__TIME__,__DATE__);
     }
     else
        (void)fprintf(stderr,"\n");
@@ -117,9 +118,9 @@ _EXTERN void (* USE )() __attribute__ ((aligned(16))) = xcat_usage;
 #endif /* SLOT */
 
 
-/*------------------------------------------------------------------------------
-    Application build date ...
-------------------------------------------------------------------------------*/
+/*------------------------*/
+/* Application build date */
+/*------------------------*/
 
 _EXTERN char appl_build_time[SSIZE] = __TIME__;
 _EXTERN char appl_build_date[SSIZE] = __DATE__;
@@ -128,9 +129,9 @@ _EXTERN char appl_build_date[SSIZE] = __DATE__;
 
 
 
-/*------------------------------------------------------------------------------
-    Defines which are local to this application ...
-------------------------------------------------------------------------------*/
+/*---------*/
+/* Defines */
+/*---------*/
 
 #define TO_STDOUT    1
 #define TO_PSRP      2
@@ -140,14 +141,14 @@ _EXTERN char appl_build_date[SSIZE] = __DATE__;
 
 
 
-/*------------------------------------------------------------------------------
-    Private variables required by this application ...
-------------------------------------------------------------------------------*/
+/*-----------------*/
+/* Local variables */
+/*-----------------*/
 
                                                        /*-------------------------------------*/
 _PRIVATE _BOOLEAN data_flowing         = TRUE;         /* State of dataflow (stdin -> stdout) */
 _PRIVATE _BOOLEAN root_instance        = TRUE;         /* State of dataflow (stdin -> stdout) */
-_PRIVATE int      bytes_read;                          /* Number of bytes read from stdin     */
+_PRIVATE ssize_t  bytes_read;                          /* Number of bytes read from stdin     */
 _PRIVATE char     line_of_input[SSIZE] = "";           /* Line buffer                         */
 _PRIVATE char     mytmpfile[SSIZE]     = "";           /* Temporary file name                 */
 _PRIVATE FILE     *mystream            = (FILE *)NULL; /* I/O stream                          */
@@ -155,24 +156,24 @@ _PRIVATE FILE     *mystream            = (FILE *)NULL; /* I/O stream            
 
 
 
-/*------------------------------------------------------------------------------
-    Local prototype function declarations ...
-------------------------------------------------------------------------------*/
+/*---------------------------------------*/
+/* Local prototype function declarations */
+/*---------------------------------------*/
 
 /* Report status of function to PSRP client */
-_PROTOTYPE _PRIVATE int psrp_process_status(int, char *[]);
+_PROTOTYPE _PRIVATE  int32_t psrp_process_status(int32_t, char *[]);
 
 /* Switch dataflow on/off */
-_PROTOTYPE _PRIVATE int dataflow(int, char *[]);
+_PROTOTYPE _PRIVATE  int32_t dataflow(int32_t, char *[]);
 
 
 
 
-/*------------------------------------------------------------------------------
-    Report process status ...
-------------------------------------------------------------------------------*/
+/*-----------------------*/
+/* Report process status */
+/*-----------------------*/
 
-_PRIVATE int psrp_process_status(int argc, char *argv[])
+_PRIVATE  int32_t psrp_process_status(int32_t argc, char *argv[])
 
 {    (void)fprintf(psrp_out,"\n    Pipleline dynamic insertion marker status\n");
      (void)fprintf(psrp_out,"    =========================================\n\n");
@@ -196,11 +197,11 @@ _PRIVATE int psrp_process_status(int argc, char *argv[])
 
 
 
-/*------------------------------------------------------------------------------
-    Switch dataflow to specified sink ...
-------------------------------------------------------------------------------*/
+/*----------------------------------------*/
+/* Switch dataflow to specified data sink */
+/*----------------------------------------*/
 
-_PRIVATE int dataflow(int argc, char *argv[])
+_PRIVATE  int32_t dataflow(int32_t argc, char *argv[])
 
 {   if(strcmp(argv[1],"help") == 0 || strcmp(argv[1],"usage") == 0)
     {  (void)fprintf(psrp_out,"usage: dataflow [stdout | psrp | ptap | off]\n");
@@ -288,11 +289,11 @@ _PRIVATE int dataflow(int argc, char *argv[])
 
 
 
-/*------------------------------------------------------------------------------
-    Remove junk ...
-------------------------------------------------------------------------------*/
+/*-------------*/
+/* Remove junk */
+/*-------------*/
 
-_PRIVATE int remove_junk(void)
+_PRIVATE  int32_t remove_junk(void)
 
 {    (void)pups_fclose(mystream);
      (void)unlink(mytmpfile);
@@ -301,24 +302,21 @@ _PRIVATE int remove_junk(void)
 
 
 
-/*------------------------------------------------------------------------------
-    Software I.D. tag (used if CKPT support enabled to discard stale dynamic
-    checkpoint files) ...
-------------------------------------------------------------------------------*/
+/*-------------------*/
+/* Software I.D. tag */
+/*-------------------*/
 
-#define VTAG  3785
-
-extern int appl_vtag = VTAG;
+#define VTAG  4323
+extern  int32_t appl_vtag = VTAG;
 
 
 
 
+/*------------------*/
+/* Main entry point */
+/*------------------*/
 
-/*------------------------------------------------------------------------------
-    Main entry point ...
-------------------------------------------------------------------------------*/
-
-_PUBLIC int pups_main(int argc, char *argv[])
+_PUBLIC  int32_t pups_main(int32_t argc, char *argv[])
 
 
 {
@@ -333,8 +331,6 @@ _PUBLIC int pups_main(int argc, char *argv[])
     /*--------------------*/
     /* Parse command tail */
     /*--------------------*/
-
-
     /*-----------------------------*/
     /* Do standard initialisations */
     /*-----------------------------*/
@@ -344,10 +340,10 @@ _PUBLIC int pups_main(int argc, char *argv[])
                   XCAT_VERSION,
                   "M.A. O'Neill",
                   "xcat",
-                  "2023",
-                  argv);
+                  "2024",
+                  (void *)argv);
 
-    (void)psrp_init(PSRP_STATUS_ONLY  | PSRP_HOMEOSTATIC_STREAMS,&psrp_process_status);
+    (void)psrp_init(PSRP_STATUS_ONLY  | PSRP_HOMEOSTATIC_STREAMS,(void *)&psrp_process_status);
     (void)psrp_attach_static_function("status",(void *)&psrp_process_status);
     (void)psrp_attach_static_function("flow",(void *)&dataflow);
     (void)psrp_load_default_dispatch_table();
@@ -368,7 +364,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
     /* Check command tail for unparsed arguments */
     /*-------------------------------------------*/
 
-    pups_t_arg_errs(argd,args);
+    pups_t_arg_errs(argd,(void *)args);
 
     if(isatty(0) == 1)
        pups_error("[xcat] no file attached to stdin");

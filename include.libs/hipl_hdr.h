@@ -8,8 +8,8 @@
              NE3 4RT
              United Kingdom
 
-    Version: 2.02 
-    Dated:   7th January 2023
+    Version: 2.04 
+    Dated:   12th December 2024
     E-Mail:  mao@tumblingdice.co.uk 
 ------------------------------------------------------------------------------*/
 
@@ -29,7 +29,7 @@
 /* Version */
 /***********/
 
-#define HIPLIB_VERSION  "2.02"
+#define HIPLIB_VERSION  "2.04"
 
 
 /*-------------*/
@@ -49,8 +49,6 @@
 /*---------------------------------------------------------------*/
 /* Routines for accessing elements of arrays of known pixel type */
 /*---------------------------------------------------------------*/
-
-
 /*---------------------------------------*/
 /* Access an element if a HIPS row array */
 /*---------------------------------------*/
@@ -118,17 +116,17 @@
 
 typedef struct
 {
-   char   orig_name[SSIZE];     // The originator of this sequence 
-   char   seq_name[SSIZE];      // The name of this sequence 
-   int    num_frame;            // The number of frames in this sequence 
-   char   orig_date[SSIZE];     // The date the sequence was originated
-   int    rows;                 // The number of rows in each image 
-   int    cols;                 // The number of columns in each image
-   int    bits_per_pixel;       // The number of significant bits per pixel 
-   int    bit_packing;          // Nonzero if bits were packed contiguously
-   int    pixel_format;         // The format of each pixel, see below 
-   char   seq_history[SSIZE];   // The sequence's history of transformations 
-   char   seq_desc[SSIZE];      // Descriptive information 
+   char     orig_name[SSIZE];     // The originator of this sequence 
+   char     seq_name[SSIZE];      // The name of this sequence 
+   int32_t  num_frame;            // The number of frames in this sequence 
+   char     orig_date[SSIZE];     // The date the sequence was originated
+   int32_t  rows;                 // The number of rows in each image 
+   int32_t  cols;                 // The number of columns in each image
+   int32_t  bits_per_pixel;       // The number of significant bits per pixel 
+   int32_t  bit_packing;          // Nonzero if bits were packed contiguously
+   int32_t  pixel_format;         // The format of each pixel, see below 
+   char     seq_history[SSIZE];   // The sequence's history of transformations 
+   char     seq_desc[SSIZE];      // Descriptive information 
 } hipl_hdr;
 
 
@@ -165,18 +163,18 @@ typedef struct {   float real,
 #define IMG_GREY    1
 #define IMG_RGB     2
 
-typedef struct {    int      rows;           // Rows in image 
-                    int      cols;           // Columns in image 
-                    int      n_frames;       // Images in sequence 
-                    int      colour;         // RGB or GREY 
-                    long int datatype;       // Image datatype 
-                    long int seeklutdata;    // Image RGB LUT offset
-                    long int seekRdata;      // Offset to grey (RGB red) data 
-                    long int seekGdata;      // Offset to RGB green data 
-                    long int seekBdata;      // Offset to RGB blue data 
-                    long     size;           // Image size (in pixels)
-                    _BOOLEAN has_lut;        // TRUE if image has LUT
-                    _BYTE    lut[768];       // RGB look up table 
+typedef struct {     int32_t  rows;           // Rows in image 
+                     int32_t  cols;           // Columns in image 
+                     int32_t  n_frames;       // Images in sequence 
+                     int32_t  colour;         // RGB or GREY 
+                     int64_t  datatype;       // Image datatype 
+                     int64_t  seeklutdata;    // Image RGB LUT offset
+                     int64_t  seekRdata;      // Offset to grey (RGB red) data 
+                     int64_t  seekGdata;      // Offset to RGB green data 
+                     int64_t  seekBdata;      // Offset to RGB blue data 
+                     int64_t  size;           // Image size (in pixels)
+                    _BOOLEAN  has_lut;        // TRUE if image has LUT
+                    _BYTE     lut[768];       // RGB look up table 
                } img_hdr_type;
 
 #endif
@@ -187,94 +185,138 @@ typedef struct {    int      rows;           // Rows in image
 ------------------------------------------------------------------------------*/
 
 // Get HIPS header from stdin
-_PROTOTYPE _EXPORT int  hips_rd_hdr_info(int, int *, int *, int *, hipl_hdr *);
+_PROTOTYPE _EXPORT int32_t  hips_rd_hdr_info(uint32_t     ,
+                                             uint32_t    *,
+                                             uint32_t    *,
+                                             uint32_t    *,
+                                             hipl_hdr    *);
 
 // Display HIPS header information in textual format
-_PROTOTYPE _EXPORT int  hips_display_hdr_info(FILE *, hipl_hdr *);
+_PROTOTYPE _EXPORT int32_t hips_display_hdr_info(const FILE *, const hipl_hdr *);
 
 // Get HIPS header from file 
-_PROTOTYPE _EXPORT int  hips_f_rd_hdr_info(int, int, int *, int *, int *, hipl_hdr *);
+_PROTOTYPE _EXPORT int32_t  hips_f_rd_hdr_info(des_t      ,
+                                               uint32_t   ,
+                                               uint32_t  *,
+                                               uint32_t  *,
+                                               uint32_t  *, 
+                                               hipl_hdr  *);
 
 // Write HIPS header to stdout
-_PROTOTYPE _EXPORT void hips_wr_hdr_info(char *, int, char *[], char *, hipl_hdr *);
+_PROTOTYPE _EXPORT void hips_wr_hdr_info(const char        *,
+                                         const uint32_t     ,
+                                         const char      *[],
+                                         const char        *,
+                                         hipl_hdr          *);
 
 
 // Write HIPS header to file
-_PROTOTYPE _EXPORT void hips_f_wr_hdr_info(int, char *, int, char *[], char *, hipl_hdr *);
+_PROTOTYPE _EXPORT void hips_f_wr_hdr_info(const des_t       ,
+                                           const char       *,
+                                           const uint32_t    ,
+                                           const char     *[],
+                                           const char       *,
+                                           hipl_hdr         *);
 
 // Read HIPS header
 _PROTOTYPE _EXPORT void hips_rd_hdr(hipl_hdr *);
 
 // Read HIPS header from file
-_PROTOTYPE _EXPORT void hips_frd_hdr(int, hipl_hdr *);
+_PROTOTYPE _EXPORT void hips_frd_hdr(const des_t, hipl_hdr *);
 
 // Write hips header
-_PROTOTYPE _EXPORT void hips_wr_hdr(hipl_hdr *);
+_PROTOTYPE _EXPORT void hips_wr_hdr(const hipl_hdr *);
 
 // Write HIPS header to file 
-_PROTOTYPE _EXPORT void hips_fwr_hdr(int, hipl_hdr *);
+_PROTOTYPE _EXPORT void hips_fwr_hdr(const des_t, const hipl_hdr *);
 
 // Initialise HIPS header
-_PROTOTYPE _EXPORT void hips_init_hdr  (hipl_hdr *, char *, char *, int, char *, int, int, int, int, int, char *, char *);
+_PROTOTYPE _EXPORT void hips_init_hdr(hipl_hdr     *,
+                                      const char   *,
+                                      const char   *,
+                                      const  int32_t,
+                                      const char   *,
+                                      const  int32_t,
+                                      const  int32_t,
+                                      const  int32_t,
+                                      const  int32_t,
+                                      const  int32_t,
+                                      const char   *,
+                                      const char   *);
 
 // Skip frame of data
-_PROTOTYPE _EXPORT void hips_frame_skip(int, int, hipl_hdr *);
+_PROTOTYPE _EXPORT void hips_frame_skip(int32_t,  int32_t, hipl_hdr *);
 
 // Update the header descriptor
-_PROTOTYPE _EXPORT void hips_upd_hdr(hipl_hdr *, char *, int, char **);
+_PROTOTYPE _EXPORT void hips_upd_hdr(hipl_hdr *,  const char *, const uint32_t, const char **);
 
 // Update the sequence discriptor
-_PROTOTYPE _EXPORT void hips_upd_desc(hipl_hdr *, char *);
+_PROTOTYPE _EXPORT void hips_upd_desc(hipl_hdr *, const char *);
 
 // Set header descriptor
-_PROTOTYPE _EXPORT void hips_set_desc(hipl_hdr *, char *);
+_PROTOTYPE _EXPORT void hips_set_desc(hipl_hdr *, const char *);
 
 // Allocate memory for a frame
 _PROTOTYPE _EXPORT void **hips_fralloc(hipl_hdr *);
 
 // Allocate memory for n rows of image
-_PROTOTYPE _EXPORT void **hips_nralloc(int, hipl_hdr *);
+_PROTOTYPE _EXPORT void **hips_nralloc(int32_t, hipl_hdr *);
 
 // Allocate memory for one image row
 _PROTOTYPE _EXPORT void *hips_ralloc(hipl_hdr *);
 
 // Pread routine to read correctly from a pipe 
-_PROTOTYPE _EXPORT int pipe_pread(int, void *, int);
+_PROTOTYPE _EXPORT int32_t pipe_pread(int32_t, void *, int32_t);
 
 // Routine to return size of pixel in bytes
-_PROTOTYPE _EXPORT int hips_pixel_size(int);
+_PROTOTYPE _EXPORT int32_t hips_pixel_size(const int32_t);
 
 // Routine to decode a pixel output type
-_PROTOTYPE _EXPORT int hips_output_pixel_type(char *);
+_PROTOTYPE _EXPORT int32_t hips_output_pixel_type(const char *);
 
 // Routine to return type string corresponding to a HIPL pixel format
-_PROTOTYPE _EXPORT char *hips_pixstr(int);
+_PROTOTYPE _EXPORT char *hips_pixstr(const uint32_t);
 
 // Routine to destroy HIPS header datastructure
 _PROTOTYPE _EXPORT void hips_destroy_hdr(hipl_hdr *);
 
+// Manipulate a HIPS raster of arbitrary type
+_PROTOTYPE _EXPORT void *hips_access_pixel(const uint32_t   ,   // Pixel size (bytes)
+                                           const uint32_t   ,   // Pixel (row) position
+                                           const uint32_t   ,   // Pixel (col) position
+                                           void           **);  // Image raster
 
 #ifdef TIFF_SUPPORT
 // Convert a HIPS file to a TIFF file
-_PROTOTYPE _EXPORT void hips_to_tiff(_BOOLEAN, int, int, char **, int, char *, char *);
+_PROTOTYPE _EXPORT void hips_to_tiff(const _BOOLEAN,
+                                     const  int32_t,
+                                     const  int32_t,
+                                     const char  **,
+                                     const  int32_t,
+                                     const char   *,
+                                     const char   *);
 
 // Convert a TIFF file to a HIPS file
-_PROTOTYPE _EXPORT void tiff_to_hips(_BOOLEAN, int, char **, char *, char *);
+_PROTOTYPE _EXPORT void tiff_to_hips(const    _BOOLEAN,
+                                     const uint32_t   ,
+                                     const char     **,
+                                     const char      *,
+                                     const char      *);
 #endif /* TIFF_SUPPORT */
 
 
 #ifdef IMG_SUPPORT
 // Read Kontron IMG image
-_PROTOTYPE _EXPORT void img_read_hdr(int  fdes, _BOOLEAN, img_hdr_type *);
+_PROTOTYPE _EXPORT void img_read_hdr(const des_t, const _BOOLEAN, img_hdr_type *);
 
 // Write Kontron IMG image
-_PROTOTYPE _EXPORT void img_write_hdr(int fdes, _BOOLEAN, img_hdr_type *);
+_PROTOTYPE _EXPORT void img_write_hdr(const des_t, const _BOOLEAN, img_hdr_type *);
 
 // Convert Kontron IMG image to HIPS image
-_PUBLIC void img_to_hips(_BOOLEAN, int, char *[], char *, char *);
+_PUBLIC void img_to_hips(const _BOOLEAN, const uint32_t, const char *[], const char *, const char *);
 
 // Convert HIPS image to Kontron IMG image
-_PUBLIC void hips_to_img(_BOOLEAN, char *, char *);
+_PUBLIC void hips_to_img(const _BOOLEAN, const char *, const char *);
 #endif /* IMG_SUPPORT */
 
 #ifdef _CPLUSPLUS
@@ -285,4 +327,4 @@ _PUBLIC void hips_to_img(_BOOLEAN, char *, char *);
 #   define _EXPORT extern
 #endif
 
-#endif /* HIPL_H */
+#endif /* HIPL_H    */

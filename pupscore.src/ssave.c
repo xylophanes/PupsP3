@@ -1,4 +1,4 @@
-/*----------------------------------------------------------------------------
+/*------------------------------------------
      Purpose: Saves command state (via Criu) 
 
      Author:  M.A. O'Neill
@@ -8,10 +8,10 @@
               NE3 4RT
               United Kingdom
 
-     Version: 2.01 
-     Dated:   24th May 2023
+     Version: 2.02 
+     Dated:   11th December 2024
      E-mail:  mao@tumblingdice.co.uk
------------------------------------------------------------------------------*/
+-----------------------------------------*/
 
 #include <stdio.h>
 #include <string.h>
@@ -24,9 +24,12 @@
 #include <time.h>
 #include <sys/wait.h>
 #include <signal.h>
+#include <stdint.h>
 
 
-
+/*---------*/
+/* Defines */
+/*---------*/
 /*-------------*/
 /* Version tag */
 /*-------------*/
@@ -86,8 +89,8 @@
 /* Variables which are global to this application */
 /*------------------------------------------------*/
 
-_PRIVATE int  child_pid       = (-1);
-_PRIVATE char buildStr[SSIZE] = "";
+_PRIVATE  pid_t child_pid       = (-1);
+_PRIVATE  char  buildStr[SSIZE] = "";
 
 
 
@@ -96,7 +99,7 @@ _PRIVATE char buildStr[SSIZE] = "";
 /* Signal handler for SIGINT and SIGTERM */
 /*---------------------------------------*/
 
-_PRIVATE int term_handler(int signum)
+_PRIVATE  int32_t term_handler(int signum)
 
 {   (void)fprintf(stderr,"ssave: aborted\n\n");
     (void)fflush(stderr);
@@ -112,25 +115,25 @@ _PRIVATE int term_handler(int signum)
 /* Main entry point */
 /*------------------*/
 
-_PUBLIC int main(int argc, char *argv[])
+_PUBLIC int32_t main(int32_t argc, char *argv[])
 
-{   int i,
-        argd                  = 1;
+{   uint32_t i,
+             argd                   = 1;
 
-    time_t poll_time          = DEFAULT_POLL_TIME;
+    time_t   poll_time              = DEFAULT_POLL_TIME;
 
-    _BOOLEAN do_verbose       = FALSE;
+    _BOOLEAN do_verbose             = FALSE;
 
-    char criu_check_f[SSIZE]    = "",
-         reply[SSIZE]           = "",
-         criu_cmd[SSIZE]        = "",
-         payload_cmd[SSIZE]     = "",
-         payload_sh_cmd[SSIZE]  = "",
-         criu_dir[SSIZE]        = "/tmp",
-         ssave_dir[SSIZE]       = "",
-         ssave_buildpath[SSIZE] = "";
+    char     criu_check_f[SSIZE]    = "",
+             reply[SSIZE]           = "",
+             criu_cmd[SSIZE]        = "",
+             payload_cmd[SSIZE]     = "",
+             payload_sh_cmd[SSIZE]  = "",
+             criu_dir[SSIZE]        = "/tmp",
+             ssave_dir[SSIZE]       = "",
+             ssave_buildpath[SSIZE] = "";
 
-    FILE *stream              = (FILE *)NULL;
+    FILE     *stream                = (FILE *)NULL;
 
 
     /*------------------------------------*/
@@ -145,8 +148,8 @@ _PUBLIC int main(int argc, char *argv[])
     /*--------------------*/
 
     if(argc == 1)
-    {  (void)fprintf(stderr,"\n   ssave version %s (built %s %s)\n",SSAVE_VERSION,__TIME__,__DATE__);
-       (void)fprintf(stderr,"   (C) Tumbling Dice, 2016-2023\n\n");
+    {  (void)fprintf(stderr,"\n   ssave version %s (gcc %s: built %s %s)\n",SSAVE_VERSION,__VERSION__,__TIME__,__DATE__);
+       (void)fprintf(stderr,"   (C) Tumbling Dice, 2016-2024\n\n");
        (void)fprintf(stderr,"   Usage: ssave [-usage | -help] |\n");
        (void)fprintf(stderr,"                [-t <poll time:%d>]\n",DEFAULT_POLL_TIME);
        (void)fprintf(stderr,"                [-cd <criu directory:/tmp>]\n");
@@ -165,8 +168,8 @@ _PUBLIC int main(int argc, char *argv[])
        /*--------------------------*/
 
        if(strcmp(argv[i],"-usage") == 0 || strcmp(argv[i],"-help") == 0)
-       {  (void)fprintf(stderr,"\n   ssave version %s (built %s %s)\n",SSAVE_VERSION,__TIME__,__DATE__);
-          (void)fprintf(stderr,"   (C) Tumbling Dice, 2016-2023\n\n");
+       {  (void)fprintf(stderr,"\n   ssave version %s (gcc %s: built %s %s)\n",SSAVE_VERSION,__VERSION__,__TIME__,__DATE__);
+          (void)fprintf(stderr,"   (C) Tumbling Dice, 2016-2024\n\n");
           (void)fprintf(stderr,"   Usage: ssave [-usage | -help] |\n");
           (void)fprintf(stderr,"                [-t <poll time:%d>]\n",DEFAULT_POLL_TIME);
           (void)fprintf(stderr,"                [-cd <criu directory:/tmp>\n");
@@ -332,7 +335,6 @@ _PUBLIC int main(int argc, char *argv[])
     /* payload                                   */
     /*-------------------------------------------*/
 
-
     if((child_pid = fork()) == 0)
     {
 
@@ -407,9 +409,8 @@ _PUBLIC int main(int argc, char *argv[])
         #endif /* SSAVE_DEBUG */
 
         while(TRUE)
-        {   int ret,
-                status;
-
+        {   int32_t ret,
+                    status;
 
             #ifdef SSAVE_DEBUG
             (void)fprintf(stderr,"CRIU LOOP1\n");
@@ -472,7 +473,7 @@ _PUBLIC int main(int argc, char *argv[])
                #endif /* SSAVE_DEBUG */
 
                if(do_verbose == TRUE)
-               {  (void)fprintf(stderr,"ssave: payload command has terminated unexpectedly - exiting with checkpoint\n\n");
+               {  (void)fprintf(stderr,"ssave: payload command has terminated unexpectedly - exiting with checkpoiont\n\n");
                   (void)fflush(stderr); 
                }
 

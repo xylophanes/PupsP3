@@ -1,5 +1,5 @@
-/*-----------------------------------------------------------------------------
-    Purpose: Return suffix of string of form prefix.suffix. 
+/*--------------------------------------------------------
+    Purpose: Return suffix of string of form prefix.suffix 
 
     Author:  M.A. O'Neill
              Tumbling Dice Ltd
@@ -8,21 +8,25 @@
              NE3 4RT
              United Kingdom
 
-    Version: 2.00 
-    Dated:   4th January 2023
+    Version: 2.02 
+    Dated:   11th December 2024
     E-mail:  mao@tumblingdice.co.uk
------------------------------------------------------------------------------*/
+--------------------------------------------------------*/
 
 
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <xtypes.h>
+#include <stdint.h>
 
 
-/*-------------------*/
-/* Version of suffix */
-/*-------------------*/
+/*---------*/
+/* Defines */
+/*---------*/
+/*---------*/
+/* Version */
+/*---------*/
 
 #define SUFFIX_VERSION  "2.00"
 
@@ -38,19 +42,24 @@
 /* main entry point */
 /*------------------*/
 
-_PUBLIC int main(int argc, char *argv[])
+_PUBLIC  int32_t main(int32_t argc, char *argv[])
 
-{   int i,
-        j,
-        pos = 0,
-        cnt = 0;
+{   uint32_t i,
+             j,
+             pos           = 0,
+             cnt           = 0;
 
-    char suffix[SSIZE] = "";
+    char     suffix[SSIZE] = "";
+
+
+    /*--------------------*/
+    /* Parse command line */
+    /*--------------------*/
 
     if(argc != 2                                          ||
        strncmp(argv[1],"-help", strlen(argv[1])) == 0     ||
        strncmp(argv[1],"--help",strlen(argv[1])) == 0      )
-    {  (void)fprintf(stderr,"\nsuffix version %s, (C) Tumbling Dice 2000-2023 (built %s %s)\n\n",SUFFIX_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nsuffix version %s, (C) Tumbling Dice 2000-2024 (gcc %s: built %s %s)\n\n",SUFFIX_VERSION,__VERSION__,__TIME__,__DATE__);
        (void)fprintf(stderr,"SUFFIX is free software, covered by the GNU General Public License, and you are\n");
        (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
        (void)fprintf(stderr,"See the GPL and LGPL licences at www.gnu.org for further details\n");
@@ -83,4 +92,3 @@ _PUBLIC int main(int argc, char *argv[])
 
      exit(0);
 }
-

@@ -9,8 +9,8 @@
               NE3 4RT
               United Kingdom
 
-     Version: 2.02 
-     Dated:   4th May 2023
+     Version: 2.03 
+     Dated:   10th December 2024
      E-mail:  mao@tumblingdice.co.uk
 ---------------------------------------------------------------------------------------*/
 
@@ -21,10 +21,10 @@
 #include <string.h>
 #include <bsd/string.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 #ifdef HAVE_READLINE
 #include <readline/readline.h>
-#include <readline/history.h>
 #endif /* HAVE_READLINE */
 
 
@@ -32,7 +32,7 @@
 /* Version of appgen */
 /*-------------------*/
 
-#define APPGEN_VERSION    "2.02"
+#define APPGEN_VERSION    "2.03"
 
 
 /*---------------*/
@@ -52,14 +52,14 @@
 
 
 
-/*---------------------------------------------------------------------------------------
-    Strip control characters from string ...
----------------------------------------------------------------------------------------*/
+/*--------------------------------------*/
+/* Strip control characters from string */
+/*--------------------------------------*/
 
-_PRIVATE void strstrp(char *s_in, char *s_out)
+static void strstrp(char *s_in, char *s_out)
 
-{   int i,
-        cnt = 0;
+{   uint32_t i,
+             cnt = 0;
 
     for(i=0; i<strlen(s_in); ++i)
     {  if(s_in[i] == '\n' || s_in[i] == '\r')
@@ -76,11 +76,11 @@ _PRIVATE void strstrp(char *s_in, char *s_out)
 
 
 
-/*---------------------------------------------------------------------------------------
-    Read input (with line editing if supported) ...
----------------------------------------------------------------------------------------*/
+/*---------------------------------------------*/
+/* Read input (with line editing if supported) */
+/*---------------------------------------------*/
 
-_PRIVATE void read_line(char *line, char *prompt)
+static void read_line(char *line, char *prompt)
 
 {   char *tmp_line = (char *)NULL;
 
@@ -111,17 +111,17 @@ _PRIVATE void read_line(char *line, char *prompt)
 
         } while(strcmp(line,"") == 0);
 
-    (void)free(tmp_line);
+    (void)free((void *)tmp_line);
 }
 
 
 
 
-/*---------------------------------------------------------------------------------------
-    Main entry point to process ...
----------------------------------------------------------------------------------------*/
+/*-----------------------------*/
+/* Main entry point to process */
+/*-----------------------------*/
 
-_PUBLIC int main(int argc, char *argv[])
+int32_t main(int32_t argc, char *argv[])
 
 {   char tmpstr[SSIZE]            = "",
          skelpapp[SSIZE]          = "",
@@ -139,6 +139,11 @@ _PUBLIC int main(int argc, char *argv[])
          sed_cmd[SSIZE]           = "",
          sed_cmds[SSIZE]          = "sed '";
 
+
+    /*--------------------*/
+    /* Parse command line */
+    /*--------------------*/
+
     if(argc == 1)
     {  if((char *)getenv("PUPS_SKELPAPP") != (char *)NULL && (char *)getenv("PUPS_MAKE_SKELPAPP") != (char *)NULL)
        { (void)strlcpy(skelpapp,(char *)getenv("PUPS_MAKE_SKELPAPP"),SSIZE); 
@@ -149,8 +154,9 @@ _PUBLIC int main(int argc, char *argv[])
           (void)snprintf(skelpapp,SSIZE,"%s/skelpapp.c",DEFAULT_BASEPATH);
        }
     }
+
     else if(argc == 2 && (strcmp(argv[1],"-usage") == 0 || strcmp(argv[1],"-help") == 0))
-    {  (void)fprintf(stderr,"\nPUPS/P3 application generator version %s, (C) Tumbling Dice, 2002-2023 (built %s %s)\n",APPGEN_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nPUPS/P3 application generator version %s, (C) Tumbling Dice, 2002-2024 (gcc %s: built %s %s)\n",APPGEN_VERSION,__VERSION__,__TIME__,__DATE__);
        (void)fprintf(stderr,"Usage: application [skeleton application file]\n\n");
        (void)fflush(stderr);
        (void)fprintf(stderr,"APPLICATION is free software, covered by the GNU General Public License, and you are\n");
@@ -162,12 +168,14 @@ _PUBLIC int main(int argc, char *argv[])
 
        exit(255);
     }
+
     else if(argc == 3)
     {  (void)strlcpy(make_skelpapp,argv[1],SSIZE);
        (void)strlcpy(skelpapp,argv[2],SSIZE);
     }
+
     else
-    {  (void)fprintf(stderr,"\nPUPS/P3 application generator version %s, (C) Tumbling Dice, 2002-2023 (built %s %s)\n",APPGEN_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nPUPS/P3 application generator version %s, (C) Tumbling Dice, 2002-2024 (gcc %s: built %s %s)\n",APPGEN_VERSION,__VERSION__,__TIME__,__DATE__);
        (void)fprintf(stderr,"Usage: application [skeleton application file]\n\n");
        (void)fflush(stderr);
        (void)fprintf(stderr,"APPLICATION is free software, covered by the GNU General Public License, and you are\n");
@@ -194,7 +202,12 @@ _PUBLIC int main(int argc, char *argv[])
        exit(255);
     }
 
-    (void)fprintf(stderr,"\nPUPS/P3 application generator version 1.03 (C) M.A. O'Neill, Tumbling Dice, 2011\n\n");
+
+    /*---------------------------------------------------*/
+    /* Generate application framework from template file */
+    /*---------------------------------------------------*/
+
+    (void)fprintf(stderr,"\nPUPS/P3 application generator version %s (C) M.A. O'Neill, Tumbling Dice, 2011-2024\n\n",APPGEN_VERSION);
     (void)fflush(stderr); 
     read_line(app_name,"appgen (Application name)> ");
     (void)strstrp(app_name,tmpstr);
@@ -244,5 +257,6 @@ _PUBLIC int main(int argc, char *argv[])
 
     (void)fprintf(stderr,"\n\nApplication \"%s\" generated (in %s.c, makefile is Make_%s.in)\n\n",app_name,app_name,app_name);
     (void)fflush(stderr); 
+
     exit(0);
 }

@@ -1,4 +1,4 @@
-/*------------------------------------------------------------------
+/*------------------------------------------------------
      Purpose: Relay SIGHUP as SIGTERM (to payload child) 
 
      Author:  M.A. O'Neill
@@ -8,10 +8,10 @@
               NE3 4RT
               United Kingdom
 
-     Version: 2.00 
-     Dated:   4th January 2023
+     Version: 2.02 
+     Dated:   10th December 2024
      e-mail:  mao@tumblingdice.co.uk
--------------------------------------------------------------------*/
+-----------------------------------------------------*/
 
 #include <stdio.h>
 #include <string.h>
@@ -19,13 +19,18 @@
 #include <xtypes.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <sys/wait.h>
+#include <stdint.h>
 
 
+/*---------*/
+/* Defines */
+/*---------*/
 /*-------------------*/
 /* Version of hupter */
 /*-------------------*/
 
-#define HUPTER_VERSION    "2.00"
+#define HUPTER_VERSION    "2.02"
 
 
 /*-------------*/
@@ -35,12 +40,12 @@
 #define SSIZE             2048 
 
 
-/*-----------------------------------------------*/
-/* Variables which are local to this application */
-/*-----------------------------------------------*/
+/*-----------------*/
+/* Local variables */
+/*-----------------*/
 
-_PRIVATE int child_pid;
-_PRIVATE int relay_signal = SIGTERM;
+_PRIVATE  int32_t child_pid;
+_PRIVATE  int32_t relay_signal = SIGTERM;
 
 
 
@@ -48,7 +53,7 @@ _PRIVATE int relay_signal = SIGTERM;
 /* Relay -- send signal to process group */
 /*---------------------------------------*/
 
-_PRIVATE int relay(int signum)
+_PRIVATE int32_t relay(const  int32_t signum)
 {
 
     /*--------------------------------*/
@@ -63,24 +68,28 @@ _PRIVATE int relay(int signum)
     /*-------------------------------------*/
 
     (void)kill(-(child_pid+1),SIGINT);
-
     exit (0);
 }
 
 
 
-/*------------------------------------------*/
-/* Main entry point for process group relay */
-/*------------------------------------------*/
+/*------------------*/
+/* Main entry point */
+/*------------------*/
 
-_PUBLIC int main(int argc, char *argv[])
-{   char payload_cmd[SSIZE] = "";
+_PUBLIC  int32_t main(int argc, char *argv[])
+{   char payload_cmd[SSIZE]  = "";
 
-    int  status,
-         cmd_index = 1;
+    int32_t  status,
+             cmd_index       = 1;
+
+
+    /*--------------------*/ 
+    /* Parse command line */
+    /*--------------------*/
 
     if(argc == 1 || (argc != 3 && (strcmp(argv[1],"-help") == 0 || strcmp(argv[1],"-help") == 0)))
-    {  (void)fprintf(stderr,"\nhupter version %s, (C) Tumbling Dice 2003-2023 (built %s %s)\n\n",HUPTER_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nhupter version %s, (C) Tumbling Dice 2003-2024 (gcc %s: built %s %s)\n\n",HUPTER_VERSION,__VERSION__,__TIME__,__DATE__);
        (void)fprintf(stderr,"HUPTER is free software, covered by the GNU General Public License, and you are\n");
        (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
        (void)fprintf(stderr,"See the GPL and LGPL licences at www.gnu.org for further details\n");

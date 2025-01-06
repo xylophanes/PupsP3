@@ -1,4 +1,4 @@
-/*-----------------------------------------------------------------------------
+/*------------------------------------------------------------
     Purpose: Set/update build tag on a PUPS application source 
 
     Author:  M.A. O'Neill
@@ -8,10 +8,10 @@
              NE3 4RT
              United Kingdom
 
-    Version: 2.02
-    Dated:   4th January 2023
+    Version: 2.03
+    Dated:   12th December 2024
     E-mail:  mao@tumblingdice.co.uk
------------------------------------------------------------------------------*/
+------------------------------------------------------------*/
 
 #include <stdio.h>
 #include <string.h>
@@ -19,11 +19,15 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 
-/*-------------------*/
-/* Version of vtagup */
-/*-------------------*/
+/*---------*/
+/* Defines */
+/*---------*/
+/*---------*/
+/* Version */
+/*---------*/
 
 #define VTAGUP_VERSION    "2.00"
 
@@ -39,7 +43,7 @@
 /* Local function prototypes */
 /*---------------------------*/
 
-_PRIVATE _BOOLEAN strin(char *, char *);
+_PRIVATE _BOOLEAN strin(const char *, const char *);
 
 
 
@@ -48,22 +52,27 @@ _PRIVATE _BOOLEAN strin(char *, char *);
 /* main entry point */
 /*------------------*/
 
-int main(int argc, char *argv[])
+int32_t main(int32_t argc, char *argv[])
 
-{   char line[SSIZE]   = "",
-         tag[SSIZE]    = "",
-         strdum[SSIZE] = "";
+{   char      line[SSIZE]    = "",
+              tag[SSIZE]     = "",
+              strdum[SSIZE]  = "";
 
-    int  cnt           = 0,
-         v_num         = (-1);
+    uint32_t  cnt    = 0,
+              v_num  = (-1);
 
-    FILE *stream       = (FILE *)NULL;
+    FILE      *stream        = (FILE *)NULL;
 
-    unsigned long int pos;
-    struct   stat buf;
+    off_t     pos;
+    struct    stat buf;
+
+
+    /*--------------------*/
+    /* Parse command line */
+    /*--------------------*/
 
     if(argc < 3 || argc > 5 || strcmp(argv[1],"-help") == 0)
-    {  (void)fprintf(stderr,"\nvtagup version %s, (C) Tumbling Dice 2000-2023 (built %s %s)\n\n",VTAGUP_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nvtagup version %s, (C) Tumbling Dice 2000-2024 (gcc %s: built %s %s)\n\n",VTAGUP_VERSION,__VERSION__,__TIME__,__DATE__);
        (void)fprintf(stderr,"VTAGUP is free software, covered by the GNU General Public License, and you are\n");
        (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
        (void)fprintf(stderr,"See the GPL and LGPL licences at www.gnu.org for further details\n");
@@ -146,15 +155,15 @@ int main(int argc, char *argv[])
 
 
 
-/*-----------------------------------------------------------------------------
-    Look for the occurence of string s2 within string s1 ...
------------------------------------------------------------------------------*/
+/*------------------------------------------------------*/
+/* Look for the occurence of string s2 within string s1 */
+/*------------------------------------------------------*/
 
-_PUBLIC _BOOLEAN strin(char *s1, char *s2)
+_PUBLIC _BOOLEAN strin(const char *s1, const char *s2)
     
-{   int i,                    
-        cmp_size,                                                             
-        chk_limit;
+{   size_t i,                    
+           cmp_size,                                                             
+           chk_limit;
 
     if(strlen(s2) > strlen(s1))
        return(FALSE);

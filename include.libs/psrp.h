@@ -8,8 +8,8 @@
              NE3 4RT
              United Kingdom
 
-    Version: 5.08
-    Dated:   25th October 2023 
+    Version: 7.04 
+    Dated:   29th December 2024 
     E-mail:  mao@tumblingdice.co.uk
 -------------------------------------------------------------------------*/
 
@@ -38,14 +38,14 @@
 /* Version */
 /***********/
 
-#define PSRPLIB_VERSION    "5.08"
+#define PSRPLIB_VERSION      "7.04"
 
 
 /*-------------*/
 /* String size */
 /*-------------*/
 
-#define SSIZE                 2048
+#define SSIZE                512 
 
 
 /*-------------------------------*/
@@ -56,7 +56,7 @@
 
 
 /*-----------------*/
-/* PSRP interfaces */
+/* PSRP  interface */
 /*-----------------*/
 
                              /*-----------------------*/
@@ -163,7 +163,7 @@
 /* PSRP system defines */
 /*---------------------*/
 
-#define PSRP_PROTOCOL_VERSION          9.02 
+#define PSRP_PROTOCOL_VERSION          10.00 
 #define PSRP_BAG_TABLE_SIZE            128 
 #define PSRP_DISPATCH_TABLE_SIZE       128 
 #define PSRP_ALLOCATION_QUANTUM        128 
@@ -237,8 +237,8 @@
 /* Types used by mail subsystem */
 /*------------------------------*/
 
-typedef struct {   char     type[SSIZE];     // MIME part type
-                   char     path[SSIZE];     // Filepath of part
+typedef struct {   char     type[SSIZE];        // MIME part type
+                   char     path[SSIZE];        // Filepath of part
                } mc_type;
 
 #endif /* MAIL_SUPPORT */
@@ -248,13 +248,13 @@ typedef struct {   char     type[SSIZE];     // MIME part type
 /* Types used by cron subsystem */
 /*------------------------------*/
 
-typedef struct {   int      from;            // Start of scheduled op.
-                   int      to;              // End of scheduled op.
-                   _BOOLEAN overnight;       // Op extends over midnight
-                   void     (*func)(int);    // Payload function
-                   char     fname[SSIZE];    // Name of payload function
-                   char     fromdate[SSIZE]; // Date string for start
-                   char     todate[SSIZE];   // Date string for stop
+typedef struct {   time_t        from;                // Start of scheduled op.
+                   time_t         to;                 // End of scheduled op.
+                   _BOOLEAN       overnight;          // Op extends over midnight
+                   void           (*func)(int32_t);   // Payload function
+                   char           fname[SSIZE];       // Name of payload function
+                   char           fromdate[SSIZE];    // Date string for start
+                   char           todate[SSIZE];      // Date string for stop
                } psrp_crontab_type;
 
 
@@ -262,29 +262,29 @@ typedef struct {   int      from;            // Start of scheduled op.
 /* Types used by PSRP handler system */
 /*-----------------------------------*/
 
-typedef struct {    int  aliases_allocated;  // Allocated alias slots
-		    int  aliases;            // Number of aliases
-		    char **object_tag;       // Names of PSRP object
-                    char *object_f_name;     // Object resource file
-                    int  hid;                // Heap descriptor
-		    int  object_type;        // Type of PSRP object
-		    int  object_size;        // Size of PSRP object
-		    int  object_state;       // State of PSRP object
-		    void *object_handle;     // Handle of PSRP object
+typedef struct {    uint32_t       aliases_allocated;  // Allocated alias slots
+		    uint32_t       aliases;            // Number of aliases
+		    char           **object_tag;       // Names of PSRP object
+                    char           *object_f_name;     // Object resource file
+                    uint32_t       hid;                // Heap descriptor
+		    int32_t        object_type;        // Type of PSRP object
+		    size_t         object_size;        // Size of PSRP object
+		    int32_t        object_state;       // State of PSRP object
+		    void           *object_handle;     // Handle of PSRP object
 	       } psrp_object_type;
 
 
-typedef struct {    char       *in_name;     // Name of in stream
-		    char      *out_name;     // Name of out stream
-		    char     *host_name;     // Host for PSRP client
-                    char      *ssh_port;     // Host ssh port
-		    char           *pen;     // PSRP client PEN
-		    FILE     *in_stream;     // In stream
-		    FILE    *out_stream;     // Out stream
-		    int           index;     // Index in channel table
-                    int             scp;     // Slaved client PID
-                    int            type;     // Channel type
-                    _BOOLEAN     remote;     // TRUE if SIC remote
+typedef struct {    char           in_name[SSIZE];     // Name of in stream
+		    char           out_name[SSIZE];    // Name of out stream
+		    char           host_name[SSIZE];   // Host for PSRP client
+                    char           ssh_port[SSIZE];    // Host ssh port
+		    char           pen[SSIZE];         // PSRP client PEN
+		    FILE           *in_stream;         // In stream
+		    FILE           *out_stream;        // Out stream
+		    uint32_t       index;              // Index in channel table
+                    pid_t          scp;                // Slaved client PID
+                    int32_t        type;               // Channel type
+                    _BOOLEAN       remote;             // TRUE if SIC remote
 		} psrp_channel_type;
 
 
@@ -303,11 +303,11 @@ _EXPORT FILE     *psrp_in;                             // PSRP input channel (fr
 _EXPORT FILE     *psrp_out;                            // PSRP output channel (to client)
 _EXPORT char     channel_name_in[];                    // PSRP input channel name
 _EXPORT char     channel_name_out[];                   // PSRP ouput channel name
-_EXPORT int      psrp_client_pid[MAX_CLIENTS];         // PID of PSRP client process
-_EXPORT int      n_clients;                            // Number of connected clients
-_EXPORT int      c_client;                             // Currently active client
-_EXPORT int      psrp_seg_cnt;                         // Server segment counter
-_EXPORT int      psrp_instances;                       // Instance counter
+_EXPORT  int32_t psrp_client_pid[MAX_CLIENTS];         // PID of PSRP client process
+_EXPORT  int32_t n_clients;                            // Number of connected clients
+_EXPORT  int32_t c_client;                             // Currently active client
+_EXPORT  int32_t psrp_seg_cnt;                         // Server segment counter
+_EXPORT  int32_t psrp_instances;                       // Instance counter
 _EXPORT _BOOLEAN psrp_child_instance;                  // TRUE if child instance 
 _EXPORT _BOOLEAN psrp_mode;                            // TRUE if server in psrp mode
 _EXPORT _BOOLEAN in_psrp_new_segment;                  // TRUE if about to segment
@@ -326,323 +326,315 @@ _EXPORT          psrp_object_type  *psrp_object_list;  // List of attached PSRP 
 /* PSRP handler functions */
 /*------------------------*/
 
-// Register client side abort callback
-_PROTOTYPE _EXPORT int psrp_register_on_abort_callback_f(const char *, const void *);
+// Register client side abort callback [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_register_on_abort_callback_f(const char *, const void *);
 
-// Deregister client side abort callback
+// Deregister client side abort callback [root thread]
 _PROTOTYPE _EXPORT void psrp_deregister_on_abort_callback_f(void);
 
-// Display client side abort callback function details
-_PROTOTYPE _EXPORT int psrp_show_on_abort_callback_f(const FILE *);
+// Display client side abort callback function details [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_show_on_abort_callback_f(const FILE *);
 
 // Callback function for client side abort
 _PROTOTYPE _EXPORT _BOOLEAN (*on_abort_callback_f)(void);
 
-// Ignore PSRP requests
+// Ignore PSRP requests [root thread]
 _PROTOTYPE _EXPORT void psrp_ignore_requests(void);
 
-// Accept PSRP requests
+// Accept PSRP requests [root thread]
 _PROTOTYPE _EXPORT void psrp_accept_requests(void);
 
-// Initialise PSRP handler
-_PROTOTYPE _EXPORT void psrp_init(const int, const int (*)(const int, const char *[]));
+// Initialise PSRP handler [root thread]
+_PROTOTYPE _EXPORT void psrp_init(const int32_t, const int32_t (*)(const int32_t, const char *[]));
 
-// Attach static function to PSRP handler
-_PROTOTYPE _EXPORT int psrp_attach_static_function(const char *, const void *);
+// Attach static function to PSRP handler [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_attach_static_function(const char *, const void *);
 
-// Attach static databag to PSRP handler
-_PROTOTYPE _EXPORT int psrp_attach_static_databag(const char *, const unsigned long int, const _BYTE *);
+// Attach static databag to PSRP handler [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_attach_static_databag(const char *, const uint64_t, const _BYTE *);
 
-// Attach static databag to PSRP handler
-_PROTOTYPE _EXPORT int psrp_attach_dynamic_databag(const _BOOLEAN, const char *, const char *, const int);
+// Attach dynamic databag to PSRP handler [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_attach_dynamic_databag(const _BOOLEAN, const char *, const char *, const int32_t);
 
-// Overlay PSRP server process with new command
-_PROTOTYPE _EXPORT int psrp_overlay_server_process(const _BOOLEAN, const char *, const char *);
+// Overlay PSRP server process with specified command [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_overlay_server_process(const _BOOLEAN, const char *, const char *);
 
 
 #ifdef SUPPORT_DLL
-
-// Attach dynamic function to PSRP handler
-_PROTOTYPE _EXPORT int psrp_attach_dynamic_function(const _BOOLEAN, const char *, const char *);
-
+// Attach dynamic function to PSRP handler [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_attach_dynamic_function(const _BOOLEAN, const char *, const char *);
 #endif /* SUPPORT_DLL */
 
 
 #ifdef PERSISTENT_HEAP_SUPPORT
+// Attach a persistent heap [root thread]
+_PROTOTYPE _EXPORT int32_t  psrp_attach_persistent_heap(const _BOOLEAN, const char *, const char *, const int32_t);
 
-// Attach a persistent heap
-_PROTOTYPE _EXPORT int  psrp_attach_persistent_heap(const _BOOLEAN, const char *, const char *, const int);
-
-// Show persistent heaps mapped into process address space
+// Show persistent heaps mapped  into process address space [root thread]
 _PROTOTYPE _EXPORT void psrp_show_persistent_heaps(const FILE *);
-
 #endif /* PERSISTENT_HEAP_SUPPORT */
 
 
-// Detach named object from PSRP handler
-_PROTOTYPE _EXPORT int psrp_detach_object_by_name(const char *);
+// Detach object from PSRP handler list by name [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_detach_object_by_name(const char *);
 
-// Detach object with known handle from PSRP handler
-_PROTOTYPE _EXPORT int psrp_detach_object_by_handle(const void *);
+// Detach object from PSRP handler list by handle [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_detach_object_by_handle(const void *);
 
-// Show attached functions
+// Show objects in PSRP dispatch table and  PSRP server status information [root thread]
 _PROTOTYPE _EXPORT void psrp_show_object_list(void);
 
 // Handle PSRP interrupt function request from remote client
-_PROTOTYPE _EXPORT int int_handler(int);
+_PROTOTYPE _EXPORT int32_t  int_handler(int);
 
-// Load default dispatch table (at server startup)
+// Load default dispatch table (at server startup) [root thead]
 _PROTOTYPE _EXPORT _BOOLEAN psrp_load_default_dispatch_table(void);
 
-// Load a dispatch table class (merging functions on server)
-_PROTOTYPE _EXPORT int psrp_load_dispatch_table(const _BOOLEAN, const char *);
+// Load a dispatch table class (merging functions on server) [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_load_dispatch_table(const _BOOLEAN, const char *);
 
-// Save a dispatch table class
-_PROTOTYPE _EXPORT int psrp_save_dispatch_table(const char *);
+// Save a dispatch table  [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_save_dispatch_table(const char *);
 
 // Handle broken channel
-_PROTOTYPE _EXPORT int psrp_chbrk_handler(const unsigned int, const int);
+_PROTOTYPE _EXPORT int32_t psrp_chbrk_handler(const uint32_t, const uint32_t);
 
-// Initialise PSRP object function command tail decoder
-_PROTOTYPE _EXPORT _BOOLEAN psrp_std_init(const int, const char *[]);
+// Initialise PSRP environment [root thread]
+_PROTOTYPE _EXPORT _BOOLEAN psrp_std_init(const int32_t, const char *[]);
 
-// Check for junk on PSRP object function comamnd lines
-_PROTOTYPE _EXPORT _BOOLEAN psrp_t_arg_errs(const int, const _BOOLEAN *, const char *[]);
+// PSRP handler command line parser error handler [root thread]
+_PROTOTYPE _EXPORT _BOOLEAN psrp_t_arg_errs(const int32_t, const _BOOLEAN *, const char *[]);
 
-// send error message to client
+// send error message to client [root thread]
 _PROTOTYPE _EXPORT void psrp_error(const char *);
 
-// Look up item in dispatch table by name
-_PROTOTYPE _EXPORT int lookup_psrp_object_by_name(const char *);
+// Get PSRP handler list entry by name [root thread]
+_PROTOTYPE _EXPORT int32_t lookup_psrp_object_by_name(const char *);
 
-// Look up item in dispatch table by handle
-_PROTOTYPE _EXPORT int lookup_psrp_object_by_handle(const void *);
+// Get PSRP handler list entry by handle
+_PROTOTYPE _EXPORT int32_t lookup_psrp_object_by_handle(const void *);
 
-// Get handle of PSRP object from name
+// Get handle of PSRP object from name [root thread]
 _PROTOTYPE _EXPORT void *psrp_get_handle_from_name(const char *);
 
-// Get name of PSRP object from handle
-_PROTOTYPE _EXPORT int psrp_get_name_from_handle(const void *, char *);
+// Get name of PSRP object from handle [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_get_name_from_handle(const void *, char *);
 
-// Get type of psrp object from name
-_PROTOTYPE _EXPORT int psrp_get_type_from_name(const char *);
+// Get type of psrp object from name [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_get_type_from_name(const char *);
 
-// Get type of psrp object from name
-_PROTOTYPE _EXPORT int psrp_get_type_from_handle(const void *);
+// Get type of psrp object from handle [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_get_type_from_handle(const void *);
 
-// Remove communication channel
+// Remove communication channels when PSRP server process exist [root thread]
 _PROTOTYPE _EXPORT void psrp_exit(void);
 
-// Resolve pid from process name
-_PROTOTYPE _EXPORT int psrp_pname_to_pid(const char *);
+// Get process pid from process name [root thread]
+_PROTOTYPE _EXPORT pid_t psrp_pname_to_pid(const char *);
 
-// Resolve process name from process pid
-_PROTOTYPE _EXPORT _BOOLEAN psrp_pid_to_pname(const int, char *);
+// Get process name from pid [root thread]
+_PROTOTYPE _EXPORT _BOOLEAN psrp_pid_to_pname(const pid_t, char *);
 
-// Resolve pid from PSRP channel name
-_PROTOTYPE _EXPORT int psrp_channelname_to_pid(const char *, char *, char *);
+// Get pid from PSRP channel name [root thread]
+_PROTOTYPE _EXPORT pid_t psrp_channelname_to_pid(const char *, const char *, const char *);
 
-// Resolve process name from PSRP channel name
-_PROTOTYPE _EXPORT _BOOLEAN psrp_pid_to_channelname(const char *, const int, char *, char *);
+// Resolve process name from PSRP channel name [root thread]
+_PROTOTYPE _EXPORT _BOOLEAN psrp_pid_to_channelname(const char *, const pid_t, char *, char *);
 
-// Set current SIC
-_PROTOTYPE _EXPORT int psrp_set_current_sic(const psrp_channel_type *);
+// Set current PSRP slaved client channel [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_set_current_sic(const psrp_channel_type *);
 
-// Unset current SIC
+// Unset current slaved client channel [root thread]
 _PROTOTYPE _EXPORT void psrp_unset_current_sic(void);
 
-// Create a slaved psrp interaction client
+// Create connection to slaved PSRP client process [root thread]
 #ifdef SSH_SUPPORT
 _PROTOTYPE _EXPORT psrp_channel_type *psrp_create_slaved_interaction_client(const char *, const char *, const char *);
 #else
 _PROTOTYPE _EXPORT psrp_channel_type *psrp_create_slaved_interaction_client(const char *);
 #endif /* SSH_SUPPORT */
 
-// Carry out PSRP transaction via slaved client
+// Send a request to slaved PSRP client and wait for reply [root thread]
 _PROTOTYPE _EXPORT char *psrp_slaved_client_transaction(const _BOOLEAN, const psrp_channel_type *, const char *);
 
-// Destroy psrp slaved interaction client
+// Destroy slaved PSRP client connection [root thread]
 _PROTOTYPE _EXPORT psrp_channel_type *psrp_destroy_slaved_interaction_client(const psrp_channel_type *, const _BOOLEAN);
 
-// Assign descriptors for a PSRP task function
-_PROTOTYPE _EXPORT int psrp_assign_stdio(const FILE *, const int *, const char *[], int *, int *, int *);
+// Assign stdio descriptors for PSRP server [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_assign_stdio(const FILE *, const int32_t *, const char *[], des_t *, des_t *, des_t *);
 
-// Assign streams for a PSRP task function
-_PROTOTYPE _EXPORT int psrp_assign_fstdio(const FILE *, const int *, const char *[], FILE *, FILE *, FILE *);
+// Assign stdio streams for a PSRP task function [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_assign_fstdio(const FILE *, const int32_t *, const char *[], FILE *, FILE *, FILE *);
 
-// Wait for data on nominated descriptor
-_PROTOTYPE _EXPORT int psrp_wait_for_data(const int);
+// Wait for data on nominated descriptor [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_wait_for_data(const des_t);
 
-// Provide an alias for a bound PSRP object
-_PROTOTYPE _EXPORT int psrp_alias(const char *, const char *);
+// Create alias for PSRP object [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_alias(const char *, const char *);
 
-// Remove an alias for a bound PSRP object
-_PROTOTYPE _EXPORT int psrp_unalias(const char *, const char *);
+// Remove PSRP object alias [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_unalias(const char *, const char *);
 
-// Show alaises on object
-_PROTOTYPE _EXPORT int psrp_show_aliases(const char *);
+// Display PSRP object aliases [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_show_aliases(const char *);
 
 // Duplicate current process
-_PROTOTYPE _EXPORT int psrp_duplicate_instance(_BOOLEAN, char *);
+_PROTOTYPE _EXPORT int32_t psrp_duplicate_instance(_BOOLEAN, char *);
 
-// Free resources allocated to tag index 
-_PROTOTYPE _EXPORT int psrp_ifree_tag_list(const unsigned int);
+// Free resources allocated to PSRP handler slot [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_ifree_tag_list(const uint32_t);
 
-// Search tag list for the first free slot
-_PROTOTYPE _EXPORT int psrp_get_tag_index(const unsigned int);
+// Search PSRP handler list for the first free slot [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_get_tag_index(const uint32_t);
 
-// Search tag list
-_PROTOTYPE _EXPORT int psrp_isearch_tag_list(const char *, const unsigned int);
+// Search PSRP handler list [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_isearch_tag_list(const char *, const uint32_t);
 
-// Get the index of the next available slot in the dispatch table
-_PROTOTYPE _EXPORT int psrp_get_action_slot_index(void);
+// Get the index of the next available slot in the dispatch table [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_get_action_slot_index(void);
 
-// Destroy PSRP object
-_PROTOTYPE _EXPORT void psrp_destroy_object(const unsigned int);
+// Destroy PSRP object by handler table index [root thread]
+_PROTOTYPE _EXPORT void psrp_destroy_object(const uint32_t);
 
-// Get state of PSRP object
-_PROTOTYPE _EXPORT int psrp_ostate(const char *);
+// Get state of PSRP object by tag [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_ostate(const char *);
 
-// Check whether we have client locked on named channel
+// Check if named psrp channel is locked by client [root thread]
 _PROTOTYPE _EXPORT _BOOLEAN psrp_channel_locked(const FILE *, const char *);
 
-// Show open slaved interation client channels
+// Show open slaved client channels [root thread]
 _PROTOTYPE _EXPORT void psrp_show_open_sics(const FILE *);
 
-// Empty a FIFO
-_PROTOTYPE _EXPORT void empty_fifo(const int);
+// Empty a FIFO [root thread]
+_PROTOTYPE _EXPORT void psrp_empty_fifo(const des_t);
 
-// Handler for client side of PSRP interrupt mechanism
-_PROTOTYPE _EXPORT int psrp_client_int_handler(int);
+// Handler for client side of PSRP  interrupt mechanism
+_PROTOTYPE _EXPORT int32_t psrp_client_int_handler(int32_t);
 
-// Start a new server segment
 #ifdef SSH_SUPPORT
-_PROTOTYPE _EXPORT int psrp_new_segment(const char *, const char *, const char *, const char *);
+// Start new server segment [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_new_segment(const char *, const char *, const char *, const char *);
 #else
-_PROTOTYPE _EXPORT int psrp_new_segment(const char *, const char *, const char *);
+_PROTOTYPE _EXPORT int32_t psrp_new_segment(const char *, const char *, const char *);
 #endif /* SSH_SUPPORT */
 
-// Generate duplicate instance a PSRP server
-_PROTOTYPE _EXPORT int psrp_new_instance(const _BOOLEAN, const char *, const char *);
+// Generate duplicate instance a PSRP server [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_new_instance(const _BOOLEAN, const char *, const char *);
 
 // Find host running specified server
-_PROTOTYPE _EXPORT int psrp_get_server_host(FILE *, char *, char [][SSIZE]);
+_PROTOTYPE _EXPORT int32_t psrp_get_server_host(FILE *, char *, char [][SSIZE]);
 
 // Prod a remote host (to see if it is alive)
-_PROTOTYPE _EXPORT int psrp_prod_host(FILE *, char *, char *, char *, int, int *);
+_PROTOTYPE _EXPORT int32_t psrp_prod_host(FILE *, char *, char *, char *, int32_t, int32_t *);
 
-// Find PSRP dispatch table slot entry
-_PROTOTYPE _EXPORT int psrp_find_action_slot_index(const char *);
+// Find PSRP dispatch table slot entry [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_find_action_slot_index(const char *);
 
-// Send request over slaved client channel (peer-to-peer)
-_PROTOTYPE _EXPORT int psrp_write_sic(const psrp_channel_type *, const char *);
+// Send request over slaved PSRP client channel [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_write_sic(const psrp_channel_type *, const char *);
 
-// Read reply over slaved client channel (peer-to-peer)
-_PROTOTYPE _EXPORT int psrp_read_sic(const psrp_channel_type *, char *);
+// Read reply over slaved PSRP client channel [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_read_sic(const psrp_channel_type *, char *);
 
-// Send abort over slaved client channel (perr-to-peer)
+// Send  interrupt to slaved PSRP client [root thread]
 _PROTOTYPE _EXPORT void psrp_int_sic(const psrp_channel_type *);
 
-// Reset dispatch table
+// Reset dispatch table [root thread]
 _PROTOTYPE _EXPORT void psrp_reset_dispatch_table(void);
 
-// Install PSRP channel exit function
-_PROTOTYPE _EXPORT int psrp_set_client_exitf(const unsigned int , const char *, int (*)(int));
+// Install exit function for PSRP client [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_set_client_exitf(const uint32_t, const char *,  int32_t (*)(int32_t));
 
-// Deinstall PSRP channel exit function
-_PROTOTYPE _EXPORT int psrp_reset_client_exitf(const unsigned int);
+// Remove exit function for PSRP client [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_reset_client_exitf(const uint32_t);
 
-// Schedule a crontab operation
-_PROTOTYPE _EXPORT int psrp_crontab_schedule(const char *, const char *, const char *, const void *);
+// Schedule activity in (PSRP server) crontab table [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_crontab_schedule(const char *, const char *, const char *, const void *);
 
-// Unschedule a crontab operation
-_PROTOTYPE _EXPORT int psrp_crontab_unschedule(const unsigned int);
+// Unschedule  PSRP server (crontab) activity[root thread]
+_PROTOTYPE _EXPORT int32_t psrp_crontab_unschedule(const uint32_t);
 
-// Initialise crontab
+// Initialise (PSRP server) crontab [root thread]
 _PROTOTYPE _EXPORT void psrp_crontab_init(void);
 
-// Display crontab
-_PROTOTYPE _EXPORT int psrp_show_crontab(const FILE *);
+// Display scheduled (PSRP crontab) activities for this PSRP server [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_show_crontab(const FILE *);
 
-// Set dispatch function error/status code
+// Set PSRP handler condition (error/status) code [root thread]
 _PROTOTYPE _EXPORT void psrp_set_c_code(const char *);
 
-// Fork a PUPS (server) process
-_PROTOTYPE _EXPORT int psrp_fork(const char *, const _BOOLEAN);
+// Fork a PUPS (server) process [root thread]
+_PROTOTYPE _EXPORT pid_t psrp_fork(const char *, const _BOOLEAN);
 
-// Herpes algorithm
-_PROTOTYPE _EXPORT int herpes_homeostat(void *, char *);
-
-// Shy algorithm
-_PROTOTYPE _EXPORT int shy_homeostat(void *, char *);
-
-// Read trail data from migrated PSRP O/P channel
+// Read trail data from migrated PSRP channel [root thread]
 _PROTOTYPE _EXPORT _BOOLEAN psrp_read_trailfile(const char *, char *, char *, char *);
 
 
 #ifdef MAIL_SUPPORT
+// Store components of a MIME encapsulated message [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_mime_storeparts(const char *, const char *);
 
-// Store components of a MIME message
-_PROTOTYPE _EXPORT int psrp_mime_storeparts(const char *, const char *);
+// Extract PSRP requests from text segment of MIME encapsulated message [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_msg2requestlist(const char *, char *);
 
-// Extract PSRP requests from text segment of MIME message
-_PROTOTYPE _EXPORT int psrp_msg2requestlist(const char *, const char *);
+// Delete MIME encapsulated message [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_mime_delete(const char *);
 
-// Delete compomnents of MIME message
-_PROTOTYPE _EXPORT int psrp_mime_delete(const char *);
-
-// Send single file as MIME message 
+// Send single file as MIME message [root thread]
 _PROTOTYPE _EXPORT void psrp_mime_mail(const char *, const char *, const char *);
 
-// Send files as multipart MIME message 
-_PROTOTYPE _EXPORT int psrp_mime_encapsulate(const char *, const char *, const char *, const int, const mc_type *);
+// Send set of files as multipart MIME message [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_mime_encapsulate(const char *, const char *, const char *, const int32_t, const mc_type *);
 
-// Get replyto address from message header
-_PROTOTYPE _EXPORT int psrp_get_replyto(const char *, char *);
+// Get replyto  address from MIME message header [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_get_replyto(const char *, char *);
 
-// Mail homeostat (allow PSRP process to read its mailbox and reply to it mail!)
-_PROTOTYPE _EXPORT int psrp_mail_homeostat(void *, const char *);
-
+// Mail homeostat (allow PSRP process to read mailbox and reply to  mail) [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_mail_homeostat(void *, const char *);
 #endif /* MAIL_SUPPORT */
 
-// Handler for SIGCONT */
-_PROTOTYPE _EXPORT int psrp_cont_handler(const int);
 
-// Rename an existing PSRP channel
-_PROTOTYPE _EXPORT int psrp_rename_channel(const char *);
+// Handler for client disconnect in response to server stop [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_cont_handler(const int32_t);
 
-// Start PSRP server on remote host 
-_PROTOTYPE _EXPORT int psrp_remote_start(const char *, const _BOOLEAN, const int, const char *[]);
+// Rename PSRP channel [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_rename_channel(const char *);
 
-// Send list of requests to remote peer (via enslaved PSRP client)
+// Start PSRP server on target host [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_cmd_on_host(const char *, const _BOOLEAN, uint32_t, char *[]);
+
 #ifdef SSH_SUPPORT
-_PROTOTYPE _EXPORT char **psrp_process_sic_transaction_list(const char *, const char *, const int, const char *);
+// Process a set of (slaved) PSRP requests  [root thread]
+_PROTOTYPE _EXPORT char **psrp_process_sic_transaction_list(const char *, const char *, const int32_t, const char *);
 #else
-_PROTOTYPE _EXPORT char **psrp_process_sic_transaction_list(const char *, const int, const char *);
+_PROTOTYPE _EXPORT char **psrp_process_sic_transaction_list(const char *, const int32_t, const char *);
 #endif /* SSH_SUPPORT */
 
-// Set up (exec) ennviroment
-_PROTOTYPE _EXPORT int psrp_exec_env(const char *);
+// Set (bash) enviroment for remote execution [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_exec_env(const char *);
 
-// Enable PSRP abort flag 
-_PROTOTYPE _EXPORT int psrp_enable_abrtflag(void);
+// Enable PSRP abort status flag  [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_enable_abrtflag(void);
 
-// Disable PSRP abort flag 
-_PROTOTYPE _EXPORT int psrp_disable_abrtflag(void);
+// Disable PSRP abort status flag [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_disable_abrtflag(void);
 
-// Rest PSRP abort flag 
-_PROTOTYPE _EXPORT int psrp_reset_abrtflag(void);
+// Reset PSRP abort status flag 
+_PROTOTYPE _EXPORT int32_t psrp_reset_abrtflag(void);
 
-// Get PSRP abort flag 
+// Clear PSRP abort status flag [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_clear_abrtflag(void);
+
+// Get PSRP abort status flag  [root thread]
 _PROTOTYPE _EXPORT _BOOLEAN psrp_get_abrtflag(void);
 
-// Enable/disable PSRP client interrupt (via SIGABRT)
-_PROTOTYPE _EXPORT int psrp_critical(const _BOOLEAN);
+// Enable/disable PSRP client interrupt in critical PSRP server operation [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_critical(const _BOOLEAN);
 
-// Block/unblock client interrupt (via SIGABRT) 
-_PROTOTYPE _EXPORT int psrp_client_block(const _BOOLEAN);
+// Block/unblock client interrupt [root thread]
+_PROTOTYPE _EXPORT int32_t psrp_client_block(const _BOOLEAN);
 
-// Is PEN (process execution name) unique? 
+// Is PEN (process execution name) unique? [root thread]
 _PROTOTYPE _EXPORT void psrp_pen_unique(void);
 
 

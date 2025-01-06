@@ -8,8 +8,8 @@
              NE3 4RT
              United Kingdom
 
-    Version: 1.16
-    Dated:   4th January 2023
+    Version: 2.00 
+    Dated:   11th September 2024
     E-Mail:  mao@tumblingdice.co.uk 
 ------------------------------------------------------------------------------*/
 
@@ -29,7 +29,7 @@
 /* Definitions local to this library */
 /*-----------------------------------*/
 
-#define SLOTMAN_VERSION "1.16"
+#define SLOTMAN_VERSION "2.00"
 
 #ifndef MAX_SLOTS
 #define MAX_SLOTS    64 
@@ -50,7 +50,7 @@
 _EXPORT _PROTOTYPE void slot_manager_init(void);
 
 // Display current slot usage
-_EXPORT _PROTOTYPE void slot_usage(int);
+_EXPORT _PROTOTYPE void slot_usage(int32_t);
 
 // Display application shortform usage
 _EXPORT _PROTOTYPE void usage(void);

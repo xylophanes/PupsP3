@@ -1,4 +1,4 @@
-/*-------------------------------------------------------------------------------------------------
+/*-----------------------------------------
     Purpose: main for a PUPS/P3 application 
 
     Author: M.A. O'Neill
@@ -8,9 +8,9 @@
             NE3 4RT
 
     Version: 2.00 
-    Dated:   4th January 2023
+    Dated:   10th December 2024
     E-mail:  mao@tumblingdice.co.uk 
--------------------------------------------------------------------------------------------------*/
+-----------------------------------------*/
 
 
 #include <stdio.h>
@@ -23,6 +23,10 @@
 #include <xtypes.h>
 #include <setjmp.h>
 
+#ifdef PTHREAD_SUPPORT
+#include <pthread.h>
+#endif /* PTHREAD_SUPPORT */
+
 
 /*-------------------*/
 /* Local definitions */
@@ -31,46 +35,61 @@
 #define CRC_SIZE 1024
 #define SSIZE    2048 
 
-#ifdef THREAD_SUPPORT
-_PUBLIC pthread_t root_tid;
-#endif /* THREAD_SUPPORT */
+
+/*--------------------*/
+/* Imported functions */
+/*--------------------*/
+
+_IMPORT int32_t   pups_main(); 
 
 
 /*--------------------*/
 /* Imported variables */
 /*--------------------*/
 
+#ifdef PTHREAD_SUPPORT
+_IMPORT pthread_t appl_root_tid;
+#endif /* THREAD_SUPPORT */
+
+#ifdef BUBBLE_MEMORY_SUPPORT
 _IMPORT _BOOLEAN initialised;
+#endif /* BUBBLE_MEMORY_SUPPORT */
 
 
-/*-------------------*/
-/* Exported vaiables */
-/*-------------------*/
 
-_PUBLIC int     _bubble_lang_flag = 0;
+/*--------------------*/
+/* Exported variables */
+/*--------------------*/
+
+_PUBLIC int32_t _bubble_lang_flag = 0;
 _PUBLIC jmp_buf appl_resident_restart;
+
+
 
 
 /*------------------*/
 /* Main entry point */
 /*------------------*/
 
-_PUBLIC int main(int argc, char **argv, char **envp)
-{    int   bin_des   = (-1);
+_PUBLIC int32_t main(int argc, char **argv, char **envp)
+{   des_t bin_des   = (-1);
 
-     off_t pos,
-           size;
+    off_t pos,
+          size;
 
-     char  **eff_argv  = (char **)NULL,
-           itag[SSIZE] = "";
+    char  **eff_argv  = (char **)NULL,
+          itag[SSIZE] = "";
 
-     struct stat stat_buf;
+    struct stat stat_buf;
 
-     #ifdef THREAD_SUPPORT
-     _root_tid = pthread_self();
-     #endif /* THREAD_SUPPORT */
+    #ifdef PTHREAD_SUPPORT
+    appl_root_tid = pthread_self();
+    #endif /* PTHREAD_SUPPORT */
 
+    #ifdef BUBBLE_MEMORY_SUPPORT
     initialised = TRUE;
+    #endif /* BUBBLE_MEMORY_SUPPORT */
+
 
 
     /*--------------------------------------------------*/
@@ -100,10 +119,5 @@ _PUBLIC int main(int argc, char **argv, char **envp)
 
        eff_argv = argv;
 
-
-    #ifdef BUBBLE_MEMORY_SUPPORT
-    return bubble_target(argc, eff_argv, envp);
-    #else
-    return pups_main(argc, eff_argv, envp);
-    #endif /* BUBBLE_MEMORY_SUPPORT */
+    return pups_main(argc, eff_argv, envp); // was pups_main
 }

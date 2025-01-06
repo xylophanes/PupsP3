@@ -12,7 +12,7 @@
              United Kingdom
 
     Version: 2.11
-    Dated:   4th January 2023
+    Dated:   12th December 2024
     E-mail:  mao@tumblingdice.co.uk 
 ------------------------------------------------------------------------------*/
 
@@ -26,22 +26,20 @@
 #include <utils.h>
 
 
-/*------------------------------------------------------------------------------
-    Slot and usage functions - used by slot manager ...
-------------------------------------------------------------------------------*/
-
-
+/*-----------------------------------------------*/
+/* Slot and usage functions used by slot manager */
+/*-----------------------------------------------*/
 /*---------------------*/
 /* Slot usage function */
 /*---------------------*/
 
-_PRIVATE void veclib_slot(int level)
+_PRIVATE void veclib_slot(int32_t level)
 {   (void)fprintf(stderr,"lib vec3lib %s: [ANSI C]\n",VEC3_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 1985-2023 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 1985-2024 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
-       (void)fprintf(stderr,"PUPS/P3 vector support library (built %s %s)\n\n",__TIME__,__DATE__);
+       (void)fprintf(stderr,"PUPS/P3 vector support library (gcc %s: built %s %s)\n\n",__VERSION__,__TIME__,__DATE__);
     }
     else
        (void)fprintf(stderr,"\n");
@@ -62,15 +60,15 @@ _EXTERN void (* SLOT )() __attribute__ ((aligned(16))) = veclib_slot;
 
 
 
-/*-------------------------------------------*/
-/* Constants exported by the vector3 modules */
-/*-------------------------------------------*/
+/*-----------------------------------------*/
+/* Constants exported by the vector module */
+/*-----------------------------------------*/
 
-#define NOT_ASSIGNED (-999.0)
+#define NOT_ASSIGNED   (-999.0)
 
-_PUBLIC  _CONST int    ANNOT   = 1;
-_PUBLIC  _CONST int    N_ANNOT = 0;
-_PRIVATE _CONST FTYPE TINY    = 1.0e-20;
+_PUBLIC  _CONST int32_t  ANNOT   = 1;
+_PUBLIC  _CONST int32_t  N_ANNOT = 0;
+_PRIVATE _CONST FTYPE    TINY    = 1.0e-20;
 
 
 /*------------------------------------------*/
@@ -94,31 +92,31 @@ _PRIVATE _CONST FTYPE TINY    = 1.0e-20;
 /*---------------------------------------------*/
 
 // Eliminate routine for Gaussian elimination
-_PROTOTYPE _PRIVATE _BOOLEAN eliminate(int *, matrix3 *, vector3 *);
+_PROTOTYPE _PRIVATE _BOOLEAN eliminate(int32_t *, matrix3 *, vector3 *);
 
 // Re-order routine for Gaussian elimination
-_PROTOTYPE _PRIVATE _BOOLEAN reorder(int, matrix3 *, vector3 *);
+_PROTOTYPE _PRIVATE _BOOLEAN reorder(uint32_t, matrix3 *, vector3 *);
 
 // Back substitution for Gaussian elimination 
-_PROTOTYPE _PRIVATE void backsub(matrix3 *, vector3*, vector3 *);
+_PROTOTYPE _PRIVATE void backsub(const matrix3 *, const vector3 *, vector3 *);
 
 // LU back substitution routine
-_PROTOTYPE _PRIVATE void lubksb(int [], matrix3 *, vector3 *);
+_PROTOTYPE _PRIVATE void lubksb(int32_t [], matrix3 *, vector3 *);
 
 // LU decomposisition routine
-_PROTOTYPE _PRIVATE void ludcmp(int [], FTYPE *, matrix3 *);
+_PROTOTYPE _PRIVATE void ludcmp(int32_t [], FTYPE *, matrix3 *);
 
 
 
 
-/*------------------------------------------------------------------------------
-    Constructor for the vector3 type (similar to C++ concept) ...
-------------------------------------------------------------------------------*/
+/*----------------*/
+/* Assign vector3 */
+/*----------------*/
 
-_PUBLIC void v3ass(vector3   *arg,
-                   FTYPE   comp_1,
-                   FTYPE   comp_2,
-                   FTYPE   comp_3)
+_PUBLIC void v3ass(vector3         *arg,
+                      const FTYPE   comp_1,
+                      const FTYPE   comp_2,
+                      const FTYPE   comp_3)
 
 {   arg->comp[0] = comp_1;
     arg->comp[1] = comp_2;
@@ -128,13 +126,13 @@ _PUBLIC void v3ass(vector3   *arg,
 
 
 
-/*-----------------------------------------------------------------------------
-    Zero a vector3 ...
------------------------------------------------------------------------------*/
+/*--------------*/
+/* Zero vector3 */
+/*--------------*/
 
 _PUBLIC void v3zero(vector3 *v)
 
-{   int i;
+{   uint32_t i;
 
     for(i=0; i<3; ++i)
        v->comp[i] = 0.0;
@@ -143,13 +141,13 @@ _PUBLIC void v3zero(vector3 *v)
 
 
 
-/*-----------------------------------------------------------------------------
-    Routine to add two vector3s ...
------------------------------------------------------------------------------*/
+/*-------------------*/
+/* Add two vector3's */
+/*-------------------*/
 
-_PUBLIC vector3 v3add(vector3 *arg1, vector3 *arg2)
+_PUBLIC vector3 v3add(const vector3 *arg1, const vector3 *arg2)
 
-{   int    i;
+{   uint32_t   i;
     vector3 ret;
 
     for(i=0; i<3; ++i)
@@ -161,11 +159,11 @@ _PUBLIC vector3 v3add(vector3 *arg1, vector3 *arg2)
 
 
 
-/*-----------------------------------------------------------------------------
-    Procedure to calculate the angle between two vector3s ...
------------------------------------------------------------------------------*/
+/*--------------------------------------*/
+/* Calculate angle between two vector3s */
+/*--------------------------------------*/
 
-_PUBLIC FTYPE v3ang(vector3 *arg1, vector3 *arg2)
+_PUBLIC FTYPE v3ang(const vector3 *arg1, const vector3 *arg2)
 
 {   FTYPE arg;
 
@@ -179,17 +177,15 @@ _PUBLIC FTYPE v3ang(vector3 *arg1, vector3 *arg2)
 
 
 
-/*-----------------------------------------------------------------------------
-     Procedure to transform a vector3 expressed in terms of a given axis set
-     in terms of another axis set. It is assumed that an axis set, which is
-     set of vector3s giving the basis of the axis set to be transformed from,
-     in terms of the axis set which is to be transformed to is known ...
------------------------------------------------------------------------------*/
+/*------------------------------------------------------------*/
+/* Transform a vector3 expressed in terms of a given axis set */
+/* in terms of another orthogonal axis set                    */
+/*------------------------------------------------------------*/
 
-_PUBLIC vector3 v3axtran(vector3  *arg,
-                         vector3 *ax_x,
-                         vector3 *ax_y,
-                         vector3 *ax_z)
+_PUBLIC vector3 v3axtran(const vector3  *arg,
+                         const vector3 *ax_x,
+                         const vector3 *ax_y,
+                         const vector3 *ax_z)
 
 {   vector3 ret;
 
@@ -211,11 +207,11 @@ _PUBLIC vector3 v3axtran(vector3  *arg,
 
 
 
-/*-----------------------------------------------------------------------------
-    Procedure to take the vector3 product of two vector3 ...
------------------------------------------------------------------------------*/
+/*------------------------------------------*/
+/* Vector3 (cross) product of two vector3's */
+/*------------------------------------------*/
 
-_PUBLIC vector3 v3cross(vector3 *arg1, vector3 *arg2)
+_PUBLIC vector3 v3cross(const vector3 *arg1, const vector3 *arg2)
 
 {   vector3 ret;
 
@@ -233,14 +229,14 @@ _PUBLIC vector3 v3cross(vector3 *arg1, vector3 *arg2)
 
 
 
-/*-----------------------------------------------------------------------------
-    Procedure to take the vector3 product of two vector3s ...
------------------------------------------------------------------------------*/
+/*-----------------------------------------------*/
+/* Vector3 scalar (dot) product of two vector3's */
+/*-----------------------------------------------*/
 
-_PUBLIC FTYPE v3dot(vector3 *arg1, vector3 *arg2)
+_PUBLIC FTYPE v3dot(const vector3 *arg1, const vector3 *arg2)
 
-{   int    i;
-    FTYPE sum = 0.0;
+{   uint32_t i;
+    FTYPE    sum = 0.0;
 
     for(i=0; i<3; ++i)
         sum += arg1->comp[i]*arg2->comp[i];
@@ -251,14 +247,14 @@ _PUBLIC FTYPE v3dot(vector3 *arg1, vector3 *arg2)
 
 
 
-/*-----------------------------------------------------------------------------
-    Procedure to test whether two vector3s are equal ...
------------------------------------------------------------------------------*/
+/*---------------------------------*/
+/* Test if two vector3's are equal */
+/*---------------------------------*/
 
-_PUBLIC _BOOLEAN v3eq(vector3 *arg1, vector3 *arg2)
+_PUBLIC _BOOLEAN v3eq(const vector3 *arg1, const vector3 *arg2)
 
-{  int i,
-       cnt = 0;
+{  uint32_t i,
+            cnt = 0;
 
    for(i=0; i<3; ++i)
        if(arg1->comp[i] - arg2->comp[i] < (FTYPE)ASSUMED_ZERO)
@@ -273,14 +269,14 @@ _PUBLIC _BOOLEAN v3eq(vector3 *arg1, vector3 *arg2)
 
 
 
-/*-----------------------------------------------------------------------------
-    Invert the argument vector3 ...
------------------------------------------------------------------------------*/
+/*----------------*/
+/* Invert vector3 */
+/*----------------*/
 
-_PUBLIC vector3 v3inv(vector3 *arg)
+_PUBLIC vector3 v3inv(const vector3 *arg)
 
-{   int    i;
-    vector3 ret;
+{   uint32_t i;
+    vector3      ret;
 
     for(i=0; i<3; ++i)
         ret.comp[i] = -arg->comp[i];
@@ -291,14 +287,14 @@ _PUBLIC vector3 v3inv(vector3 *arg)
 
 
 
-/*-----------------------------------------------------------------------------
-    Procedure to find the magnitude of a vector ...
------------------------------------------------------------------------------*/
+/*-------------------------------*/
+/* Find the magnitude of vector3 */
+/*-------------------------------*/
 
-_PUBLIC FTYPE v3mag(vector3 *arg)
+_PUBLIC FTYPE v3mag(const vector3 *arg)
 
-{   int   i;
-    FTYPE sum;
+{   uint32_t i;
+    FTYPE    sum;
 
     sum = 0.0;
     for(i=0; i<3; ++i)
@@ -310,11 +306,11 @@ _PUBLIC FTYPE v3mag(vector3 *arg)
 
 
 
-/*-----------------------------------------------------------------------------
-    Procedure to see whether a pair of vector3s are parallel ...
------------------------------------------------------------------------------*/
+/*---------------------------------------*/
+/* Test if pair of vector3s are parallel */
+/*---------------------------------------*/
 
-_PUBLIC _BOOLEAN v3par(vector3 *arg1, vector3 *arg2)
+_PUBLIC _BOOLEAN v3par(const vector3 *arg1, const vector3 *arg2)
 
 {   FTYPE angle;
 
@@ -334,12 +330,12 @@ _PUBLIC _BOOLEAN v3par(vector3 *arg1, vector3 *arg2)
 
 
 
-/*-----------------------------------------------------------------------------
-    Procedure to calculate a unit vector3 perpendicular to arg1 and in the
-    plane defined by arg_1 and arg_2 ...
------------------------------------------------------------------------------*/
+/*-----------------------------------------------------------*/
+/* Calculate a unit vector3 perpendicular to arg1 and in the */
+/* plane defined by arg_1 and arg_2                          */
+/*-----------------------------------------------------------*/
 
-_PUBLIC vector3 v3planp(vector3 *arg1, vector3 *arg2)
+_PUBLIC vector3 v3planp(const vector3 *arg1, const vector3 *arg2)
 
 {   vector3 ret;
 
@@ -361,41 +357,47 @@ _PUBLIC vector3 v3planp(vector3 *arg1, vector3 *arg2)
 
 
 
-/*------------------------------------------------------------------------------
-    Procedure to input a vector3 from standard input ...
-------------------------------------------------------------------------------*/
+/*--------------------------*/
+/* Read vector3 from stream */
+/*--------------------------*/
 
-_PUBLIC int v3read(char    *vname,
-                   vector3 *arg,
-                   FILE    *file)
+_PUBLIC int32_t v3read(char       *vname,
+                   vector3    *arg,
+                   const FILE *stream)
                   
-{   int i;
+{   uint32_t i;
+    char     line[SSIZE]    = "";
+
+    (void)fgets(line,SSIZE,stream);
+
+
+    /*------------------------*/
+    /* Name must be a comment */
+    /* # <vector name>        */
+    /*------------------------*/
+
+    if(line[0] != '#')
+       return(-1);
 
     for(i=0; i<3; ++i)
-    {   if(isatty(0) == 1)
-           (void)fprintf(stderr,"Enter %s[%d] > ",vname,i);
-
-        if(fscanf(file,"%F",&arg->comp[i]) == EOF)
-           return(EOF);
+    {  if(fscanf(stdin,"%F",&arg->comp[i]) != 1)
+           return(-1);
     }
 
-    if(isatty(0) == 1) 
-       (void)fprintf(stderr,"\n");
-
-    return(1);
+    return(0);
 }
 
 
 
 
-/*------------------------------------------------------------------------------
-    Procedure to multiply a vector by a scalar ...
-------------------------------------------------------------------------------*/
+/*----------------------------*/
+/* Divide vector3 by a scalar */
+/*----------------------------*/
 
-_PUBLIC vector3 v3scald(FTYPE scalar, vector3 *arg)
+_PUBLIC vector3 v3scald(const FTYPE scalar, const vector3 *arg)
 
-{   int     i;
-    vector3 ret;
+{   uint32_t i;
+    vector3      ret;
 
     for(i=0; i<3; ++i)
         ret.comp[i] = arg->comp[i] / scalar;
@@ -406,14 +408,14 @@ _PUBLIC vector3 v3scald(FTYPE scalar, vector3 *arg)
 
 
 
-/*-----------------------------------------------------------------------------
-    Procedure to multiply a vector by a scalar ...
------------------------------------------------------------------------------*/
+/*------------------------------*/
+/* Multiply vector3 by a scalar */
+/*------------------------------*/
 
-_PUBLIC vector3 v3scalm(FTYPE scalar, vector3 *arg)
+_PUBLIC vector3 v3scalm(const FTYPE scalar, const vector3 *arg)
 
-{   int     i;
-    vector3 ret;
+{   uint32_t i;
+    vector3      ret;
 
     for(i=0; i<3; ++i)
        ret.comp[i] = arg->comp[i] * scalar;
@@ -424,32 +426,14 @@ _PUBLIC vector3 v3scalm(FTYPE scalar, vector3 *arg)
 
 
 
-/*-----------------------------------------------------------------------------
-    Shift origin by the vector (a,b,c) ...
------------------------------------------------------------------------------*/
+/*---------------------------------------*/
+/* Get sign vector3 of argument  vector3 */
+/*---------------------------------------*/
 
-_PUBLIC vector3 v3shift(vector3 *arg1, vector3 *arg2)
+_PUBLIC vector3 v3sign(const vector3 *arg)
 
-{   int     i;
-    vector3 ret;
-
-    for(i=0; i<3; ++i)
-        ret.comp[i] = arg1->comp[i] - arg2->comp[i];
-
-    return(ret);
-}
-
-
-
-
-/*-----------------------------------------------------------------------------
-    Procedure to take the sign vector of a vector ...
------------------------------------------------------------------------------*/
-
-_PUBLIC vector3 v3sign(vector3 *arg)
-
-{  int     i;
-   vector3 ret;
+{  uint32_t i;
+   vector3      ret;
 
    for(i=0; i<3; ++i)
       ret.comp[i] = (FTYPE)isign(arg->comp[i]);
@@ -459,14 +443,14 @@ _PUBLIC vector3 v3sign(vector3 *arg)
 
 
 
-/*-----------------------------------------------------------------------------
-    Routine to subtract two vectors ...
------------------------------------------------------------------------------*/
+/*-------------------------------*/
+/* Subtract vector3 from vector3 */
+/*-------------------------------*/
 
-_PUBLIC vector3 v3sub(vector3 *arg1, vector3 *arg2)
+_PUBLIC vector3 v3sub(const vector3 *arg1, const vector3 *arg2)
 
-{   int     i;
-    vector3 ret;
+{   uint32_t i;
+    vector3      ret;
 
 
     for(i=0; i<3; ++i)
@@ -479,14 +463,14 @@ _PUBLIC vector3 v3sub(vector3 *arg1, vector3 *arg2)
 
 
 
-/*-----------------------------------------------------------------------------
-    Routine to find the unit vector in the direction of a given vector ...
------------------------------------------------------------------------------*/
+/*------------------------------------------------------------*/
+/* Find the unit vector3 in the direction of argument vector3 */
+/*------------------------------------------------------------*/
 
-_PUBLIC vector3 v3unit(vector3 *arg)
+_PUBLIC vector3 v3unit(const vector3 *arg)
 
-{   int   i;
-    FTYPE magnitude = 0.0;
+{   uint32_t i;
+    FTYPE    magnitude = 0.0;
 
     vector3 ret;
 
@@ -516,51 +500,41 @@ _PUBLIC vector3 v3unit(vector3 *arg)
 
 
 
+/*---------------------------*/
+/* Write a vector3 to stream */
+/*---------------------------*/
 
-/*-----------------------------------------------------------------------------
-    Procedure to write a vector to stream ...
------------------------------------------------------------------------------*/
+_PUBLIC void v3write(const char    *vname,
+                     const vector3 *arg,
+                     const FILE    *stream)
 
-_PUBLIC void v3write(char    *vname,
-                     vector3 *arg,
-                     FILE    *f_ptr)
+{   uint32_t i;
 
-{   int i;
+    (void)fprintf(stream,"# %s\n",vname);
 
     for(i=0; i<3; ++i)
-    {   
+       (void)fprintf(stream,"%E ",arg->comp[i]);
 
-        if(isatty(1) == 1)
-           (void)fprintf(f_ptr,"%s[%d]:%E  ",vname,i,arg->comp[i]);
-        else
-           (void)fprintf(f_ptr,"%E    ",arg->comp[i]);
-
-    }
-
-    (void)fprintf(f_ptr,"\n");
+    (void)fprintf(stream,"\n");
+    (void)fflush(stream);
 }
 
 
 
 
-/*-----------------------------------------------------------------------------
-    Rotate a vector by theta degrees about the X axis ...
------------------------------------------------------------------------------*/
+/*-------------------------------------------*/
+/* Rotate vector3 theta degrees about X axis */
+/*-------------------------------------------*/
 
-_PUBLIC vector3 v3rotx(vector3 *arg, FTYPE theta)
+_PUBLIC vector3 v3rotx(const vector3 *arg, const FTYPE theta)
 
 {   vector3 ret;
 
-    _IMMORTAL FTYPE last_theta = (-999.0);
+    FTYPE cos_theta,
+          sin_theta;
 
-    _IMMORTAL FTYPE cos_theta,
-                    sin_theta;
-
-    if(last_theta != theta)
-    {  sin_theta  = SIN(theta);
-       cos_theta  = COS(theta);
-       last_theta = theta;
-    }
+    sin_theta  = SIN(theta);
+    cos_theta  = COS(theta);
 
     ret.comp[0] = arg->comp[0];
     ret.comp[1] = arg->comp[1]*cos_theta - arg->comp[2]*sin_theta;
@@ -573,24 +547,19 @@ _PUBLIC vector3 v3rotx(vector3 *arg, FTYPE theta)
 
 
 
-/*-----------------------------------------------------------------------------
-    Rotate a vector by theta degrees  about the Y axis ...
------------------------------------------------------------------------------*/
+/*----------------------------------------------*/
+/* Rotate vector3 by theta degrees about Y axis */
+/*----------------------------------------------*/
 
-_PUBLIC vector3 v3roty(vector3 *arg, FTYPE theta)
+_PUBLIC vector3 v3roty(const vector3 *arg, const FTYPE theta)
 
 {   vector3 ret;
 
-    _IMMORTAL FTYPE last_theta = NOT_ASSIGNED;
+    FTYPE cos_theta,
+          sin_theta;
 
-    _IMMORTAL FTYPE cos_theta,
-                    sin_theta;
-
-    if(last_theta != theta)
-    {  sin_theta  = SIN(theta);
-       cos_theta  = COS(theta);
-       last_theta = theta;
-    }
+    sin_theta  = SIN(theta);
+    cos_theta  = COS(theta);
 
     ret.comp[0] = arg->comp[0]*cos_theta  + arg->comp[2]*sin_theta;
     ret.comp[1] = arg->comp[1];
@@ -602,24 +571,19 @@ _PUBLIC vector3 v3roty(vector3 *arg, FTYPE theta)
 
 
 
-/*-----------------------------------------------------------------------------
-    Rotate a vector by theta degrees  about the Z axis ...
------------------------------------------------------------------------------*/
+/*----------------------------------------------*/
+/* Rotate vector3 by theta degrees about Z axis */
+/*----------------------------------------------*/
 
-_PUBLIC vector3 v3rotz(vector3 *arg, FTYPE theta)
+_PUBLIC vector3 v3rotz(const vector3 *arg, const FTYPE theta)
 
 {   vector3 ret;
 
-    _IMMORTAL FTYPE last_theta = NOT_ASSIGNED;
+    FTYPE cos_theta,
+          sin_theta;
 
-    _IMMORTAL FTYPE cos_theta,
-                    sin_theta;
-
-    if(last_theta != theta)
-    {  sin_theta  = SIN(theta);
-       cos_theta  = COS(theta);
-       last_theta = theta;
-    }
+    sin_theta  = SIN(theta);
+    cos_theta  = COS(theta);
 
     ret.comp[0] = arg->comp[0]*cos_theta - arg->comp[1]*sin_theta;
     ret.comp[1] = arg->comp[0]*sin_theta + arg->comp[1]*cos_theta;
@@ -629,32 +593,30 @@ _PUBLIC vector3 v3rotz(vector3 *arg, FTYPE theta)
 }
 
 
+/*################################################*/
+/* Euler matrices are only defined for 3D vectors */
+/*################################################*/
+#ifdef THREE_SPACE
+/*---------------------------------------------------*/
+/* Euler rotation matrix. Multiply vector3 by this   */
+/* matrix to rotate it about arbitrary axis          */
+/*                                                   */
+/* Based on the Euler Matrix derivation given in     */
+/* "The Algebra of Matrices" by E.H. Thompson,       */
+/* Edn. 1, 1969, pp.150-151,                         */
+/* Published by Hilger.                              */
+/*---------------------------------------------------*/
 
-/*-----------------------------------------------------------------------------
-    Routine to rotate about arbitary axis by angle theta ...
+_PUBLIC matrix3 m3euler(const FTYPE   theta,   // Angle of rotation 
+                           const vector3 *r_axis) // Rotation axis 
 
-    Based on the Euler Matrix derivation given in
-
-    "The Algebra of Matrices" by E.H. Thompson,
-    Edn. 1, 1969, pp.150-151,
-    Published by Hilger.
------------------------------------------------------------------------------*/
-
-_PUBLIC matrix3 m3euler(FTYPE  theta,    // Angle of rotation 
-                        vector3 *r_axis) // Rotation axis 
-
-{   _IMMORTAL FTYPE last_theta;
-
-    FTYPE sin_theta,
+{   FTYPE sin_theta,
           cos_theta;
 
     matrix3 Euler_mat;
 
-    if(last_theta != theta)
-    {  sin_theta  = SIN(theta);
-       cos_theta  = COS(theta);
-       last_theta = theta;
-    }
+    sin_theta  = SIN(theta);
+    cos_theta  = COS(theta);
 
 
     /*---------------------------------------------*/
@@ -669,42 +631,27 @@ _PUBLIC matrix3 m3euler(FTYPE  theta,    // Angle of rotation
     /* X elements of Euler matrix3 */
     /*-----------------------------*/
 
-    Euler_mat.comp[0][0] = sqr(r_axis->comp[0]) +
-                              (1 - sqr(r_axis->comp[0]))*cos_theta;
-
-    Euler_mat.comp[0][1] = r_axis->comp[0]*r_axis->comp[1]*(1 - cos_theta) -
-                                                 r_axis->comp[2]*sin_theta;
-
-    Euler_mat.comp[0][2] = r_axis->comp[0]*r_axis->comp[2]*(1 - cos_theta) +
-                                                 r_axis->comp[1]*sin_theta;
+    Euler_mat.comp[0][0] = sqr(r_axis->comp[0]) + (1 - sqr(r_axis->comp[0]))*cos_theta;
+    Euler_mat.comp[0][1] = r_axis->comp[0]*r_axis->comp[1]*(1 - cos_theta) - r_axis->comp[2]*sin_theta;
+    Euler_mat.comp[0][2] = r_axis->comp[0]*r_axis->comp[2]*(1 - cos_theta) + r_axis->comp[1]*sin_theta;
 
 
     /*----------------------------*/
     /* Y elements of Euler Matrix */
     /*----------------------------*/
 
-    Euler_mat.comp[1][0] = r_axis->comp[1]*r_axis->comp[0]*(1 - cos_theta) +
-                                                 r_axis->comp[2]*sin_theta;
-
-    Euler_mat.comp[1][1] = sqr(r_axis->comp[1]) +
-                              (1 - sqr(r_axis->comp[1]))*cos_theta;
-
-    Euler_mat.comp[1][2] = r_axis->comp[1]*r_axis->comp[2]*(1 - cos_theta) -
-                                                 r_axis->comp[0]*sin_theta;
+    Euler_mat.comp[1][0] = r_axis->comp[1]*r_axis->comp[0]*(1 - cos_theta) + r_axis->comp[2]*sin_theta;
+    Euler_mat.comp[1][1] = sqr(r_axis->comp[1]) + (1 - sqr(r_axis->comp[1]))*cos_theta;
+    Euler_mat.comp[1][2] = r_axis->comp[1]*r_axis->comp[2]*(1 - cos_theta) - r_axis->comp[0]*sin_theta;
 
 
     /*----------------------------*/
     /* Z elements of Euler Matrix */ 
     /*----------------------------*/
 
-    Euler_mat.comp[2][0] = r_axis->comp[2]*r_axis->comp[0]*(1 - cos_theta) -
-                                                 r_axis->comp[1]*sin_theta;
-
-    Euler_mat.comp[2][1] = r_axis->comp[2]*r_axis->comp[1]*(1 - cos_theta) +
-                                                 r_axis->comp[0]*sin_theta;
-
-    Euler_mat.comp[2][2] = sqr(r_axis->comp[2]) +
-                             (1 - sqr(r_axis->comp[2]))*cos_theta;
+    Euler_mat.comp[2][0] = r_axis->comp[2]*r_axis->comp[0]*(1 - cos_theta) - r_axis->comp[1]*sin_theta;
+    Euler_mat.comp[2][1] = r_axis->comp[2]*r_axis->comp[1]*(1 - cos_theta) + r_axis->comp[0]*sin_theta;
+    Euler_mat.comp[2][2] = sqr(r_axis->comp[2]) + (1 - sqr(r_axis->comp[2]))*cos_theta;
 
     return(Euler_mat);
 }
@@ -712,10 +659,10 @@ _PUBLIC matrix3 m3euler(FTYPE  theta,    // Angle of rotation
 
 
 
-/*-----------------------------------------------------------------------------
-    Euler matrix3 for small angle rotations [See E.H Thompson, "An
-    introduction to the algebra of matrices"] ...
------------------------------------------------------------------------------*/
+/*----------------------------------------------------------------*/
+/* Euler matrix3 for small angle rotations [See E.H Thompson, "An */
+/* introduction to the algebra of matrices"]                      */
+/*----------------------------------------------------------------*/
 
 _PUBLIC matrix3 m3seuler(FTYPE r_theta, vector3 *r_axis)
 
@@ -743,38 +690,18 @@ _PUBLIC matrix3 m3seuler(FTYPE r_theta, vector3 *r_axis)
 
     return(s_Euler_mat);
 }
+#endif /* THREE_SPACE */
 
 
 
-/*-----------------------------------------------------------------------------
-    Routine to print a vector to stream ...
------------------------------------------------------------------------------*/
-
-_PUBLIC void v3print(FILE *stream, char *v_annot, vector3 *arg)
-
-{   int i;
-
-    (void)fprintf(stream,"    vprint: %s\n\n",v_annot);
-
-    for(i=0; i<3; ++i)
-    {  (void)fprintf(stream,"    component [%d]: %E\n",i,arg->comp[i]);
-       (void)fflush(stream);
-    }
-    (void)fprintf(stream,"\n");
-    (void)fflush(stream);
-}
-
-
-
-
-/*-----------------------------------------------------------------------------
-    Routine to set up a random unit vector3 ...
------------------------------------------------------------------------------*/
+/*-----------------------------------------*/
+/* Routine to set up a random unit vector3 */
+/*-----------------------------------------*/
 
 _PUBLIC vector3 v3urnd(void)
 
-{   int    i;
-    vector3 ret;
+{   uint32_t i;
+    vector3      ret;
 
     for(i=0; i<3; ++i)
         ret.comp[i] = ran1();
@@ -786,15 +713,15 @@ _PUBLIC vector3 v3urnd(void)
 
 
 
-/*-----------------------------------------------------------------------------
-    Routine to set up a randomly pointing vector3 of random size
-    max_cs controls the maximum size of any one component ...
------------------------------------------------------------------------------*/
+/*-------------------------------------------------------*/
+/* Set up a randomly pointing vector3 of random size     */
+/* max_cs controls the maximum size of any one component */
+/*-------------------------------------------------------*/
 
-_PUBLIC vector3 v3rnd(FTYPE max_cs)
+_PUBLIC vector3 v3rnd(const FTYPE max_cs)
 
-{   int    i;
-    vector3 ret;
+{   uint32_t i;
+    vector3      ret;
 
     for(i=0; i<3; ++i)
         ret.comp[i] = (ran1() - 0.5)*max_cs;
@@ -805,14 +732,14 @@ _PUBLIC vector3 v3rnd(FTYPE max_cs)
 
 
 
-/*------------------------------------------------------------------------------
-    Routine to test the component sign hetrogeneity of a vector3 ...
-------------------------------------------------------------------------------*/
+/*--------------------------------------------------*/
+/* Compute component sign hetrogeneity of a vector3 */
+/*--------------------------------------------------*/
 
-_PUBLIC _BOOLEAN v3hecs(vector3 *arg)
+_PUBLIC _BOOLEAN v3hecs(const vector3 *arg)
 
-{   int i,
-        sign_sum = 0;
+{   uint32_t i,
+             sign_sum = 0;
 
    for(i=0; i<3; ++i)
        sign_sum += fsign(arg->comp[i]);
@@ -825,25 +752,22 @@ _PUBLIC _BOOLEAN v3hecs(vector3 *arg)
 
 
 
-/*------------------------------------------------------------------------------
-    Routine to print a matrix3 to stderr ...
-------------------------------------------------------------------------------*/
+/*-------------------------*/
+/* Write matrix3 to stream */
+/*-------------------------*/
 
-_PUBLIC void m3print(FILE *stream, char *m_annot, matrix3 *arg)
+_PUBLIC void m3write(const FILE *stream, const char *mname, const matrix3 *arg)
 
-{   int i,
-        j;
+{   uint32_t i,
+             j;
 
-    (void)fprintf(stream,"    mprint: %s\n\n",m_annot);
+    (void)fprintf(stream,"# %s\n\n",mname);
     (void)fflush(stream);
 
     for(i=0; i<3; ++i)
-    {  (void)fprintf(stream,"    Row:%d\n",i);
-       for(j=0; j<3; ++j)
-       {  (void)fprintf(stream,"     Component [%d,%d]: %E\n",i,j,
-                                                  arg->comp[i][j]);
-          (void)fflush(stream);
-       }
+    {  for(j=0; j<3; ++j)
+          (void)fprintf(stream,"[%d,%d]: %E\n",i,j, arg->comp[i][j]);
+       (void)fflush(stream);
     }
 
     (void)fprintf(stream,"\n\n");
@@ -853,18 +777,18 @@ _PUBLIC void m3print(FILE *stream, char *m_annot, matrix3 *arg)
 
 
 
-/*-----------------------------------------------------------------------------
-    Find the solution of a set of linear equations using Gaussian
-    elimination. These routines are based on those gib`ven in Pascal in:
+/*---------------------------------------------------------------*/
+/* Find the solution of a set of linear equations using Gaussian */
+/* elimination. These routines are based on thosein Pascal in:   */
+/*                                                               */
+/* "Pascal for Science and Engineering" by McGregor and Watt     */
+/* --------------------------------------------------------------*/
 
-    "Pascal for Science and Engineering" by McGregor and Watt ...
------------------------------------------------------------------------------*/
+_PRIVATE _BOOLEAN eliminate(int32_t *singular, matrix3 *a, vector3 *b)
 
-_PRIVATE _BOOLEAN eliminate(int *singular, matrix3 *a, vector3 *b)
-
-{   int i,
-        j,
-        k;
+{   uint32_t i,
+             j,
+             k;
 
     FTYPE multiplier;
 
@@ -906,17 +830,17 @@ _PRIVATE _BOOLEAN eliminate(int *singular, matrix3 *a, vector3 *b)
 
 
 
-/*------------------------------------------------------------------------------
-    Reorder routine for Gaussian Elimination ...
-------------------------------------------------------------------------------*/
+/*------------------------------------------*/
+/* Reorder routine for Gaussian Elimination */
+/*------------------------------------------*/
 
-_PRIVATE _BOOLEAN reorder(int i, matrix3 *a, vector3 *b)
+_PRIVATE _BOOLEAN reorder(uint32_t i, matrix3 *a, vector3 *b)
 
-{   int k,
-        l,
-        j;
+{   uint32_t k,
+             l,
+             j;
 
-    FTYPE temp;
+    FTYPE    temp;
 
     l = i;
     for(k=i+1; k<3; ++k)
@@ -925,29 +849,31 @@ _PRIVATE _BOOLEAN reorder(int i, matrix3 *a, vector3 *b)
     if((temp = fabs(a->comp[l][i])) < ASSUMED_ZERO)
        return(TRUE);
     else
-       if(i != l)
+    {  if(i != l)
        {  for(j=i; j<3; ++j)
              fswap(&a->comp[i][j],&a->comp[l][j]);
           fswap(&b->comp[i],&b->comp[l]);
        }
+    }
+
     return(FALSE);
 }
 
 
 
 
-/*------------------------------------------------------------------------------
-    Backsubstitution for Gaussian Elimination ...
-------------------------------------------------------------------------------*/
+/*---------------------------------------------------*/
+/* Backsubstitution routine for Gaussian Elimination */
+/*---------------------------------------------------*/
 
-_PRIVATE void backsub(matrix3 *a, vector3 *b, vector3 *x)
+_PRIVATE void backsub(const matrix3 *a, const vector3 *b, vector3 *x)
 
-{   int i,
-        j;
+{    uint32_t i,
+              j;
 
-     FTYPE s;
+     FTYPE    s;
 
-     for(i=2; i>-1; --i)
+     for(i=2; i >= 0; --i) // MAO was >(-1)
      {  s = b->comp[i];
         for(j=i+1; j<3; ++j)
            s -= a->comp[i][j]*x->comp[j];
@@ -958,11 +884,11 @@ _PRIVATE void backsub(matrix3 *a, vector3 *b, vector3 *x)
 
 
 
-/*-----------------------------------------------------------------------------
-    Gaussian Elimination solution routine ...
------------------------------------------------------------------------------*/
+/*-------------------------------------------------------------*/
+/* Solve 3x3 simultaneous equations using Gaussian Elimination */
+/*-------------------------------------------------------------*/
 
-_PUBLIC _BOOLEAN m3GE_solve(int *singular, matrix3 *a, vector3 *b, vector3 *x)
+_PUBLIC _BOOLEAN m3GE_solve(uint32_t *singular, const matrix3 *a, const vector3 *b, vector3 *x)
 
 {    if(eliminate(singular,a,b) == TRUE)
         return(TRUE);
@@ -973,12 +899,12 @@ _PUBLIC _BOOLEAN m3GE_solve(int *singular, matrix3 *a, vector3 *b, vector3 *x)
 
 
 
-/*-----------------------------------------------------------------------------
-    Return the scalar distance between a line and point at closest
-    approach ...
------------------------------------------------------------------------------*/
 
-_PUBLIC FTYPE v3dpoints(vector3 *pt, vector3 *to_line, vector3 *along_line)
+/*---------------------------------------------------------*/
+/* Get scalar distance between a point in 3 space and line */
+/*---------------------------------------------------------*/
+
+_PUBLIC FTYPE v3dpoints(const vector3 *pt, const vector3 *to_line, const vector3 *along_line)
 
 {   vector3 ret_v;
 
@@ -989,20 +915,20 @@ _PUBLIC FTYPE v3dpoints(vector3 *pt, vector3 *to_line, vector3 *along_line)
 
 
 
-/*------------------------------------------------------------------------------
-    Generalised line-point intercept routine ...
-------------------------------------------------------------------------------*/
+/*---------------------------------------------------*/
+/* Calculate smallest vector3 between line and point */
+/*---------------------------------------------------*/
 
-_PUBLIC vector3 v3dpointv(vector3 *pt, vector3 *to_line, vector3 *along_line)
+_PUBLIC vector3 v3dpointv(const vector3 *pt, const vector3 *to_line, const vector3 *along_line)
 
 {   FTYPE theta,
            thi,
            to_pt_mag;
 
     vector3 p_vec,
-           p_u_vec,
-           z_vec,
-           to_pt_u_vec;
+            p_u_vec,
+            z_vec,
+            to_pt_u_vec;
 
 
     /*----------------------------------------------------*/
@@ -1040,18 +966,18 @@ _PUBLIC vector3 v3dpointv(vector3 *pt, vector3 *to_line, vector3 *along_line)
 
 
 
-/*-----------------------------------------------------------------------------
-    Generalised skew intercept routine ...
------------------------------------------------------------------------------*/
+/*--------------------------------------------------*/
+/* Calculate smallest vector3 between two skew line */
+/*--------------------------------------------------*/
 
-_PUBLIC vector3 v3dlinesv(int      *singular,  // Action if singular
-                         vector3 *divergence,  // Ray-ray divergence vector3
-                         vector3       *to_1,  // Vector to line 1
-                         vector3    *along_1,  // Vector along line 1
-                         vector3       *to_2,  // Vector to line 2
-                         vector3    *along_2,  // Vector along line 2
-                         vector3     *intw_1,  // Skew vector3 for line 1
-                         vector3     *intw_2)  // Skew vector3 for line 2
+_PUBLIC vector3 v3dlinesv(uint32_t       *singular,    // Singular
+                          vector3         *divergence,  // Ray-ray divergence vector3
+                          const vector3   *to_1,        // Vector to line 1
+                          const vector3   *along_1,     // Vector along line 1
+                          const vector3   *to_2,        // Vector to line 2
+                          const vector3   *along_2,     // Vector along line 2
+                          vector3         *intw_1,      // Skew (intercept) vector3 for line 1
+                          vector3         *intw_2)      // Skew (intercept) vector3 for line 2
 
 {   matrix3 a;
 
@@ -1061,6 +987,7 @@ _PUBLIC vector3 v3dlinesv(int      *singular,  // Action if singular
             vtemp_1,
             vtemp_2,
             ret;
+
 
     /*---------------------------*/
     /* First find the tie vector */
@@ -1124,18 +1051,18 @@ _PUBLIC vector3 v3dlinesv(int      *singular,  // Action if singular
 
 
 
-/*-----------------------------------------------------------------------------
-    Routine to find the optimum intesect for multiple ray vectors ...
------------------------------------------------------------------------------*/
+/*------------------------------------------------------------*/
+/* Compute mean nearest approach vector3 of set of skew lines */
+/*------------------------------------------------------------*/
 
-_PUBLIC vector3 v3mlinesv(int       *singular, // Action if singular
-                         int          n_rays,  // Number of rays to consider
-                         vector3          *pc, // Array of to_line vector3s
-                         vector3         *ray, // Array of along_line vector
-                         FTYPE   *divergence)  // RMS divergence 
-{   int i,
-        j,
-        n_vecs = 0;
+_PUBLIC vector3 v3mlinesv(uint32_t     *singular,  // Action if singular
+                         int                    n_rays,  // Number of rays to consider
+                         const vector3          *pc,  // Array of to_line vector3s
+                         const vector3         *ray,  // Array of along_line vector
+                         FTYPE             *divergence)  // Mean divergence 
+{   uint32_t i,
+             j,
+             n_vecs = 0;
 
     vector3 intw_1,
             intw_2,
@@ -1199,16 +1126,16 @@ _PUBLIC vector3 v3mlinesv(int       *singular, // Action if singular
 
 
 
-/*------------------------------------------------------------------------------
-    copy a vector to a matrix column ...
-------------------------------------------------------------------------------*/
+/*--------------------------------*/
+/* Copy vector3 to matrix3 column */
+/*--------------------------------*/
 
-_PUBLIC void v3tomatc(int row, matrix3 *arg_m, vector3 *arg_v)
+_PUBLIC void v3tomatc(const uint32_t row, matrix3 *arg_m, const vector3 *arg_v)
 
-{   int i;
+{   uint32_t i;
 
 
-    /*-------------------------------------------------------------------------
+    /*-------------------------------------------------------------------------*/
     /* If the vector3 is not of the same dimensionality as the matrix3 column, */
     /* print a suitable error message and exit                                 */
     /*-------------------------------------------------------------------------*/
@@ -1219,11 +1146,12 @@ _PUBLIC void v3tomatc(int row, matrix3 *arg_m, vector3 *arg_v)
 
 
 
-/*-----------------------------------------------------------------------------
-    Routine to distort a vector3 in about its X and Y axes ...
------------------------------------------------------------------------------*/
 
-_PUBLIC vector3 v3distort(vector3 *arg, FTYPE theta, FTYPE thi)
+/*--------------------------------------------------------------------*/
+/* Compute planar distortion to vector3 caused by rotation projection */
+/*--------------------------------------------------------------------*/
+
+_PUBLIC vector3 v3distort(const vector3 *arg, const FTYPE theta, const FTYPE thi)
 
 {    vector3 ret;
 
@@ -1253,14 +1181,14 @@ _PUBLIC vector3 v3distort(vector3 *arg, FTYPE theta, FTYPE thi)
 
 
 
-/*-----------------------------------------------------------------------------
-    Zeroise matrix ...
------------------------------------------------------------------------------*/
+/*---------------------*/
+/* Assign zero matrix3 */
+/*---------------------*/
 
 _PUBLIC void m3zero(matrix3 *arg)
 
-{   int i,
-        j;
+{   uint32_t i,
+             j;
 
     for(i=0; i<3; ++i)
        for(j=0; j<3; ++j)
@@ -1270,13 +1198,13 @@ _PUBLIC void m3zero(matrix3 *arg)
 
 
 
-/*-----------------------------------------------------------------------------
-    Create identity matrix ...
------------------------------------------------------------------------------*/
+/*-------------------------*/
+/* Assign identity matrix3 */
+/*-------------------------*/
 
 _PUBLIC void m3ident(matrix3 *arg)
 
-{   int i;
+{   uint32_t i;
 
     m3zero(arg);
     for(i=0; i<3; ++i)
@@ -1285,20 +1213,20 @@ _PUBLIC void m3ident(matrix3 *arg)
 
 
 
-/*------------------------------------------------------------------------------
-    Assign a matrix - dimentionality fixed at 3 ...
-------------------------------------------------------------------------------*/
+/*----------------*/
+/* Assign matrix3 */
+/*----------------*/
 
-_PUBLIC void m3ass(matrix3 *arg,
-                   FTYPE  c11,
-                   FTYPE  c12,
-                   FTYPE  c13,
-                   FTYPE  c21,
-                   FTYPE  c22,
-                   FTYPE  c23,
-                   FTYPE  c31,
-                   FTYPE  c32,
-                   FTYPE  c33)
+_PUBLIC void m3ass(matrix3       *arg,
+                   const FTYPE    c11,
+                   const FTYPE    c12,
+                   const FTYPE    c13,
+                   const FTYPE    c21,
+                   const FTYPE    c22,
+                   const FTYPE    c23,
+                   const FTYPE    c31,
+                   const FTYPE    c32,
+                   const FTYPE    c33)
 
 {   arg->comp[0][0] = c11;
     arg->comp[1][0] = c12;
@@ -1314,17 +1242,17 @@ _PUBLIC void m3ass(matrix3 *arg,
 
 
 
-/*------------------------------------------------------------------------------
-    Multiply a pair of matrices ...
-------------------------------------------------------------------------------*/
+/*------------------------------*/
+/* Multiply a pair of matrix3's */
+/*------------------------------*/
 
-_PUBLIC matrix3 m3mmult(matrix3 *arg_1, matrix3 *arg_2)
+_PUBLIC matrix3 m3mult(const matrix3 *arg_1, const matrix3 *arg_2)
 
-{   int i,
-        j,
-        k;
+{   uint32_t i,
+             j,
+             k;
 
-    matrix3 ret;
+    matrix3  ret;
 
     for(i=0; i<3; ++i)
     {  for(j=0; j<3; ++j)
@@ -1340,14 +1268,14 @@ _PUBLIC matrix3 m3mmult(matrix3 *arg_1, matrix3 *arg_2)
 
 
 
-/*-----------------------------------------------------------------------------
-    Multiply a vector by a matrix ...
------------------------------------------------------------------------------*/
+/*-----------------------------*/
+/* Multiply vector3 by matrix3 */
+/*-----------------------------*/
 
-_PUBLIC vector3 v3mmult(matrix3 *arg_1, vector3 *arg_2)
+_PUBLIC vector3 v3mmult(const matrix3 *arg_1, const vector3 *arg_2)
 
-{   int i,
-        j;
+{   uint32_t i,
+             j;
 
     vector3 ret;
 
@@ -1363,37 +1291,41 @@ _PUBLIC vector3 v3mmult(matrix3 *arg_1, vector3 *arg_2)
 
 
 
-/*-----------------------------------------------------------------------------
-    Find the linear inconsistency of a set of vectors ...
------------------------------------------------------------------------------*/
+/*----------------------------------------------------*/
+/*  Compute the spatial entropy of a set of vector3's */
+/*----------------------------------------------------*/
 
-_PUBLIC FTYPE v3lvsi(int n_vecs, vector3 vec_arr[])
+_PUBLIC FTYPE v3lvsi(const int32_t n_vecs, const vector3 vec_arr[])
 
-{   int i,
-        j;
+{   uint32_t i,
+             j;
 
-    FTYPE ret    = 0.0,
-          mean[] = {0.0, 0.0, 0.0},
-          adev[] = {0.0, 0.0, 0.0};
+    FTYPE    ret    = 0.0,
+             mean[] = {0.0, 0.0, 0.0},
+             adev[] = {0.0, 0.0, 0.0};
+
 
     /*---------------------------------------------------------------------*/
     /* Form up the means for each component of the set of vector3s in turn */
     /*---------------------------------------------------------------------*/
 
     for(i=0; i<3; ++i)
-       for(j=0; j<n_vecs; ++j)
+    {  for(j=0; j<n_vecs; ++j)
           mean[i] += vec_arr[j].comp[i];
+    }
 
     for(i=0; i<3; ++i)
         mean[i] /= n_vecs;
+
 
     /*---------------------------------------------------*/
     /* Now find the average deviation for each component */
     /*---------------------------------------------------*/
 
     for(i=0; i<3; ++i)
-       for(j=0; j<n_vecs; ++j)
+    {  for(j=0; j<n_vecs; ++j)
            adev[i] += FABS(vec_arr[j].comp[i] - mean[i]);
+    }
 
 
     /*------------------------------------------*/
@@ -1403,29 +1335,21 @@ _PUBLIC FTYPE v3lvsi(int n_vecs, vector3 vec_arr[])
     for(i=0; i<3; ++i) 
         ret += adev[i];
 
-
-    /*-------------------*/
-    /* Deallocate memory */
-    /*-------------------*/
-
-    (void)pups_free((char *)mean);
-    (void)pups_free((char *)adev);
-
     return(ret);
 }  
 
 
 
-/*------------------------------------------------------------------------------
-    Add a pair of matrices ...
-------------------------------------------------------------------------------*/
+/*-------------------------*/
+/* Add a pair of matrix3's */
+/*-------------------------*/
 
-_PUBLIC matrix3 m3add(matrix3 *arg_1, matrix3 *arg_2)
+_PUBLIC matrix3 m3add(const matrix3 *arg_1, const matrix3 *arg_2)
 
-{   int i,
-        j;
+{   uint32_t i,
+             j;
 
-    matrix3 ret;
+    matrix3  ret;
 
     for(i=0; i<3; ++i)
     {  for(j=0; j<3; ++j)
@@ -1438,14 +1362,14 @@ _PUBLIC matrix3 m3add(matrix3 *arg_1, matrix3 *arg_2)
 
 
 
-/*-----------------------------------------------------------------------------
-    Subtract a pair of matrices ...
------------------------------------------------------------------------------*/
+/*-------------------------------*/
+/* Subtract matrix3 from matrix3 */ 
+/*-------------------------------*/
 
-_PUBLIC matrix3 m3sub(matrix3 *arg_1, matrix3 *arg_2)
+_PUBLIC matrix3 m3sub(const matrix3 *arg_1, const matrix3 *arg_2)
 
-{   int i,
-        j;
+{   uint32_t i,
+             j;
 
     matrix3 ret;
 
@@ -1460,14 +1384,14 @@ _PUBLIC matrix3 m3sub(matrix3 *arg_1, matrix3 *arg_2)
 
 
 
-/*-----------------------------------------------------------------------------
-    Multiply matrix by scalar ...
------------------------------------------------------------------------------*/
+/*----------------------------*/
+/* Multiply matrix3 by scalar */
+/*----------------------------*/
 
-_PUBLIC matrix3 m3scalm(FTYPE arg_1, matrix3 *arg_2)
+_PUBLIC matrix3 m3scalm(const FTYPE arg_1, const matrix3 *arg_2)
 
-{   int i,
-        j;
+{   uint32_t i,
+             j;
 
     matrix3 ret;
 
@@ -1481,14 +1405,14 @@ _PUBLIC matrix3 m3scalm(FTYPE arg_1, matrix3 *arg_2)
 
 
 
-/*-----------------------------------------------------------------------------
-    Find the transpose of a matrix ...
------------------------------------------------------------------------------*/
+/*-------------------------------*/
+/* Find the transpose of matrix3 */
+/*-------------------------------*/
 
-_PUBLIC matrix3 m3transp(matrix3 *arg)
+_PUBLIC matrix3 m3ransp(const matrix3 *arg)
 
-{   int i,
-        j;
+{   uint32_t i,
+             j;
 
     FTYPE   temp;
     matrix3 ret;
@@ -1512,17 +1436,17 @@ _PUBLIC matrix3 m3transp(matrix3 *arg)
 
 
 
-/*-----------------------------------------------------------------------------
-    Routine to solve a set of N linear equations using LU decompostion,
-    this routine is taken from "Numerical Recipes in C" pp43-44 ...
------------------------------------------------------------------------------*/
+/*-------------------------------------------------------------*/
+/* Solve a set of N linear equations using LU decompostion,    */
+/* this routine is taken from "Numerical Recipes in C" pp43-44 */
+/*-------------------------------------------------------------*/
 
-_PRIVATE void lubksb(int indx[], matrix3 *a, vector3 *b)
+_PRIVATE void lubksb(int32_t indx[], matrix3 *a, vector3 *b)
 
-{   int i,
-        ip,
-        j,
-        ii = (-1);
+{   int32_t i,
+            ip,
+            j,
+            ii = (-1);
 
     FTYPE sum;
 
@@ -1566,22 +1490,22 @@ _PRIVATE void lubksb(int indx[], matrix3 *a, vector3 *b)
 
 
 
-/*----------------------------------------------------------------------------
-    Routine to do LU decomposition on the matrix3 a ...
-----------------------------------------------------------------------------*/
+/*-------------------------------------------------*/
+/* Routine to do LU decomposition on the matrix3 a */
+/*-------------------------------------------------*/
 
-_PRIVATE void ludcmp(int indx[], FTYPE *d, matrix3 *a)
+_PRIVATE void ludcmp(int32_t indx[], FTYPE *d, matrix3 *a)
 
-{   int i,
-        imax,
-        j,
-        k;
+{   uint32_t i,
+             imax,
+             j,
+             k;
 
-    FTYPE big,
-          dum,
-          sum,
-          temp,
-          vv[3];
+    FTYPE    big,
+             dum,
+             sum,
+             temp,
+             vv[3];
 
     *d = 1.0;
 
@@ -1695,15 +1619,61 @@ _PRIVATE void ludcmp(int indx[], FTYPE *d, matrix3 *a)
 
 
 
-/*----------------------------------------------------------------------------
-    Routine to invert a matrix3 using LU decomposition ...
-----------------------------------------------------------------------------*/
+
+/*-----------------------*/
+/* Is matrix3 symmetric? */
+/*-----------------------*/
+
+_PUBLIC _BOOLEAN m3sym(const matrix3 *arg)
+
+{   uint32_t i,
+             j;
+
+    for(i=0; i<3; ++i)
+    {  for(j=i; j<3; ++j)
+       {  if(i != j && arg->comp[i][j] != arg->comp[j][i])
+             return(FALSE);
+       }
+    }
+
+    return(TRUE);
+}
+
+
+/*##########################################################*/
+/* Determinant computation is only defined for 3x3 matrices */
+/*##########################################################*/
+#ifdef THREE_SPACE
+/*--------------------------------*/
+/* Compute determinant of matrix3 */
+/*--------------------------------*/
+
+_PUBLIC FTYPE m3det(const matrix3 *arg)
+
+{   uint32_t i;
+    FTYPE    det;
+
+    for(i=0; i<3; ++i) 
+    {   det += (arg->comp[0][i] * (arg->comp[1][(i + 1) % 3] * arg->comp[2][(i + 2) % 3] -
+                                   arg->comp[1][(i + 2) % 3] * arg->comp[2][(i + 1) % 3]));
+    }
+
+    return(det);
+}
+#endif /* THREE_SPACE */
+
+
+
+
+/*-----------------------------------------*/
+/* Invert a matrix3 using LU decomposition */
+/*-----------------------------------------*/
 
 _PUBLIC matrix3 m3inv(matrix3 *arg)
 
-{   int i,
-        j,
-        *indx = (int *)NULL;
+{   uint32_t i,
+             j,
+             *indx = (int32_t *)NULL;
 
     FTYPE   d;
     vector3 col;
@@ -1714,7 +1684,7 @@ _PUBLIC matrix3 m3inv(matrix3 *arg)
     /* taken from "Numerical Recipes in C", pp43-44                        */
     /* --------------------------------------------------------------------*/
 
-    indx = (int *)pups_realloc(3,sizeof(int));
+    indx = (int32_t *)pups_calloc(3,sizeof(int32_t));
     ludcmp(indx,&d,arg);
 
 

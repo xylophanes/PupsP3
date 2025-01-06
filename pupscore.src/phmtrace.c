@@ -1,4 +1,4 @@
-/*---------------------------------------------------------------------------
+/*--------------------------------------------------------------------------
     More debugging hooks for `malloc'.
     Copyright (C) 1991, 1992, 1993, 1994 Free Software Foundation, Inc.
 		 Written April 2, 1991 by John Gilmore of Cygnus Support.
@@ -23,8 +23,8 @@
     or (US mail) as Mike Haertel c/o Free Software Foundation.
 
     Shared heap modification by Mark O'Neill (mao@tumblingdice.co.uk)
-    (C) 1998-2023 M.A. O'Neill, Tumbling Dice
---------------------------------------------------------------------------*/
+    (C) 1998-2024 M.A. O'Neill, Tumbling Dice
+-------------------------------------------------------------------------*/
 
 #include <xtypes.h>
 #ifndef	_PHMALLOC_INTERNAL
@@ -33,6 +33,7 @@
 #endif /* PHMALLOC_INTERNAL */
 
 #include <stdio.h>
+#include <stdint.h>
 
 #ifndef	__GNU_LIBRARY__
 _IMPORT char *getenv ();
@@ -41,8 +42,8 @@ _IMPORT char *getenv ();
 #endif /* __GNU_LIBRARY__ */
 
 
-_PRIVATE FILE *mallstream     = (FILE *)NULL;
-_PRIVATE char mallenv[]       = "PHMALLOC_TRACE";
+_PRIVATE FILE *mallstream  = (FILE *)NULL;
+_PRIVATE char mallenv[]    = "PHMALLOC_TRACE";
 
 
                                                    /*-----------------------*/
@@ -62,17 +63,17 @@ __ptr_t mallwatch;
 /* the foresight to call through a macro.                      */
 /*-------------------------------------------------------------*/
 
-_PUBLIC char *_mtrace_file = (char *)NULL;
-_PUBLIC int   _mtrace_line;
+_PUBLIC char *   _mtrace_file = (char *)NULL;
+_PUBLIC int32_t  _mtrace_line;
 
 
 /*-----------------*/
 /* Old hook values */
 /*-----------------*/
 
-_PRIVATE void (*tr_old_phfree_hook)        __P ((int, __ptr_t ptr));
-_PRIVATE __ptr_t (*tr_old_phmalloc_hook)   __P ((int, __malloc_size_t size, char *));
-_PRIVATE __ptr_t (*tr_old_phrealloc_hook)  __P ((int, __ptr_t ptr, __malloc_size_t size, char *));
+_PRIVATE void (*tr_old_phfree_hook)        __P ((int32_t, __ptr_t ptr));
+_PRIVATE __ptr_t (*tr_old_phmalloc_hook)   __P ((int32_t, __malloc_size_t size, char *));
+_PRIVATE __ptr_t (*tr_old_phrealloc_hook)  __P ((int32_t, __ptr_t ptr, __malloc_size_t size, char *));
 
 
 /*-------------------------------------------------------------------------*/
@@ -82,8 +83,8 @@ _PRIVATE __ptr_t (*tr_old_phrealloc_hook)  __P ((int, __ptr_t ptr, __malloc_size
 /* tr_break.                                                               */
 /*-------------------------------------------------------------------------*/
 
-_PUBLIC int tr_break __P ((void));
-_PUBLIC int tr_break ()
+_PUBLIC  int32_t tr_break __P ((void));
+_PUBLIC  int32_t tr_break ()
 {
 }
 
@@ -99,84 +100,85 @@ _PRIVATE void tr_where ()
 }
 
 
-_PRIVATE void tr_phfreehook __P ((int, __ptr_t));
-_PRIVATE void tr_phfreehook (int hdes, __ptr_t ptr)
+_PRIVATE void tr_phfreehook __P ((int32_t, __ptr_t));
+_PRIVATE void tr_phfreehook (int32_t hdes, __ptr_t ptr)
 {
-  tr_where ();
+    tr_where ();
 
                                                 /*---------------------------*/
-  (void)fprintf (mallstream, "- %p\n", ptr);	/* Be sure to print it first */
+    (void)fprintf (mallstream, "- %p\n", ptr);	/* Be sure to print it first */
                                                 /*---------------------------*/
 
-  (void)fflush(mallstream);
+    (void)fflush(mallstream);
 
-  if(ptr == mallwatch)
-     tr_break ();
-  __phfree_hook = tr_old_phfree_hook;
-  phfree (hdes, ptr);
-  __phfree_hook = tr_phfreehook;
+    if(ptr == mallwatch)
+       tr_break ();
+
+    __phfree_hook = tr_old_phfree_hook;
+    phfree (hdes, ptr);
+    __phfree_hook = tr_phfreehook;
 }
 
 
-_PRIVATE __ptr_t tr_phmallochook __P ((int, __malloc_size_t, char *));
-_PRIVATE __ptr_t tr_phmallochook (int hdes, __malloc_size_t size, char *name)
+_PRIVATE __ptr_t tr_phmallochook __P ((int32_t, __malloc_size_t, char *));
+_PRIVATE __ptr_t tr_phmallochook (int32_t hdes, __malloc_size_t size, char *name)
 {
-  __ptr_t hdr;
+    __ptr_t hdr;
 
-  __phmalloc_hook = tr_old_phmalloc_hook;
-  hdr             = (__ptr_t) phmalloc (hdes, size, name);
-  __phmalloc_hook = tr_phmallochook;
+    __phmalloc_hook = tr_old_phmalloc_hook;
+    hdr             = (__ptr_t) phmalloc (hdes, size, name);
+    __phmalloc_hook = tr_phmallochook;
 
-  tr_where ();
+    tr_where ();
 
 
-  /*---------------------------------------------*/
-  /* We could be printing a NULL here; that's OK */
-  /*---------------------------------------------*/
+    /*---------------------------------------------*/
+    /* We could be printing a NULL here; that's OK */
+    /*---------------------------------------------*/
 
-  (void)fprintf (mallstream, "+ %p %lx\n", hdr, (unsigned long)size);
-  (void)fflush(mallstream);
+    (void)fprintf (mallstream, "+ %p %lx\n", hdr, (unsigned long)size);
+    (void)fflush(mallstream);
 
-  if(hdr == mallwatch)
-    tr_break ();
+    if(hdr == mallwatch)
+      tr_break ();
 
-  return hdr;
+    return hdr;
 }
 
 
-_PRIVATE __ptr_t tr_phreallochook __P ((int hdes, __ptr_t, __malloc_size_t, char *));
-_PRIVATE __ptr_t tr_phreallochook (int hdes, __ptr_t ptr, __malloc_size_t size, char *name)
+_PRIVATE __ptr_t tr_phreallochook __P ((int32_t hdes, __ptr_t, __malloc_size_t, char *));
+_PRIVATE __ptr_t tr_phreallochook (int32_t hdes, __ptr_t ptr, __malloc_size_t size, char *name)
 {
-  __ptr_t hdr;
+    __ptr_t hdr;
 
-  if (ptr == mallwatch)
-    tr_break ();
+    if (ptr == mallwatch)
+      tr_break ();
 
-  __phfree_hook    = tr_old_phfree_hook;
-  __phmalloc_hook  = tr_old_phmalloc_hook;
-  __phrealloc_hook = tr_old_oealloc_hook;
-  hdr              = (__ptr_t) phrealloc (hdes, ptr, size, name);
-  __phfree_hook    = tr_phfreehook;
-  __phmalloc_hook  = tr_phmallochook;
-  __phrealloc_hook = tr_phreallochook;
-  tr_where ();
+    __phfree_hook    = tr_old_phfree_hook;
+    __phmalloc_hook  = tr_old_phmalloc_hook;
+    __phrealloc_hook = tr_old_oealloc_hook;
+    hdr              = (__ptr_t) phrealloc (hdes, ptr, size, name);
+    __phfree_hook    = tr_phfreehook;
+    __phmalloc_hook  = tr_phmallochook;
+    __phrealloc_hook = tr_phreallochook;
+    tr_where ();
 
-  if (hdr == NULL)
+    if (hdr == NULL)
 
 
-    /*----------------*/
-    /* Failed realloc */
-    /*----------------*/
+      /*----------------*/
+      /* Failed realloc */
+      /*----------------*/
 
-    (void)fprintf (mallstream, "realloc failed ! %p %lx\n", ptr, (unsigned long)size);
-  else
-    (void)fprintf (mallstream, "< %p\n> %p %lx\n", ptr, hdr, (unsigned long)size);
-  (void)fflush(mallstream);
+      (void)fprintf (mallstream, "realloc failed ! %p %lx\n", ptr, (unsigned long)size);
+    else
+      (void)fprintf (mallstream, "< %p\n> %p %lx\n", ptr, hdr, (unsigned long)size);
+    (void)fflush(mallstream);
 
-  if (hdr == mallwatch)
-    tr_break ();
+    if (hdr == mallwatch)
+       tr_break ();
 
-  return hdr;
+    return hdr;
 }
 
 
@@ -189,22 +191,22 @@ _PRIVATE __ptr_t tr_phreallochook (int hdes, __ptr_t ptr, __malloc_size_t size, 
 
 _PUBLIC void mtrace(void)
 {
-  char *mallfile = (char *)NULL;
+    char *mallfile = (char *)NULL;
 
 
-  /*--------------------------------------------*/ 
-  /* Don't panic if we're called more than once */
-  /*--------------------------------------------*/
+    /*--------------------------------------------*/ 
+    /* Don't panic if we're called more than once */
+    /*--------------------------------------------*/
 
-  if (mallstream != NULL)
-    return;
+    if (mallstream != NULL)
+       return;
 
-  mallfile = getenv (mallenv);
-  if (mallfile != NULL || mallwatch != NULL)
-  {
-      mallstream = fopen (mallfile != NULL ? mallfile : "/dev/null", "w");
-      if (mallstream != NULL)
-      {
+   mallfile = getenv (mallenv);
+   if (mallfile != NULL || mallwatch != NULL)
+   {
+       mallstream = fopen (mallfile != NULL ? mallfile : "/dev/null", "w");
+       if (mallstream != NULL)
+       {
 
           /*---------------------------------------*/
 	  /* Be sure it doesn't malloc its buffer! */
@@ -220,22 +222,22 @@ _PUBLIC void mtrace(void)
 	  __phmalloc_hook        = tr_phmallochook;
 	  tr_old_phrealloc_hook  = __phrealloc_hook;
 	  __phrealloc_hook       = tr_phreallochook;
-	}
+       }
     }
 }
 
 
 _PUBLIC void muntrace (void)
 {
-  if (mallstream == (FILE *)NULL)
-    return;
+    if (mallstream == (FILE *)NULL)
+       return;
 
-  (void)fprintf (mallstream, "= End\n");
-  (void)fflush(mallstream);
-  (void)fclose (mallstream);
+    (void)fprintf (mallstream, "= End\n");
+    (void)fflush(mallstream);
+    (void)fclose (mallstream);
 
-  mallstream       = (FILE *)NULL;
-  __ohfree_hook    = tr_old_phfree_hook;
-  __phmalloc_hook  = tr_old_phmalloc_hook;
-  __phrealloc_hook = tr_old_phrealloc_hook;
+    mallstream       = (FILE *)NULL;
+    __ohfree_hook    = tr_old_phfree_hook;
+    __phmalloc_hook  = tr_old_phmalloc_hook;
+    __phrealloc_hook = tr_old_phrealloc_hook;
 }

@@ -1,4 +1,4 @@
-/*-------------------------------------------------------------------------------------------
+/*----------------------------------------------------------------------------------
     Purpose: automatic (POSIX) threading of sources which are written to comply with
              PUPS semantics (impemnted as a C pre-processor).
 
@@ -9,40 +9,41 @@
              NE3 4RT
              United Kingdom
 
-    Version: 2.01 
-    Dated:   24th May 2023
+    Version: 2.0 
+    Dated:   10th December 2024
     E-mail:  mao@tumblingdice.co.uk
--------------------------------------------------------------------------------------------*/
+-----------------------------------------------------------------------------------*/
 
 #include <stdio.h>
 #include <string.h>
 #include <bsd/string.h>
 #include <stdlib.h>
 #include <xtypes.h>
+#include <unistd.h>
+#include <ctype.h>
+#include <stdint.h>
 
 
-
-
-/*-------------------------------------------------------------------------------------------
-    Defines which are private to this application ...
--------------------------------------------------------------------------------------------*/
+/*---------*/
+/* Defines */
+/*---------*/
 /*-----------------*/
 /* Version of pc2c */
 /*-----------------*/
 
-#define PC2C_VERSION   "2.01"
+#define PC2C_VERSION   "2.02"
 
 
 /*-------------*/
 /* String size */
 /*-------------*/
 
-#define SSIZE          2048 
-
+#define SSIZE          2048
 
 #define UP             1
 #define DOWN           (-1)
 #define MTABLE_SIZE    256
+#define ARGLIST_SIZE   64
 
 
 
@@ -52,82 +53,82 @@
 /* and _THREADSAFE are being used correctly                     */
 /*--------------------------------------------------------------*/
 
-_PROTOTYPE _PRIVATE _BOOLEAN check_function_head_modifiers(char *);
+_PROTOTYPE _PRIVATE _BOOLEAN check_function_head_modifiers(const char *);
 
 // Strip comments from line
-_PROTOTYPE _PRIVATE void strip_line(char *, char *);
+_PROTOTYPE _PRIVATE void strip_line(const char *, char *);
 
 // Set up a default function mutex definition
-_PROTOTYPE _PRIVATE void default_fmutex_define(char *);
+_PROTOTYPE _PRIVATE void default_fmutex_define(const char *);
 
 // Set up a use function mutex definition
-_PROTOTYPE _PRIVATE void use_fmutex_define(char *);
+_PROTOTYPE _PRIVATE void use_fmutex_define(const char *);
 
 // Translate a _TKEY directive
-_PROTOTYPE _PRIVATE void tkey_transform(char *);
+_PROTOTYPE _PRIVATE void tkey_transform(const char *);
 
 // Translate a _TKEY_BIND directive
-_PROTOTYPE _PRIVATE void tkey_bind_transform(char *);
+_PROTOTYPE _PRIVATE void tkey_bind_transform(const char *);
 
 // Translate a _TKEY_FREE directive
-_PROTOTYPE _PRIVATE void tkey_free_transform(char *);
+_PROTOTYPE _PRIVATE void tkey_free_transform(const char *);
 
-// Replace characrer c_1 in string s by character c_2 */
-_PROTOTYPE _PRIVATE void ch_rep(char *, char, char);
+// Replace character c_1 in string s by character c_2
+_PROTOTYPE _PRIVATE void ch_rep(char *, const char, const char);
 
 // Check that string is upper case
-_PROTOTYPE _PRIVATE _BOOLEAN is_upper(char *);
+_PROTOTYPE _PRIVATE _BOOLEAN is_upper(const char *);
 
 // Parse a PUPS-C macro function (checking its syntax)
-_PROTOTYPE _PRIVATE _BOOLEAN parse_pups_c_macro_function(char *, int, char [32][SSIZE]);
+_PROTOTYPE _PRIVATE _BOOLEAN parse_pups_c_macro_function(const char *, const uint32_t, char [32][SSIZE]);
 
 // Check for empty lines (contain only spaces cntl-c)
-_PROTOTYPE _PRIVATE _BOOLEAN empty_line(char *);
+_PROTOTYPE _PRIVATE _BOOLEAN empty_line(const char *);
 
 // Check if-else construct syntax
-_PROTOTYPE _PRIVATE _BOOLEAN check_if_else(char *);
+_PROTOTYPE _PRIVATE _BOOLEAN check_if_else(const char *);
 
 // Count number of (non-embedded) characters in line
-_PROTOTYPE _PRIVATE int chcnt(char *, char);
+_PROTOTYPE _PRIVATE int32_t chcnt(const char *, const char);
 
 // Check that function head conforms to PUPS-C syntax
-_PROTOTYPE _PRIVATE _BOOLEAN ansi_c_head(char *);
+_PROTOTYPE _PRIVATE _BOOLEAN ansi_c_head(const char *);
 
 // Check that orifice function prototype is correct
-_PROTOTYPE _PRIVATE _BOOLEAN check_orifice_arguments(char *);
+_PROTOTYPE _PRIVATE _BOOLEAN check_orifice_arguments(const char *);
 
 // Strip characters from string
-_PROTOTYPE _PRIVATE void strpach(char *, char);
+_PROTOTYPE _PRIVATE void strpach(char *, const char);
 
 // Extended fputs function (checks for newline in O/P data)
-_PROTOTYPE _PRIVATE void xfputs(char *, FILE *);
+_PROTOTYPE _PRIVATE void xfputs(char *, const FILE *);
 
 // Routine to skip text which has already been substituted
-_PROTOTYPE _PRIVATE void skip_pre_substituted_text(char *);
+_PROTOTYPE _PRIVATE void skip_pre_substituted_text(const char *);
 
 // Routine to skip comments in source text
-_PROTOTYPE _PRIVATE void skip_comment(char *);
+_PROTOTYPE _PRIVATE void skip_comment(const char *);
 
 // Initialise mutex table
 _PROTOTYPE _PRIVATE void init_mtable(void);
 
 // Add mutex to list of defined mutexes
-_PROTOTYPE _PRIVATE _BOOLEAN defined(char *);
+_PROTOTYPE _PRIVATE _BOOLEAN define(const char *);
 
 // Add mutex to list of defined mutexes
-_PROTOTYPE _PRIVATE _BOOLEAN undefine(char *);
+_PROTOTYPE _PRIVATE _BOOLEAN undefine(const char *);
 
 // Adjust function block count
-_PROTOTYPE _PRIVATE void braket(int);
+_PROTOTYPE _PRIVATE void braket(uint32_t);
 
 // Get position of character
-_PROTOTYPE _PRIVATE int ch_pos(char *, char);
+_PROTOTYPE _PRIVATE int32_t ch_pos(const char *, const char);
 
 // Count number of bra '{' symbols in line
-_PROTOTYPE _PRIVATE int nbras(char *);
+_PROTOTYPE _PRIVATE int32_t nbras(const char *);
 
 // Count number of ket '}' symbols in line
-_PROTOTYPE _PRIVATE int nkets(char *);
+_PROTOTYPE _PRIVATE int32_t nkets(const char *);
 
 // Detect a PUPS function head
 _PROTOTYPE _PRIVATE _BOOLEAN is_function_head(char *);
@@ -136,7 +137,7 @@ _PROTOTYPE _PRIVATE _BOOLEAN is_function_head(char *);
 _PROTOTYPE _PRIVATE _BOOLEAN is_function_exit(char *);
 
 // Test for occurence of s2 within s1
-_PROTOTYPE _PRIVATE _BOOLEAN strin(char *, char *);
+_PROTOTYPE _PRIVATE _BOOLEAN strin(const char *, const char *);
 
 
 /*----------------------------------------------------------*/
@@ -144,20 +145,20 @@ _PROTOTYPE _PRIVATE _BOOLEAN strin(char *, char *);
 /* of extracted string                                      */
 /*----------------------------------------------------------*/
 
-_PROTOTYPE _PRIVATE _BOOLEAN strinpos(long *, long *, char *, char *);
+_PROTOTYPE _PRIVATE _BOOLEAN strinpos(int64_t  *,  int64_t  *, const char *, const char *);
 
-// Reverse strip character from strinposg
-_PROTOTYPE _PRIVATE char *rstrpch(char *, char);
+// Reverse strip character from string
+_PROTOTYPE _PRIVATE char *rstrpch(char *, const char);
 
 // Routine to strip s2 from s1
-_PROTOTYPE _PRIVATE _BOOLEAN strinstrip(char *, char *);
+_PROTOTYPE _PRIVATE _BOOLEAN strinstrip(char *, const char *);
 
 
 
 
-/*-------------------------------------------------------------------------------------------
-    Variables which are private to this application ...
--------------------------------------------------------------------------------------------*/
+/*-------------------------------------------------*/
+/* Variables which are private to this application */
+/*-------------------------------------------------*/
 
                                                       /*------------------------------------*/
 _PRIVATE _BOOLEAN in_function_body       = FALSE;     /* TRUE if in function body           */
@@ -170,15 +171,15 @@ _PRIVATE _BOOLEAN use_default_mutex      = TRUE;      /* TRUE if using default m
 _PRIVATE _BOOLEAN in_comment             = FALSE;     /* TRUE if pc2c translator in comment */
 _PRIVATE _BOOLEAN one_line_comment       = FALSE;     /* TRUE if pc2c translator in comment */
 _PRIVATE _BOOLEAN m_alternative_body     = FALSE;     /* TRUE if func has conitional forms  */
-_PRIVATE int      f_ts_cnt               = 0;         /* Number of threadsafe functions     */
-_PRIVATE int      f_rto_cnt              = 0;         /* Number of exec root thread funcs   */
-_PRIVATE int      f_orifice_cnt          = 0;         /* Number of DLL orifice functions    */
-_PRIVATE int      l_cnt                  = 0;         /* Line counter                       */
-_PRIVATE int      r_cnt                  = 0;         /* Function block counter             */
-_PRIVATE int      tsd_cnt                = 0;         /* TSD key counter                    */
-_PRIVATE int      n_bras                 = 0;         /* bra '{' counter                    */
-_PRIVATE int      n_kets                 = 0;         /* ket '}' counter                    */
-_PRIVATE int      n_mutexes              = 0;         /* Number of user defined mutexes     */
+_PRIVATE int32_t f_ts_cnt                = 0;         /* Number of threadsafe functions     */
+_PRIVATE int32_t f_rto_cnt               = 0;         /* Number of exec root thread funcs   */
+_PRIVATE int32_t f_orifice_cnt           = 0;         /* Number of DLL orifice functions    */
+_PRIVATE int32_t l_cnt                   = 0;         /* Line counter                       */
+_PRIVATE int32_t r_cnt                   = 0;         /* Function block counter             */
+_PRIVATE int32_t tsd_cnt                 = 0;         /* TSD key counter                    */
+_PRIVATE int32_t n_bras                  = 0;         /* bra '{' counter                    */
+_PRIVATE int32_t n_kets                  = 0;         /* ket '}' counter                    */
+_PRIVATE int32_t n_mutexes               = 0;         /* Number of user defined mutexes     */
 _PRIVATE char     current_f_mutex[SSIZE] = "";        /* Currently active mutex macro       */ 
 _PRIVATE char     default_mutex[SSIZE]   = "default"; /* Current default mutex              */ 
 _PRIVATE char     mutex[SSIZE]           = "default"; /* Current insertion mutex            */ 
@@ -196,22 +197,27 @@ _PRIVATE char     defined_mutex[MTABLE_SIZE][SSIZE];  /* Table of user defined m
 
 
 
-/*-------------------------------------------------------------------------------------------
-    Main entry point for pc2c ...
--------------------------------------------------------------------------------------------*/
+/*------------------*/
+/* Main entry point */
+/*------------------*/
 
-_PUBLIC int main(int argc, char *argv[])
+_PUBLIC  int32_t main(int32_t argc, char *argv[])
 
-{   _BOOLEAN is_f_head      = FALSE,
-             is_f_exit      = FALSE; 
+{   _BOOLEAN is_f_head                    = FALSE,
+             is_f_exit                    = FALSE; 
 
-    char arglist[32][SSIZE] = { "" };
+    char     arglist[ARGLIST_SIZE][SSIZE] = { "" };
 
-    (void)fprintf(stderr,"\nPUPS parallel C  to C translation tool version %s\n",PC2C_VERSION);
-    (void)fprintf(stderr,"(C) Tumbling Dice, 2006-2023 (built %s %s)\n\n",__TIME__,__DATE__);
+    (void)fprintf(stderr,"\nPUPS-C  to C translation tool version %s\n",PC2C_VERSION);
+    (void)fprintf(stderr,"(C) Tumbling Dice, 2006-2024 (gcc %s: built %s %s)\n\n",__VERSION__,__TIME__,__DATE__);
+
+
+    /*--------------------*/
+    /* Parse command line */
+    /*--------------------*/
 
     if(isatty(0) == 1 || isatty(1) == 1)
-    {  (void)fprintf(stderr,"Usage: pc2c < <input PUPS parallel C file> > <output C file>\n\n");
+    {  (void)fprintf(stderr,"Usage: pc2c < <input PUPS-C file> > <output C file>\n\n");
        (void)fflush(stderr);
 
        (void)fprintf(stderr,"PC2C is free software, covered by the GNU General Public License, and you are\n");
@@ -352,7 +358,7 @@ next_line: (void)fgets(line,SSIZE,stdin);
 
            /*-----------------------------------------*/
            /* Check for multiple '{' or '}' on a line */
-           /* illegal under PUPS                      */
+           /* illegal for PUPS-C semantics            */
            /*-----------------------------------------*/
 
            n_bras = nbras(line);
@@ -501,11 +507,11 @@ done:
 
 
 
-/*-------------------------------------------------------------------------------------------
-    Check that the orifice function conforms to a PUPS orifice function prototype ...
--------------------------------------------------------------------------------------------*/
+/*-------------------------------------------------------------------------------*/
+/* Check that the orifice function conforms to a PUPS orifice function prototype */
+/*-------------------------------------------------------------------------------*/
 
-_PRIVATE int check_orifice_arguments(char *line)
+_PRIVATE int32_t check_orifice_arguments(const char *line)
 
 {   char tmp_str[SSIZE]  = "",
          ret_type[SSIZE] = "",
@@ -521,18 +527,18 @@ _PRIVATE int check_orifice_arguments(char *line)
     (void)strpach(line_buf,')'); 
 
 
-    /*--------------------------------------------------------------------------------*/
-    /* Case 1 function of form _PUBLIC _DLL_ORIFICE _BOOLEAN func(char *a1, char *a2) */
-    /*--------------------------------------------------------------------------------*/
+    /*----------------------------------------------------------------------------*/
+    /* Case 1 function of form _PUBLIC _DLL_ORIFICE _BOOLEAN func(char *, char *) */
+    /*----------------------------------------------------------------------------*/
 
     if(sscanf(line_buf,"%s %s %s %s %s %s %s %s",tmp_str,
                                                  tmp_str,
-                                                ret_type,
+                                                 ret_type,
                                                  tmp_str,
-                                                    arg1,
-                                                    arg2,
-                                                    arg3,
-                                                    arg4) == 8)
+                                                 arg1,
+                                                 arg2,
+                                                 arg3,
+                                                 arg4) == 8)
     {   if(strcmp(ret_type,"_BOOLEAN") != 0)
            return(FALSE);
 
@@ -547,16 +553,16 @@ _PRIVATE int check_orifice_arguments(char *line)
     }
 
 
-    /*---------------------------------------------------------------------------------*/
-    /* Class 2 function of form _PUBLIC _DLL_ORIFICE _BOOLEAN func(char* a1, char *a2) */
-    /*---------------------------------------------------------------------------------*/
+    /*---------------------------------------------------------------------------*/
+    /* Class 2 function of form _PUBLIC _DLL_ORIFICE _BOOLEAN func(char*, char*) */
+    /*---------------------------------------------------------------------------*/
 
     if(sscanf(line_buf,"%s %s %s %s %s %s",tmp_str,
                                            tmp_str,
-                                          ret_type,
+                                           ret_type,
                                            tmp_str,
-                                              arg1,
-                                              arg2) == 6)
+                                           arg1,
+                                           arg2) == 6)
     {   if(strcmp(ret_type,"_BOOLEAN") != 0)
            return(FALSE);
 
@@ -570,18 +576,19 @@ _PRIVATE int check_orifice_arguments(char *line)
 
 
 
-/*-------------------------------------------------------------------------------------------
-    Check that function head conforms to PUPS-C syntax ...
--------------------------------------------------------------------------------------------*/
+/*----------------------------------------------------*/
+/* Check that function head conforms to PUPS-C syntax */
+/*----------------------------------------------------*/
 
-_PRIVATE _BOOLEAN ansi_c_head(char *line)
+_PRIVATE _BOOLEAN ansi_c_head(const char *line)
 
-{   int i,
-        eq_index        = (-1),
-        bra_index       = (-1),
-        cnt             = 0;
+{   uint32_t i;
 
-    char line_buf[4096] = "";
+    int32_t  eq_index        = (-1),
+             bra_index       = (-1),
+             cnt             = 0;
+
+    char     line_buf[SSIZE] = "";
 
     if(in_function_body == TRUE)
        return(FALSE);
@@ -629,17 +636,15 @@ _PRIVATE _BOOLEAN ansi_c_head(char *line)
 
 
 
-/*-------------------------------------------------------------------------------------------
-    Find function head - if found make sure threads calling the function lock it
-    on entry ...
--------------------------------------------------------------------------------------------*/
+/*------------------------------------------------------------------------------*/
+/* Find function head - if found make sure threads calling the function lock it */
+/* on entry                                                                     */
+/*------------------------------------------------------------------------------*/
 
 _PRIVATE _BOOLEAN is_function_head(char *line)
 
-{   int      h_cnt;
-
-    char     stripped_line[4096] = "",
-             f_head_line[4096]   = "";
+{   char stripped_line[SSIZE] = "",
+         f_head_line[SSIZE]   = "";
 
     if(in_function_body == TRUE)
        return(FALSE);
@@ -672,17 +677,17 @@ _PRIVATE _BOOLEAN is_function_head(char *line)
        /* We have a function head - find its body */
        /*-----------------------------------------*/
 
-       int h_cnt           = 0,
-           index,
-           n_args;
+       int32_t  h_cnt            = 0,
+                index,
+                n_args;
 
-       char prev_item[SSIZE] = "",
-            next_item[SSIZE] = "",
-            line_buf[SSIZE]  = "",
-            tmp_str[SSIZE]   = "";
+       char     prev_item[SSIZE] = "",
+                next_item[SSIZE] = "",
+                line_buf[SSIZE]  = "",
+                tmp_str[SSIZE]   = "";
 
-       _BOOLEAN is_main    = FALSE,
-                looper     = FALSE;
+       _BOOLEAN is_main          = FALSE,
+                looper           = FALSE;
 
 
        /*----------------------------------------------------*/
@@ -691,7 +696,7 @@ _PRIVATE _BOOLEAN is_function_head(char *line)
        /*----------------------------------------------------*/
 
        if(strin(stripped_line,"_PUBLIC") == FALSE && strin(stripped_line,"_PRIVATE") == FALSE)
-       {  (void)fprintf(stderr,"%d: PUPS parallel C syntax error %s\n",h_cnt,rstrpch(f_head_line,'\n'));
+       {  (void)fprintf(stderr,"%d: PUPS C syntax error %s\n",h_cnt,rstrpch(f_head_line,'\n'));
           (void)fflush(stderr);
 
           exit(255);
@@ -1031,9 +1036,6 @@ _PRIVATE _BOOLEAN is_function_head(char *line)
                      (void)fflush(stdout);
                   }
 
-                  //index = ch_pos(fname,'(');
-                  //fname[index] = '\0';
-
                   if(is_main == TRUE)
                      (void)fprintf(stderr,"%d: making PUPS \"main\" function pthread initialisation function\n",l_cnt);
 
@@ -1095,15 +1097,15 @@ _PRIVATE _BOOLEAN is_function_head(char *line)
 
 
 
-/*-------------------------------------------------------------------------------------------
-    Find the exit points for a function and make sure thread releases locks on exit
-    from them ...
--------------------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------------------*/
+/* Find the exit points for a function and make sure thread releases locks on exit */
+/* from them                                                                       */
+/*---------------------------------------------------------------------------------*/
 
 _PRIVATE _BOOLEAN is_function_exit(char *line)
 
-{   char tmp_str[SSIZE] = "";
-    int  index;
+{   char     tmp_str[SSIZE] = "";
+    int32_t  index;
 
 
     /*-----------------------------------------*/
@@ -1125,9 +1127,9 @@ _PRIVATE _BOOLEAN is_function_exit(char *line)
     /* and return starting index for it in line          */
     /*---------------------------------------------------*/  
 
-    if(strinpos((long *)&index,(long *)NULL,line,"return") == TRUE)
-    {  char tmp_str[SSIZE] = "";
-       int  embed_index;
+    if(strinpos((uint64_t *)&index,(int64_t *)NULL,line,"return") == TRUE)
+    {  char    tmp_str[SSIZE] = "";
+       int32_t embed_index;
 
 
        /*---------------------------------------------*/
@@ -1140,12 +1142,12 @@ _PRIVATE _BOOLEAN is_function_exit(char *line)
        if(index > embed_index && embed_index != (-1))
           return(FALSE);
 
-       if(strinpos((long *)&embed_index,(long *)NULL,line,"/*") == TRUE)
+       if(strinpos((int64_t *)&embed_index,(int64_t *)NULL,line,"/*") == TRUE)
        {  if(index > embed_index)
              return(FALSE);
        }
 
-       if(strinpos((long *)&embed_index,(long *)NULL,line,"//") == TRUE)
+       if(strinpos((int64_t *)&embed_index,(int64_t *)NULL,line,"//") == TRUE)
        {  if(index > embed_index)
              return(FALSE);
        }
@@ -1220,18 +1222,18 @@ _PRIVATE _BOOLEAN is_function_exit(char *line)
 
 
 
-/*-------------------------------------------------------------------------------------------
-    Find the exit points for a function and make sure thread releases locks on exit
-    from them ...
--------------------------------------------------------------------------------------------*/
+/*--------------------------------------*/
+/* Get index of character c in string s */
+/*--------------------------------------*/
 
-_PRIVATE int ch_pos(char *s, char c)
+_PRIVATE int32_t ch_pos(const char *s, const char c)
 
-{   int i;
+{   size_t i;
 
     for(i=0; i<strlen(s); ++i)
-       if(s[i] == c)
-          return(i);
+    {  if(s[i] == c)
+         return(i);
+    }
 
     return(-1);
 }
@@ -1240,17 +1242,17 @@ _PRIVATE int ch_pos(char *s, char c)
 
 
 
-/*-------------------------------------------------------------------------------------------
-    Count the number of (non-embedded) characters in a line ...
--------------------------------------------------------------------------------------------*/
+/*---------------------------------------------------------*/
+/* Count the number of (non-embedded) characters in a line */
+/*---------------------------------------------------------*/
 
-_PRIVATE int chcnt(char *line, char ch)
+_PRIVATE int32_t chcnt(const char *line, const char ch)
 
-{   int i,
-        bra_cnt = 0;
+{   size_t    i;
+    uint32_t  bra_cnt        = 0;
 
-    _BOOLEAN in_comment     = FALSE,
-             in_txt_literal = FALSE;
+    _BOOLEAN  in_comment     = FALSE,
+              in_txt_literal = FALSE;
 
     for(i=0; i<strlen(line); ++i)
     {
@@ -1292,11 +1294,11 @@ _PRIVATE int chcnt(char *line, char ch)
 
 
 
-/*-------------------------------------------------------------------------------------------
-    Count the number of brackets '{' [bras] in a line ...
--------------------------------------------------------------------------------------------*/
+/*---------------------------------------------------*/
+/* Count the number of brackets '{' [bras] in a line */
+/*---------------------------------------------------*/
 
-_PRIVATE int nbras(char *line)
+_PRIVATE int32_t nbras(const char *line)
 
 {   return(chcnt(line,'{'));
 }
@@ -1304,11 +1306,11 @@ _PRIVATE int nbras(char *line)
 
 
 
-/*-------------------------------------------------------------------------------------------
-    Count the number of brackets '}' [kets] in a line ...
--------------------------------------------------------------------------------------------*/
+/*---------------------------------------------------*/
+/* Count the number of brackets '}' [kets] in a line */
+/*---------------------------------------------------*/
 
-_PRIVATE int nkets(char *line)
+_PRIVATE int32_t nkets(const char *line)
 
 {   return(chcnt(line,'}'));
 }
@@ -1316,15 +1318,15 @@ _PRIVATE int nkets(char *line)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Look for the occurence of strinposg s2 within string s1 ...
-------------------------------------------------------------------------------------------*/
+/*--------------------------------------------------*/
+/* Look for occurence of string s2 within string s1 */
+/*--------------------------------------------------*/
 
-_PRIVATE _BOOLEAN strin(char *s1, char *s2)
+_PRIVATE _BOOLEAN strin(const char *s1, const char *s2)
 
-{   int i,
-        cmp_size,
-        chk_limit;
+{   size_t i,
+           cmp_size,
+           chk_limit;
 
     if(strlen(s2) > strlen(s1))
        return(FALSE);
@@ -1343,16 +1345,16 @@ _PRIVATE _BOOLEAN strin(char *s1, char *s2)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Look for the occurence of strinposg s2 within string s1 returnig indices of start
-    and end of s2 within s1 ...
-------------------------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------------------*/
+/* Look for the occurence of string s2 within string s1 returnig indices of start */
+/* and end of s2 within s1                                                        */
+/*--------------------------------------------------------------------------------*/
 
-_PRIVATE _BOOLEAN strinpos(long *s_pos, long *e_pos, char *s1, char *s2)
+_PRIVATE _BOOLEAN strinpos(int64_t *s_pos,  int64_t  *e_pos, const char *s1, const char *s2)
 
-{   int i,
-        cmp_size,
-        chk_limit;
+{   size_t i,
+           cmp_size,
+           chk_limit;
 
     if(strlen(s2) > strlen(s1))
        return(FALSE);
@@ -1362,20 +1364,20 @@ _PRIVATE _BOOLEAN strinpos(long *s_pos, long *e_pos, char *s1, char *s2)
 
     for(i=0; i<chk_limit; ++i)
     {  if(strncmp(&s1[i],s2,cmp_size) == 0)
-       {  if(s_pos != (long *)NULL)
+       {  if(s_pos != (int64_t *)NULL)
              *s_pos = i;
 
-          if(e_pos != (long *)NULL)
+          if(e_pos != (int64_t *)NULL)
              *e_pos = i + strlen(s2);
 
           return(TRUE);
        }
     }
 
-    if(s_pos != (long *)NULL)
+    if(s_pos != (int64_t *)NULL)
        *s_pos = (-1);
 
-    if(e_pos != (long *)NULL)
+    if(e_pos != (int64_t *)NULL)
        *e_pos = (-1);
 
     return(FALSE);
@@ -1385,19 +1387,20 @@ _PRIVATE _BOOLEAN strinpos(long *s_pos, long *e_pos, char *s1, char *s2)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Reverse strip character from strinposg ...
-------------------------------------------------------------------------------------------*/
+/*-------------------------------------*/
+/* Reverse strip character from string */
+/*-------------------------------------*/
 
-_PRIVATE char *rstrpch(char *s, char c)
+_PRIVATE char *rstrpch(char *s, const char c)
 
-{   int i;
+{   size_t i;
 
     for(i=strlen(s); i>0; --i)
-       if(s[i] == c)
+    {  if(s[i] == c)
        {  s[i] = '\0';
           return(s);
        }
+    }
 
     return(s);
 }
@@ -1406,11 +1409,11 @@ _PRIVATE char *rstrpch(char *s, char c)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Adjust function block count ...
-------------------------------------------------------------------------------------------*/
+/*-----------------------------*/
+/* Adjust function block count */
+/*-----------------------------*/
 
-_PRIVATE void braket(int direction)
+_PRIVATE void braket(uint32_t direction)
 
 {   if(direction == UP)
        ++r_cnt;
@@ -1421,22 +1424,22 @@ _PRIVATE void braket(int direction)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Strip string s2 from string s1 ...
-------------------------------------------------------------------------------------------*/
+/*--------------------------------*/
+/* Strip string s2 from string s1 */
+/*--------------------------------*/
 
-_PRIVATE _BOOLEAN strinstrip(char *s1, char *s2)
+_PRIVATE _BOOLEAN strinstrip(char *s1, const char *s2)
 
-{   int start_index,
-        end_index;
+{   int32_t start_index,
+            end_index;
 
-    char tmp_str[SSIZE] = "";
+    char    tmp_str[SSIZE] = "";
 
     if(sscanf(s1,"%s",s2) != 1)
        return(FALSE);
 
-    (void)strinpos((long *)&start_index,(long *)&end_index,s1,s2);
-    (void)strlcpy(tmp_str,SSIZE,(char *)&s1[end_index]);
+    (void)strinpos((int64_t *)&start_index,(int64_t *)&end_index,s1,s2);
+    (void)strlcpy(tmp_str,(char *)&s1[end_index],SSIZE);
     (void)strlcpy(s1,tmp_str,SSIZE);
 
     return(TRUE);
@@ -1445,13 +1448,13 @@ _PRIVATE _BOOLEAN strinstrip(char *s1, char *s2)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Define a user defined mutex ...
-------------------------------------------------------------------------------------------*/
+/*-----------------------------*/
+/* Define a user defined mutex */
+/*-----------------------------*/
 
-_PRIVATE _BOOLEAN defined(char *mutex)
+_PRIVATE _BOOLEAN define(const char *mutex)
 
-{   int i;
+{   uint32_t i;
 
     if(n_mutexes == MTABLE_SIZE)
     {  (void)fprintf(stderr,"pc2c: mutex table full (max %d user defined mutexes)\n",MTABLE_SIZE);
@@ -1494,13 +1497,13 @@ _PRIVATE _BOOLEAN defined(char *mutex)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Undefine a user defined mutex ...
-------------------------------------------------------------------------------------------*/
+/*-------------------------------*/
+/* Undefine a user defined mutex */
+/*-------------------------------*/
 
-_PRIVATE _BOOLEAN undefine(char *mutex)
+_PRIVATE _BOOLEAN undefine(const char *mutex)
 
-{   int i;
+{   uint32_t i;
 
     for(i=0; i<n_mutexes; ++i)
     {  if(strcmp(defined_mutex[i],mutex) == 0)
@@ -1515,13 +1518,13 @@ _PRIVATE _BOOLEAN undefine(char *mutex)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Initialise mutex table ...
-------------------------------------------------------------------------------------------*/
+/*------------------------*/
+/* Initialise mutex table */
+/*------------------------*/
 
 _PRIVATE void init_mtable(void)
 
-{   int i;
+{   uint32_t i;
 
     for(i=0; i<MTABLE_SIZE; ++i)
        (void)strlcpy(defined_mutex[i],"none",SSIZE);
@@ -1530,11 +1533,11 @@ _PRIVATE void init_mtable(void)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Skip text which has already been substituted ...
-------------------------------------------------------------------------------------------*/
+/*----------------------------------------------*/
+/* Skip text which has already been substituted */
+/*----------------------------------------------*/
 
-_PRIVATE void skip_pre_substituted_text(char *line)
+_PRIVATE void skip_pre_substituted_text(const char *line)
 
 {   if(strin(line,">>>>") == TRUE)
     {  (void)xfputs(line,stdout);
@@ -1592,16 +1595,16 @@ _PRIVATE void skip_pre_substituted_text(char *line)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Skip text which has contains comments ...
-------------------------------------------------------------------------------------------*/
+/*---------------------------------------*/
+/* Skip text which has contains comments */
+/*---------------------------------------*/
 
-_PRIVATE void skip_comment(char *line)
+_PRIVATE void skip_comment(const char *line)
 
-{   long c_s_pos,
-         b_s_pos;
+{   uint64_t c_s_pos,
+             b_s_pos;
 
-    char tmp_str[SSIZE] = "";
+    char     tmp_str[SSIZE] = "";
 
 
     /*----------------------------------------*/
@@ -1640,11 +1643,11 @@ _PRIVATE void skip_comment(char *line)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Extended fputs function ...
-------------------------------------------------------------------------------------------*/
+/*-------------------------*/
+/* Extended fputs function */
+/*-------------------------*/
 
-_PRIVATE void xfputs(char *line, FILE *stream)
+_PRIVATE void xfputs(char *line, const FILE *stream)
 
 {   if(ch_pos(line,'\n') == (-1))
        strlcat(line,"\n",SSIZE);
@@ -1655,14 +1658,13 @@ _PRIVATE void xfputs(char *line, FILE *stream)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Strip characters from string ...
-------------------------------------------------------------------------------------------*/
+/*-----------------------------*/
+/* Strip character from string */
+/*-----------------------------*/
 
-_PRIVATE void strpach(char *s, char ch)
+_PRIVATE void strpach(char *s, const char ch)
 
-{   int i,
-        cnt = 0;
+{   size_t i;
 
     for(i=0; i<strlen(s); ++i)
     {  if(s[i] == ch)
@@ -1673,21 +1675,20 @@ _PRIVATE void strpach(char *s, char ch)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Check that if-else statements conform to PUPS-C syntax ...
-------------------------------------------------------------------------------------------*/
+/*--------------------------------------------------------*/
+/* Check that if-else statements conform to PUPS-C syntax */
+/*--------------------------------------------------------*/
 
-_PRIVATE _BOOLEAN check_if_else(char *line)
+_PRIVATE _BOOLEAN check_if_else(const char *line)
 
-{   int i,
-        cnt,
-        s_cnt,
-        e_cnt;
+{   size_t i,
+           s_cnt,
+           e_cnt;
 
-    char line_buf[4096];
+    char line_buf[SSIZE] = "";
 
-    _BOOLEAN looper     = FALSE,
-             in_comment = FALSE;
+    _BOOLEAN looper      = FALSE,
+             in_comment  = FALSE;
 
     _IMMORTAL _BOOLEAN in_if_else = FALSE;
 
@@ -1727,7 +1728,7 @@ _PRIVATE _BOOLEAN check_if_else(char *line)
       /*---------------------------------------*/
 
        e_cnt = strlen(line_buf); 
-       while(line_buf[e_cnt] == ' ' || line_buf[e_cnt] == '\n' || line_buf[e_cnt] == '\0')
+       while(e_cnt > 0 && (line_buf[e_cnt] == ' ' || line_buf[e_cnt] == '\n' || line_buf[e_cnt] == '\0'))
            --e_cnt;
 
 
@@ -1762,14 +1763,14 @@ _PRIVATE _BOOLEAN check_if_else(char *line)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Check for empty lines in PUPS-C text ...
-------------------------------------------------------------------------------------------*/
+/*--------------------------------------*/
+/* Check for empty lines in PUPS-C text */
+/*--------------------------------------*/
 
-_PRIVATE _BOOLEAN empty_line(char *line)
+_PRIVATE _BOOLEAN empty_line(const char *line)
 
-{   int  cnt = 0;
-    char first_item[SSIZE] = "";
+{   uint32_t  cnt               = 0;
+    char      first_item[SSIZE] = "";
 
 
     /*------------------------------------------------------------*/
@@ -1802,14 +1803,13 @@ _PRIVATE _BOOLEAN empty_line(char *line)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Check that string is composed of upper case characters (and digits) only ...
-------------------------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------------*/
+/* Check that string is composed of upper case characters (and digits) only */
+/*--------------------------------------------------------------------------*/
 
-_PRIVATE _BOOLEAN is_upper(char *s)
+_PRIVATE _BOOLEAN is_upper(const char *s)
 
-{   int i,
-        cnt = 0;
+{   ssize_t i;
 
     for(i=0; i<strlen(s); ++i)
     {  if(isalpha(s[i]) == 1 && isupper(s[i]) == 0)
@@ -1822,24 +1822,24 @@ _PRIVATE _BOOLEAN is_upper(char *s)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Parse PUPS-C macro. n_args is the number of arguments expected, arglist is a list of
-    the parsed arguments, and line is the input line containing the macro. If we get
-    any errors FALSE is returned, otherwise TRUE is returned ...
-------------------------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------------------------*/
+/* Parse PUPS-C macro. n_args is the number of arguments expected, arglist is a list of */
+/* the parsed arguments, and line is the input line containing the macro. If we get     */
+/* any errors FALSE is returned, otherwise TRUE is returned                             */
+/*--------------------------------------------------------------------------------------*/
 
-_PRIVATE _BOOLEAN parse_pups_c_macro_function(char *line, int n_args, char arglist[32][SSIZE])
+_PRIVATE _BOOLEAN parse_pups_c_macro_function(const char *line, const uint32_t n_args, char arglist[ARGLIST_SIZE][SSIZE])
 
-{   int i,
-        s_index,
-        e_index;
+{   uint32_t i,
+             s_index,
+             e_index;
 
-    _BOOLEAN looper        = FALSE;
+    _BOOLEAN looper            = FALSE;
 
-    char line_buf[SSIZE]   = "",
-         next_item[SSIZE]  = "",
-         arg_str[SSIZE]    = "",
-         macro_name[SSIZE] = "";
+    char     line_buf[SSIZE]   = "",
+             next_item[SSIZE]  = "",
+             arg_str[SSIZE]    = "",
+             macro_name[SSIZE] = "";
 
 
     /*----------------------------------------------------------------------*/
@@ -1923,32 +1923,32 @@ _PRIVATE _BOOLEAN parse_pups_c_macro_function(char *line, int n_args, char argli
 
 
 
-/*------------------------------------------------------------------------------------------
-    Replace character c_1 in string s by character c_2 ...
-------------------------------------------------------------------------------------------*/
+/*----------------------------------------------------*/
+/* Replace character c_1 in string s by character c_2 */
+/*----------------------------------------------------*/
 
-_PRIVATE void ch_rep(char *s, char c_1, char c_2)
+_PRIVATE void ch_rep(char *s, const char c_1, const char c_2)
 
-{   int i;
+{   size_t i;
 
     for(i=0; i<strlen(s); ++i)
-       if(s[i] == c_1)
+    {  if(s[i] == c_1)
           s[i] = c_2;
+    }
 }
 
 
 
 
 
-/*------------------------------------------------------------------------------------------
-    Translate a thread key create definition ...
-------------------------------------------------------------------------------------------*/
+/*------------------------------------------*/
+/* Translate a thread key create definition */
+/*------------------------------------------*/
 
-_PRIVATE void tkey_transform(char *line)
+_PRIVATE void tkey_transform(const char *line)
 
-{   char tkey[SSIZE]        = "",
-         arglist[32][SSIZE] = { "" };
-
+{   char tkey[SSIZE]                   = "",
+         arglist[ARGLIST_SIZE][SSIZE]  = { "" };
 
 
     /*----------------------------------------------------------*/
@@ -1965,7 +1965,7 @@ _PRIVATE void tkey_transform(char *line)
 
     /*-----------------------------------------------------------*/
     /* In the case of _TKEY_CREATE we must transform the macro   */
-    /* into a line of the form _TKEY_CREATE(type,var,keyval);    */
+    /*  int32_to a line of the form _TKEY_CREATE(type,var,keyval);    */
     /* Better not to complicate things by permitting the user to */
     /* initialise the key here                                   */
     /*-----------------------------------------------------------*/
@@ -1988,14 +1988,14 @@ _PRIVATE void tkey_transform(char *line)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Translate a thread key delete definition ...
-------------------------------------------------------------------------------------------*/
+/*------------------------------------------*/
+/* Translate a thread key delete definition */
+/*------------------------------------------*/
 
-_PRIVATE void tkey_bind_transform(char *line)
+_PRIVATE void tkey_bind_transform(const char *line)
 
-{   char tkey[SSIZE]        = "",
-         arglist[32][SSIZE] = { "" };
+{   char tkey[SSIZE]                   = "",
+         arglist[ARGLIST_SIZE][SSIZE]  = { "" };
 
 
     /*--------------------------------------------------*/
@@ -2025,14 +2025,14 @@ _PRIVATE void tkey_bind_transform(char *line)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Translate a thread key set value definition ...
-------------------------------------------------------------------------------------------*/
+/*---------------------------------------------*/
+/* Translate a thread key set value definition */
+/*---------------------------------------------*/
 
-_PRIVATE void tkey_free_transform(char *line)
+_PRIVATE void tkey_free_transform(const char *line)
 
-{   char tkey[SSIZE]        = "",
-         arglist[32][SSIZE] = { "" };
+{   char tkey[SSIZE]                   = "",
+         arglist[ARGLIST_SIZE][SSIZE]  = { "" };
 
     if(in_function_body == FALSE || parse_pups_c_macro_function(line,1,arglist) == FALSE)
     {  (void)fprintf(stderr,"%d: PUPS-C syntax error: %s\n",l_cnt,rstrpch(line,'\n'));
@@ -2056,13 +2056,13 @@ _PRIVATE void tkey_free_transform(char *line)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Insert an _FMUTEX_DEFINE definition ...
-------------------------------------------------------------------------------------------*/
+/*-------------------------------------*/
+/* Insert an _FMUTEX_DEFINE definition */
+/*-------------------------------------*/
 
-_PRIVATE void use_fmutex_define(char *line)
+_PRIVATE void use_fmutex_define(const char *line)
 
-{   char arglist[32][SSIZE] = { "" };
+{   char arglist[ARGLIST_SIZE][SSIZE] = { "" };
 
     if(in_function_body == TRUE || parse_pups_c_macro_function(line,1,arglist) == FALSE)
     {  (void)fprintf(stderr,"%d: PUPS-C syntax error: %s\n",l_cnt,rstrpch(line,'\n'));
@@ -2080,7 +2080,7 @@ _PRIVATE void use_fmutex_define(char *line)
     (void)strlcpy(mutex,arglist[0],SSIZE);
     (void)strlcpy(current_mutex,arglist[0],SSIZE);
 
-    if(defined(mutex) == TRUE)
+    if(define(mutex) == TRUE)
        (void)fprintf(stderr,"%d: current mutex is \"%s\" (defining)\n",l_cnt,mutex);
     else
        (void)fprintf(stderr,"%d: current mutex is \"%s\"\n",l_cnt,mutex);
@@ -2095,13 +2095,13 @@ _PRIVATE void use_fmutex_define(char *line)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Insert an _DEFAULT_FMUTEX_DEFINE definition ...
-------------------------------------------------------------------------------------------*/
+/*---------------------------------------------*/
+/* Insert an _DEFAULT_FMUTEX_DEFINE definition */
+/*---------------------------------------------*/
 
-_PRIVATE void default_fmutex_define(char *line)
+_PRIVATE void default_fmutex_define(const char *line)
 
-{   char arglist[32][SSIZE] = { "" };
+{   char arglist[ARGLIST_SIZE][SSIZE] = { "" };
 
     if(in_function_body == TRUE || parse_pups_c_macro_function(line,1,arglist) == FALSE)
     {  (void)fprintf(stderr,"%d: PUPS-C syntax error: %s\n",l_cnt,rstrpch(line,'\n'));
@@ -2126,14 +2126,14 @@ _PRIVATE void default_fmutex_define(char *line)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Strip comments from line ...
-------------------------------------------------------------------------------------------*/
+/*--------------------------*/
+/* Strip comments from line */
+/*--------------------------*/
 
-_PRIVATE void strip_line(char *line, char *stripped_line)
+_PRIVATE void strip_line(const char *line, char *stripped_line)
 
-{   int      i;
-    _BOOLEAN in_comment = FALSE;
+{   size_t    i;
+    _BOOLEAN  in_comment = FALSE;
 
     for(i=0; i<strlen(line); ++i)
     {  if(line[i] == '/' && line[i+1] == '*')
@@ -2144,8 +2144,8 @@ _PRIVATE void strip_line(char *line, char *stripped_line)
        }
        else if(line[i] == '*' && line[i+1] == '/')
        {  in_comment = FALSE;
-          line[i] = ' ';
-          line[i+1] = ' ';
+          stripped_line[i] = ' ';
+          stripped_line[i+1] = ' ';
        }
 
        if(in_comment == TRUE)
@@ -2160,30 +2160,27 @@ _PRIVATE void strip_line(char *line, char *stripped_line)
 
 
 
-/*------------------------------------------------------------------------------------------
-    Check that modifiers (_ROOTTHREAD, _DLL_ORIFICE and _THREADSAFE) are correctly
-    used ...
-------------------------------------------------------------------------------------------*/
+/*-------------------------------------------------------------------------------------*/
+/* Check that modifiers (_ROOTTHREAD, _DLL_ORIFICE and _THREADSAFE) are correctly used */
+/*-------------------------------------------------------------------------------------*/
 
-_PRIVATE _BOOLEAN check_function_head_modifiers(char *line)
+_PRIVATE _BOOLEAN check_function_head_modifiers(const char *line)
 
-{  char line_buf[4096] = "";
+{  char line_buf[SSIZE] = "";
 
    strip_line(line,line_buf);
 
    if(strin(line_buf,"_ROOTTHREAD")  == TRUE    ||
       strin(line_buf,"_DLL_ORIFICE") == TRUE    ||
       strin(line_buf,"_THREADSAFE")  == TRUE     )
-{
+   {
+      #ifdef DEBUG
+      (void)fprintf(stderr,"LINE CHECK %s\n",line);
+      (void)fflush(stderr);
+       #endif /* DEBUG */
 
+       return(FALSE);
+   }
 
-#ifdef DEBUG
-(void)fprintf(stderr,"LINE CHECK %s\n",line);
-void)fflush(stderr);
-#endif /* DEBUG */
-
-      return(FALSE);
-}
    return(TRUE);
 }
-

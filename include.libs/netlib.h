@@ -1,4 +1,4 @@
-/*------------------------------------------------------------------------------
+/*-------------------------------------------------------------------------
     Purpose: distributed programming library. Note almost all functions in
              this library are #ifdef'd. There are two sets, one for a
              generic POSIX enviroment and one with minimal functionality
@@ -12,9 +12,9 @@
              United Kingdom
 
     Version: 5.00 
-    Dated:   4th January 2023
+    Dated:   27th February 2024
     E-Mail:  mao@tumblingdice.co.uk 
-------------------------------------------------------------------------------*/
+------------------------------------------------------------------------*/
 
 #ifndef NETLIB_H
 #define NETLIB_H
@@ -103,7 +103,7 @@
 
 _EXPORT _BOOLEAN    use_nodel;         // Nodel toggle
 _EXPORT jmp_buf     ch_jmp_buf;        // Channel err handlrr
-_EXPORT int         rstat_timeout;     // Timeout rstat
+_EXPORT  int32_t    rstat_timeout;     // Timeout rstat
 
 #else
 #   undef  _EXPORT
@@ -111,13 +111,13 @@ _EXPORT int         rstat_timeout;     // Timeout rstat
 #endif
 
 // Extended command processor routine
-_PROTOTYPE _EXPORT int pups_system(const char *, const char *, const unsigned int, int *);
+_PROTOTYPE _EXPORT int32_t pups_system(const char *, const char *, const uint32_t, pid_t  *);
 
 // Open a command descriptor
-_PROTOTYPE _EXPORT int pups_copen(const char *, const char *, const unsigned int);
+_PROTOTYPE _EXPORT des_t pups_copen(const char *, const char *, const uint32_t);
 
 // Close command descriptor
-_PROTOTYPE _EXPORT int pups_cclose(const int);
+_PROTOTYPE _EXPORT int32_t pups_cclose(const des_t);
 
 // Open a command stream
 _PROTOTYPE _EXPORT FILE *pups_fcopen(const char *, const char *, const char *);
@@ -127,46 +127,34 @@ _PROTOTYPE _EXPORT FILE *pups_fcclose(const FILE *);
 
 
 #ifdef ZLIB_SUPPORT
+// Open a command zstream
+_PROTOTYPE _EXPORT gzFile *pups_gzcopen(const char *, const char *, const char *);
 
-// Open a command zstream */
-_PROTOTYPE _EXPORT gzFILE *pups_gzcopen(const char *, const char *, const char *);
-
-// Close command zstream */
-_PROTOTYPE _EXPORT gzFILE *pups_gzcclose(const gzFILE *);
-
+// Close command zstream
+_PROTOTYPE _EXPORT gzFile *pups_gzcclose(const gzFile *);
 #endif /* ZLIB_SUPPORT */
 
  
 // Extended command processor routine [version 2]
-_PROTOTYPE _EXPORT int pups_system2(const char *, const char *, const unsigned int, int *, int *, int *, int *); 
+_PROTOTYPE _EXPORT int32_t pups_system2(const char *, const char *, const uint32_t, pid_t *, des_t *, des_t *, des_t *); 
 
 // Open a set command descriptors bound to pipeline [version 2]
-_PROTOTYPE _EXPORT int pups_copen2(const char *, const char *, int *, int *, int *, int *);  /* MAO */
+_PROTOTYPE _EXPORT int32_t pups_copen2(const char *, const char *,  pid_t *, des_t *, des_t *, des_t *); 
 
 // Open a set of streams bound to pipeline [version 2]
-_PROTOTYPE _EXPORT int pups_fcopen2(const char *, const char *, int *, FILE *, FILE *, FILE *);  /* MAO */
+_PROTOTYPE _EXPORT int32_t pups_fcopen2(const char *, const char *, pid_t *, FILE *, FILE *, FILE *); 
 
 // Close stdio descriptors
-_PROTOTYPE _EXPORT void detach_from_pipeline(const int);
+_PROTOTYPE _EXPORT void detach_from_pipeline(const  int32_t);
 
 // Relay signal to process running on remote host
-_PROTOTYPE _EXPORT int pups_rkill(const char *, const char *, const char *, const char *, const unsigned int);
+_PROTOTYPE _EXPORT int32_t pups_rkill(const char *, const char *, const char *, const char *, const uint32_t);
 
+// Disable automatic killing of pipestream on the closure of associated descriptor
+_PROTOTYPE _EXPORT int32_t pups_pipestream_kill_disable(const des_t);
 
-/*-----------------------------------------------------------*/
-/* Disable automatic killing of pipestream on the closure of */
-/* associated descriptor                                     */
-/*-----------------------------------------------------------*/
-
-_PROTOTYPE _EXPORT int pups_pipestream_kill_disable(const int);
-
-
-/*----------------------------------------------------------*/
-/* Enable automatic killing of pipestream on the closure of */
-/* associated descriptor                                    */
-/*----------------------------------------------------------*/
-
-_PROTOTYPE _EXPORT int pups_pipestream_kill_enable(const int);
+// Enable automatic killing of pipestream on the closure of associated descriptor
+_PROTOTYPE _EXPORT int32_t pups_pipestream_kill_enable(const des_t);
 
 
 #ifdef _CPLUSPLUS

@@ -1,4 +1,4 @@
-/*--------------------------------------------------------------------------------
+/*----------------------------------------------------
     Purpose: Compute CPU loading using mpstat untility
 
     Author:  Mark A. O'Neill
@@ -8,10 +8,10 @@
              NE3 4RT
              Tyne and Wear
 
-    Version: 1.02
-    Dated:   24th May 2023
+    Version: 1.04
+    Dated:   10th Decemeber 2024
     E-mail:  mao@tumblingdice.co.uk
----------------------------------------------------------------------------------*/
+---------------------------------------------------*/
 
 #include <stdio.h>
 #include <string.h>
@@ -30,26 +30,30 @@
 /* Defines */
 /*---------*/
 
-#define CPULOAD_VERSION  "1.02"
+#define CPULOAD_VERSION  "1.03"
 #define SSIZE            2048
 #define WINDOW_SIZE      32 
+#define _PUBLIC
 
 
 /*------------------*/
 /* Global variables */
 /*------------------*/
 
-FILE  *pstream             = (FILE *)NULL;
-FILE  *stream              = (FILE *)NULL;
-char  linkName[SSIZE]      = "";
-float loading[WINDOW_SIZE] = { 0.0 };
+_PRIVATE char  boldOn [8]  = "\e[1m",                  // Make character bold
+               boldOff[8]  = "\e[m" ;                  // Make character non-bold
+
+_PRIVATE FILE  *pstream             = (FILE *)NULL;
+_PRIVATE FILE  *stream              = (FILE *)NULL;
+_PRIVATE char  linkName[SSIZE]      = "";
+_PRIVATE float loading[WINDOW_SIZE] = { 0.0 };
 
 
 /*----------------*/
 /* Signal handler */
 /*----------------*/
 
-static int sigHandler(int signum)
+_PRIVATE int32_t sigHandler(int32_t signum)
 
 {    struct stat buf;
 
@@ -102,10 +106,10 @@ static int sigHandler(int signum)
 /* Window average CPU loading */
 /*----------------------------*/
 
-_PRIVATE float window_average_loading(unsigned int cnt, float next_loading)
+_PRIVATE float window_average_loading(uint32_t    cnt, float next_loading)
 
-{   unsigned int i;
-    float        sum = 0.0;
+{   uint32_t i;
+    float    sum = 0.0;
     
     if(cnt < WINDOW_SIZE)
     {  loading[cnt] = next_loading;
@@ -136,7 +140,7 @@ _PRIVATE float window_average_loading(unsigned int cnt, float next_loading)
 
 _PRIVATE void file_homeostat()
 
-{   int           pid;
+{   pid_t         pid;
     DIR           *dirp      = (DIR *)NULL;
     struct dirent *next_item = (struct dirent *)NULL;
 
@@ -222,15 +226,15 @@ _PRIVATE void file_homeostat()
 /* Main entry point */
 /*------------------*/
 
-_PUBLIC int main(int argc, char *argv[])
+_PUBLIC int32_t main(int32_t argc, char *argv[])
 
-{   long  int cnt              = 0;
+{   int64_t cnt                = 0;
 
-    char  strdum[SSIZE]        = "",
-          mpstat_cmd[SSIZE]    = "";
+    char    strdum[SSIZE]      = "",
+            mpstat_cmd[SSIZE]  = "";
 
-    float next_loading,
-          average_loading;
+    float next_loading         = 0.0,
+          average_loading      = 0.0;
 
 
     /*------*/
@@ -240,7 +244,7 @@ _PUBLIC int main(int argc, char *argv[])
     if(argc == 2                                           && 
        (strncmp(argv[1],"-help", strlen(argv[1])) == 0     ||
         strncmp(argv[1],"-usage",strlen(argv[1])) == 0     ))
-    {  (void)fprintf(stderr,"\ncpuload version %s, (C) Tumbling Dice 2000-2023 (built %s %s)\n\n",CPULOAD_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\ncpuload version %s, (C) Tumbling Dice 2000-2024 (gcc %s: built %s %s)\n\n",CPULOAD_VERSION,__VERSION__,__TIME__,__DATE__);
        (void)fprintf(stderr,"CPULOAD is free software, covered by the GNU General Public License, and you are\n");
        (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
        (void)fprintf(stderr,"See the GPL and LGPL licences at www.gnu.org for further details\n");
@@ -258,7 +262,7 @@ _PUBLIC int main(int argc, char *argv[])
     /*----------------------------------*/
 
     else if(argc > 1)
-    {  (void)fprintf(stderr,"\n    cpuload ERROR: unparsed command line paramters\n\n");
+    {  (void)fprintf(stderr,"\n    cpuload %sERROR%s: unparsed command line paramters\n\n",boldOn,boldOff);
        (void)fflush(stderr);
 
        exit(255);
@@ -290,7 +294,7 @@ _PUBLIC int main(int argc, char *argv[])
        /*----------------------------------------*/
 
        if(close(creat("/tmp/cpuloading",0666)) == (-1))
-       {  (void)fprintf(stderr,"\n    cpuload ERROR: failed to create /tmp/cpuloading\n\n");
+       {  (void)fprintf(stderr,"\n    cpuload %sERROR%s: failed to create /tmp/cpuloading\n\n",boldOn,boldOff);
           (void)fflush(stderr);
 
           exit(255);
@@ -334,16 +338,15 @@ _PUBLIC int main(int argc, char *argv[])
     /*----------------------------------------------*/
 
     else
-    {  int  pid;
-
-       char procpid[SSIZE]  = "";
+    {  pid_t pid;
+       char  procpid[SSIZE]  = "";
 
        _BOOLEAN first = TRUE;
 
 
        (void)snprintf(linkName,SSIZE,"/tmp/cpuloading.%d.link",getpid());
        if(link("/tmp/cpuloading",linkName) == (-1))
-       {  (void)fprintf(stderr,"\n    cpuload ERROR: failed to make (hard) link to /tmp/cpuloading\n\n");
+       {  (void)fprintf(stderr,"\n    cpuload %sERROR%s: failed to make (hard) link to /tmp/cpuloading\n\n",boldOn,boldOff);
           (void)fflush(stderr);
 
           exit(255);
@@ -407,7 +410,7 @@ _PUBLIC int main(int argc, char *argv[])
 
     (void)strlcpy(mpstat_cmd,"bash -c \"mpstat 1\"",SSIZE);
     if((pstream = popen(mpstat_cmd,"r")) == (FILE *)NULL)
-    {  (void)fprintf(stderr,"\n    cpuload ERROR: could not start mpstat command\n\n");
+    {  (void)fprintf(stderr,"\n    cpuload %sERROR%s: could not start mpstat command\n\n",boldOn,boldOff);
        (void)fflush(stderr);
 
        exit(255);
@@ -419,7 +422,7 @@ _PUBLIC int main(int argc, char *argv[])
     /*----------------------------------*/
 
     if((stream = fopen("/tmp/cpuloading","w")) == (FILE *)NULL)
-    {  (void)fprintf(stderr,"\n    cpuload ERROR: could not open /tmp/cpuload\n\n");
+    {  (void)fprintf(stderr,"\n    cpuload %sERROR%s: could not open /tmp/cpuload\n\n",boldOn,boldOff);
        (void)fflush(stderr);
 
        exit(255);

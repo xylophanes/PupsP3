@@ -1,14 +1,13 @@
-/*---------------------------------------------------------------------------------------------
-    Purpose: starts PSRP server writing error log to new window.
+/*-------------------------------------------------------------
+    Purpose: starts PSRP server writing error log to new window
 
     Author: M.A. O'Neill
             Tumbling Dice
             Gosforth
-            Oxfordshire
-            OX11 8QY
+            NE3 4RT 
 
     Version: 2.01 
-    Dated:   24th May 2023
+    Dated:   11th December 2024
     E-mail:  mao@tumblingdice.co.uk
 ----------------------------------------------------------------------------------------------*/
 
@@ -17,13 +16,18 @@
 #include <string.h>
 #include <bsd/string.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <stdint.h>
 
 
-/*-----------------------*/
-/* Version of servertool */
-/*-----------------------*/
+/*---------*/
+/* Defines */
+/*---------*/
+/*---------*/
+/* Version */
+/*---------*/
 
-#define SERVERTOOL_VERSION    "2.01"
+#define SERVERTOOL_VERSION    "2.02"
 
 
 /*-------------*/
@@ -39,9 +43,9 @@
 /* Main entry point */
 /*------------------*/
 
-_PUBLIC int main(int argc, char *argv[])
+_PUBLIC int32_t main(int32_t argc, char *argv[])
 
-{   int i;
+{   uint32_t i;
 
     char server_name[SSIZE]   = "",
          server_hname[SSIZE]  = "",
@@ -50,12 +54,12 @@ _PUBLIC int main(int argc, char *argv[])
          xterm_command[SSIZE] = "";
 
 
-    /*---------------------------------------------------------*/
-    /* Display help information if "-help" or "-usage" flagged */
-    /*---------------------------------------------------------*/
+    /*--------------------*/
+    /* Parse command line */
+    /*--------------------*/
 
     if(argc == 1 || (argc == 2 && (strcmp(argv[1],"-usage") == 0 || strcmp(argv[1],"-help") == 0)))
-    {  (void)fprintf(stderr,"\nservertool version %s, (C) Tumbling Dice 2003-2023 (built %s %s)\n\n",SERVERTOOL_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nservertool version %s, (C) Tumbling Dice 2003-2024 (gcc %s: built %s %s)\n\n",SERVERTOOL_VERSION,__VERSION__,__TIME__,__DATE__);
        (void)fprintf(stderr,"\nUsage: psrptool [-help | -usage] | !server!  [PSRP server  argument list]\n\n");                                              
 
        (void)fprintf(stderr,"SERVERTOOL is free software, covered by the GNU General Public License, and you are\n");
@@ -90,7 +94,7 @@ _PUBLIC int main(int argc, char *argv[])
 
        if(strcmp(argv[i],"-on") == 0)
        {  if(argv[i+1][0] == '-')
-          {  (void)fprintf(stderr,"\nservertool: illegal command tail syntax\n\n");
+          {  (void)fprintf(stderr,"\nservertool: illegal command syntax\n\n");
              (void)fflush(stderr);
 
              exit(255);
@@ -108,7 +112,7 @@ _PUBLIC int main(int argc, char *argv[])
 
        if(strcmp(argv[i],"-pen") == 0)
        {  if(argv[i+1][0] == '-')
-          {  (void)fprintf(stderr,"\nservertool: illegal command tail syntax\n\n");
+          {  (void)fprintf(stderr,"\nservertool: illegal command syntax\n\n");
              (void)fflush(stderr);
 
              exit(255);

@@ -1,4 +1,4 @@
-/*--------------------------------------------------------------------------------------------------------
+/*-------------------------------------------------------------------------
     Free a block of memory allocated by `malloc'.
     Copyright 1990, 1991, 1992, 1994 Free Software Foundation, Inc.
 		  Written May 1989 by Mike Haertel.
@@ -22,13 +22,14 @@
     or (US mail) as Mike Haertel c/o Free Software Foundation.
 
     Persistent heap modifications by Mark O'Neill (mao@tumblingdice.co.uk)
-    (C) 1998-2023 M.A. O'Neill, Tumbling Dice
--------------------------------------------------------------------------------------------------------*/
+    (C) 1998-2024 M.A. O'Neill, Tumbling Dice
+-------------------------------------------------------------------------*/
 
 #include <stdio.h>
 #include <unistd.h>
 #include <errno.h>
 #include <xtypes.h>
+#include <stdint.h>
 
 #ifndef	_PHMALLOC_INTERNAL
 #define _PHMALLOC_INTERNAL
@@ -44,21 +45,21 @@ _IMPORT __malloc_size_t   *pheapsize;
 /* Add a persistent object to persistent object map */
 /*--------------------------------------------------*/
 
-_PROTOTYPE _EXTERN int msm_map_object(const unsigned int, const unsigned int, const void *, const char *);
+_PROTOTYPE _EXTERN int32_t msm_map_object(const uint32_t, const uint32_t, const void *, const char *);
 
 
 /*-----------------------------------------------------------------------------------*/
 /* Remove a persistent object persistent object map within persistent memory segment */
 /*-----------------------------------------------------------------------------------*/
 
-_PROTOTYPE _EXTERN int msm_unmap_object(const unsigned int, const unsigned int);
+_PROTOTYPE _EXTERN int32_t msm_unmap_object(const uint32_t, const uint32_t);
 
 
 /*-------------------------*/
 /* Debugging hook for free */
 /*-------------------------*/
 
-_PUBLIC void (*__phfree_hook) __P ((const unsigned int, const __ptr_t __ptr));
+_PUBLIC void (*__phfree_hook) __P ((const uint32_t, const __ptr_t __ptr));
 
 
 /*---------------------------------------*/
@@ -72,14 +73,14 @@ _PUBLIC struct alignlist *_aligned_blocks = NULL;
 /* Object mapping switch */
 /*-----------------------*/
 
-_PUBLIC int _no_phobject_mapping;
+_PUBLIC int32_t _no_phobject_mapping;
 
 
 /*---------------------------*/
 /* Number of objects in heap */
 /*---------------------------*/
 
-_IMPORT int *_phobjects;
+_IMPORT int32_t *_phobjects;
 
 
 /*------------------------------------------------------------*/
@@ -87,10 +88,10 @@ _IMPORT int *_phobjects;
 /* Like `free' but don't call a __free_hook if there is one.  */
 /*------------------------------------------------------------*/
 
-_PUBLIC void _phfree_internal (const unsigned int hdes, const __ptr_t ptr)
+_PUBLIC void _phfree_internal (const uint32_t hdes, const __ptr_t ptr)
 {
-  int type,
-      h_index;
+   int32_t type,
+           h_index;
 
   __malloc_size_t block,
                   blocks,
@@ -147,7 +148,7 @@ _PUBLIC void _phfree_internal (const unsigned int hdes, const __ptr_t ptr)
 
 
       /*-------------------------------------------------------*/
-      /* Determine how to link this block into the free list.  */
+      /* Determine how to link this block  int32_to the free list.  */
       /*-------------------------------------------------------*/
 
       if (block == i + _pheapinfo[hdes][i].free.size)
@@ -164,7 +165,7 @@ _PUBLIC void _phfree_internal (const unsigned int hdes, const __ptr_t ptr)
       {
 
           /*--------------------------------------------------*/
-	  /* Really link this block back into the free list.  */
+	  /* Really link this block back  int32_to the free list.  */
           /*--------------------------------------------------*/
 
 	  _pheapinfo[hdes][block].free.size = _pheapinfo[hdes][block].busy.info.size;
@@ -309,8 +310,8 @@ _PUBLIC void _phfree_internal (const unsigned int hdes, const __ptr_t ptr)
 
 	  prev = (struct list *) ptr;
 	  _pheapinfo[hdes][block].busy.info.frag.nfree = 1;
-	  _pheapinfo[hdes][block].busy.info.frag.first = (unsigned long int)
-	  ((unsigned long int) ((char *) ptr - (char *) NULL) % BLOCKSIZE >> type);
+	  _pheapinfo[hdes][block].busy.info.frag.first = (uint64_t)
+	  ((uint64_t)((char *) ptr - (char *) NULL) % BLOCKSIZE >> type);
 
 	  prev->next       = _phfraghead[hdes][type].next;
 	  prev->prev       = &_phfraghead[hdes][type];
@@ -331,8 +332,8 @@ _PUBLIC void _phfree_internal (const unsigned int hdes, const __ptr_t ptr)
     (void)msm_unmap_object(hdes,h_index);
 
 #ifdef DEBUG
-    (void)fprintf(stderr,"PHFREE EXIT\n");
-    (void)fflush(stderr);
+(void)fprintf(stderr,"PHFREE EXIT\n");
+(void)fflush(stderr);
 #endif /* DEBUG */
 
 }
@@ -343,33 +344,34 @@ _PUBLIC void _phfree_internal (const unsigned int hdes, const __ptr_t ptr)
 /* Return memory to the heap. */
 /*----------------------------*/
 
-void *phfree (const unsigned int hdes, const __ptr_t ptr)
+void *phfree (const uint32_t hdes, const __ptr_t ptr)
 
 { struct alignlist *l;
 
   if (ptr == NULL)
-    return;
+    return((void *)NULL);
 
   #ifdef PTHREAD_SUPPORT
   (void)pthread_mutex_lock(&htab_mutex);
   #endif /* PTHREAD_SUPPORT */
 
   for (l = _aligned_blocks; l != NULL; l = l->next)
-    if (l->aligned == ptr)
+  {   if (l->aligned == ptr)
       {
 
                                 /*-----------------------------------*/
-	l->aligned = NULL;	/* Mark the slot in the list as free */
+ 	 l->aligned = NULL;	/* Mark the slot in the list as free */
                                 /*-----------------------------------*/
 
-	ptr = l->exact;
-	break;
+	 ptr = l->exact;
+	 break;
       }
+  }
 
   if (__phfree_hook != NULL)
-    (*__phfree_hook) (hdes, ptr);
+     (*__phfree_hook) (hdes, ptr);
   else
-    _phfree_internal (hdes, ptr);
+     _phfree_internal (hdes, ptr);
 
   #ifdef PTHREAD_SUPPORT
   (void)pthread_mutex_unlock(&htab_mutex);

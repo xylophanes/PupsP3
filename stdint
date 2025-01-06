@@ -1,0 +1,251 @@
+#!/bin/bash
+#
+#--------------------------------------
+# Sunstiture safe integer variables
+# (C) M.A. O'Neill, Tumbling Dice, 2024
+#--------------------------------------
+#------------------
+# Sed substitutions
+#------------------
+
+find1="unsigned int"
+sub1="uint32_t   "
+
+find2="unsigned long int"
+sub2="uint64_t         "
+
+find3="long int"
+sub3="int64_t "
+
+find4=" int"
+sub4="  int32_t"
+
+find5="unsigned short int"
+sub5="uint16_t          "
+
+find6="short int"
+sub6="int16_t  "
+
+
+#-------
+# Banner
+#-------
+
+echo ""                           >&2
+echo "   stdint version 1.00"     >&2
+echo "   (C) TumblingDice, 2024"  >&2
+echo ""                           >&2
+
+
+#-------------------
+# Parse command line
+#-------------------
+#------------
+# File suffix
+#------------
+
+if [[ $# -ge 1  &&  $1 !=  c  &&   "$1" != h ]] ; then
+	echo ""                                           >&2
+	echo "    usage: stdint !c  h! [substitute | s]"  >&2
+	echo ""                                           >&2
+
+	exit 255
+fi
+
+
+#-----------
+# Substitute
+#-----------
+
+if [[ $# -eq 2 && $2 != s && $2 != substitute ]] ; then
+	echo ""                                           >&2
+	echo "    usage: stdint !c  h! [substitute | s]"  >&2
+	echo ""                                           >&2
+
+	exit 255
+
+
+#-------------------
+# Too many arguments 
+#-------------------
+
+elif [[ $# -gt 2 ]] ; then
+	echo ERRFUCK
+	echo ""                                           >&2
+	echo "    usage: stdint !c  h! [substitute | s]"  >&2
+	echo ""                                           >&2
+
+	exit 255
+fi
+
+
+#------------------------------------
+# Protect address.c which gives sizes
+# of native integer types
+#-----------------------------------
+
+mv address.c address.save >& /dev/null
+
+
+#---------------------------------
+# Pass 1: unsigned int -> uint32_t
+#---------------------------------
+
+echo "    Pass 1: unsigned int -> uint32_t"  >&2
+for file in *.$1 ; do
+
+	printf "    sed s/'$find1'/'$sub1'/g < $file > $$               \r"  >&2
+
+
+	#------------------
+	# Make substitution
+	#------------------
+	
+	if [[ $2 == s || $2 == $substitue ]] ; then
+		sed s/"$find1"/"$sub1"/g < $file 1> $$ 
+		\mv $$ $file.sub
+	fi
+
+	sleep 1
+done
+
+
+
+
+#--------------------------------------
+# Pass 2: unsigned long int -> uint64_t
+#--------------------------------------
+
+echo ""                                           >&2
+echo ""                                           >&2
+echo "    Pass 2: unsigned long int -> uint64_t"  >&2
+for file in *.$1 ; do
+
+	printf "    sed s/'$find2'/'$sub2'/g < $file > $$               \r"  >&2
+
+
+	#------------------
+	# Make substitution
+	#------------------
+	
+	if [[ $2 == s || $2 == $substitue ]] ; then
+		sed s/"$find2"/"$sub2"/g < $file.sub > $$
+		\mv $$ $file.sub
+	fi
+
+	sleep 1	
+done
+
+
+#----------------------------
+# Pass 3: long int -> int64_t
+#----------------------------
+
+echo ""                                 >&2
+echo ""                                           >&2
+echo "    Pass 3: long int -> int64_t"  >&2
+for file in *.$1 ; do
+
+	printf "    sed s/'$find3'/'$sub3'/g < $file > $$               \r"  >&2
+
+
+	#------------------
+	# Make substitution
+	#------------------
+	
+	if [[ $2 == s || $2 == $substitue ]] ; then
+		sed s/"$find3"/"$sub3"/g < $file.sub > $$
+		\mv $$ $file.sub
+	fi
+
+	sleep 1
+done
+
+
+#-----------------------
+# Pass 4: int -> int32_t
+#-----------------------
+
+echo ""                            >&2
+echo ""                            >&2
+echo "    Pass 4: int -> int32_t"  >&2
+for file in *.$1 ; do
+
+	printf "    sed s/'$find4'/'$sub4'/g < $file > $$               \r"  >&2
+
+
+	#------------------
+	# Make substitution
+	#------------------
+	
+	if [[ $2 == s || $2 == $substitue ]] ; then
+		sed s/"$find4"/"$sub4"/g < $file.sub > $$
+		\mv $$ $file.sub
+	fi
+
+	sleep 1
+done
+
+
+#---------------------------------------
+# Pass 5: unsigned short int -> uint16_t
+#---------------------------------------
+
+echo ""                                            >&2
+echo ""                                            >&2
+echo "    Pass 5: unsigned short int -> uint16_t"  >&2
+for file in *.$1 ; do
+
+	printf "    sed s/'$find3'/'$sub3'/g < $file > $$               \r"  >&2
+
+
+	#------------------
+	# Make substitution
+	#------------------
+	
+	if [[ $2 == s || $2 == $substitue ]] ; then
+		sed s/"$find5"/"$sub5"/g < $file.sub > $$
+		\mv $$ $file.sub
+	fi
+
+	sleep 1	
+done
+
+
+#-----------------------------
+# Pass 6: short int -> int16_t
+#-----------------------------
+
+echo ""                                  >&2
+echo ""                                  >&2
+echo "    Pass 6: short int -> int16_t"  >&2
+for file in *.$1 ; do
+
+	printf "    sed s/'$find4'/'$sub4'/g < $file > $$               \r"  >&2
+
+
+	#------------------
+	# Make substitution
+	#------------------
+	
+	if [[ $2 == s || $2 == $substitue ]] ; then
+		sed s/"$find6"/"$sub6"/g < $file.sub > $$
+		\mv $$ $file.sub
+	fi
+
+	sleep 1
+done
+
+
+#------------------
+# Restore address.c
+#------------------
+
+mv address.save address.c >& /dev/null
+
+echo ""              >&2
+echo "    finished"  >&2
+echo ""              >&2
+
+exit 0
+

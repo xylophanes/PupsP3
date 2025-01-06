@@ -1,4 +1,4 @@
-/*-----------------------------------------------------------------------------------------------------
+/*----------------------------------------------------------------------------------------
      Purpose: creates a mouth (gob hole) into which data for payload application is cat'ed
 
      Author:  M.A. O'Neill
@@ -8,10 +8,10 @@
               NE3 4RT
               United Kingdom
 
-     Version: 2.03 
-     Dated:   24th May 2023
+     Version: 2.04 
+     Dated:   10th December 2024
      E-mail:  mao@tumblingdice.co.uk
------------------------------------------------------------------------------------------------------*/
+----------------------------------------------------------------------------------------*/
 
 #include <stdio.h>
 #include <string.h>
@@ -23,18 +23,19 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <xtypes.h>
+#include <stdint.h>
 
 
 
 
-/*------------------------------------------------------------------------------------------------------
-    Defines which are local to this application ...
-------------------------------------------------------------------------------------------------------*/
+/*---------*/
+/* Defines */
+/*---------*/
 /*----------------*/
 /* Version of gob */
 /*----------------*/
 
-#define GOB_VERSION   "2.03"
+#define GOB_VERSION   "2.04"
 
 
 /*-------------*/
@@ -54,16 +55,16 @@
 
 
 
-/*------------------------------------------------------------------------------------------------------
-    Variables which are private to this application ...
-------------------------------------------------------------------------------------------------------*/
+/*-------------------------------------------------*/
+/* Variables which are private to this application */
+/*-------------------------------------------------*/
 
 static char hostname[SSIZE]      = "";
 static char pen[SSIZE]           = "";
 static char gob_fifo_name[SSIZE] = "";
-static int  delete_on_exit       = FALSE;
-static int  verbose              = FALSE;
-static int  indes                = (-1);
+static int32_t  delete_on_exit   = FALSE;
+static int32_t  verbose          = FALSE;
+static int32_t  indes            = (-1);
 
 
 
@@ -72,7 +73,7 @@ static int  indes                = (-1);
 /* Handle SIGTERM and SIGINT */
 /*---------------------------*/
 
-_PRIVATE int gob_exit(int signum)
+_PRIVATE  int32_t gob_exit(int32_t signum)
 
 {   if(delete_on_exit == TRUE)
     {  (void)unlink(gob_fifo_name);
@@ -100,9 +101,9 @@ _PRIVATE int gob_exit(int signum)
 /* FIFO homeostat */ 
 /*----------------*/
 
-_PRIVATE int gob_fifo_homeostat(int signum)
+_PRIVATE int32_t gob_fifo_homeostat(int32_t signum)
 
-{   int           bytes_read = (-1);
+{   int32_t       bytes_read = (-1);
     unsigned char buf[SSIZE] = "";
 
     if(access(gob_fifo_name,F_OK | R_OK) == (-1))
@@ -158,26 +159,26 @@ _PRIVATE int gob_fifo_homeostat(int signum)
 
 
 
-/*----------------------------------*/
-/* Main entry point for application */
-/*----------------------------------*/
+/*------------------*/
+/* Main entry point */
+/*------------------*/
 
-_PUBLIC int main(int argc, char *argv[])
+_PUBLIC int32_t main(int32_t argc, char *argv[])
 
-{   int  i,
-         bytes_read,
-         decoded      = 0,
-         end_of_data  = TRUE;
+{   int32_t i,
+            bytes_read           = 0,
+            decoded              = 0,
+            end_of_data          = TRUE;
 
-    char          newstr[SSIZE] = "";
-    unsigned char buf[SSIZE]    = "";
+    char          newstr[SSIZE]  = "";
+    unsigned char buf[SSIZE]     = "";
 
 
     /*----------------------------*/
     /* Get process execution name */
     /*----------------------------*/
 
-    (void)strncpy(pen,argv[0],SSIZE);
+    (void)strlcpy(pen,argv[0],SSIZE);
 
 
     /*----------------------*/
@@ -197,13 +198,13 @@ _PUBLIC int main(int argc, char *argv[])
     (void)gethostname(hostname,SSIZE);
 
 
-    /*-------------------------------*/
-    /* Decode command tail arguments */
-    /*-------------------------------*/
+    /*--------------------*/
+    /* Parse command line */
+    /*--------------------*/
 
     if(isatty(1) == 1)
     {  if(argc == 1 || strcmp(argv[1],"-usage") == 0 || strcmp(argv[1],"-help") == 0)
-       {  (void)fprintf(stderr,"\ngob version %s, (C) Tumbling Dice 2005-2023 (built %s %s)\n\n",GOB_VERSION,__TIME__,__DATE__);
+       {  (void)fprintf(stderr,"\ngob version %s, (C) Tumbling Dice 2005-2024 (gcc %s: built %s %s)\n\n",GOB_VERSION,__VERSION__,__TIME__,__DATE__);
           (void)fprintf(stderr,"GOB is free software, covered by the GNU General Public License, and you are\n");
           (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
           (void)fprintf(stderr,"See the GPL and LGPL licences at www.gnu.org for further details\n");
@@ -220,7 +221,7 @@ _PUBLIC int main(int argc, char *argv[])
           verbose = TRUE;
        else if(strcmp(argv[i],"-pen") == 0)
        {  if(fork() == 0)
-          {  int  j,
+          {   int32_t  j,
                   cnt = 1;
 
              char args[32][SSIZE]  = { "" },
@@ -249,19 +250,19 @@ _PUBLIC int main(int argc, char *argv[])
              (void)strlcpy(args[cnt],"\0",SSIZE);
              argptr[0]   = (char *)&args[0];
 
-              if(verbose == TRUE)
-              {  (void)fprintf(stderr,"%s (%d@%s): executing as \"%s\"\n\n",pen,getpid(),hostname,argptr[0]);
-                 (void)fflush(stderr);
-              }
+             if(verbose == TRUE)
+             {  (void)fprintf(stderr,"%s (%d@%s): executing as \"%s\"\n\n",pen,getpid(),hostname,argptr[0]);
+                (void)fflush(stderr);
+             }
 
-              (void)execvp("gob",argptr);
+             (void)execvp("gob",argptr);
 
-              if(verbose == TRUE)
-              {  (void)fprintf(stderr,"%s (%d@%s): failed to exec (gob) child process\n\n",pen,getpid(),hostname);
-                 (void)fflush(stderr);
-              }
+             if(verbose == TRUE)
+             {  (void)fprintf(stderr,"%s (%d@%s): failed to exec (gob) child process\n\n",pen,getpid(),hostname);
+                (void)fflush(stderr);
+             }
 
-              exit(255);
+             exit(255);
           }
           else
              _exit(255);

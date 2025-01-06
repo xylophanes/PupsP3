@@ -1,4 +1,4 @@
-/*-------------------------------------------------------------------------------------------------------
+/*----------------------------------------------------------------------------------------
     Purpose: Process which piggybacks a conventional UNIX application and allows it to use
              PUPS/PSRP services without a rewrite. 
 
@@ -9,10 +9,10 @@
              NE3 4RT
              United Kingdom
 
-    Version: 2.02 
-    Dated:   26th October 2023
+    Version: 2.03 
+    Dated:   10th December 2024
     E-mail:  mao@@tumblingdice.co.uk
--------------------------------------------------------------------------------------------------------*/
+-----------------------------------------------------------------------------------------*/
 
 
 #include <me.h>
@@ -35,13 +35,14 @@
 #include <fcntl.h>
 #include <dirent.h>
 #include <stdlib.h>
+#include <bsd/bsd.h>
 
 
-/*-----------------*/
-/* Version of pass */
-/*-----------------*/
+/*---------*/
+/* Version */
+/*---------*/
 
-#define PASS_VERSION    "2.02"
+#define PASS_VERSION    "2.03"
 
 
 #ifdef BUBBLE_MEMORY_SUPPORT
@@ -74,22 +75,20 @@
 
 
 
-/*------------------------------------------------------------------------------------------------------
-    Get application information for slot manager ...
-------------------------------------------------------------------------------------------------------*/
-
-
+/*----------------------------------------------*/
+/* Get application information for slot manager */
+/*----------------------------------------------*/
 /*---------------------------*/ 
 /* Slot information function */
 /*---------------------------*/ 
 
-_PRIVATE void pass_slot(int level)
+_PRIVATE void pass_slot(int32_t level)
 {   (void)fprintf(stderr,"int dynamic app (PSRP) pass %s: [ANSI C, PUPS MTD D]\n",PASS_VERSION);
  
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 2005-2023 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 2005-2024 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
-       (void)fprintf(stderr,"PUPS/PSRP service server-client (built %s %s)\n\n",__TIME__,__DATE__);
+       (void)fprintf(stderr,"PUPS/PSRP service server-client (gcc %s: built %s %s)\n\n",__VERSION__,__TIME__,__DATE__);
     }
     else
        (void)fprintf(stderr,"\n");
@@ -137,9 +136,9 @@ _EXTERN void (* USE )() __attribute__ ((aligned(16))) = pass_usage;
 
 
 
-/*-------------------------------------------------------------------------------------------------------
-    Application build date ...
--------------------------------------------------------------------------------------------------------*/
+/*------------------------*/
+/* Application build date */
+/*------------------------*/
 
 _EXTERN char appl_build_time[SSIZE] = __TIME__;
 _EXTERN char appl_build_date[SSIZE] = __DATE__;
@@ -147,14 +146,12 @@ _EXTERN char appl_build_date[SSIZE] = __DATE__;
 
 
 
-/*-------------------------------------------------------------------------------------------------------
-    Public variables and function pointers used by this application ...
--------------------------------------------------------------------------------------------------------*/
-
-
-/*-------------------------------------------------------------------------------------------------------
-    Functions which are private to this application ...
--------------------------------------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------*/
+/* Public variables and function pointers used by this application */
+/*-----------------------------------------------------------------*/
+/*--------------------*/
+/*  Private functions */
+/*--------------------*/
 
 // Restore (lost) sensitive directory 
 _PROTOTYPE _PRIVATE void restore_sdir(char *);
@@ -163,34 +160,34 @@ _PROTOTYPE _PRIVATE void restore_sdir(char *);
 _PROTOTYPE _PRIVATE _BOOLEAN in_thread_table(char *);
 
 // Get a slot in the thread table/
-_PROTOTYPE _PRIVATE int get_thread_index(char *, int *);
+_PROTOTYPE _PRIVATE int32_t get_thread_index(char *, int32_t *);
 
 // Set sentitive directory O/P file type
-_PROTOTYPE _PRIVATE int pass_set_sdir_ftype(int, char *[]);
+_PROTOTYPE _PRIVATE int32_t pass_set_sdir_ftype(int32_t, char *[]);
 
 // Set sensitive directory O/P mode
-_PROTOTYPE _PRIVATE int pass_set_sdir_omode(int, char *[]);
+_PROTOTYPE _PRIVATE int32_t pass_set_sdir_omode(int32_t, char *[]);
 
 // Set lyosome lifetime (in seconds)
-_PROTOTYPE _PRIVATE int pass_set_sdir_lyosome_lifetime(int, char *[]);
+_PROTOTYPE _PRIVATE int32_t pass_set_sdir_lyosome_lifetime(int32_t, char *[]);
 
 // Remove junk (at exit)
 _PROTOTYPE _PRIVATE void remove_junk(char *);
 
 // Hoemeostat for sensitive directory 
-_PROTOTYPE _PRIVATE int sdir_homeostat(void *, char *);
+_PROTOTYPE _PRIVATE int32_t sdir_homeostat(void *, char *);
 
 // Set command pipeline string
-_PROTOTYPE _PRIVATE int pass_set_command_pipeline(int, char *[]);
+_PROTOTYPE _PRIVATE int32_t pass_set_command_pipeline(int32_t, char *[]);
 
 // Set sensitive directory processing tag
-_PROTOTYPE _PRIVATE int pass_set_sdir_tag(int, char *[]);
+_PROTOTYPE _PRIVATE int32_t pass_set_sdir_tag(int32_t, char *[]);
 
 // Set processing mode for input data (in sensitive directory mode)
-_PROTOTYPE _PRIVATE int pass_set_sdir_pmode(int, char *[]);
+_PROTOTYPE _PRIVATE int32_t pass_set_sdir_pmode(int32_t, char *[]);
 
 // Payload homeostat -- montors status of payload command pipeline
-_PROTOTYPE _PRIVATE int payload_homeostat(void *, char *);
+_PROTOTYPE _PRIVATE int32_t payload_homeostat(void *, char *);
 
 // Relay data to payload (from PASS server sensitive directory)
 _PROTOTYPE _PRIVATE void sdir_loop(char *, char *);
@@ -199,14 +196,14 @@ _PROTOTYPE _PRIVATE void sdir_loop(char *, char *);
 _PROTOTYPE _PRIVATE void stdio_loop(char *);
 
 // Display current process status (via PSRP client)
-_PROTOTYPE _PRIVATE int psrp_process_status(int, char *[]);
+_PROTOTYPE _PRIVATE int32_t psrp_process_status(int32_t, char *[]);
 
 
 
 
-/*-------------------------------------------------------------------------------------------------------
-    Variables which are private to this module ...
--------------------------------------------------------------------------------------------------------*/
+/*-------------------*/
+/* Private variables */
+/*-------------------*/
                                                 /*-----------------------------------------------------*/ 
 _PRIVATE _BOOLEAN child_terminated = FALSE;     /* TRUE if child has been terminated                   */
 _PRIVATE _BOOLEAN stdio_output     = FALSE;     /* TRUE if (serial) sdir O/P to stdio (not sdir)       */
@@ -219,14 +216,14 @@ _PRIVATE _BOOLEAN use_fifos        = FALSE;     /* TRUE if sdir O/P to FIFO's   
 _PRIVATE _BOOLEAN sdir_wait        = FALSE;     /* TRUE if waiting for file re-use in sdir             */
 _PRIVATE char     tag[SSIZE]       = "notset";  /* Processing tag (for sdir)                           */
 _PRIVATE char     sdir[SSIZE]      = "";        /* Sensitive directory                                 */
-_PRIVATE int      child_pid        = (-1);      /* PID of command pipeline exec shell                  */
-_PRIVATE int      thread[SSIZE]    = {(-1)};    /* PID of next slave PASS server                       */
-_PRIVATE int      threads          = 1;         /* Number of currently executing threads               */
-_PRIVATE int      t_index          = 0;         /* Index of next thread in thread table                */
-_PRIVATE int      payload_cnt      = 0;         /* Number of payloads executed                         */
-_PRIVATE int      lyosome_lifetime = 60;        /* Lyosome lifetime (in seconds)                       */
-_PRIVATE int      losome           = (-1);      /* PID of sdir O/P lyosome process                     */
-_PRIVATE int      lesome           = (-1);      /* PID of sdir error/log lyosome process               */
+_PRIVATE pid_t    child_pid        = (-1);      /* PID of command pipeline exec shell                  */
+_PRIVATE int32_t  thread[SSIZE]    = {(-1)};    /* PID of next slave PASS server                       */
+_PRIVATE int32_t  threads          = 1;         /* Number of currently executing threads               */
+_PRIVATE int32_t  t_index          = 0;         /* Index of next thread in thread table                */
+_PRIVATE int32_t  payload_cnt      = 0;         /* Number of payloads executed                         */
+_PRIVATE int32_t  lyosome_lifetime = 60;        /* Lyosome lifetime (in seconds)                       */
+_PRIVATE int32_t  losome           = (-1);      /* PID of sdir O/P lyosome process                     */
+_PRIVATE int32_t  lesome           = (-1);      /* PID of sdir error/log lyosome process               */
 _PRIVATE char     command_pipeline[SSIZE] = ""; /* Payload command pipeline                            */
                                                 /*-----------------------------------------------------*/ 
 
@@ -241,24 +238,23 @@ _PRIVATE char     *tsname[SSIZE]   = { (char *) NULL };  /* List of sdir input f
                                                          /*--------------------------------------------*/ 
 
 
-/*-------------------------------------------------------------------------------------------------------
-    Software I.D. tag (used if CRIU support enabled to discard stale dynamic
-    checkpoint files) ...
--------------------------------------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------------*/
+/* Software I.D. tag (used if CRIU support enabled to discard stale dynamic */
+/* checkpoint files)                                                        */
+/*--------------------------------------------------------------------------*/
 
-#define VTAG  4670
-
-extern int appl_vtag = VTAG;
-
+#define VTAG  5215
+extern  int32_t appl_vtag = VTAG;
 
 
 
 
-/*--------------------------------------------------------------------------------------------------------
-    Main - decode command tail then interpolate using parameters supplied by user ...
---------------------------------------------------------------------------------------------------------*/
 
-_PUBLIC int pups_main(int argc, char *argv[])
+/*------------------*/
+/* Main entry point */
+/*------------------*/
+
+_PUBLIC int32_t pups_main(int32_t argc, char *argv[])
 
 {
 
@@ -273,15 +269,14 @@ _PUBLIC int pups_main(int argc, char *argv[])
     /* Get standard items form the command tail */
     /*------------------------------------------*/
 
-
     appl_pg_leader = TRUE;
     pups_std_init(TRUE,
                   &argc,
                   PASS_VERSION,
                   "M.A. O'Neill",
                   "(PSRP) pass",
-                  "2023",
-                  argv);
+                  "2024",
+                  (void *)argv);
 
 
     /*------------------------*/
@@ -319,8 +314,8 @@ _PUBLIC int pups_main(int argc, char *argv[])
 
     if((ptr = pups_locate(&init,"sdir",&argc,args,0)) != NOT_FOUND)
     {  if(strccpy(sdir,pups_str_dec(&ptr,&argc,args)) == (char *)NULL)
-       {  int  i;
-          char sdir_etag[SSIZE] = "";
+       {  uint32_t  i;
+          char      sdir_etag[SSIZE] = "";
 
 
           /*--------------------------------------------------*/
@@ -447,7 +442,7 @@ _PUBLIC int pups_main(int argc, char *argv[])
        /*------------------*/
 
        if((ptr = pups_locate(&init,"lifetime",&argc,args,0)) != NOT_FOUND) 
-       {  if((lyosome_lifetime = pups_i_dec(&ptr,&argc,args)) == (int)INVALID_ARG)
+       {  if((lyosome_lifetime = pups_i_dec(&ptr,&argc,args)) == (int32_t)INVALID_ARG)
              pups_error("[pass] expecting lyosome lifetime (in seconds)");
        }
 
@@ -461,20 +456,19 @@ _PUBLIC int pups_main(int argc, char *argv[])
                           date,appl_name,appl_pid,appl_host,appl_owner,lyosome_lifetime);
           (void)fflush(stderr);
        }
-
     }                                          
 
     /*---------------------------------------*/
     /* Complain about any unparsed arguments */
     /*---------------------------------------*/
 
-    pups_t_arg_errs(argd,args);
+    pups_t_arg_errs(argd,(void *)args);
 
 
-/*-------------------------------------------------------------------------------------------------------------
-    Initialise PSRP function dispatch handler - note that the embryo is fully dynamic and prepared
-    to import both dynamic functions and data objects ...
--------------------------------------------------------------------------------------------------------------*/
+    /*------------------------------------------------------------------------------------------------*/
+    /* Initialise PSRP function dispatch handler - note that the embryo is fully dynamic and prepared */
+    /* to import both dynamic functions and data objects                                              */
+    /*------------------------------------------------------------------------------------------------*/
 
     psrp_init(PSRP_STATIC_FUNCTION | PSRP_STATIC_DATABAG | PSRP_HOMEOSTATIC_STREAMS,NULL);
 
@@ -507,10 +501,11 @@ _PUBLIC int pups_main(int argc, char *argv[])
 
     psrp_accept_requests();
 
-/*-------------------------------------------------------------------------------------------------------------
-    Main loop of the PASS server. If sdir is set wait for files which are moved into the sensitive
-    directory, otherwise wait for data to appear on stdin ...
--------------------------------------------------------------------------------------------------------------*/
+
+    /*------------------------------------------------------------------------------------------------*/
+    /* Main loop of the PASS server. If sdir is set wait for files which are moved  int32_to the sensitive */
+    /* directory, otherwise wait for data to appear on stdin                                          */
+    /*------------------------------------------------------------------------------------------------*/
 
     if(sdir_mode == TRUE)
        sdir_loop(sdir,command_pipeline);
@@ -527,18 +522,19 @@ _PUBLIC int pups_main(int argc, char *argv[])
 
 
 
-/*-------------------------------------------------------------------------------------------------------------
-    Execute command pipeline feeding data to/from PASS server stdio ...
--------------------------------------------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------*/
+/* Execute command pipeline feeding data to/from PASS server stdio */
+/*-----------------------------------------------------------------*/
 
 _PRIVATE void stdio_loop(char *command_pipeline)
 
-{   int nb,
-        cin  = (-1),
-        cout = (-1),
-        cerr = (-1);
+{   ssize_t nb;
 
-    _BYTE buf[512] = "";
+    des_t   cin      = (-1),
+            cout     = (-1),
+            cerr     = (-1);
+
+    _BYTE  buf[512]  = "";
 
 
     /*-------------------------------------------------*/
@@ -589,21 +585,22 @@ _PRIVATE void stdio_loop(char *command_pipeline)
 
 
 
-/*--------------------------------------------------------------------------------------------------------------
-    Execute command pipeline feeding data to/from PSRP server sensitive directory ...
---------------------------------------------------------------------------------------------------------------*/
+/*-------------------------------------------------------------------------------*/
+/* Execute command pipeline feeding data to/from PSRP server sensitive directory */
+/*-------------------------------------------------------------------------------*/
 
 _PRIVATE void sdir_loop(char *sdir, char *command_pipeline)
 
 {   struct dirent *next_item = (struct dirent *)NULL;
 
-    int nb,
-        cin        = (-1),
-        cout       = (-1),
-        cerr       = (-1),
-        sdin       = (-1),
-        sdout      = (-1),
-        sderr      = (-1);
+    ssize_t nb;
+
+    des_t   cin    = (-1),
+            cout   = (-1),
+            cerr   = (-1),
+            sdin   = (-1),
+            sdout  = (-1),
+            sderr  = (-1);
 
     _BYTE buf[512] = "";
 
@@ -746,8 +743,10 @@ _PRIVATE void sdir_loop(char *sdir, char *command_pipeline)
                       {  (void)mkfifo(sdepath,0600);
                           sderr = pups_open(sdepath,2,LIVE); 
                       }
+
                       else if(stdio_output == TRUE)
                          sderr = pups_open("/dev/tty",1,LIVE);
+
                       else
                       {  (void)pups_creat(sdepath,0600);
                          sderr = pups_open(sdepath,1,LIVE); 
@@ -1028,11 +1027,11 @@ _PRIVATE void sdir_loop(char *sdir, char *command_pipeline)
 
 
 
-/*--------------------------------------------------------------------------------------------------------------
-    Homeostat which checks that payload (shell) is still alive ...
---------------------------------------------------------------------------------------------------------------*/
+/*------------------------------------------------------------*/
+/* Homeostat which checks that payload (shell) is still alive */
+/*------------------------------------------------------------*/
 
-_PRIVATE int payload_homeostat(void *t_info, char *args)
+_PRIVATE int32_t payload_homeostat(void *t_info, char *args)
 
 {   if(sdir_mode == FALSE)
     {  if(kill(child_pid,SIGALIVE) == (-1))
@@ -1070,6 +1069,7 @@ _PRIVATE int payload_homeostat(void *t_info, char *args)
           (void)pups_clearvitimer("slavepass_homeostat");
        }
     }
+
     else
     {  if(child_pid != (-1) && kill(child_pid,SIGALIVE) == (-1))
        {  child_terminated = TRUE;
@@ -1102,14 +1102,14 @@ _PRIVATE int payload_homeostat(void *t_info, char *args)
 
 
 
-/*---------------------------------------------------------------------------------------------------------------
-    Homeostat which removes unwanted files from sensitive directory -- anything which does not match the
-    filter tag is removed ...
----------------------------------------------------------------------------------------------------------------*/
+/*------------------------------------------------------------------------------------------------------*/
+/* Homeostat which removes unwanted files from sensitive directory -- anything which does not match the */
+/* filter tag is removed                                                                                */
+/*------------------------------------------------------------------------------------------------------*/
 
-_PRIVATE int sdir_homeostat(void *t_info, char *args)
+_PRIVATE int32_t sdir_homeostat(void *t_info, char *args)
 
-{   DIR *dirp                = (DIR *)NULL;
+{   DIR    *dirp             = (DIR *)NULL;
     struct dirent *next_item = (struct dirent *)NULL;
 
 
@@ -1156,12 +1156,12 @@ _PRIVATE int sdir_homeostat(void *t_info, char *args)
 
 
 
-/*---------------------------------------------------------------------------------------------------------------
-    Set processing tag for sensitive directory. Any file containing this tag which appear in the sensitive
-    directory will be processed ...
----------------------------------------------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------------------------------------------*/
+/* Set processing tag for sensitive directory. Any file containing this tag which appear in the sensitive */
+/* directory will be processed                                                                            */
+/*--------------------------------------------------------------------------------------------------------*/
 
-_PRIVATE int pass_set_sdir_tag(int argc, char *argv[])
+_PRIVATE int32_t pass_set_sdir_tag(int32_t argc, char *argv[])
 
 {   if(sdir_mode == FALSE)
     {  (void)fprintf(psrp_out,"\nno sensitive directory (cannot set processing tag)\n\n");
@@ -1195,13 +1195,13 @@ _PRIVATE int pass_set_sdir_tag(int argc, char *argv[])
 
 
 
-/*---------------------------------------------------------------------------------------------------------------
-    Set lifetime for lyosome function ... 
----------------------------------------------------------------------------------------------------------------*/
+/*-----------------------------------*/
+/* Set lifetime for lyosome function */
+/*-----------------------------------*/
 
-_PRIVATE int pass_set_sdir_lyosome_lifetime(int argc, char *argv[])
+_PRIVATE  int32_t pass_set_sdir_lyosome_lifetime(int32_t argc, char *argv[])
 
-{   int i_tmp;
+{    int32_t i_tmp;
 
     if(sdir_mode == FALSE)
     {  (void)fprintf(psrp_out,"\nno sensitive directory (cannot set lyosome lifetime)\n\n");
@@ -1228,7 +1228,7 @@ _PRIVATE int pass_set_sdir_lyosome_lifetime(int argc, char *argv[])
        lyosome_lifetime = 60;
     else
     {  if(sscanf(argv[1],"&d",&i_tmp) != 1 || i_tmp < 0)
-       {  (void)fprintf(psrp_out,"\n\nlifetime must be a (positive) integer\n\n",tag);
+       {  (void)fprintf(psrp_out,"\n\nlifetime must be a (positive)  integer\n\n",tag);
           (void)fflush(psrp_out);
 
           return(PSRP_OK);
@@ -1249,11 +1249,11 @@ _PRIVATE int pass_set_sdir_lyosome_lifetime(int argc, char *argv[])
 
 
 
-/*---------------------------------------------------------------------------------------------------------------
-    Set sensitive directory processing model. Currently multithreaded and serial modes are supported ...
----------------------------------------------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------------------------------------*/
+/* Set sensitive directory processing model. Currently multithreaded and serial modes are supported */
+/*--------------------------------------------------------------------------------------------------*/
 
-_PRIVATE int pass_set_sdir_pmode(int argc, char *argv[])
+_PRIVATE int32_t pass_set_sdir_pmode(int32_t argc, char *argv[])
 
 {   if(sdir_mode == FALSE)
     {  (void)fprintf(psrp_out,"\nno sensitive directory (cannot set processing mode)\n\n");
@@ -1308,11 +1308,11 @@ _PRIVATE int pass_set_sdir_pmode(int argc, char *argv[])
 
 
 
-/*---------------------------------------------------------------------------------------------------------------
-    Set output mode (for sdir) ...
----------------------------------------------------------------------------------------------------------------*/
+/*----------------------------*/
+/* Set output mode (for sdir) */
+/*----------------------------*/
 
-_PRIVATE int pass_set_sdir_omode(int argc, char *argv[])
+_PRIVATE int32_t pass_set_sdir_omode(int32_t argc, char *argv[])
 
 {   if(sdir_mode == FALSE)
     {  (void)fprintf(psrp_out,"\nno sensitive directory (cannot set sdir O/P mode)\n\n");
@@ -1368,11 +1368,11 @@ _PRIVATE int pass_set_sdir_omode(int argc, char *argv[])
 
 
 
-/*---------------------------------------------------------------------------------------------------------------
-    Set output file mode (for sdir) ...
----------------------------------------------------------------------------------------------------------------*/
+/*---------------------------------*/
+/* Set output file mode (for sdir) */
+/*---------------------------------*/
 
-_PRIVATE int pass_set_sdir_ftype(int argc, char *argv[])
+_PRIVATE int32_t pass_set_sdir_ftype(int32_t argc, char *argv[])
 
 {   if(sdir_mode == FALSE)
     {  (void)fprintf(psrp_out,"\nno sensitive directory (cannot set sdir file type)\n\n");
@@ -1435,11 +1435,11 @@ _PRIVATE int pass_set_sdir_ftype(int argc, char *argv[])
 
 
 
-/*---------------------------------------------------------------------------------------------------------------
-    Set sensitive directory processing model. Currently multithreaded and serial modes are supported ...
----------------------------------------------------------------------------------------------------------------*/
+/*----------------------*/
+/* Set command pipeline */
+/*----------------------*/
 
-_PRIVATE int pass_set_command_pipeline(int argc, char *argv[])
+_PRIVATE int32_t pass_set_command_pipeline(int32_t argc, char *argv[])
 
 {   if(sdir_mode == FALSE)
     {  (void)fprintf(psrp_out,"\nno sensitive directory (cannot set command pipeline)\n\n");
@@ -1473,19 +1473,19 @@ _PRIVATE int pass_set_command_pipeline(int argc, char *argv[])
 
 
 
-/*------------------------------------------------------------------------------
-    Report process status ...
-------------------------------------------------------------------------------*/
+/*-----------------------*/
+/* Report process status */
+/*-----------------------*/
 
-_PRIVATE int psrp_process_status(int argc, char *argv[])
+_PRIVATE int32_t psrp_process_status(int32_t argc, char *argv[])
 
 {    (void)fprintf(psrp_out,"\n    PASS server status status\n");
      (void)fprintf(psrp_out,"    =========================\n\n");
      (void)fflush(psrp_out);
 
-#if defined(CRIU_SUPPORT)
-        (void)fprintf(psrp_out,"    Binary is Criu enabled (checkpointable)\n");
-#endif /* CRIU_SUPPORT */
+     #if defined(CRIU_SUPPORT)
+     (void)fprintf(psrp_out,"    Binary is Criu enabled (checkpointable)\n");
+     #endif /* CRIU_SUPPORT */
 
      /* I/O mode information */
      if(sdir_mode == TRUE)
@@ -1562,9 +1562,9 @@ _PRIVATE int psrp_process_status(int argc, char *argv[])
 
 
 
-/*------------------------------------------------------------------------------
-    Remove junk (at exit)  ...
-------------------------------------------------------------------------------*/
+/*-----------------------*/
+/* Remove junk (at exit) */
+/* ----------------------*/
 
 _PRIVATE void remove_junk(char *arg_str)
 
@@ -1593,13 +1593,13 @@ _PRIVATE void remove_junk(char *arg_str)
 
 
 
-/*--------------------------------------------------------------------------------
-    Get thread index ...
---------------------------------------------------------------------------------*/
+/*------------------*/
+/* Get thread index */
+/*------------------*/
 
-_PRIVATE int get_thread_index(char *in_name, int *t_index)
+_PRIVATE int32_t get_thread_index(char *in_name,  int32_t *t_index)
 
-{   int i;
+{   uint32_t i;
 
 
     /*----------------------------------*/
@@ -1649,13 +1649,13 @@ _PRIVATE int get_thread_index(char *in_name, int *t_index)
 
 
 
-/*--------------------------------------------------------------------------------
-    Is next item in the thread table  ...
---------------------------------------------------------------------------------*/
+/*----------------------------------*/
+/* Is next item in the thread table */
+/*----------------------------------*/
 
 _PRIVATE _BOOLEAN in_thread_table(char *item)
 
-{   int i;
+{   uint32_t i;
 
     if(multithreaded == FALSE)
        return(FALSE);
@@ -1671,9 +1671,9 @@ _PRIVATE _BOOLEAN in_thread_table(char *item)
 
 
 
-/*---------------------------------------------------------------------------------
-    Restore the sensitive directory ...
----------------------------------------------------------------------------------*/
+/*---------------------------------*/
+/* Restore the sensitive directory */
+/*---------------------------------*/
 
 _PRIVATE void restore_sdir(char *sdir)
 

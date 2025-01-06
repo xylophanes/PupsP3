@@ -1,5 +1,5 @@
-/*-------------------------------------------------------------------------------
-     Purpose: Send signalto named process(es) which could be on remote machine(s)
+/*--------------------------------------------------------------------------------
+     Purpose: Send signal to named process(es) which could be on remote machine(s)
 
      Author:  M.A. O'Neill
               Tumbling Dice Ltd
@@ -8,10 +8,10 @@
               NE3 4RT
               United Kingdom
 
-     Version: 5.01 
-     Dated:   24th May 2023
+     Version: 5.02 
+     Dated:   10th December 2024
      E-mail:  mao@tumblingdice.co.uk
--------------------------------------------------------------------------------*/
+--------------------------------------------------------------------------------*/
 
 #include <stdio.h>
 #include <string.h>
@@ -22,6 +22,8 @@
 #include <arpa/inet.h>
 #include <stdlib.h>
 #include <pwd.h>
+#include <sys/wait.h>
+#include <stdint.h>
 
 #ifdef SHADOW_SUPPORT
 #include <shadow.h>
@@ -36,9 +38,11 @@
 #include <signal.h>
 #include <dirent.h>
 
-
 #define _XOPEN_SOURCE
 #include <unistd.h>
+
+#define _GNU_SOURCE 
+#include <crypt.h>
 
 
 /*----------------------------------------------------------------*/
@@ -65,9 +69,9 @@
 
 
 
-/*------------------------------------------------------------------------
-    Defines which are local to this application ...
-------------------------------------------------------------------------*/
+/*---------*/
+/* Defines */
+/*---------*/
 /*------------------*/
 /* Version of nkill */
 /*------------------*/
@@ -92,7 +96,7 @@
 /* Method flags (for establishing process name) */
 /*----------------------------------------------*/
 
-#define COMM          (1 << 0) 
+#define COMMAND       (1 << 0) 
 #define CMDLINE       (1 << 1) 
 #define BINNAME       (1 << 2) 
 #define STATUS        (1 << 3) 
@@ -105,84 +109,83 @@
 
 
 
-/*------------------------------------------------------------------------
-    Functions which are local to this application ...
-------------------------------------------------------------------------*/
+/*-----------------------*/
+/* Local functions which */
+/*-----------------------*/
 
 // Get password entry from static table or NIS map by name
-_PROTOTYPE _PRIVATE struct passwd *pups_getpwnam(char *);
+_PROTOTYPE _PRIVATE struct passwd *pups_getpwnam(const char *);
 
 // Get password entry from static table or NIS map by UID
-_PROTOTYPE _PRIVATE struct passwd *pups_getpwuid(int);
+_PROTOTYPE _PRIVATE struct passwd *pups_getpwuid(const uid_t);
 
-// Convert (local) PID to pidname */
-_PROTOTYPE _PRIVATE _BOOLEAN local_pid_to_pname(int, char *);
+// Convert (local) PID to pidname
+_PROTOTYPE _PRIVATE _BOOLEAN local_pid_to_pname(const pid_t, char *);
 
 // Convert (local) pidname to pidlist
-_PROTOTYPE _PRIVATE _BOOLEAN local_pname_to_pids(FILE *, char *, _BOOLEAN, _BOOLEAN, char *, int []);
+_PROTOTYPE _PRIVATE _BOOLEAN local_pname_to_pids(const FILE *, const char *,const  _BOOLEAN, const _BOOLEAN, const char *, pid_t []);
 
 // Extract pidname 
-_PROTOTYPE _PRIVATE _BOOLEAN get_pid_name(char *, char *, int *, char *);
+_PROTOTYPE _PRIVATE _BOOLEAN get_pid_name(const char *, const char *, pid_t *);
 
 
 #ifdef SSH_SUPPORT
 // Check authentication token 
-_PROTOTYPE _PRIVATE _BOOLEAN checkuser(char *username, char *password);
+_PROTOTYPE _PRIVATE _BOOLEAN checkuser(const char *username, const char *password);
 #endif /* SSH_SUPPORT */
 
 
 // Look for the occurence of string s2 within string s1
-_PROTOTYPE _PRIVATE _BOOLEAN strin(char *, char *);
+_PROTOTYPE _PRIVATE _BOOLEAN strin(const char *, const char *);
 
 // Parse (fully qualified) pidname to pidname,hostname pair or pidname,hostname.username tuple 
-_PROTOTYPE _PRIVATE int parse_pidname(char *, char *, char *, char *);
+_PROTOTYPE _PRIVATE int32_t parse_pidname(const char *, char *, char *, char *);
 
 // Distribute signal to process on named host
-_PROTOTYPE _PRIVATE _BOOLEAN nkill(FILE *, _BOOLEAN, char *, char *, char *, char *, char *);
+_PROTOTYPE _PRIVATE _BOOLEAN nkill(const FILE *, const _BOOLEAN, const char *, const char *, const char *, const char *, const char *);
 
 // Convert signal name to signal number
-_PRIVATE int signametosigno(char *);
+_PRIVATE int32_t signametosigno(const char *);
 
 
 
 
-/*------------------------------------------------------------------------
-    Variables which are private to this application ...
-------------------------------------------------------------------------*/
+/*-------------------*/
+/* Private variables */
+/*-------------------*/
 
 _PRIVATE char     username[SSIZE]       = "notset";
 _PRIVATE char     password[SSIZE]       = "notset";
 _PRIVATE char     localhostname[SSIZE]  = "";
 _PRIVATE char     remotehostname[SSIZE] = "";
-_PRIVATE _BOOLEAN binname               = COMM;
+_PRIVATE _BOOLEAN binname               = COMMAND;
 _PRIVATE _BOOLEAN slaved                = FALSE;
 
 
 
 
-/*------------------------------------------------------------------------
-    Main entry point to code ...
-------------------------------------------------------------------------*/
+/*--------------------------*/
+/* Main entry point to code */
+/*--------------------------*/
 
-_PUBLIC int main(int argc, char *argv[])
+_PUBLIC int32_t main(int32_t argc, char *argv[])
 
-{   int i,
-        uid,
-        start,
-        parsed;
+{   uint32_t i,
+             start,
+             parsed;
 
-    char pidname[SSIZE]         = "",
-         hostname[SSIZE]        = "localhost",
-         signame[SSIZE]         = "SIGTERM",
-         local_hostname[SSIZE]  = "",
-         target_hostname[SSIZE] = "";
+    char     pidname[SSIZE]         = "",
+             hostname[SSIZE]        = "localhost",
+             signame[SSIZE]         = "SIGTERM",
+             local_hostname[SSIZE]  = "",
+             target_hostname[SSIZE] = "";
 
-    _BOOLEAN s_all              = FALSE;
-    FILE     *stream            = (FILE *)NULL;
+    _BOOLEAN s_all                  = FALSE;
+    FILE     *stream                = (FILE *)NULL;
 
 
     /*------------------------------------------------------------------*/
-    /* Decode the comand tail. nkill commands are of the for            */
+    /* Decode the comand tail. nkill commands are of the form           */
     /* nkill !signal | signame! <process-list>                          */
     /* where the processes in the <process-list> can be either          */
     /* of the form numeric-pid, process-name, numeric-pid@hostname or   */
@@ -193,7 +196,7 @@ _PUBLIC int main(int argc, char *argv[])
     /*-------------------------------------------------------*/
 
     if(argc < 2 || strcmp(argv[1],"-usage") == 0 || strcmp(argv[1],"-help") == 0)
-    {  (void)fprintf(stderr,"\nnkill version %s, (C) 1999-2023 Tumbling Dice (built %s)\n",NKILL_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nnkill version %s, (C) 1999-2024 Tumbling Dice (gcc %s: built %s)\n",NKILL_VERSION,__VERSION__,__TIME__,__DATE__);
        (void)fprintf(stderr,"\nUsage: nkill [+/-all] [+/-verbose] [+binname | +status] [-slaved:FALSE] [-psrp] !signum | signame! <process-list>\n");
        (void)fprintf(stderr,"\nProcess list entries have the following forms:\n\n");
        (void)fprintf(stderr,"numeric-pid              :    Process identifier on local host\n");
@@ -379,7 +382,7 @@ _PUBLIC int main(int argc, char *argv[])
                       password,
                       signame,
                       target_hostname,
-                              pidname);
+                      pidname);
 
        }
     }
@@ -394,11 +397,11 @@ _PUBLIC int main(int argc, char *argv[])
     Parse pidname returning process,host pair ...
 ------------------------------------------------------------------------*/
 
-_PRIVATE int parse_pidname(char *full_pidname, char *pidname, char *hostname, char *username)
+_PRIVATE int32_t parse_pidname(const char *full_pidname, char *pidname, char *hostname, char *username)
 
-{   int i,
-        j,
-        cnt = 0;
+{   size_t i,
+           j,
+           cnt = 0;
 
     struct passwd *pwent = (struct passwd *)NULL;
 
@@ -503,28 +506,30 @@ _PRIVATE int parse_pidname(char *full_pidname, char *pidname, char *hostname, ch
     alive ...
 ------------------------------------------------------------------------*/
 
-_PRIVATE _BOOLEAN nkill(FILE   *stream,   /* Error log/status stream                */
-                        _BOOLEAN s_all,   /* Signal all procs called pname  if TRUE */
-                        char *username,   /* Username (on remote host)              */
-                        char *password,   /* Authentication token                   */
-                        char  *signame,   /* Signal name (or number)                */
-                        char    *rhost,   /* Remote host                            */
-                        char  *pidname)   /* Name of process to signal              */
+_PRIVATE _BOOLEAN nkill(const FILE   *stream,   /* Error log/status stream                */
+                        const _BOOLEAN s_all,   /* Signal all procs called pname  if TRUE */
+                        const char *username,   /* Username (on remote host)              */
+                        const char *password,   /* Authentication token                   */
+                        const char  *signame,   /* Signal name (or number)                */
+                        const char    *rhost,   /* Remote host                            */
+                        const char  *pidname)   /* Name of process to signal              */
 
-{   int i,
-        pid,
-        status,
-        signum,
-        reply,
-        cnt  = 0,
-        sent = 0,
-        ptab[MAX_HOSTS];
+{   uint32_t i,
+             cnt                 = 0;
 
-    char strdum[SSIZE]       = "",
-         lhost[SSIZE]        = "",
-         next_pidname[SSIZE] = "";
+    pid_t    pid,
+             ptab[MAX_HOSTS];
 
-    _BOOLEAN remote = TRUE;
+    int32_t  status,
+             signum,
+             reply,
+             sent = 0;
+
+    char     strdum[SSIZE]       = "",
+             lhost[SSIZE]        = "",
+             next_pidname[SSIZE] = "";
+
+    _BOOLEAN remote              = TRUE;
 
     if(sscanf(signame,"%d",&signum) == 0)
     {
@@ -568,8 +573,8 @@ _PRIVATE _BOOLEAN nkill(FILE   *stream,   /* Error log/status stream            
     /*----------------------------------------------------------------*/
 
     if(sscanf(pidname,"%d",&ptab[0]) == 0)
-    {  int i,
-           ret = 0;
+    {  uint32_t i;
+       int32_t  ret = 0;
 
 
        /*-----------------------------------------------------*/
@@ -606,7 +611,6 @@ _PRIVATE _BOOLEAN nkill(FILE   *stream,   /* Error log/status stream            
              /*--------------------*/
              /* Child side of fork */
              /*--------------------*/
-
              /*---------------------*/
              /* Overlay ssh command */
              /*---------------------*/
@@ -692,7 +696,7 @@ _PRIVATE _BOOLEAN nkill(FILE   *stream,   /* Error log/status stream            
 
        #ifdef SSH_SUPPORT
        if(remote == TRUE)
-       {  int ret = 0;
+       {   int32_t ret = 0;
 
           /*-------------------------------------------------*/
           /* We are sending a signal to a remote numeric PID */ 
@@ -768,6 +772,7 @@ _PRIVATE _BOOLEAN nkill(FILE   *stream,   /* Error log/status stream            
 
           return(TRUE);
        }
+
        else
        #endif /* SSH_SUPPORT */
 
@@ -793,7 +798,7 @@ _PRIVATE _BOOLEAN nkill(FILE   *stream,   /* Error log/status stream            
           {  if(stream != (FILE *)NULL)
              {  if(slaved == FALSE)
                    (void)fprintf(stream,"Signal %s sent to %s [%d@%s:%s] (reply %d)\n",
-                                     signame,pidname,ptab[0],lhost,username,reply);
+                                          signame,pidname,ptab[0],lhost,username,reply);
                 else
                    (void)fprintf(stream,"%d\n",reply);
              }
@@ -843,11 +848,11 @@ _PRIVATE _BOOLEAN nkill(FILE   *stream,   /* Error log/status stream            
 
 
 #ifdef SSH_SUPPORT
-/*------------------------------------------------------------------------
-    Check to see if remote user is permitted to run this service ...
-------------------------------------------------------------------------*/
+/*--------------------------------------------------------------*/
+/* Check to see if remote user is permitted to run this service */
+/*--------------------------------------------------------------*/
 
-_PRIVATE _BOOLEAN checkuser(char *username, char *password)
+_PRIVATE _BOOLEAN checkuser(const char *username, const char *password)
 
 {   struct passwd  *pwent = (struct passwd *)NULL;
 
@@ -892,15 +897,15 @@ _PRIVATE _BOOLEAN checkuser(char *username, char *password)
 
 
 
-/*------------------------------------------------------------------------
-    Look for the occurence of string s2 within string s1 ...
-------------------------------------------------------------------------*/
+/*--------------------------------------------------*/
+/* Look for occurence of string s2 within string s1 */
+/*--------------------------------------------------*/
 
-_PRIVATE _BOOLEAN strin(char *s1, char *s2)
+_PRIVATE _BOOLEAN strin(const char *s1, const char *s2)
 
-{   int i,
-        cmp_size,
-        chk_limit;
+{   size_t i,
+           cmp_size,
+           chk_limit;
 
     if(strlen(s2) > strlen(s1))
        return(FALSE);
@@ -916,8 +921,9 @@ _PRIVATE _BOOLEAN strin(char *s1, char *s2)
     cmp_size  = strlen(s2);
 
     for(i=0; i<chk_limit; ++i)
-       if(strncmp(&s1[i],s2,cmp_size) == 0)
+    {  if(strncmp(&s1[i],s2,cmp_size) == 0)
           return(TRUE);
+    }
 
     return(FALSE);
 }
@@ -925,17 +931,18 @@ _PRIVATE _BOOLEAN strin(char *s1, char *s2)
 
 
 
-/*---------------------------------------------------------------------------
-    Translate signal name to signal number ...
----------------------------------------------------------------------------*/
+/*----------------------------------------*/
+/* Translate signal name to signal number */
+/*----------------------------------------*/
 
-_PRIVATE int signametosigno(char *name)
+_PRIVATE int32_t signametosigno(const char *name)
 
-{   int i;
+{   uint32_t i;
 
     for(i=0; i<MAX_SIGS; ++i)
-       if(signame[i] != (char *)NULL && strin(signame[i],name) == TRUE)
+    {  if(signame[i] != (char *)NULL && strin(signame[i],name) == TRUE)
           return(i+1);
+    }
 
     return(-1);
 }
@@ -943,11 +950,11 @@ _PRIVATE int signametosigno(char *name)
 
 
 
-/*----------------------------------------------------------------------------
-    Extract pidname ...
-----------------------------------------------------------------------------*/
+/*-----------------*/
+/* Extract pidname */
+/*-----------------*/
 
-_PRIVATE _BOOLEAN get_pid_name(char *pidname, char *line, int *pid, char *next_pidname)
+_PRIVATE _BOOLEAN get_pid_name(const char *pidname, const char *line, pid_t *pid)
 
 {    char strdum[SSIZE]   = "",
           bpidname[SSIZE] = "";
@@ -969,26 +976,26 @@ _PRIVATE _BOOLEAN get_pid_name(char *pidname, char *line, int *pid, char *next_p
 
 
 
-/*----------------------------------------------------------------------------
-    Convert (local) pidname to list of matching PIDS ...
-----------------------------------------------------------------------------*/
+/*--------------------------------------------------*/
+/* Convert (local) pidname to list of matching PIDS */
+/*--------------------------------------------------*/
 
-_PRIVATE _BOOLEAN local_pname_to_pids(FILE      *stream,
-                                      char       *lhost,
-                                      _BOOLEAN    s_all,
-                                      _BOOLEAN  binname,
-                                      char     *pidname,
-                                      int        ptab[])
+_PRIVATE _BOOLEAN local_pname_to_pids(const FILE      *stream,
+                                      const char       *lhost,
+                                      const _BOOLEAN    s_all,
+                                      const _BOOLEAN  binname,
+                                      const char     *pidname,
+                                      pid_t            ptab[])
 
 
-{  int  pid,
-        cnt = 0;
+{  pid_t    pid;
+   uint32_t cnt                  = 0;
 
-   char line[SSIZE]         = "",
-        next_pidname[SSIZE] = "";
+   char     line[SSIZE]          = "",
+            next_pidname[SSIZE]  = "";
 
-   DIR           *dirp      = (DIR *)NULL;
-   struct dirent *next_item = (struct dirent *)NULL;
+   DIR      *dirp                = (DIR *)NULL;
+   struct   dirent *next_item    = (struct dirent *)NULL;
 
    dirp = opendir("/proc");
 
@@ -1005,79 +1012,105 @@ _PRIVATE _BOOLEAN local_pname_to_pids(FILE      *stream,
         /*----------------------------------------*/
 
         if(sscanf(next_item->d_name,"%d",&pid) == 1)
-        {    int i,
-                 nb,
-                 fdes = (-1);
+        {    ssize_t i,
+                     nb;
 
-           char cmdline[SSIZE]     = "",
-                procpidpath[SSIZE] = ""; 
+             des_t fdes = (-1);
 
-           if(binname == COMM)
-           {  (void)snprintf(procpidpath,SSIZE,"/proc/%d/comm",pid);
-              fdes = open(procpidpath,0);
-              nb   = read(fdes,cmdline,SSIZE);
-              cmdline[nb] = '\0';
-              (void)close(fdes);
-           }
-           else if(binname == CMDLINE)
-           {  (void)snprintf(procpidpath,SSIZE,"/proc/%d/cmdline",pid);
-              fdes = open(procpidpath,0);
-              nb   = read(fdes,cmdline,SSIZE); 
-              cmdline[nb] = '\0';
-              (void)close(fdes);
-           }
-           else if(binname == BINNAME)
-           {  
-
-              /*--------------------*/
-              /* Get name of binary */ 
-              /*--------------------*/
-
-              (void)snprintf(procpidpath,SSIZE,"/proc/%d/exe",pid);
-              (void)readlink(procpidpath,cmdline,SSIZE);
-           }
-           else if(binname == STATUS)
-           {  char strdum[SSIZE] = "",
-                   tmpstr[SSIZE] = "";
-
-              (void)snprintf(procpidpath,SSIZE,"/proc/%d/status",pid);
-              fdes = open(procpidpath,0);
-              nb   = read(fdes,tmpstr,SSIZE);
-              tmpstr[nb] = '\0';
-              (void)close(fdes);
-              (void)sscanf(tmpstr,"%s%s",strdum,cmdline);
-           }
+             char cmdline[SSIZE]     = "",
+                  procpidpath[SSIZE] = ""; 
 
 
-           /*------------*/
-           /* Strip path */
-           /*------------*/
+             /*-------------------------*/
+             /* Extract by command name */
+             /*-------------------------*/
 
-           for(i=strlen(cmdline); i>0; --i)
-           {   if(cmdline[i] == '/')
-                  goto stripped;
-           }
+             if(binname == COMMAND)
+             {  (void)snprintf(procpidpath,SSIZE,"/proc/%d/comm",pid);
+                fdes = open(procpidpath,0);
+                nb   = read(fdes,cmdline,SSIZE);
+                cmdline[nb] = '\0';
+                (void)close(fdes);
+             }
+
+
+             /*-------------------------*/
+             /* Extract by command line */
+             /*-------------------------*/
+
+             else if(binname == CMDLINE)
+             {  (void)snprintf(procpidpath,SSIZE,"/proc/%d/cmdline",pid);
+                fdes = open(procpidpath,0);
+                nb   = read(fdes,cmdline,SSIZE); 
+                cmdline[nb] = '\0';
+                (void)close(fdes);
+             }
+
+
+             /*------------------------*/
+             /* Extract by binary name */
+             /*------------------------*/
+
+             else if(binname == BINNAME)
+             {  
+
+                /*--------------------*/
+                /* Get name of binary */ 
+                /*--------------------*/
+
+                (void)snprintf(procpidpath,SSIZE,"/proc/%d/exe",pid);
+                (void)readlink(procpidpath,cmdline,SSIZE);
+             }
+
+
+             /*-------------------*/
+             /* Extract by status */
+             /*-------------------*/
+
+             else if(binname == STATUS)
+             {  char strdum[SSIZE] = "",
+                     tmpstr[SSIZE] = "";
+
+                (void)snprintf(procpidpath,SSIZE,"/proc/%d/status",pid);
+
+                fdes       = open(procpidpath,0);
+                nb         = read(fdes,tmpstr,SSIZE);
+                tmpstr[nb] = '\0';
+
+                (void)close(fdes);
+                (void)sscanf(tmpstr,"%s%s",strdum,cmdline);
+             }
+
+
+             /*------------*/
+             /* Strip path */
+             /*------------*/
+
+             for(i=strlen(cmdline); i>0; --i)
+             {   if(cmdline[i] == '/')
+                    goto stripped;
+             }
 
 stripped:  
 
-           if(strncmp(cmdline,pidname,strlen(pidname)) == 0 || strncmp(&cmdline[i+1],pidname,strlen(pidname)) == 0)
-           {  if(cnt == 1 && s_all == FALSE && binname == FALSE)
-              {  (void)closedir(dirp);
+             if(strncmp(cmdline,pidname,strlen(pidname)) == 0 || strncmp(&cmdline[i+1],pidname,strlen(pidname)) == 0)
+             {  if(cnt == 1 && s_all == FALSE && binname == FALSE)
+                {  (void)closedir(dirp);
 
-                 if(stream != (FILE *)NULL)
-                 {  (void)fprintf(stream,"nkill: process %s[@%s] is not uniquely named\n",pidname,lhost);
-                    (void)fflush(stream);
-                 }
-
-                 return(-1);
-              }
-              else
-              {  ptab[cnt] = pid;
-                 ++cnt;
-              }                  
-           }
-        }
-   }
+                   if(stream != (FILE *)NULL)
+                   {  (void)fprintf(stream,"nkill: process %s[@%s] is not uniquely named\n",pidname,lhost);
+                      (void)fflush(stream);
+                   }
+  
+                   return(-1);
+                }
+                else
+                {  ptab[cnt] = pid;
+                   ++cnt;
+                }                  
+             }
+          }
+     }
 
    return(cnt);
 }
@@ -1085,21 +1118,20 @@ stripped:
 
 
 
-/*----------------------------------------------------------------------------
-    Translate PID to (local) process name ...
-----------------------------------------------------------------------------*/
+/*---------------------------------------*/
+/* Translate PID to (local) process name */
+/*---------------------------------------*/
 
-_PRIVATE _BOOLEAN local_pid_to_pname(int pid, char *pidname)
+_PRIVATE _BOOLEAN local_pid_to_pname(const pid_t pid, char *pidname)
 
-{   int  i;
+{   size_t  i;
+    ssize_t nb;
 
-    char tmpstr[SSIZE]  = "",
-         cmdline[SSIZE] = "";
+    char    tmpstr[SSIZE]       = "",
+            cmdline[SSIZE]      = "";
 
-    int nb,
-        fdes = (-1);
-
-    char procpidpath[SSIZE] = "";
+    des_t   fdes                = (-1);
+    char    procpidpath[SSIZE]  = "";
 
     (void)snprintf(procpidpath,SSIZE,"/proc/%d/cmdline",pid);
     if((fdes = open(procpidpath,0)) == (-1))
@@ -1126,12 +1158,12 @@ stripped:
 
 
 
-/*----------------------------------------------------------------------------------------
-    Extended PUPS getpwnam routine which searches static password table. If this
-    fails, the appropriate NIS map is then searched ...
-----------------------------------------------------------------------------------------*/
+/*------------------------------------------------------------------------------*/
+/* Extended PUPS getpwnam routine which searches static password table. If this */
+/* fails, the appropriate NIS map is then searched                              */
+/*------------------------------------------------------------------------------*/
 
-_PRIVATE struct passwd *pups_getpwnam(char *name)
+_PRIVATE struct passwd *pups_getpwnam(const char *name)
 
 {   _IMMORTAL struct passwd *pwent = (struct passwd *)NULL;
 
@@ -1187,12 +1219,12 @@ _PRIVATE struct passwd *pups_getpwnam(char *name)
 
 
 
-/*----------------------------------------------------------------------------------------
-    Extended PUPS getpwnam routine which searches static password table. If this
-    fails, the appropriate NIS map is then searched ...
-----------------------------------------------------------------------------------------*/
+/*------------------------------------------------------------------------------*/
+/* Extended PUPS getpwnam routine which searches static password table. If this */
+/* fails, the appropriate NIS map is then searched                              */
+/*------------------------------------------------------------------------------*/
 
-_PRIVATE struct passwd *pups_getpwuid(int uid)
+_PRIVATE struct passwd *pups_getpwuid(const uid_t uid)
 
 {   _IMMORTAL struct passwd *pwent = (struct passwd *)NULL;
 
@@ -1240,4 +1272,3 @@ _PRIVATE struct passwd *pups_getpwuid(int uid)
 
     return(pwent);
 }
-

@@ -8,8 +8,8 @@
              NE3 4RT
              United Kingdom
 
-    Version: 3.00 
-    Dated:   4th January 2023 
+    Version: 3.02 
+    Dated:   12th December 2024 
     E-Mail:  mao@tumblingdice.co.uk 
 ------------------------------------------------------------------------------*/
 
@@ -28,7 +28,7 @@
 /* Version */
 /***********/
 
-#define NFO_VERSION    "3.00"
+#define NFO_VERSION    "3.02"
 
 
 
@@ -79,111 +79,100 @@ _EXPORT FTYPE  upper_limit;     // Upper limit for mnbrak
 /*---------------------------------------------------*/
 
 // Least squares fitting
-_PROTOTYPE _EXPORT void least_squares(int,        \
-                                      int,        \
-                                      FTYPE [],   \
-                                      FTYPE [],   \
-                                      FTYPE *,    \
-                                      FTYPE *,    \
+_PROTOTYPE _EXPORT void least_squares(uint32_t,
+                                      uint32_t,
+                                      FTYPE [],
+                                      FTYPE [],
+                                      FTYPE *,
+                                      FTYPE *,
                                       FTYPE []);
 
 // Cubic spline initialisation
-_PROTOTYPE _EXPORT void spline(FTYPE [],  \
-                               FTYPE [],  \
-                               int,       \
-                               FTYPE,     \
-                               FTYPE,     \
+_PROTOTYPE _EXPORT void spline(FTYPE [],
+                               FTYPE [],
+                               uint32_t, 
+                               FTYPE,
+                               FTYPE,
                                FTYPE []);
 
-// Standard statistical moments of a distribution
-_PROTOTYPE _EXPORT void moment(FTYPE [], \
-                               int,      \
-                               FTYPE *,  \
-                               FTYPE *,  \
-                               FTYPE *,  \
-                               FTYPE *,  \
-                               FTYPE *,  \
-                               FTYPE *,  \
-                               FTYPE *);
-
 // Parabolic bracketer for minimia
-_PROTOTYPE _EXPORT void mnbrak(FTYPE *,                    \
-                               FTYPE *,                    \
-                               FTYPE *,                    \
-                               FTYPE *,                    \
-                               FTYPE *,                    \
-                               FTYPE *,                    \
+_PROTOTYPE _EXPORT void mnbrak(FTYPE *,
+                               FTYPE *,
+                               FTYPE *,
+                               FTYPE *,
+                               FTYPE *, 
+                               FTYPE *,
                                FTYPE (* )(__UDEF_ARGS__));
 
-// Multidimensional minimisation
-_PROTOTYPE _EXPORT void Powell(FTYPE [],                   \
-                               FTYPE [][MAX_D],            \
-                               int,                        \
-                               int,                        \
-                               FTYPE,                      \
-                               int *,                      \
-                               FTYPE *,                    \
-                               FTYPE (* )(__UDEF_ARGS__),  \
-                               FTYPE (* )(__UDEF_ARGS__),  \
+// Multidimensional minimisation using Powell's method [not thread safe]
+_PROTOTYPE _EXPORT void Powell(FTYPE [],
+                               FTYPE [][MAX_D],
+                               uint32_t, 
+                               uint32_t,
+                               FTYPE,
+                               uint32_t *,
+                               FTYPE *,
+                               FTYPE (* )(__UDEF_ARGS__),
+                               FTYPE (* )(__UDEF_ARGS__),
                                FTYPE (* )(__UDEF_ARGS__));
 
-// Multidimensional annealer
-_PROTOTYPE _EXPORT void anneal(FTYPE [],                   \
-                               FTYPE,                      \
-                               int,                        \
-                               FTYPE,                      \
-                               int *,                      \
-                               FTYPE *,                    \
-                               FTYPE (* )(__UDEF_ARGS__),  \
-                               FTYPE (* )(__UDEF_ARGS__),  \
+// minimise N dimentional function stochatically using simulated annealing
+_PROTOTYPE _EXPORT void anneal(FTYPE [], 
+                               FTYPE, 
+                               uint32_t, 
+                               FTYPE,
+                               uint32_t  *, 
+                               FTYPE *,                  
+                               FTYPE (* )(__UDEF_ARGS__),
+                               FTYPE (* )(__UDEF_ARGS__),
                                FTYPE (* )(__UDEF_ARGS__));
 
 
 
 // Fit function using least squares parameters
-_PROTOTYPE _EXPORT FTYPE lsq_fgen(FTYPE, int, FTYPE []);
+_PROTOTYPE _EXPORT FTYPE lsq_fgen(FTYPE, uint32_t, FTYPE []);
 
-// Linear interpolator
-_PROTOTYPE _EXPORT FTYPE lint(FTYPE [], FTYPE [], int, FTYPE);
+// Linear  interpolator
+_PROTOTYPE _EXPORT FTYPE lint(FTYPE [], FTYPE [], uint32_t, FTYPE);
 
-// Spline interpolator
-_PROTOTYPE _EXPORT FTYPE splint(FTYPE [], FTYPE [], FTYPE [], int, FTYPE);
+// Spline  interpolator [not thread safe]
+_PROTOTYPE _EXPORT FTYPE splint(FTYPE [], FTYPE [], FTYPE [], uint32_t, FTYPE);
 
-// Trapezoidal integration
-_PROTOTYPE _EXPORT FTYPE trapspl(FTYPE,     \
-                                 FTYPE,     \
-                                 FTYPE,     \
-                                 FTYPE [],  \
-                                 FTYPE [],  \
-                                 FTYPE [],  \
-                                 int);
+// Trapezoidal  integration
+_PROTOTYPE _EXPORT FTYPE trapspl(FTYPE,
+                                 FTYPE,
+                                 FTYPE,
+                                 FTYPE [],
+                                 FTYPE [],
+                                 FTYPE [],
+                                 uint32_t);
 
 // Integration using Simpsons' rule 
-_PROTOTYPE _EXPORT FTYPE Simpson_spl(FTYPE,    \
-                                     FTYPE,    \
-                                     FTYPE,    \
-                                     FTYPE [], \
-                                     FTYPE [], \
-                                     FTYPE [], \
-                                     int);
+_PROTOTYPE _EXPORT FTYPE Simpson_spl(FTYPE,
+                                     FTYPE,
+                                     FTYPE,
+                                     FTYPE [],
+                                     FTYPE [],
+                                     FTYPE [],
+                                     uint32_t);
 
 // Differentiation using Milnes method
-_PROTOTYPE _EXPORT FTYPE Milne_diff(int, FTYPE, FTYPE []);
+_PROTOTYPE _EXPORT FTYPE Milne_diff(uint32_t   , FTYPE, FTYPE []);
 
-// Linear minimisation using Brents' method
-_PROTOTYPE _EXPORT FTYPE Brent(FTYPE,                      \
-                               FTYPE,                      \
-                               FTYPE,                      \
-                               FTYPE (* )(__UDEF_ARGS__),  \
-                               FTYPE,                      \
+// Linear minimisation using Brents' method [not thread safe]
+_PROTOTYPE _EXPORT FTYPE Brent(FTYPE, 
+                               FTYPE,
+                               FTYPE,
+                               FTYPE (* )(__UDEF_ARGS__),
+                               FTYPE, 
                                FTYPE *);
 
 // 1 dimensional minimisation by Golden Search
-_PROTOTYPE _EXPORT FTYPE golden(FTYPE,                      \
-                                FTYPE,                      \
-                                FTYPE,                      \
-                                FTYPE (* )(__UDEF_ARGS__),  \
-                                FTYPE,                      \
+_PROTOTYPE _EXPORT FTYPE golden(FTYPE,
+                                FTYPE,
+                                FTYPE,
+                                FTYPE (* )(__UDEF_ARGS__), 
+                                FTYPE, 
                                 FTYPE *);
 
 #ifdef _CPLUSPLUS

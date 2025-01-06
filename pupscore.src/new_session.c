@@ -1,5 +1,5 @@
-/*------------------------------------------------------------------------------------------------
-    Purpose: sets up a new process group.
+/*--------------------------------------
+    Purpose: sets up a new process group
 
     Author:  M.A. O'Neill
              Tumbling Dice Ltd
@@ -8,25 +8,27 @@
              NE3 4RT
              United Kingdom
 
-    Version: 2.00 
-    Dated:   4th January 2023
+    Version: 2.02 
+    Dated:   10th Decemeber 2024
     E-mail:  mao@tumblingdice.co.uk
-------------------------------------------------------------------------------------------------*/
+--------------------------------------*/
 
 #include <stdio.h>
 #include <string.h>
 #include <signal.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <stdint.h>
 
 
-/*---------------------------------------------*/
-/* Defines which are local to this applciation */
-/*---------------------------------------------*/
-/*---------------*/
-/* Version of ns */
-/*---------------*/
+/*---------*/
+/* Defines */
+/*---------*/
+/*---------*/
+/* Version */
+/*---------*/
 
-#define NS_VERSION  "2.00"
+#define NS_VERSION  "2.02"
 
 #ifdef FALSE
 #undef FALSE
@@ -44,21 +46,32 @@
 /* Relay signals to process group */
 /*--------------------------------*/
 
-static int signal_relay(int sig)
+static int32_t signal_relay(const int32_t signum)
 
-{   static int caught = FALSE;
+{   static int32_t caught = FALSE;
+
+
+    /*-----------------------*/
+    /* Send to process group */
+    /*-----------------------*/
 
     if(caught == FALSE)
     {  caught = TRUE;
-       (void)kill(0,sig);
+       (void)kill(0,signum);
     }
+
+
+    /*-------------------------------------*/
+    /* Ignore signal sent to process group */
+    /*-------------------------------------*/
+
     else
        caught = FALSE;
 
-    if(sig == SIGTERM)
+    if(signum == SIGTERM)
        exit(0);
 
-    (void)signal(sig,(void *)&signal_relay);
+    (void)signal(signum,(void *)&signal_relay);
 }
 
 
@@ -67,13 +80,18 @@ static int signal_relay(int sig)
 /* main entry point */
 /*------------------*/
 
-int main(int argc, char *argv[])
+int32_t main(int32_t argc, char *argv[])
 
-{   int pgrp;
+{   int32_t pgrp;
+
+
+    /*--------------------*/
+    /* Parse command line */
+    /*--------------------*/
 
     if(argc == 2 && (strcmp(argv[1],"-help") == 0 || strcmp(argv[1],"-usage") == 0))
     {  
-       (void)fprintf(stderr,"\nnew_session version %s, (C) Tumbling Dice 2003-2023 (built %s %s)\n\n",NS_VERSION,__TIME__,__DATE__);
+       (void)fprintf(stderr,"\nnew_session version %s, (C) Tumbling Dice 2003-2024 (gcc %s: built %s %s)\n\n",NS_VERSION,__VERSION__,__TIME__,__DATE__);
        (void)fprintf(stderr,"NEW_SESSION is free software, covered by the GNU General Public License, and you are\n");
        (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
        (void)fprintf(stderr,"See the GPL and LGPL licences at www.gnu.org for further details\n");
@@ -112,7 +130,7 @@ int main(int argc, char *argv[])
     /*-------------------------------------*/
 
     while(1)
-        (void)sleep(1);
+         (void)sleep(1);
 
     exit(0);
 }

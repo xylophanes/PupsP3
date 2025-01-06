@@ -1,11 +1,11 @@
 #---------------------------------------
 # Makefile for persistent heap library
-# M.A. O'Neill, Tumbling Dice 04/01/2022
+# M.A. O'Neill, Tumbling Dice 12/12/2024
 #---------------------------------------
 
 #CPPFLAGS 	= -DUSG
 #CFLAGS		= -g -DDEBUG -I.
-CFLAGS		= -I. -I../include.libs TARGET_PHMALLOC_CFLAGS -fPIC
+CFLAGS		= -I. -I../include.libs TARGET_PHMALLOC_CFLAGS -fPIC -funsafe-math-optimizations
 CC     		= gcc
 
 .PHONY: 	all
@@ -49,10 +49,10 @@ libphmalloc.a:	phgmalloc.o
 .PHONY: clean realclean malloc-clean malloc-realclean
 
 clean malloc-clean:
-		-rm -f libphmalloc.a *.o core
+		-rm -f libphmalloc.a *.o core >& /dev/null
 
 realclean malloc-realclean: clean
-		-rm -f TAGS tags *~
+		-rm -f TAGS tags *~ >& /dev/null
 
 
 #-------------------------

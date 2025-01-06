@@ -1,8 +1,13 @@
 #!/bin/bash
+#
+#--------------------------------------
+# Display PUPS/P3 version
+# (CV) M.A. O'Neill, Tumbling Dice 2025 
+#--------------------------------------
 
 echo ""
-echo "    PUPSP3 version 5.5.3"
-echo "    (C) M.A. O'Neill, Tumbling Dice, 2023"
+echo "    PUPSP3 version 8.0.5"
+echo "    (C) M.A. O'Neill, Tumbling Dice, 2025"
 echo ""
 
 exit 0

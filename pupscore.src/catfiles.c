@@ -1,4 +1,4 @@
-/*------------------------------------------------------------------
+/*----------------------------------
     Purpose:  Catenate pair of files
 
     Author:  M.A. O'Neill
@@ -8,10 +8,10 @@
              NE3 4RT
              United Kingdom
 
-    Version: 2.00 
-    Dated:   4th January 2023
+    Version: 2.02 
+    Dated:   10th Decemeber 2024
     e-mail:  mao@tumblingdice.co.uk
--------------------------------------------------------------------*/
+---------------------------------*/
 
 
 #include <xtypes.h>
@@ -19,13 +19,14 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 
 /*---------------------*/
 /* Version of catfiles */
 /*---------------------*/
 
-#define CATFILES_VERSION    "2.00"
+#define CATFILES_VERSION    "2.02"
 
 
 /*-------------*/
@@ -41,7 +42,7 @@
 /* main entry point */
 /*------------------*/
 
-_PUBLIC int main(int argc, char *argv[])
+_PUBLIC int32_t main(int32_t argc, char *argv[])
 
 {   FILE *stream_1 = (FILE *)NULL,
 	 *stream_2 = (FILE *)NULL;
@@ -49,7 +50,7 @@ _PUBLIC int main(int argc, char *argv[])
     char line[SSIZE] = "";
 
     if(argc < 3)
-    {  (void)fprintf(stderr,"\ncatfiles version %s, (C) Tumbling Dice 2003-2023 (built %s %s)\n\n",CATFILES_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\ncatfiles version %s, (C) Tumbling Dice 2003-2024 (gcc %s: built %s %s)\n\n",CATFILES_VERSION,__VERSION__,__TIME__,__DATE__);
        (void)fprintf(stderr,"CATFILES is free software, covered by the GNU General Public License, and you are\n");
        (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
        (void)fprintf(stderr,"See the GPL and LGPL licences at www.gnu.org for further details\n");

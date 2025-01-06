@@ -1,9 +1,9 @@
-#--------------------------------------
+#-------------------------------------------
 # .bash_profile
 # for PSRP
 #
-# (C) M.A. O'Neill, Tumbling Dice, 2022
-#--------------------------------------
+# (C) M.A. O'Neill, Tumbling Dice, 2022-2024
+#-------------------------------------------
 
 # Get the aliases and functions
 if [ -f ~/.bashrc ]; then

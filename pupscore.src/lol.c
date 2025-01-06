@@ -1,4 +1,4 @@
-/*----------------------------------------------------------------------------
+/*------------------------------------------------
      Purpose: tests for owner of lock (being live) 
 
      Author:  M.A. O'Neill
@@ -8,10 +8,10 @@
               NE3 4RT
               United Kingdom
 
-     Version: 2.01 
-     Dated:   24th Ma 2023
+     Version: 2.02 
+     Dated:   10th October 2024
      E-mail:  mao@tumblingdice.co.uk
------------------------------------------------------------------------------*/
+------------------------------------------------*/
 
 #include <stdio.h>
 #include <signal.h>
@@ -22,19 +22,18 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <xtypes.h>
+#include <ctype.h>
+#include <stdint.h>
 
 
-
-
-/*-----------------------------------------------------------------------------
-    Defines which are local to this application ...
------------------------------------------------------------------------------*/
+/*---------*/
+/* Defines */
+/*---------*/
 /*----------------*/
 /* Version of lol */
 /*----------------*/
 
-#define LOL_VERSION "2.01"
-#define END_STRING  9999
+#define LOL_VERSION "2.02"
 
 
 /*-------------*/
@@ -42,48 +41,51 @@
 /*-------------*/
 
 #define SSIZE       2048 
+#define END_STRING  9999
 
 
 
 
-/*-----------------------------------------------------------------------------
-    Replace multiple chracters in string with given character ...
------------------------------------------------------------------------------*/
+/*-----------------------------------------------------------*/
+/* Replace multiple chracters in string with given character */
+/*-----------------------------------------------------------*/
 
-_PRIVATE void mchrep(char rep_ch, char *ch_to_rep, char *s1)
+_PRIVATE void mchrep(const char rep_ch, const char *ch_to_rep, char *s1)
 
-{   int i,
-        j,
-        s1_l,
-        rep_s_l;
+{   size_t i,
+           j,
+           s1_l,
+           rep_s_l;
 
     s1_l    = strlen(s1);
     rep_s_l = strlen(ch_to_rep);
 
     for(i=0; i<s1_l; ++i)
-       for(j=0; j<rep_s_l; ++j)
-          if(s1[i] == ch_to_rep[j] || (ch_to_rep[j] == 'D' && isdigit(s1[i])))
+    {  for(j=0; j<rep_s_l; ++j)
+       {  if(s1[i] == ch_to_rep[j] || (ch_to_rep[j] == 'D' && isdigit(s1[i])))
              s1[i] = rep_ch;
+       }
+    }
 }
 
 
 
 
-/*-----------------------------------------------------------------------
-    Routine to extract substrings which are demarkated by a usr defined
-    character ...
------------------------------------------------------------------------*/
-                                    /*---------------------------------*/
-_PRIVATE int strext(char dm_ch,     /* Demarcation character           */
-                    char   *s1,     /* Extracted sub string            */
-                    char   *s2)     /* Argument string                 */
-                                    /*---------------------------------*/
+/*---------------------------------------------------------------------*/
+/* Routine to extract substrings which are demarkated by a usr defined */
+/* character ...                                                       */
+/*---------------------------------------------------------------------*/
+                                           /*------------------------------*/
+_PRIVATE int32_t strext(const char dm_ch,  /* Demarcation character        */
+                        char       *s1,    /* Extracted sub string         */
+                        const char *s2)    /* Argument string              */
+                                           /*------------------------------*/
 
-{   int s1_ptr = 0;
+{   size_t s1_ptr = 0;
 
                                     /*---------------------------------*/
-    _PRIVATE int   s2_ptr = 0;      /* Current pointer into arg string */
-    _PRIVATE char *s2_was;          /* Copy of current argument string */
+    _IMMORTAL size_t s2_ptr = 0;    /* Current pointer into arg string */
+    _IMMORTAL char   *s2_was;       /* Copy of current argument string */
                                     /*---------------------------------*/
 
 
@@ -136,7 +138,7 @@ _PRIVATE int strext(char dm_ch,     /* Demarcation character           */
     if(s2[s2_ptr] == '\0' || s2[s2_ptr] == '\n')
     {  s2_ptr = 0;
        s1[0] = '\0';
-       (void)free(s2_was);
+       (void)free((void *)s2_was);
        return(FALSE);
     }
 
@@ -156,7 +158,7 @@ _PRIVATE int strext(char dm_ch,     /* Demarcation character           */
 
     if(s2[s2_ptr] == '\0' || s2[s2_ptr] == '\n')
     {  s2_ptr = 0;
-       (void)free(s2_was);
+       (void)free((void *)s2_was);
 
                               /*----------------------------------------------*/
        return(END_STRING);    /* Messy but some applications need to know if  */
@@ -172,14 +174,14 @@ _PRIVATE int strext(char dm_ch,     /* Demarcation character           */
 
 
 
-/*-----------------------------------------------------------------------------
-    Main entry point to application ...
------------------------------------------------------------------------------*/
+/*------------------*/
+/* Main entry point */
+/*------------------*/
 
-_PUBLIC int main(int argc, char *argv[])
+_PUBLIC  int32_t main(int32_t argc, char *argv[])
 
-{   int ret,
-        lock_pid;
+{   int32_t ret;
+    pid_t   lock_pid;
 
     char tmpstr[SSIZE]    = "",
          strdum[SSIZE]    = "",
@@ -188,8 +190,13 @@ _PUBLIC int main(int argc, char *argv[])
 
     struct stat buf;
 
+
+    /*--------------------*/
+    /* Parse command line */
+    /*--------------------*/
+
     if(argv[1] == (char *)NULL || strcmp(argv[1],"-help") == 0 || strcmp(argv[1],"-usage") == 0)
-    {  (void)fprintf(stderr,"\nlol version %s, (C) Tumbling Dice 2005-2023 (built %s %s)\n\n",LOL_VERSION,__TIME__,__DATE__);
+    {  (void)fprintf(stderr,"\nlol version %s, (C) Tumbling Dice 2005-2024 (gcc %s: built %s %s)\n\n",LOL_VERSION,__VERSION__,__TIME__,__DATE__);
        (void)fprintf(stderr,"LOL is free software, covered by the GNU General Public License, and you are\n");
        (void)fprintf(stderr,"welcome to change it and/or distribute copies of it under certain conditions.\n");
        (void)fprintf(stderr,"See the GPL and LGPL licences at www.gnu.org for further details\n");

@@ -1,5 +1,5 @@
-/*----------------------------------------------------------------------------- 
-    Header for the standard utilities library.
+/*------------------------------------------- 
+    Header for the standard utilities library
 
     Author:  M.A. O'Neill
              Tumbling Dice Ltd
@@ -8,10 +8,10 @@
              NE3 4RT
              United Kingdom
 
-    Version: 7.20
-    Dated:   26th October 2023
+    Version: 8.11
+    Dated:   2nd January 2025 
     E-Mail:  mao@tumblingdice.co.uk
-------------------------------------------------------------------------------*/
+-------------------------------------------*/
 
 
 #ifndef UTILS_H
@@ -52,15 +52,31 @@
 /* Version */
 /***********/
 
-#define UTILIB_VERSION              "7.20"
+#define UTILIB_VERSION              "8.11"
+
+
+/******************/
+/* P3 application */
+/******************/
+
+#define P3
 
 
 /*-------------*/
 /* String size */
 /*-------------*/
 
-#define SSIZE                       2048
+#define SSIZE                       512 
 
+
+/*-------------*/
+/* Sleep delay */
+/*-------------*/
+
+#define SHORT_DELAY                 1
+#define DELAY                       100
+#define MEDIUM_DELAY                1000
+#define LONG_DELAY                  100000
 
 
 /*-------------------------------*/
@@ -68,11 +84,6 @@
 /*-------------------------------*/
 
 #include <ftype.h>
-
-
-#ifdef SECURE
-#include <sed_securicor.h>
-#endif /* SECURE */
 
 
 /*------------------------*/
@@ -96,7 +107,6 @@
 /* Default resource allocations (for an application to run) */
 /*----------------------------------------------------------*/
 
-#define BOGOMIP_SCALING              10000.0
 #define PUPS_DEFAULT_MIN_CPU         2.0 
 #define PUPS_DEFAULT_MIN_MEM         10000
 #define PUPS_DEFAULT_RESOURCE_WAIT   3600
@@ -148,7 +158,6 @@
 
 #ifdef ZLIB_SUPPORT
 #include <zlib.h>
-#define  gzFILE gzFile
 #endif /* SUPPORT_ZLIB */
 
 
@@ -156,7 +165,7 @@
 /* Quantum for PUPS virtual interval timers (in microseconds) */
 /*------------------------------------------------------------*/
 
-#define VITIMER_QUANTUM    1000
+#define VITIMER_QUANTUM    10000
 
 
 /*------------------------------------------------*/
@@ -200,16 +209,6 @@
 /*----------------------------------------------------*/
 
 #define TRYLOCK            0
-
-
-#ifdef BUBBLE_MEMORY_SUPPORT
-
-#define pups_main bubble_target
-_EXTERN _BOOLEAN checkpointing;
-
-#else
-#define pups_main main
-#endif /* BUBBLE_MEMORY_SUPPORT */
 
 
 /*--------------------------------------------------*/
@@ -296,8 +295,9 @@ _EXTERN _BOOLEAN checkpointing;
 /* Signals to be held by pupshold function */
 /*-----------------------------------------*/
 
-#define ALL_PUPS_SIGS       1
-#define PSRP_SIGS           2
+#define ALL_PUPS_SIGS       (2 << 0) 
+#define PSRP_SIGS           (2 << 1)
+#define ALL_SIGS            (2 << 2) 
 
 
 /*--------------------------------*/
@@ -400,12 +400,12 @@ _EXTERN _BOOLEAN checkpointing;
 /* Definition of signal parameter type */
 /*-------------------------------------*/
 
-typedef struct {   int  pid;                               // (Remote) pid to signal
-                   int  signum;                            // Signal to be sent
-                   int  r_pid;                             // PID of remote client
-                   int  uid;                               // Id. of clients owner
-                   char r_host[64];                        // Remote host name
-                   char r_client[64];                      // Remote client name
+typedef struct {   int32_t  pid;                             // (Remote) pid to signal
+                   int32_t  signum;                          // Signal to be sent
+                   int32_t  r_pid;                           // PID of remote client
+                   int32_t  uid;                             // Id. of clients owner
+                   char     r_host[SSIZE];                   // Remote host name
+                   char     r_client[SSIZE];                 // Remote client name
                } sigparams_type;
 
 
@@ -413,13 +413,13 @@ typedef struct {   int  pid;                               // (Remote) pid to si
 /* Definition of virtual timer type */
 /*----------------------------------*/
 
-typedef struct {   int  priority;                          // Priority of timer
-                   char *name;                             // Name of payload func
-                   int  mode;                              // Mode of timer
-                   int  prescaler;                         // Interval prescaler
-                   int  interval_time;                     // Length of interval
-                   char *handler_args;                     // Handler argument string
-                   void (*handler)(void *, char *);        // Handler function
+typedef struct {   int32_t  priority;                        // Priority of timer
+                   char     name[SSIZE];                     // Name of payload func
+                   int32_t  mode;                            // Mode of timer
+                   int32_t  prescaler;                       // Interval prescaler
+                   int32_t  interval_time;                   // Length of  interval
+                   char     handler_args[SSIZE];             // Handler argument string
+                   void     (*handler)(void *, char *);      // Handler function
                } vttab_type;
 
 
@@ -428,35 +428,35 @@ typedef struct {   int  priority;                          // Priority of timer
 /* Definition of file table type */
 /*-------------------------------*/
 
-typedef struct {   _BOOLEAN psrp;                          // Is this a PSRP stream?
-                   _BOOLEAN pheap;                         // Is this a persistent heap?
-                   _BOOLEAN creator;                       // TRUE if creator
-                   _BOOLEAN named;                         // File (inode) is named
-                   _BOOLEAN locked;                        // TRUE if file locked
-                   _BOOLEAN mounted;                       // TRUE if on mounted fs
-                   int      fdes;                          // File descriptor
-                   int      id;                            // Entry id tag 
-                   int      mode;                          // File access mode 
-                   int      homeostatic;                   // Is this a live stream?
-                   int      rd_pid;                        // Remote service daemon
-                   int      fifo_pid;                      // Pipestream leaders PID
-                   int      fs_blocks;                     // Min fs blocks for write
-                   int      st_mode;                       // File protections
-                   int      lost_cnt;                      // Loss count for file
-                   FILE     *stream;                       // Stdio stream
+typedef struct {   _BOOLEAN psrp;                            // Is this a PSRP stream?
+                   _BOOLEAN pheap;                           // Is this a persistent heap?
+                   _BOOLEAN creator;                         // TRUE if creator
+                   _BOOLEAN named;                           // File (inode) is named
+                   _BOOLEAN locked;                          // TRUE if file locked
+                   _BOOLEAN mounted;                         // TRUE if on mounted fs
+                   des_t    fdes;                            // File descriptor
+                   int32_t  id;                              // Entry id tag 
+                   int32_t  mode;                            // File access mode 
+                   int32_t  homeostatic;                     // Is this a live stream?
+                   pid_t    rd_pid;                          // Remote service daemon
+                   pid_t    fifo_pid;                        // Pipestream leaders PID
+                   int32_t  fs_blocks;                       // Min fs blocks for write
+                   int32_t  st_mode;                         // File protections
+                   int32_t  lost_cnt;                        // Loss count for file
+                   FILE     *stream;                         // Stdio stream
 
 #ifdef ZLIB_SUPPORT
-                   gzFILE   *zstream;                      // Compression stream
+                   gzFile   zstream;                         // Compression stream
 #endif /* SUPPORT_ZLIB */
 
-                   char     *hname;                        // Handler's name
-                   char     *fname;                        // File name (if any)
-                   char     *fs_name;                      // File system name
-                   char     *fshadow;                      // File shadow
-                   char     *rd_host;                      // RSD host (for rd_pid)
-                   char     *rd_ssh_port;                  // RSD host ssh port (for rd_pid)
-                   _BOOLEAN (*homeostat)(int, int);        // Dynamic fs. homeostat
-                   void     (*handler)(void *, char *);    // Handler
+                   char     hname[SSIZE];                    // Handler's name
+                   char     fname[SSIZE];                    // File name (if any)
+                   char     fs_name[SSIZE];                  // File system name
+                   char     fshadow[SSIZE];                  // File shadow
+                   char     rd_host[SSIZE];                  // RSD host (for rd_pid)
+                   char     rd_ssh_port[SSIZE];              // RSD host ssh port (for rd_pid)
+                   _BOOLEAN (*homeostat)(int32_t,  int32_t); // Dynamic fs. homeostat
+                   void     (*handler)(void *, char *);      // Handler
                } ftab_type;
 
 
@@ -464,10 +464,10 @@ typedef struct {   _BOOLEAN psrp;                          // Is this a PSRP str
 /* Definition of signal table type */
 /*---------------------------------*/
 
-typedef struct {   unsigned long int haddr;                // Signal handler address
-                   char              hname[SSIZE];         // Signal handler name
-                   sigset_t          sa_mask;              // Sigs blocked in handler
-                   int               sa_flags;             // Signal handler flags
+typedef struct {   uint64_t  haddr;                           // Signal handler address
+                   char      hname[SSIZE];                    // Signal handler name
+                   sigset_t  sa_mask;                         // Sigs blocked in handler
+                    int32_t  sa_flags;                        // Signal handler flags
                } sigtab_type;
 
 
@@ -475,11 +475,11 @@ typedef struct {   unsigned long int haddr;                // Signal handler add
 /* Definition of dynamic memory object type */
 /*------------------------------------------*/
 
-typedef struct {  unsigned long int size;                  // Size of object (bytes)
-                  int               n_el;                  // Number of elements
-                  void              *ptr;                  // Pointer to object
-                  char              *name;                 // Object name
-                  char              *type;                 // Object type
+typedef struct {  uint64_t   size;                            // Size of object (bytes)
+                  int32_t    n_el;                            // Number of elements
+                  void       *ptr;                            // Pointer to object
+                  char       name[SSIZE];                     // Object name
+                  char       type[SSIZE];                     // Object type
                } matab_object_type;
 
 
@@ -487,8 +487,8 @@ typedef struct {  unsigned long int size;                  // Size of object (by
 /* Definition of dynamic memory table type */
 /*-----------------------------------------*/
 
-typedef struct {  int               allocated;             // Objects in table
-                   matab_object_type **object;             // Dynamic memory objects
+typedef struct {   int32_t           allocated;              // Objects in table
+                   matab_object_type **object;               // Dynamic memory objects
                } matab_type;
 
 
@@ -496,17 +496,17 @@ typedef struct {  int               allocated;             // Objects in table
 /* Definitions of child table type */
 /*---------------------------------*/
 
-typedef struct {   int      pid;                           // Child pid
-                   _BOOLEAN obituary;                      // If TRUE log child death
-                   char     *name;                         // Child name
+typedef struct {   pid_t    pid;                             // Child pid
+                   _BOOLEAN obituary;                        // If TRUE log child death
+                   char     name[SSIZE];                     // Child name
                } chtab_type;
 
 
-/*-------------------------*/
-/* Seal pipestream on exit */
-/*-------------------------*/
+/*-----------------------*/
+/* Seal pipeline on exit */
+/*-----------------------*/
 
-#define PIPESTREAM_DETACH   1
+#define PUPS_PIPE_DETACH   9998
 
 
 /*------------------------------------------------------*/
@@ -573,167 +573,187 @@ typedef struct {   int      pid;                           // Child pid
 #define ASSUMED_ZERO       1.0e-128
 
 
+/*---------------------------------------------*/
+/* Maximum number of arguments in command tail */
+/*---------------------------------------------*/
+
+#define ARGS               256
+#define MAX_CMD_ARGS       253
+
 
 #ifdef __NOT_LIB_SOURCE__
 /*--------------------------------*/
 /* External variable declarations */
 /*--------------------------------*/
 
-_IMPORT jmp_buf   appl_resident_restart;  // Restart location (for memory resident application)
+_IMPORT jmp_buf        appl_resident_restart;                  // Restart location (for memory resident application)
+
+_EXPORT char           boldOn[];                               // Make character bold
+_EXPORT char           boldOff[];                              // Make charavter non-bold
 
 #ifdef SSH_SUPPORT
-_EXPORT char     ssh_remote_port[];       // Remote (ssh) port
-_EXPORT char     ssh_remote_uname[];      // Remote (ssh) username
-_EXPORT _BOOLEAN ssh_compression;         // Use ssh compression
+_EXPORT char           ssh_remote_port[];                      // Remote (ssh) port
+_EXPORT char           ssh_remote_uname[];                     // Remote (ssh) username
+_EXPORT _BOOLEAN       ssh_compression;                        // Use ssh compression
 #endif /* SSH_SUPPORT */
 
-_EXPORT _BOOLEAN    pups_abort_restart;   // TRUE if abort handler enabled
-_EXPORT  sigjmp_buf pups_restart_buf;     // Abort restart buffer
-_EXPORT _BOOLEAN    fs_write_blocked;     // TRUE if filesystem is full
+_EXPORT _BOOLEAN       pups_abort_restart;                     // TRUE if abort handler enabled
+_EXPORT  sigjmp_buf    pups_restart_buf;                       // Abort restart buffer
+_EXPORT _BOOLEAN       fs_write_blocked;                       // TRUE if filesystem is full
 
 #ifdef CRIU_SUPPORT
-_EXPORT _BOOLEAN appl_criu_ssave;         // TRUE if (criu) state saving enabled
+_EXPORT _BOOLEAN       appl_criu_ssave;                        // TRUE if (criu) state saving enabled
 #endif /* CRIU_SUPPORT */
 
-_EXPORT int sargc,                        // Number of arguments in command tail
-            ptr,                          // Pointer to current option
-            t_args,                       // Total args in generic command tail
-            vitimer_quantum,              // Timer quantum (for PSRP timers)
-            appl_fsa_mode,                // Filesystem access mode
-            appl_t_args,                  // Total args in command tail
-            appl_alloc_opt,               // Memory allocator options (for xmalloc etc)
-            appl_max_files,               // Maximum number of ftab slots
-            appl_max_child,               // Maximum number of child slots
-            appl_max_pheaps,              // Maximum number of persistent heaps
-            appl_max_vtimers,             // Maximum number of virtual timers
-            appl_max_orifices,            // Maximum number of orifice [DLL] slots
-            appl_vtag,                    // Application (compile) version tag
-            base_arg,                     // Base argument for argfile ops
-            appl_last_child,              // Last child process forked by xsystem
-            appl_sid,                     // Session (process group) i.d. 
-            appl_pid,                     // Process i.d.
-            appl_ppid,                    // (Effective) parent PID
-            appl_uid,                     // Process UID (user i.d.)
-            appl_gid,                     // Process group i.d.
-            appl_tty,                     // Process controlling terminal descriptor
-            appl_remote_pid,              // Remote PID to relay signals to
+_EXPORT pid_t          appl_pid,                               // Process i.d.
+                       appl_ppid,                              // (Effective) parent PID
+                       appl_remote_pid,                        // Remote PID to relay signals to
+                       appl_softdog_pid,                       // Software watchdog process PID
+                       appl_sid;                               // Session (process group) i.d. 
 
-#ifdef CRIU_SUPPORT
-            appl_criu_ssaves,             // Number of times state has been saved
-            appl_poll_time,               // Pol time for (Criu) state saving
-#endif /* CRIU_SUPPORT */
+_EXPORT uid_t          appl_uid;                               // Process UID (user i.d.)
+_EXPORT gid_t          appl_gid;                               // Process group i.d.
 
-#ifdef _OPENMP
-            appl_omp_threads,             // Number of OMP threads
-#endif /* _OPENMP */
-
-#ifdef PTHREAD_SUPPORT
-            appl_root_tid;                // LWP i.d. of root thread
-            appl_root_thread,             // Root (initial) thread for process
-#endif /* PTHREAD_SUPPORT */
-
-            appl_nice_lvl,                // Process niceness
-            appl_softdog_timeout,         // Software watchdog timeout
-            appl_softdog_pid;             // Software watchdog process PID
+_EXPORT  int32_t       sargc,                                  // Number of arguments in command tail
+                       ptr,                                    // Pointer to current option
+                       t_args,                                 // Total args in generic command tail
+                       vitimer_quantum,                        // Timer quantum (for PSRP timers)
+                       appl_fsa_mode,                          // Filesystem access mode
+                       appl_t_args,                            // Total args in command tail
+                       appl_alloc_opt,                         // Memory allocator options (for xmalloc etc)
+                       appl_max_files,                         // Maximum number of ftab slots
+                       appl_max_child,                         // Maximum number of child slots
+                       appl_max_pheaps,                        // Maximum number of persistent heaps
+                       appl_max_vtimers,                       // Maximum number of virtual timers
+                       appl_max_orifices,                      // Maximum number of orifice [DLL] slots
+                       appl_vtag,                              // Application (compile) version tag
+                       base_arg,                               // Base argument for argfile ops
+                       appl_last_child,                        // Last child process forked by xsystem
+                       appl_tty,                               // Process controlling terminal descriptor
 
 
-
-_EXPORT _BOOLEAN appl_verbose,            // TRUE if verbose mode selected
-                 appl_resident,           // Application is memory resident 
-                 appl_enable_residence,   // Application can be memory resident
-                 appl_etrap,              // TRUE if error trapping for gdb analysis
-                 appl_proprietary,        // TRUE if application is proprietary
-
-#ifdef MAIL_SUPPORT
-                 appl_mailable,           // TRUE if mail can be sent to process
-#endif /* MAIL_SUPPORT */
-
-                 test_mode,               // TRUE if test mode
-                 init,                    // TRUE if first option
-                 appl_pg_leader,          // TRUE if process group leader
-                 appl_nodetach,           // Don't detach stdio in background
-                 appl_fgnd,               // TRUE if process in foreground process group
-                 appl_snames_crypted,     // TRUE if shadow filenames crypted
-                 appl_wait,               // TRUE if process waiting (SIGSTOP)
-                 appl_psrp,               // TRUE if application PSRP enabled
-                 appl_ppid_exit,          // If TRUE exit if parent terminates 
-                 appl_rooted,             // IF TRUE system context cannot migrate
-                 appl_psrp_load,          // If TRUE load PSRP resources at startup
-                 appl_psrp_save,          // If TRUE save dispatch table at exit
-                 appl_have_pen,           // TRUE if binname != exec name
-                 appl_default_chname,     // TRUE if PSRP channel name default
-		 appl_softdog_enabled,    // TRUE if software watchdog enabled
-                 argd[];                  // Argument decode status flags
-
-_EXPORT char *version,                    // Version of program
-             *appl_owner,                 // Name of application owner
-             *appl_password,              // Password of application owner
-             *appl_name,                  // Application (process) name of program 
-             *appl_logfile,               // Error/log file 
-             *appl_bin_name,              // Application (binary) name of program
-             *appl_remote_host,           // Remote host to relay signals to
-
-#ifdef MAIL_SUPPORT
-             *appl_mdir,                  // Application mailbox
-             *appl_mh_folder,             // Application MH (MIME) folder
-             *appl_mime_dir,              // Process MIME workspace
-             *appl_mime_type,             // MIME message part type (to retreive)
-             *appl_replyto,               // Applicationm reply to address (for mail)
-#endif /* MAIL_SUPPORT */
-
-             *appl_fifo_dir,              // Application default FIFO patchboard directory
-             *appl_fifo_topdir,           // Directory containing application patchboards
-             *appl_ch_name,               // Application PSRP channel name
-             *appl_err,                   // Application error string
-             *appl_hostpool,              // Application capabilities database
-             *appl_ben_name,              // Application binary
-             *appl_pam_name,              // PUPS authentication module name
-             *appl_ttyname,               // Applications controlling terminal
-             *appl_uprot_tag,             // Homeostasis (file) revocation tag
-             *author,                     // Author of program
-             *revdate,                    // Date of last modification
-             *shell,                      // Application shell
-	     *appl_home,                  // Effective home directory
-             *appl_cwd,                   // Application current working directory
-             *appl_cmd_str,               // Application command string
-             *appl_host,                  // Host node running this application
-             *appl_state,                 // State of this application
-             *arg_f_name,                 // Argument file name
-             *appl_tunnel_path,           // Tunnel path (binary for tunnel process
-             *args[256],                  // Secondry argument vectors
-             appl_argfifo[];              // Argument FIFO (for memory resident process)
-
-#ifdef CRIU_SUPPORT
-_EXPORT char appl_criu_ssave_dir[];       // Criu checkpoint directory for state saving
-_EXPORT char appl_criu_dir[];             // Criu directory (holds migratable files and checkpoints) 
-#endif /* CRIU_SUPPORT */
-
-_EXPORT char date[SSIZE];                 // Date and time stamp
-_EXPORT char errstr[SSIZE];               // Error string
-_EXPORT char appl_machid[SSIZE];          // Unique machine (host) identifier
-_EXPORT void *exit_function;              // Exit function to be called by SIGTERM
+                       #ifdef CRIU_SUPPORT
+                       appl_criu_ssaves,                       // Number of times state has been saved
+                       appl_poll_time,                         // Pol time for (Criu) state saving
+                       #endif /* CRIU_SUPPORT */
 
 
-#ifdef PTHREAD_SUPPORT 
-_EXPORT pthread_mutex_t pups_fork_mutex;  // Thread safe pups_fork mutex
-_EXPORT pthread_mutex_t ftab_mutex;       // Thread safe file table mutex
-_EXPORT pthread_mutex_t chtab_mutex;      // Thread safe child table mutex
-#endif /* PTHREAD_SUPPORT */
+                       #ifdef _OPENMP
+                       appl_omp_threads,                       // Number of OMP threads
+                       #endif /* _OPENMP */
 
 
-_EXPORT _BOOLEAN    appl_kill_pg;
-_EXPORT _BOOLEAN    appl_secure;
-_EXPORT _BOOLEAN    pups_process_homeostat;
-_EXPORT _BOOLEAN    ftab_extend;
-_EXPORT ftab_type   *ftab;
-_EXPORT chtab_type  *chtab;
-_EXPORT vttab_type  *vttab;
-_EXPORT sigtab_type sigtab[MAX_SIGS];
-_EXPORT _BOOLEAN    default_fd_homeostat_action;
-_EXPORT _BOOLEAN    ignore_pups_signals;
-_EXPORT _BOOLEAN    pups_exit_entered;
-_EXPORT _BOOLEAN    in_vt_handler;
-_EXPORT _BOOLEAN    in_jmalloc;
+                       appl_nice_lvl,                          // Process niceness
+                       appl_softdog_timeout;                   // Software watchdog timeout
+
+
+                       #ifdef PTHREAD_SUPPORT
+_EXPORT pthread_t      appl_root_tid;                          // LWP i.d. of root thread
+                       #endif /* PTHREAD_SUPPORT */
+
+
+_EXPORT _BOOLEAN       appl_verbose,                           // TRUE if verbose mode selected
+                       appl_resident,                          // Application is memory resident 
+                       appl_enable_residence,                  // Application can be memory resident
+                       appl_etrap,                             // TRUE if error trapping for gdb analysis
+                       appl_proprietary,                       // TRUE if application is proprietary
+
+
+                       #ifdef MAIL_SUPPORT
+                       appl_mailable,                          // TRUE if mail can be sent to process
+                       #endif /* MAIL_SUPPORT */
+
+
+                       test_mode,                              // TRUE if test mode
+                       init,                                   // TRUE if first option
+                       appl_pg_leader,                         // TRUE if process group leader
+                       appl_nodetach,                          // Don't detach stdio in background
+                       appl_fgnd,                              // TRUE if process in foreground process group
+                       appl_snames_crypted,                    // TRUE if shadow filenames crypted
+                       appl_wait,                              // TRUE if process waiting (SIGSTOP)
+                       appl_psrp,                              // TRUE if application PSRP enabled
+                       appl_ppid_exit,                         // If TRUE exit if parent terminates 
+                       appl_rooted,                            // IF TRUE system context cannot migrate
+                       appl_psrp_load,                         // If TRUE load PSRP resources at startup
+                       appl_psrp_save,                         // If TRUE save dispatch table at exit
+                       appl_have_pen,                          // TRUE if binname != exec name
+                       appl_default_chname,                    // TRUE if PSRP channel name default
+                       appl_softdog_enabled,                   // TRUE if software watchdog enabled
+                       argd[];                                 // Argument decode status flags
+
+_EXPORT char           version[],                              // Version of program
+                       appl_owner[],                           // Name of application owner
+                       appl_password[],                        // Password of application owner
+                       appl_name[],                            // Application (process) name of program 
+                       appl_logfile[],                         // Error/log file 
+                       appl_bin_name[],                        // Application (binary) name of program
+                       appl_remote_host[],                     // Remote host to relay signals to
+
+
+                       #ifdef MAIL_SUPPORT
+                       appl_mdir[],                            // Application mailbox
+                       appl_mh_folder[],                       // Application MH (MIME) folder
+                       appl_mime_dir[],                        // Process MIME workspace
+                       appl_mime_type[],                       // MIME message part type (to retreive)
+                       appl_replyto[],                         // Applicationm reply to address (for mail)
+                       #endif /* MAIL_SUPPORT */
+
+
+                       appl_fifo_dir[],                        // Application default FIFO patchboard directory
+                       appl_fifo_topdir[],                     // Directory containing application patchboards
+                       appl_ch_name[],                         // Application PSRP channel name
+                       appl_err[],                             // Application error string
+                       appl_hostpool[],                        // Application capabilities database
+                       appl_ben_name[],                        // Application binary
+                       appl_pam_name[],                        // PUPS authentication module name
+                       appl_ttyname[],                         // Applications controlling terminal
+                       appl_uprot_tag[],                       // Homeostasis (file) revocation tag
+                       author[],                               // Author of program
+                       revdate[],                              // Date of last modification
+                       shell[],                                // Application shell
+                       appl_home[],                            // Effective home directory
+                       appl_cwd[],                             // Application current working directory
+                       appl_cmd_str[],                         // Application command string
+                       appl_host[],                            // Host node running this application
+                       appl_state[],                           // State of this application
+                       arg_f_name[],                           // Argument file name
+                       appl_tunnel_path[],                     // Tunnel path (binary for tunnel process
+                       appl_argfifo[],                         // Argument FIFO (for memory resident process)
+                       *args[ARGS];                            // Secondary argument vectors
+
+
+                        #ifdef CRIU_SUPPORT
+_EXPORT _BOOLEAN        checkpointing;                         // Checkpointing flag
+_EXPORT char            appl_criu_ssave_dir[];                 // Criu checkpoint directory for state saving
+_EXPORT char            appl_criu_dir[];                       // Criu directory (holds migratable files and checkpoints) 
+                        #endif /* CRIU_SUPPORT */
+
+
+_EXPORT char            date[];                                // Date and time stamp
+_EXPORT char            errstr[];                              // Error string
+_EXPORT char            appl_machid[];                         // Unique machine (host) identifier
+_EXPORT void            *exit_function;                        // Exit function to be called by SIGTERM
+
+
+                         #ifdef PTHREAD_SUPPORT 
+_EXPORT pthread_mutex_t  pups_fork_mutex;                      // Thread safe pups_fork mutex
+_EXPORT pthread_mutex_t  ftab_mutex;                           // Thread safe file table mutex
+_EXPORT pthread_mutex_t  chtab_mutex;                          // Thread safe child table mutex
+                         #endif /* PTHREAD_SUPPORT */
+
+
+_EXPORT _BOOLEAN         appl_secure;                          // TRUE if application secure
+_EXPORT _BOOLEAN         appl_kill_pg;                         // If TRUE kill process group on exit
+_EXPORT _BOOLEAN         pups_process_homeostat;               // If TRUE kill process group on exit 
+_EXPORT _BOOLEAN         ftab_extend;                          // TRUE if extending file table
+_EXPORT ftab_type        *ftab;                                // PUPS file table
+_EXPORT chtab_type       *chtab;                               // PUPS child (process) table
+_EXPORT sigtab_type      sigtab[MAX_SIGS];                     // Addresses of signal handlers
+_EXPORT vttab_type       *vttab;                               // Virtual timer table
+_EXPORT _BOOLEAN         default_fd_homeostat_action;          // Default action for stdio (FIFO) redirection 
+_EXPORT _BOOLEAN         ignore_pups_signals;                  // Ignore PUPS/P3 protocol signals if TRUE
+_EXPORT _BOOLEAN         in_pups_exit;                         // TRUE if in pups_exit()
+_EXPORT _BOOLEAN         in_vt_handler;                        // True if in vt_handler()
 
 
 #ifdef MAIL_SUPPORT
@@ -741,7 +761,7 @@ _EXPORT _BOOLEAN    in_jmalloc;
 /* Application mail handler   */
 /*----------------------------*/
 
-_EXPORT int         (*appl_mail_handler)(char *);
+_EXPORT  int32_t (*appl_mail_handler)(char *);
 #endif /* MAIL_SUPPORT */
 
 #else /* External variables */
@@ -750,188 +770,192 @@ _EXPORT int         (*appl_mail_handler)(char *);
 #endif /* __NOT_LIB_SOURCE__ */
 
 
-/*------------------------------------------------------------------------------
-    Prototype function definitions ...
-------------------------------------------------------------------------------*/
+/*--------------------------------*/
+/* Prototype function definitions */
+/*--------------------------------*/
 
 // Thread aware sigprockmask()
-_PROTOTYPE _EXPORT int pups_sigprocmask(int, const sigset_t *restrict, sigset_t *restrict);
+_PROTOTYPE _EXPORT int32_t pups_sigprocmask(int32_t, const sigset_t *restrict, sigset_t *restrict);
 
 // Get time (accurate to milliseconds)
 _PROTOTYPE _EXPORT double millitime(void);
 
-// Get node name and I.P. address associated with network interface
-_PROTOTYPE _EXPORT int pups_get_ip_info(const char *, char *, char *);
+// Get node name and I.P. address associated with network  interface
+_PROTOTYPE _EXPORT int32_t pups_get_ip_info(const char *, char *, char *);
 
-// Forward indexing function
-_PROTOTYPE _EXPORT long int ch_index(const char *, const char);
+// Return the position of nth occurence of character in string (relative to start) 
+_PROTOTYPE _EXPORT ssize_t ch_index(const char *, const char);
 
-// Reverse indexing function
-_PROTOTYPE _EXPORT long int rch_index(const char *, const char);
+// Return the position of nth occurence of character in string (relative to end) 
+_PROTOTYPE _EXPORT ssize_t rch_index(const char *, const char);
 
-// Extended getpwnam routine (which searches NIS passwd map)
+// Extended getpwnam routine (which searches NIS passwd map) [not thread safe]
 _PROTOTYPE _EXPORT struct passwd *pups_getpwnam(const char *);
 
-// Extended getpwuid routine (which searches NIS passwd map)
-_PROTOTYPE _EXPORT struct passwd *pups_getpwuid(const int);
+// Extended getpwuid routine (which searches NIS passwd map) [not thread safe]
+_PROTOTYPE _EXPORT struct passwd *pups_getpwuid(const uid_t);
 
-// Set up support child prior to dangerous operation
-_PROTOTYPE _EXPORT int pups_process_homeostat_enable(const _BOOLEAN);
+// Set up support child prior to performing dangerous operation
+_PROTOTYPE _EXPORT pid_t pups_process_homeostat_enable(const _BOOLEAN);
 
 // Cancel support child (at end of dangerous operation)
-_PROTOTYPE _EXPORT void pups_process_hoemostat_disable(const int);
+_PROTOTYPE _EXPORT void pups_process_hoemostat_disable(const pid_t);
 
-// Clear a virtual timer datastructure
-_PROTOTYPE _EXPORT int pups_clear_vitimer(const _BOOLEAN, const unsigned int);
+// Clear a virtual timer datastructure [root thread]
+_PROTOTYPE _EXPORT int32_t pups_clear_vitimer(const uint32_t);
 
 // Get file table index (associated with a file descriptor)
-_PROTOTYPE _EXPORT int pups_get_ftab_index_from_fd(unsigned const int);
+_PROTOTYPE _EXPORT int32_t pups_get_ftab_index_from_fd(const des_t);
 
 // Get file table index (associated with a stream)
-_PROTOTYPE _EXPORT  int pups_get_ftab_index_from_stream(const FILE *);
+_PROTOTYPE _EXPORT  int32_t pups_get_ftab_index_from_stream(const FILE *);
 
-// Restart virtual interval timers
-_PROTOTYPE _EXPORT int pups_vitrestart(void);
+// Restart virtual interval timers [root thread]
+_PROTOTYPE _EXPORT int32_t pups_vitrestart(void);
 
 // Find free file table index
-_PROTOTYPE _EXPORT int pups_find_free_ftab_index(void);
+_PROTOTYPE _EXPORT int32_t pups_find_free_ftab_index(void);
 
 #ifdef ZLIB_SUPPORT
 // Get file table index (associated with a zstream)
-_PUBLIC int pups_get_ftab_index_from_zstream(const gzFILE *);
+_PUBLIC int32_t pups_get_ftab_index_from_zstream(const gzFile);
 #endif /* ZLIB_SUPPORT */
 
 
-// Show number of link file locks concurrently held
-_PROTOTYPE _PUBLIC int pups_show_link_file_locks(const FILE *);
+// Show link file locks concurrently in use [root thread]
+_PROTOTYPE _PUBLIC int32_t pups_show_link_file_locks(const FILE *);
 
-// Apply file lock
-_PROTOTYPE _EXPORT int pups_lockf(const int, const int, const unsigned long int);
+// Apply extended file lock
+_PROTOTYPE _EXPORT int32_t pups_lockf(const des_t, const int32_t, const off_t);
 
 // Test to see if file is on a mounted filesystem
-_PROTOTYPE _EXPORT _BOOLEAN pups_get_fs_mountinfo(const char *, char *);
+_PROTOTYPE _EXPORT _BOOLEAN pups_get_fs_mouNtinfo(const char *, char *);
 
 // Set system error number
-_PROTOTYPE _EXPORT void pups_set_errno(int);
+_PROTOTYPE _EXPORT void pups_set_errno(const int32_t);
 
 // Get system error number
-_PROTOTYPE _EXPORT int pups_get_errno(void);
+_PROTOTYPE _EXPORT int32_t pups_get_errno(void);
+
+// Swap a pair of short  integers
+_PROTOTYPE _EXPORT void sswap(int16_t *, int16_t *);
 
 // Swap a pair of integers
-_PROTOTYPE _EXPORT void iswap(int *, int *);
+_PROTOTYPE _EXPORT void iswap(int *, int32_t *);
+
+// Swap a pair of long integers
+_PROTOTYPE _EXPORT void lswap(int64_t  *, int64_t  *);
 
 // Swap a pair of floats
 _PROTOTYPE _EXPORT void fswap(FTYPE *, FTYPE *);
 
 // Set error handler parameters
-_PROTOTYPE _EXPORT void pups_seterror(const FILE *, const int, const int);
+_PROTOTYPE _EXPORT void pups_seterror(const FILE *, const int32_t, const int32_t);
 
 // Error handler
-_PROTOTYPE _EXPORT int pups_error(const char *);
+_PROTOTYPE _EXPORT int32_t pups_error(const char *);
 
-// Read standard items from command tail
-_PROTOTYPE _EXPORT void pups_std_init(_BOOLEAN, int  *,char *,char *,char *,char *,char *[]);
+// Initialise PUPS/P3 environment [root thread] 
+_PROTOTYPE _EXPORT void pups_std_init(_BOOLEAN, int32_t  *,char *,char *,char *,char *, const char *[]);
 
 // Load argument vector from file
-_PROTOTYPE _EXPORT void pups_argfile(int, int *, const char *[], _BOOLEAN []);
+_PROTOTYPE _EXPORT void pups_argfile(int32_t, uint32_t *,  char *[], _BOOLEAN []);
 
 // Generate effective command tail string from secondary argument vector
 _PROTOTYPE _EXPORT void pups_argtline(char *);
 
-// Copy command tail
-_PROTOTYPE _EXPORT void pups_copytail(int *, const char *[], char *[]);
+// Make copy of comamnd line arguments
+_PROTOTYPE _EXPORT void pups_copytail(int32_t *, char *[], const char *[]);
 
-// Locate switch in command tail
-_PROTOTYPE _EXPORT int pups_locate(_BOOLEAN *, const char *, int *, const char*[], int);
+// Locate argument in command tail
+_PROTOTYPE _EXPORT int32_t pups_locate(_BOOLEAN *, const char *, uint32_t *, char *[], uint32_t);
 
-// Decode character item from command tail
-_PROTOTYPE _EXPORT char pups_ch_dec(int *, int *, const char *[]);
+// Get character from command tail
+_PROTOTYPE _EXPORT char pups_ch_dec  (int32_t *, uint32_t *, char *[]);
 
-// Decode integer from command tail
-_PROTOTYPE _EXPORT int pups_i_dec(int *, int *, const char *[]);
+// Get  integer from command tail argument
+_PROTOTYPE _EXPORT int32_t pups_i_dec(int32_t *, uint32_t *, char *[]);
 
-// Decode float from command tail
-_PROTOTYPE _EXPORT FTYPE pups_fp_dec(int *, int *, const char *[]);
+// Get float/double from command tail argument
+_PROTOTYPE _EXPORT FTYPE pups_fp_dec(int32_t *,  uint32_t *, char *[]);
 
-// Decode string item from command tail
-_PROTOTYPE _EXPORT char *pups_str_dec(int *, int *, const char *[]);
+// Get string from command tail argument [not thread safe]
+_PROTOTYPE _EXPORT char *pups_str_dec(int32_t *, uint32_t *, char *[]);
 
-
-
-#ifdef SECURE
-// Application security routine
-_PROTOTYPE _EXPORT void pups_securicor(const char *);
-#endif /* SECURE */
-
-
-// Check if a terminal device has been redirected
+// Check stdio descriptor redirectiom 
 _PROTOTYPE void pups_check_redirection(const des_t des);
 
 // Convert character to integer
-_PROTOTYPE _EXPORT int actoi(const char);
+_PROTOTYPE _EXPORT int32_t actoi(const char);
 
-// Get absolute value of integer
-_PROTOTYPE _EXPORT int iabs(int);
+// Test for short even  integer
+_PROTOTYPE _EXPORT _BOOLEAN seven(const int16_t);
 
-// Test for even integer
-_PROTOTYPE _EXPORT _BOOLEAN ieven(const int);
+// Test for even  integer
+_PROTOTYPE _EXPORT _BOOLEAN ieven(const int32_t);
 
-// Test for odd integer
-_PROTOTYPE _EXPORT _BOOLEAN iodd(const int);
+// Test for long even integer
+_PROTOTYPE _EXPORT _BOOLEAN leven(const  int64_t );
 
-// Get absolute value of integer
-_PROTOTYPE _EXPORT int iodd(const int);
+// Test for short integer sign
+_PROTOTYPE _EXPORT _BOOLEAN ssign(const int16_t);
 
-// Test for integer sign
-_PROTOTYPE _EXPORT _BOOLEAN isign(const int);
+// Test for  integer sign
+_PROTOTYPE _EXPORT _BOOLEAN isign(const int32_t);
+
+// Test for long integer sign
+_PROTOTYPE _EXPORT _BOOLEAN lsign(const int64_t );
+
+// Find the maximum of a pair of short integers
+_PROTOTYPE _EXPORT int32_t smax(const int16_t, const int16_t);
 
 // Find the maximum of a pair of integers
-_PROTOTYPE _EXPORT int imax(const int, const int);
+_PROTOTYPE _EXPORT int32_t imax(const  int32_t, const  int32_t);
 
-// Find the minimum of a pair of integers
-_PROTOTYPE _EXPORT int imin(const int, const int);
+// Find the maximum of a pair of  int32_t64_t egers
+_PROTOTYPE _EXPORT int32_t lmax(const  int64_t , const  int64_t );
 
 // Get sign of character
-_PROTOTYPE _EXPORT int chsign(const char);
+_PROTOTYPE _EXPORT int32_t chsign(const char);
 
 // Pause/test routine
-_PROTOTYPE _EXPORT int upause(const char *);
+_PROTOTYPE _EXPORT int32_t upause(const char *);
 
 // Check for file and open it if it exists
-_PROTOTYPE _EXPORT int pups_open(const char *, const int, int);
+_PROTOTYPE _EXPORT int32_t pups_open(const char *, const int32_t, const int32_t);
 
 // Close file
-_PROTOTYPE _EXPORT int pups_close(const int);
+_PROTOTYPE _EXPORT int32_t pups_close(const des_t);
 
 // Test if (named) file is living
 _PROTOTYPE _EXPORT _BOOLEAN pups_isalive(const char *);
 
 // Protect an (unopened) file
-_PROTOTYPE _EXPORT int pups_protect(const char *, const char *, const void *);
+_PROTOTYPE _EXPORT int32_t pups_protect(const char *, const char *, const void *);
 
 // Unprotect an (unopened) file
-_PROTOTYPE _EXPORT int pups_unprotect(const char *);
+_PROTOTYPE _EXPORT int32_t pups_unprotect(const char *);
 
 // Return the number of times a live file descriptor has been lost (and recreated)
-_PROTOTYPE _EXPORT int pups_lost(const int);
+_PROTOTYPE _EXPORT int32_t pups_lost(const des_t);
 
 // Test if file descriptor is living 
-_PROTOTYPE _EXPORT _BOOLEAN pups_fd_islive(const int);
+_PROTOTYPE _EXPORT _BOOLEAN pups_fd_islive(const des_t);
 
 // Make dead file descriptor alive
-_PROTOTYPE _EXPORT int pups_fd_alive(const int, const char *, const void *);
+_PROTOTYPE _EXPORT int32_t pups_fd_alive(const des_t, const char *, const void *);
 
 // Kill living file descriptor
-_PROTOTYPE _EXPORT int pups_fd_dead(const int);
+_PROTOTYPE _EXPORT int32_t pups_fd_dead(const des_t);
 
 // CLose all open (ftab) file descriptors
 _PROTOTYPE _EXPORT void pups_closeall(void);
 
-// Display currently open files
+// Display currently open extended file descriptors [root thread]
 _PROTOTYPE _EXPORT void pups_show_open_fdescriptors(const FILE *);
 
 // Strip a comment from an input file
-_PROTOTYPE _EXPORT _BOOLEAN strip_comment(const FILE *, int *, char *);
+_PROTOTYPE _EXPORT _BOOLEAN strip_comment(const FILE *, int32_t *, char *);
 
 // Test for existence of substring
 _PROTOTYPE _EXPORT _BOOLEAN strncmps(const char *, const char *);
@@ -943,131 +967,133 @@ _PROTOTYPE _EXPORT _BOOLEAN strrext(const char *, char *, const char);
 _PROTOTYPE _EXPORT _BOOLEAN strrextr(const char *, char *, const char);
 
 // Copy string excluding characters
-_PROTOTYPE _EXPORT size_t strexccpy(const char *, char *, const char *);
+_PROTOTYPE _EXPORT ssize_t strexccpy(const char *, char *, const char *);
 
-// Extract substring from string
+// Extract substring from string [root thread]
 _PROTOTYPE _EXPORT _BOOLEAN strext(const char, char *, const char *);
+
+// Case insensitive comparison of two strings (up to n significant characters)
+_PROTOTYPE _EXPORT int32_t strncmpi(const char *, const char *, size_t);
+
+// Convert string to lower case
+_PROTOTYPE _EXPORT char *strtolower(const char *);
+
+// Convert string to upper case
+_PROTOTYPE _EXPORT char *strtoupper(const char *);
 
 // Check if string 2 is a substring of string 1
 _PROTOTYPE _EXPORT _BOOLEAN strin(const char *, const char *);
 
-
-/*----------------------------------------------*/
-/* Check if string 2 is a substring of string 1 */
-/* returning tail of string 1                   */
-/*----------------------------------------------*/
-
+// Return tail of string s1 beginning at string s2
 _PROTOTYPE _EXPORT char *strin2(const char *, const char *);
 
-// Check if string 2 is a substring of string 1 [with string 2 demarcation check]
+// Look for character token demarcated occurence of string s2 within string s1
 _PROTOTYPE _EXPORT _BOOLEAN strintok(const char *, const char *, const char *);
 
 // Check if string 3 is to right of string 2 within string 1
 _PROTOTYPE _EXPORT _BOOLEAN stright(const char *, const char *, const char *);
 
-// Replace string s3 with string s4 globally within string s1, returning as string s2
-_PROTOTYPE _EXPORT _BOOLEAN strep(const char *, char *, const char *, const char *);
-
 // Replace string with a character constant
 _PROTOTYPE _EXPORT _BOOLEAN strepch(char *, const char *, const char);
 
+// Globally replace string s3 with string s4 globally in string s1, returning as string s2
+_PROTOTYPE _EXPORT _BOOLEAN strep(const char *, char *, const char *, const char *);
 
-/*-----------------------------------------------------------------------------------------*/
-/* Replace string demarcated string s3 with string s4 globally within string s1, returning */
-/* as string s2                                                                            */
-/*-----------------------------------------------------------------------------------------*/
-
+// Globally replace all token demarcated instances of string s3 in string s1 with string s4 returning result as string s2
 _PROTOTYPE _EXPORT _BOOLEAN streptok(const char *, char *, const char *, const char *, const char *);
 
-// Truncate string at demarcation character (from string tail)
-_PROTOTYPE _EXPORT _BOOLEAN strtrnc(char *, const char, int);
+//  Reverse truncate string at demarcation character (c_cnt instance from end of string)
+_PROTOTYPE _EXPORT _BOOLEAN strtrnc(char *, const char, size_t);
 
-// Truncate string at demarcation character (from string head)
-_PROTOTYPE _EXPORT _BOOLEAN strtrnch(char *, const char, int);
+// Truncate string at demarcation character (c_cnt instance from start of string)
+_PROTOTYPE _EXPORT _BOOLEAN strtrnch(char *, const char, size_t);
 
-// Strip (nominated) trailing character string
+// Strip trailing characters from string
 _PROTOTYPE _EXPORT _BOOLEAN strail(char *, const char);
 
-// Extract leaf from pathname
+// Extract leaf from pathname (/branch/leaf)
 _PROTOTYPE _EXPORT _BOOLEAN strleaf(const char *, char *);
 
-// Extract branch from pathname
+// Extract branch from pathname (/branch/leaf)
 _PROTOTYPE _EXPORT _BOOLEAN strbranch(const char *, char *);
 
-// Strip trailing character string (which begins with digit)
+// Strip first digit in string (and all characters after it)
 _PROTOTYPE _EXPORT _BOOLEAN strdigit(char *);
 
-// strip (nominated) leading characters from string
+// Strip leading characters from string (before demarcation character)
 _PROTOTYPE _EXPORT char *strlead(char *, const char);
 
 // Return substring which starts at first non-whitespace character
-_PROTOTYPE _EXPORT char *strfirst(char *);
+_PROTOTYPE _EXPORT char *strfirst(const char *);
 
-// Extract string
-_PROTOTYPE _EXPORT _BOOLEAN strfrm(const char *, const char, int, char *);
+// Extract string starting at demarcation character
+_PROTOTYPE _EXPORT _BOOLEAN strfrm(const char *, const char, int32_t, char *);
 
 // Count number of time character occurs in string
-_PROTOTYPE _EXPORT int strchcnt(const char, const char *);
+_PROTOTYPE _EXPORT ssize_t strchcnt(const char, const char *);
 
-// Extract substring from string [multiple embedded comparisons]
-_PROTOTYPE _EXPORT _BOOLEAN m_strext(const int, const char, char *, const char *);
+// Extract multiple substrings from string [root thread]
+_PROTOTYPE _EXPORT _BOOLEAN m_strext(const int32_t, const char, char *, const char *);
 
-// Routine to return the position of a character in a string
-_PROTOTYPE _EXPORT long int ch_pos(const char *, const char);
+// Routine to return the position of a character in string relative to start 
+_PROTOTYPE _EXPORT ssize_t ch_pos(const char *, const char);
 
-// Routine to return the reverse position of a character in a string
-_PROTOTYPE _EXPORT long int rch_pos(const char *, const char);
+// Routine to return the position of character in string relative to end
+_PROTOTYPE _EXPORT ssize_t rch_pos(const char *, const char);
 
-// Extract substring from string with multiple demarcation characters
-_PROTOTYPE _EXPORT _BOOLEAN mdc_strext(const char *, int *, char *, const char *);
+// Extract substrings from string demarcated by arbitrary characters [root thread]
+_PROTOTYPE _EXPORT _BOOLEAN mdc_strext(const char *, int32_t *, char *, const char *);
 
-// Extract substring from string with multiple demarcation characters
-_PROTOTYPE _EXPORT _BOOLEAN mdc_strext2(const char *, int *, int *, int *, char *, const char *);
+// Extract substrings from string demarcated by arbitrary characters [root thread]
+_PROTOTYPE _EXPORT _BOOLEAN mdc_strext2(const char *, int32_t *, int32_t *, size_t *, char *, const char *);
 
 // Look for occurence of string 1 inside string 2 returning index to string 1
-_PROTOTYPE _BOOLEAN strinp(unsigned long int *, const char *, const char *);
+_PROTOTYPE _BOOLEAN strinp(size_t *, const char *, const char *);
 
-// Strip numeric characters from a string
+// Strip numeric characters from a string (including '#' and '^')
 _PROTOTYPE _EXPORT _BOOLEAN strpdigit(const char *, char *);
 
 // Strip character from string
 _PROTOTYPE _EXPORT char *strpch(const char, char *);
 
-// Replace characters in string with nominated character
-_PROTOTYPE _EXPORT int mchrep(const char, const char *, char *);
+// Replace multiple characters in string with character
+_PROTOTYPE _EXPORT int32_t mchrep(const char, const char *, char *);
 
-// Copy string returning state of copied string pointer
+// Copy string checking for NULL or invalid argument string
 _PROTOTYPE _EXPORT char *strccpy(char *, const char *);
 
 // Test for empty string (contains only whitespace and control chars)
 _PROTOTYPE _EXPORT _BOOLEAN strempty(const char *);
 
-// Generate random alphanumeric string
-_PROTOTYPE _EXPORT int strand(const size_t, char *);
+// Generate random string constaining hexidecimal characters
+_PROTOTYPE _EXPORT int32_t strand(const size_t, char *);
 
 // Find sign of float
 _PROTOTYPE _EXPORT FTYPE fsign(const FTYPE);
 
 // Round a floating point number to N significant figures
-_PROTOTYPE _EXPORT FTYPE sigfig(const FTYPE, const unsigned int);
+_PROTOTYPE _EXPORT FTYPE sigfig(const FTYPE, const uint32_t);
 
 // Pascal compatable squaring routine
 _PROTOTYPE _EXPORT FTYPE sqr(const FTYPE);
 
 // Pascal compatable round routine
-_PROTOTYPE _EXPORT int iround(const FTYPE);
+_PROTOTYPE _EXPORT int32_t iround(const FTYPE);
 
 // Get next free PUPS file table index
-_PROTOTYPE _EXPORT int pups_find_ftab_index(void);
+_PROTOTYPE _EXPORT int32_t pups_find_ftab_index(void);
 
 // Get next free PUPS file table index
-_PROTOTYPE _EXPORT int pups_get_ftab_index(const int);
+_PROTOTYPE _EXPORT int32_t pups_get_ftab_index(const des_t);
+
+// Update PSRP channel entry in file table
+_PROTOTYPE _EXPORT int32_t pups_update_psrp_channel_ftab_entry(const char *, const char *);
 
 // Open file
-_PROTOTYPE _EXPORT FILE *pups_fopen(char *, char *, int);
+_PROTOTYPE _EXPORT FILE *pups_fopen(const char *, const char *, const int32_t);
 
 // Bind descriptor to stream
-_PROTOTYPE _EXPORT FILE *pups_fdopen(const int, const char *);
+_PROTOTYPE _EXPORT FILE *pups_fdopen(const des_t, const char *);
  
 // Close file
 _PROTOTYPE _EXPORT FILE *pups_fclose(const FILE *);
@@ -1075,589 +1101,553 @@ _PROTOTYPE _EXPORT FILE *pups_fclose(const FILE *);
 
 #ifdef ZLIB_SUPPORT
 // Open file associated with zstream
-_PROTOTYPE _EXPORT gzFILE *pups_xgzopen(const char *, const char *, const int);
+_PROTOTYPE _EXPORT gzFile pups_xgzopen(const char *, const char *, const int32_t);
 
 // Close file associated with zstream
-_PROTOTYPE _EXPORT gzFILE *pups_gzclose(const gzFILE *);
+_PROTOTYPE _EXPORT gzFile pups_gzclose(const gzFile);
 #endif /* ZLIB_SUPPORT */
 
 
 // Strip comments from file
 _PROTOTYPE _EXPORT FILE *pups_strp_commnts(const char, const FILE *, char *);
 
-// Print arguments which have not been parsed by application
+// Flag unparsed command line arguments [root thread]
 _PROTOTYPE _EXPORT void pups_t_arg_errs(const _BOOLEAN *, const char *[]);
 
-// Extended write - checks that N bytes are in fact read 
-_PROTOTYPE _EXPORT int pups_write(const des_t, const _BYTE *, const psize_t);
+// Extended error checking write 
+_PROTOTYPE _EXPORT int32_t pups_write(const des_t, const void *, const psize_t);
 
-// Extended write - checks that N bytes are in fact written
-_PROTOTYPE _EXPORT int pups_read(const des_t, _BYTE *, const psize_t);
+// Extended error checking read 
+_PROTOTYPE _EXPORT int32_t pups_read(const des_t, void *, const psize_t);
 
-// Set memory allocator (extended) options
-_PROTOTYPE _EXPORT void pups_set_alloc_opt(const int);
+// Set memory allocator (extended) options [root thread]
+_PROTOTYPE _EXPORT void pups_set_alloc_opt(const int32_t);
 
-// Extended malloc - checks for allocation
+// Extended error checking malloc
 _PROTOTYPE _EXPORT void *pups_malloc(const psize_t);
 
-// Extended realloc - checks for allocation
+// Extended error checking realloc
 _PROTOTYPE _EXPORT void *pups_realloc(void *, const psize_t);
 
-// Extended calloc - checks for allocation
+// Extended error checking calloc
 _PROTOTYPE _EXPORT void *pups_calloc(const pindex_t, const psize_t);
 
-// Extended free - checks for unassigned pointer
+// Extended error checking free 
 _PROTOTYPE _EXPORT void *pups_free(const void *);
 
 // Set process state
 _PROTOTYPE _EXPORT void pups_set_state(const char *);
 
-// Routine to get an application state vector
+// Get process state
 _PROTOTYPE _EXPORT void pups_get_state(const char *);
 
-// Display an application state vector
+// Display process state [root thread]
 _PROTOTYPE _EXPORT void pups_show_state(void);
 
 // Register name of (file) creator
-_PROTOTYPE _EXPORT int pups_creator(const int);
+_PROTOTYPE _EXPORT int32_t pups_creator(const des_t);
 
 // Relinquish creator rights to file
-_PROTOTYPE _EXPORT int pups_not_creator(const int);
+_PROTOTYPE _EXPORT int32_t pups_not_creator(const des_t);
 
-// Generate command vector from string and then do execv */
-_PROTOTYPE _EXPORT int pups_execls(const char *);
+// Execute command string
+_PROTOTYPE _EXPORT int32_t pups_execls(const char *);
 
-// Routine to allocate a two dimensional array
+// Allocate dynamic 2D array
 _PROTOTYPE _EXPORT void **pups_aalloc(const pindex_t, const pindex_t, const psize_t);
 
-// Routine to free a two dimensional array
+// Free dynamic 2D array
 _PROTOTYPE _EXPORT void **pups_afree(pindex_t, void **);
 
-// Routine to perform a heapsort
-_PROTOTYPE _EXPORT void sort2(int, FTYPE [], FTYPE[]);
+// Sort an array of floating point values using heapsort
+_PROTOTYPE _EXPORT void pups_sort(int32_t, FTYPE [], FTYPE[]);
 
-// Get entries in directory
-_PROTOTYPE _EXPORT char **pups_get_directory_entries(const char *, const char *, int *, int *);
+// Build a table of filesystem objects in the current directory matching key
+_PROTOTYPE _EXPORT char **pups_get_directory_entries(const char *, const char *, int32_t *, int32_t *);
 
-// Get (multikeyed) entries in directory
-_PROTOTYPE _EXPORT char **pups_get_multikeyed_directory_entries(const char *, const int, const char **, int *, int *);
+// Build a table of filesystem objects in the current directory matching multiple keys
+_PROTOTYPE _EXPORT char **pups_get_multikeyed_directory_entries(const char *, const int32_t, const char **, int32_t *, int32_t *);
 
 // Read call which is not interrupted by signal handling
-_PROTOTYPE _EXPORT unsigned long int pups_sread(const int, char *, const unsigned long int);
+_PROTOTYPE _EXPORT ssize_t pups_sread(const des_t, char *, const size_t);
 
 // Write call which is not interrupted by signal handling
-_PROTOTYPE _EXPORT unsigned long int pups_swrite(const int, const char *, const unsigned long int);
+_PROTOTYPE _EXPORT ssize_t pups_swrite(const des_t, const char *, const size_t);
 
-// Search a path for an item
+// Search (shell) path directories for item
 _PROTOTYPE _EXPORT char *pups_search_path(const char *, const char *);
 
-// Set process execution name
-_PROTOTYPE _EXPORT void pups_set_pen(const char *[], const char *, const char *);
+// Set process execution name (in kernel process table) [root thread]
+_PROTOTYPE _EXPORT void pups_set_pen(char *[], const char *, const char *);
 
-// Register process entrance function
-_PROTOTYPE _EXPORT int pups_register_entrance_f(const char *, const void *, const char *);
+// Register process entrance function [root thread]
+_PROTOTYPE _EXPORT int32_t pups_register_entrance_f(const char *, const void *, const char *);
 
-// Deregister process entrance function
-_PROTOTYPE _EXPORT int pups_deregister_entrance_f(const void *);
+// Deregister process entrance function [root thread]
+_PROTOTYPE _EXPORT int32_t pups_deregister_entrance_f(const void *);
 
-// Show entrance functions
+// Display process entrance functions [root thread]
 _PROTOTYPE _EXPORT void pups_show_entrance_f(const FILE *);
 
-// Register process exit function
-_PROTOTYPE _EXPORT int pups_register_exit_f(const char *, const void *, const char *);
+// Register process exit function [root thread]
+_PROTOTYPE _EXPORT int32_t pups_register_exit_f(const char *, const void *, const char *);
 
-// Deregister process exit function
-_PROTOTYPE _EXPORT int pups_deregister_exit_f(const void *);
+// Deregister process exit function [root thread]
+_PROTOTYPE _EXPORT int32_t pups_deregister_exit_f(const void *);
 
-// Show exit functions
+// Display process exit functions [root thread]
 _PROTOTYPE _EXPORT void pups_show_exit_f(const FILE *);
 
-// Register process abort function
-_PROTOTYPE _EXPORT int pups_register_abort_f(const char *, const void *, const char *);
+// Register process abort function [root thread]
+_PROTOTYPE _EXPORT int32_t pups_register_abort_f(const char *, const void *, const char *);
 
-// Show abort functions
+// Deregister process abort  function [root thread]
+_PROTOTYPE _EXPORT int32_t pups_deregister_abort_f(const void *);
+
+// Display process abort functions [root thread]
 _PROTOTYPE _EXPORT void pups_show_abort_f(const FILE *);
 
-// Deregister process abort  function
-_PROTOTYPE _EXPORT int pups_deregister_abort_f(const void *);
+// PUPS exit [root thread]
+_PROTOTYPE _EXPORT int32_t pups_exit(const int32_t);
 
-// PUPS process exit */
-_PROTOTYPE _EXPORT int pups_exit(const int);
+// Pipe read 
+_PROTOTYPE _EXPORT ssize_t pups_pipe_read(const des_t, void *, const size_t);
 
-// Pipe read */
-_PROTOTYPE _EXPORT unsigned long int pups_pipe_read(const int, void *, const unsigned long int);
+// Block signal (PUPS compliant)
+_PROTOTYPE _EXPORT int32_t pupsighold(const int32_t, const _BOOLEAN);
 
-// Block signal (for critical code sequence protection)
-_PROTOTYPE _EXPORT int pupsighold(const int, const _BOOLEAN);
+// Unblock signal (PUPS/P3 compliant)
+_PROTOTYPE _EXPORT  int32_t pupsigrelse(const int32_t);
 
-// Release blocked signals
-_PROTOTYPE _EXPORT int pupsigrelse(const int);
+// Block signal set (PUPS/P3 compliant)
+_PROTOTYPE _EXPORT void pupshold(const int32_t);
 
-// Block PUPS signals
-_PROTOTYPE _EXPORT void pupshold(const int);
+// Unblock signal set (PUPS compliant)
+_PROTOTYPE _EXPORT void pupsrelse(const int32_t);
 
-// Release all PUPS signals */
-_PROTOTYPE _EXPORT void pupsrelse(const int);
+// PUPS compliant POSIX signal handler
+_PROTOTYPE _EXPORT int32_t pups_sighandle(const int32_t, const char *, const void *, const sigset_t *);
 
-// PUPS signal handler
-_PROTOTYPE _EXPORT int pups_sighandle(const int, const char *, const void *, const sigset_t *);
+// PUPS compliant process suspension (until specified signal recieved)
+_PROTOTYPE _EXPORT int32_t pups_signalpause(const int32_t);
 
-// Suspend process until specified signal is recieved
-_PROTOTYPE _EXPORT int pups_signalpause(const int);
+// PUPS complaint sigpending
+_PUBLIC _BOOLEAN pups_signalpending(const int32_t);
 
-// Check to see if specified signal is pending
-_PUBLIC _BOOLEAN pups_signalpending(const int);
-
-// PUPS signal handler status
+// Display process signal table [root thread]
 _PROTOTYPE _EXPORT void pups_show_sigstatus(const FILE *);
 
-// PUPS signal mask/signal pending status
+// Display state of process signal mask (and signals pending) [root thread]
 _PROTOTYPE _EXPORT void pups_show_sigmaskstatus(const FILE *);
 
 // Convert signal name to signal number
-_PROTOTYPE _EXPORT int pups_signametosigno(const char *);
+_PROTOTYPE _EXPORT int32_t pups_signametosigno(const char *);
 
 // Convert signal number to signal name
-_PROTOTYPE _EXPORT char *pups_signotosigname(const int, char *);
+_PROTOTYPE _EXPORT char *pups_signotosigname(const int32_t, char *);
 
-// PUPS signal handler extended status
-_PROTOTYPE _EXPORT int pups_show_siglstatus(const int, const FILE *);
+// Display detailed state of signal [root thread]
+_PROTOTYPE _EXPORT int32_t pups_show_siglstatus(const int32_t, const FILE *);
 
-// PUPS signal handler exit vectorer
-_PROTOTYPE _EXPORT int pups_sigvector(const int, const sigjmp_buf *);
+// Execute non-local goto (as exit from a signal handler)
+_PROTOTYPE _EXPORT int32_t pups_sigvector(const int32_t, const sigjmp_buf *);
 
-// Test to see if data is available on descriptor
-_PROTOTYPE _EXPORT int pups_monitor(const int, const int, const int);
+// Check descriptor for data and/or exceptions using select
+_PROTOTYPE _EXPORT int32_t pups_monitor(const des_t, const int32_t, const int32_t);
 
-// Return date string
+// Return current date string
 _PROTOTYPE _EXPORT void strdate(char *);
 
-// Set up PUPS virtual interval timer
-_PROTOTYPE _EXPORT int pups_setvitimer(const char *, const int, const int, const time_t, const char *, const void *);
+// Set virtual  interval timer [root thread]
+_PROTOTYPE _EXPORT int32_t pups_setvitimer(const char *, const int32_t, const int32_t, const time_t, const char *, const void *);
 
-// Clear PUPS virtual interval timer
-_PROTOTYPE _EXPORT int pups_clearvitimer(const char *);
+// Clear virtual  interval timer [root thread]
+_PROTOTYPE _EXPORT int32_t pups_clearvitimer(const char *);
 
-// Restart timer system
+// Restart virtual interval timer system [root thread]
 _PROTOTYPE _EXPORT _BOOLEAN vitmer_restart(void);
 
-// Show PUPS virtual interval timer
+// Display virtual interval timer table [root thread]
 _PROTOTYPE _EXPORT void pups_show_vitimers(const FILE *);
 
-// Set homeostatic file state parameters
-_PROTOTYPE _EXPORT int pups_set_fs_hsm_parameters(const int, const int, const char *);
+// Set parameters for homeostatic file system space monitoring [root thread]
+_PROTOTYPE _EXPORT int32_t pups_set_fs_hsm_parameters(const des_t, const int32_t, const char *);
 
-// Homeostatic write check routine
-_PUBLIC int pups_write_homeostat(const int, int (*)(int));
+// Homeostatic write check for filesystem [root thread]
+_PUBLIC int32_t pups_write_homeostat(const des_t, int32_t (*)(int32_t));
 
-// Homeostat for stdio redirected to FIFO's
-_PROTOTYPE _EXPORT int pups_default_fd_homeostat(void *, const char *);
+// Homeostat for (open) files [root thread]
+_PROTOTYPE _EXPORT int32_t pups_default_fd_homeostat(void *, const char *);
 
-// Monitor effective parent process
+// Monitor effective parent and exit if it is terminated [root thread]
 _PROTOTYPE _EXPORT void pups_default_parent_homeostat(void *, const char *);
 
-// File system space homeostat
-_PROTOTYPE _EXPORT _BOOLEAN pups_check_fs_space(const int);
+// Check for space of filesystem associated with open file descriptor
+_PROTOTYPE _EXPORT _BOOLEAN pups_check_fs_space(const des_t);
 
-// Attach homeostat to file table entry
-_PROTOTYPE _EXPORT int pups_attach_homeostat(const int, const void *);
+// Attach homeostat to file table entry [root thread]
+_PROTOTYPE _EXPORT int32_t pups_attach_homeostat(const des_t, const void *);
 
-// Detach homeostat from file table entry
-_PROTOTYPE _EXPORT int pups_detach_homeostat(const int);
+// Detach homeostat from file table entry [root thread]
+_PROTOTYPE _EXPORT int32_t pups_detach_homeostat(const des_t);
 
-// VT timer compatable sleep routine
-_PROTOTYPE _EXPORT int pups_sleep(const int);
+// PUPS compliant sleep call
+_PROTOTYPE _EXPORT int32_t pups_sleep(const int32_t);
 
-// Microsecond alarm function
-_PROTOTYPE _EXPORT int pups_malarm(const unsigned long int);
+// Microsecond alarm function (raises SIGALRM on timeout)
+_PROTOTYPE _EXPORT int32_t pups_malarm(const uint64_t);
 
-// Get (named) file lock
-_PROTOTYPE _EXPORT _BOOLEAN pups_get_lock(const char *, const int);
+// Acquire lock on (named) file
+_PROTOTYPE _EXPORT _BOOLEAN pups_get_lock(const char *, const int32_t);
 
-// Release (named) file lock
+// Release lock on (named) file
 _PROTOTYPE _EXPORT _BOOLEAN pups_release_lock(const char *);
 
-// Get PUPS file descriptor lock
-_PROTOTYPE _EXPORT _BOOLEAN pups_get_fd_lock(const int, const int);
+// Get (or test) write lock on open file descriptor
+_PROTOTYPE _EXPORT _BOOLEAN pups_get_fd_lock(const des_t, const int32_t);
 
-// Release PUPS file descriptor lock
-_PROTOTYPE _EXPORT int pups_release_fd_lock(const int);
+// Release write lock on open file descriptor
+_PROTOTYPE _EXPORT int32_t pups_release_fd_lock(const des_t);
 
-// Get file descriptor (from filename)
-_PROTOTYPE _EXPORT int pups_fname2fdes(const char *);
+// Get file descriptor from filename
+_PROTOTYPE _EXPORT int32_t pups_fname2fdes(const char *);
 
-// Get file stream (from filename)
+// Get file stream from filename
 _PROTOTYPE _EXPORT FILE *pups_fname2fstream(const char *);
 
-// Get file table index (from file name)
-_PROTOTYPE _EXPORT int pups_fname2index(const char *);
+// Get file table index from file name
+_PROTOTYPE _EXPORT int32_t pups_fname2index(const char *);
 
-// Get file table index (from file descriptor)
-_PROTOTYPE _EXPORT int pups_fdes2index(const int);
+// Get file table index from file descriptor
+_PROTOTYPE _EXPORT int32_t pups_fdes2index(const des_t);
 
-// Enable obituary (for child)
-_PROTOTYPE _EXPORT int pups_pipestream_obituary_enable(const int);
+// Enable obituary for pipestream (child) process
+_PROTOTYPE _EXPORT int32_t pups_pipestream_obituary_enable(const des_t);
 
-// Disable obituary (for child)
-_PROTOTYPE _EXPORT int pups_pipestream_obituary_disable(const int);
+// Disable obituary for pipestream (child) process
+_PROTOTYPE _EXPORT int32_t pups_pipestream_obituary_disable(const des_t);
 
-// Extended fork routine
-_PROTOTYPE _EXPORT int pups_fork(const _BOOLEAN, const _BOOLEAN);
+// Extended fork routine (which records forked children)
+_PROTOTYPE _EXPORT pid_t pups_fork(const _BOOLEAN, const _BOOLEAN);
 
-// Extended creat command
-_PROTOTYPE _EXPORT int pups_creat(const char *, const int);
+// Create file without opening it 
+_PROTOTYPE _EXPORT int32_t pups_creat(const char *, const int32_t);
 
-// Extended fchmod which updates ftab
-_PROTOTYPE _EXPORT int pups_fchmod(const int, const int);
+// Change mode of file associated with open descriptor and update file table
+_PROTOTYPE _EXPORT  int32_t pups_fchmod(const des_t, const int32_t);
 
-// Extended strlen command
-_PROTOTYPE _EXPORT int pups_strlen(const char *);
+// Return string size (including terminating NULL)
+_PROTOTYPE _EXPORT  int32_t pups_strlen(const char *);
 
-// Tracked malloc routine
-_PROTOTYPE _EXPORT void *pups_tmalloc(const unsigned long int, const char *, const char *);
+// Memory block tracking malloc
+_PROTOTYPE _EXPORT void *pups_tmalloc(const size_t, const char *, const char *);
 
-// Tracked calloc routine
-_PROTOTYPE _EXPORT void *pups_tcalloc(const int, const unsigned long int, const char *, const char *);
+// Memory block tracking calloc
+_PROTOTYPE _EXPORT void *pups_tcalloc(const int32_t, const size_t, const char *, const char *);
 
-// Tracked realloc routine
-_PROTOTYPE _EXPORT void *pups_trealloc(void *, const unsigned long int);
+// Memory block tracking reaalloc
+_PROTOTYPE _EXPORT void *pups_trealloc(void *, const size_t);
 
-// Convert tracked object name to heap address
+// Get tracked object heap address from tracked object name
 _PROTOTYPE _EXPORT void *pups_tnametoptr(const char *);
 
-// Convert partial tracked object name to heap address
-_PROTOTYPE _EXPORT void *pups_tpartnametoptr(const char *);
+// Get pointer from partial tracked object name
+_PROTOTYPE _EXPORT void *pups_tpartnametoptr(uint32_t *, const char *);
 
-// Convert type to heap address
-_PROTOTYPE _EXPORT void *pups_ttypetoptr(const char *);
+// Get pointer from tracked type 
+_PROTOTYPE _EXPORT void *pups_ttypetoptr(uint32_t *, const char *);
 
-// Tracked object free
+// Memory block tracking free
 _PROTOTYPE _EXPORT void *pups_tfree(const void *);
 
 // Tracked dynamic array allocation
 _PROTOTYPE _EXPORT void **pups_taalloc(const pindex_t, const pindex_t, const psize_t, const char *, const char *);
 
-// Tracked dynamic array free
+// Free tracked 2D arrray
 _PROTOTYPE _EXPORT void **pups_tafree(const void **);
 
-// Display tracked object attributes
-_PROTOTYPE _EXPORT int pups_tshowobject(const FILE *, const void *);
+// Display tracked objects [root thread]
+_PROTOTYPE _EXPORT int32_t pups_tshowobject(const FILE *, const void *);
 
-// Display tracked object table
-_PROTOTYPE _EXPORT int pups_tshowobjects(const FILE *, int *);
+// Display tracked object table [root thread]
+_PROTOTYPE _EXPORT int32_t pups_tshowobjects(const FILE *, int32_t *);
 
-// Extended fgets function
-_PROTOTYPE _EXPORT char *pups_fgets(char *, const unsigned long int, const FILE *);
+// PUPS fgets function
+_PROTOTYPE _EXPORT char *pups_fgets(char *, const size_t, const FILE *);
 
-// PUPS wait function
-_PROTOTYPE _EXPORT int pupswait(const _BOOLEAN, int *);
+// Wait function compatable with PUPS child managment
+_PROTOTYPE _EXPORT int32_t pupswait(const _BOOLEAN,  int32_t *);
 
-// PUPS waitpid function
-_PROTOTYPE _EXPORT int pupswaitpid(const _BOOLEAN, const int, int *);
+// Waitpid function compatable with PUPS child managment
+_PROTOTYPE _EXPORT int32_t pupswaitpid(const _BOOLEAN, const pid_t, int32_t *);
 
-// Set child name associated with child process
-_PROTOTYPE _EXPORT _BOOLEAN pups_set_child_name(const int, const char *);
+// Set child name 
+_PROTOTYPE _EXPORT _BOOLEAN pups_set_child_name(const pid_t, const char *);
 
 // Clear a child table slot
-_PROTOTYPE _EXPORT int pups_clear_chtab_slot(const _BOOLEAN, const unsigned int);
+_PROTOTYPE _EXPORT  int32_t pups_clear_chtab_slot(const _BOOLEAN, const uint32_t);
 
-// Show active children
+// Display child table [root thread]
 _PROTOTYPE _EXPORT void pups_show_children(const FILE *);
 
-
-/*------------------------------------------------------------*/
-/* Switch automatic child handling off (for a process we wish */
-/* to wait for explicitily)                                   */
-/*------------------------------------------------------------*/
-
-_PROTOTYPE _EXPORT void pups_noauto_child(void);
-
-// Re-enable automatic child handling
+// Install handler for PUPS automatic child management
 _PROTOTYPE _EXPORT void pups_auto_child(void);
 
-// Is string a comment string? (first non-space character '#')
+// Remove handler for PUPS automatic child management
+_PROTOTYPE _EXPORT void pups_noauto_child(void);
+
+// Check to see if line is a comment line (first non-space char is '#') or empty
 _PROTOTYPE _EXPORT _BOOLEAN strcomment(const char *);
 
 // Set all characters in string to NULL ('\0')
 _PROTOTYPE _EXPORT void strclr(char *);
 
-// Save a PUPS sigtab entry
-_PROTOTYPE _EXPORT void pups_sigtabsave(const int, sigtab_type *);
+// Save PUPS signal table entry
+_PROTOTYPE _EXPORT void pups_sigtabsave(const int32_t, sigtab_type *);
 
-// Restore a PUPS sigtab entry
-_PROTOTYPE _EXPORT void pups_sigtabrestore(const int, const sigtab_type *);
+// Restore a PUPS signal table entry (and reinstall signal handler)
+_PROTOTYPE _EXPORT void pups_sigtabrestore(const int32_t, const sigtab_type *);
 
-// Turn local echoing off (on tty)
-_PROTOTYPE _EXPORT int pups_tty_echoing_off(FILE *, struct termios *);
+// Turn tty echoing off
+_PROTOTYPE _EXPORT int32_t pups_tty_echoing_off(FILE *, struct termios *);
 
-// Turn local tty echoing on (on tty) */
-_PROTOTYPE _EXPORT void pups_tty_echoing_on(FILE *, int, struct termios);
+// Turn tty echoing on 
+_PROTOTYPE _EXPORT void pups_tty_echoing_on(FILE *, int32_t, struct termios);
 
-// Execute command (pipeline) locally */
-_PROTOTYPE _EXPORT int pups_lexec(char *, char *, int);
+// Execute command on local host
+_PROTOTYPE _EXPORT pid_t pups_lexec(const char *, const char *, const int32_t);
 
-
-/*---------------------------------------------------------------------*/
-/* PUPS statkill -- pids which belong to terminated or stopped process */
-/* return error                                                        */
-/*---------------------------------------------------------------------*/
-
-_PROTOTYPE _EXPORT int pups_statkill(int, int);
-
+// PUPS statkill (pids of terminated or stopped processes return error)
+_PROTOTYPE _EXPORT int32_t pups_statkill(const pid_t, const  int32_t);
 
 // Set file table id tag
-_PROTOTYPE _EXPORT int set_ftab_id(const int, const int);
+_PROTOTYPE _EXPORT int32_t pups_set_ftab_id(const des_t, const  int32_t);
 
 // Get file table index (from id tag)
-_PROTOTYPE _EXPORT int pups_get_ftab_index_by_id(const int);
+_PROTOTYPE _EXPORT int32_t pups_get_ftab_index_by_id(const  int32_t);
 
 // Get file table index (from file name)
-_PROTOTYPE _EXPORT int pups_get_ftab_index_by_name(const char *);
+_PROTOTYPE _EXPORT int32_t pups_get_ftab_index_by_name(const char *);
 
 // Clear file table slot
-_PROTOTYPE _EXPORT int pups_clear_ftab_slot(const _BOOLEAN, const int);
+_PROTOTYPE _EXPORT int32_t pups_clear_ftab_slot(const _BOOLEAN, const  int32_t);
 
-// Initialise child table
-_PROTOTYPE _EXPORT void pups_init_child_table(const int);
+// Initialise child table [root thread]
+_PROTOTYPE _EXPORT void pups_init_child_table(const uint32_t);
 
 // lseek() function which is PUPS signal safe
-_PROTOTYPE _EXPORT int pups_lseek(int, unsigned long int, int);
+_PROTOTYPE _EXPORT off_t pups_lseek(des_t, off_t, int32_t);
 
-// Get load average
-_PROTOTYPE _EXPORT FTYPE pups_get_load_average(const int which_load_average);
+// Get load average for localhost
+_PROTOTYPE _EXPORT FTYPE pups_get_load_average(const int32_t which_load_average);
 
 // Test to see if fdes is asscoiated with a seekable device
-_PROTOTYPE _EXPORT _BOOLEAN pups_is_seekable(const int);
+_PROTOTYPE _EXPORT _BOOLEAN pups_is_seekable(const des_t);
 
 // Relay data to a process slaved via a pair of FIFO's
-_PROTOTYPE _EXPORT int pups_fifo_relay(const int, const int, const int);
+_PROTOTYPE _EXPORT int32_t pups_fifo_relay(const pid_t, const  int32_t, const  int32_t);
 
-// Set a read or write link file lock
-_PROTOTYPE int pups_get_rdwr_link_file_lock(const int, const int, const char *);
+// Set read or write link file lock
+_PROTOTYPE int32_t pups_get_rdwr_link_file_lock(const int32_t, const int32_t, const char *);
 
-// Get file lock [using link()]
-_PROTOTYPE _EXPORT int pups_get_link_file_lock(const unsigned int, const char *);
+// Set a write (exclusive) link file lock
+_PROTOTYPE _EXPORT int32_t pups_get_link_file_lock(const uint32_t, const char *);
 
-// Release file lock [set using link()]
-_PROTOTYPE _EXPORT int pups_release_link_file_lock(const char *);
+// Release link file lock
+_PROTOTYPE _EXPORT int32_t pups_release_link_file_lock(const char *);
+
+// Release all link file locks
+_PROTOTYPE _EXPORT int32_t pups_release_all_link_file_locks(void);
 
 // Wait for file to be unlinked before returning to caller
-_PROTOTYPE _EXPORT int pups_unlink(const char *);
+_PROTOTYPE _EXPORT int32_t pups_unlink(const char *);
 
-// Interaction free version of usleep()
-_PROTOTYPE _EXPORT int pups_usleep(const unsigned long int);
+// PUPS usleep
+_PROTOTYPE _EXPORT int32_t pups_usleep(const uint64_t);
 
-// Check to see if current file is on CDFS
+// Is current file is on ISOfs filesystem
 _PROTOTYPE _EXPORT _BOOLEAN pups_is_on_isofs(const char *);
 
-// Check to see if current file is on CDFS
-_PROTOTYPE _EXPORT _BOOLEAN pups_is_on_fisofs(const int);
+// Is file descriptor is associated with ISOfs filesystem
+_PROTOTYPE _EXPORT _BOOLEAN pups_is_on_fisofs(const des_t);
 
-// Check to see if current file is on NFS
+// Is current file is on NFS filesystem
 _PROTOTYPE _EXPORT _BOOLEAN pups_is_on_nfs(const char *);
 
-// Check to see if current file is on NFS
-_PROTOTYPE _EXPORT _BOOLEAN pups_is_on_fnfs(const int);
+// Is open file descriptor is associated with NFS filesystem
+_PROTOTYPE _EXPORT _BOOLEAN pups_is_on_fnfs(const des_t);
 
 // Copy file (by name)
-_PROTOTYPE _EXPORT int pups_cpfile(const char *, const char *, int);
+_PROTOTYPE _EXPORT int32_t pups_cpfile(const char *, const char *, int32_t);
 
-// Copy file (by descriptor)
-_PROTOTYPE _EXPORT int pups_fcpfile(const int, const int);
+// Copy file (by open descriptor descriptors)
+_PROTOTYPE _EXPORT int32_t pups_fcpfile(const des_t, const des_t);
 
-// Check for host scanning (ps, top etc)
+// Check if command is running
 _PROTOTYPE _EXPORT _BOOLEAN pups_cmd_running(void);
 
-// Do I own the current process?
-_PROTOTYPE _EXPORT _BOOLEAN pups_i_own(const int);
+// Check if I own a given process
+_PROTOTYPE _EXPORT _BOOLEAN pups_i_own(const pid_t);
 
-// Enable abort restart (on reciept of SIGQUIT)
-_PROTOTYPE _EXPORT int pups_restart_enable(void);
+// Set re-entry point for SIGRESTART
+_PROTOTYPE _EXPORT int32_t pups_restart_enable(void);
 
-// Disable abort restart (on reciept of SIGQUIT)
-_PROTOTYPE _EXPORT int pups_restart_disable(void);
+// Reset re-entry point for SIGRESTART
+_PROTOTYPE _EXPORT int32_t pups_restart_disable(void);
 
-// Compute psuedo 32 bit cyclic redundancy checksum
-_PUBLIC int pups_crc_p32(const size_t, _BYTE *);
+// Compute (psuedo) 32 bit cyclic redundancy checksum
+_PUBLIC int32_t pups_crc_32(const size_t, _BYTE *);
 
 // Generate 64 bit cyclic redundancy checksum
-_PUBLIC unsigned long int pups_crc_64(const size_t, _BYTE *);
+_PUBLIC uint64_t pups_crc_64(const size_t, _BYTE *);
 
 // Extract CRC signature from file name
-_PROTOTYPE _EXPORT unsigned long int pups_get_signature(const char *, const char);
+_PROTOTYPE _EXPORT uint64_t pups_get_signature(const char *, const char);
 
 // Sign a file (with its CRC checksum)
-_PROTOTYPE _EXPORT int pups_sign(const unsigned long int, const char *, char *, const char);
+_PROTOTYPE _EXPORT int32_t pups_sign(const uint64_t, const char *, char *, const char);
 
-// PUPS signal safe fprintf function
-_PROTOTYPE _EXPORT int pupsfprintf(FILE *, char *, ...);
-
-// Replace command tail tem at specified location
+// Replace item in command tail
 _PROTOTYPE _EXPORT _BOOLEAN pups_replace_cmd_tail_item(const char *, const char *);
 
-// Insert item into the command tail
-_PROTOTYPE _EXPORT int pups_insert_cmd_tail_item(const char *, const char *);
+// Insert item  int32_to the command tail
+_PROTOTYPE _EXPORT int32_t pups_insert_cmd_tail_item(const char *, const char *);
 
 // Clear command tail
-_PROTOTYPE _EXPORT int pups_clear_cmd_tail(void);
+_PROTOTYPE _EXPORT int32_t pups_clear_cmd_tail(void);
 
 // Handler for backtracking (when segmentation violation occurs)
-_PROTOTYPE _EXPORT int pups_segv_backtrack_handler(const int);
+//_PROTOTYPE _EXPORT int32_t pups_segv_backtrack_handler(const int32_t);
 
 // Set a backtrack re-entry point (in process address space)
 _PROTOTYPE _EXPORT _BOOLEAN pups_backtrack(const _BOOLEAN);
 
-// Has file been updated?
+// Has file been updated? [not thread safe]
 _PROTOTYPE _EXPORT _BOOLEAN pups_file_updated(const char *);
 
-// Is host reachable?
+// Is host reachable? [root thread]
 _PROTOTYPE _EXPORT _BOOLEAN pups_host_reachable(const char *);
 
-
 // Set (fcntl) file lock (on descriptor)
-_PROTOTYPE _EXPORT int pups_flock(const int, const int, const off_t, const off_t, const _BOOLEAN);
+_PROTOTYPE _EXPORT int32_t pups_flock(const des_t, const int32_t, const off_t, const off_t, const _BOOLEAN);
 
 // Set (fcntl) file lock (on named file)
-_PROTOTYPE _EXPORT int pups_flockfile(const char *, const int, const off_t, const off_t, const _BOOLEAN);
+_PROTOTYPE _EXPORT int32_t pups_flockfile(const char *, const int32_t, const off_t, const off_t, const _BOOLEAN);
 
-// Display flock locks currently held by caller process
-_PROTOTYPE _EXPORT int pups_show_flock_locks(const FILE *);
+// Display flock locks currently held by caller process [root thread]
+_PROTOTYPE _EXPORT int32_t pups_show_flock_locks(const FILE *);
 
 // Substitute substring
-_PROTOTYPE _EXPORT int strsub(const char *, const char *, const char *, char *);
+_PROTOTYPE _EXPORT int32_t strsub(const char *, const char *, const char *, char *);
 
 
 #ifdef PSRP_AUTHENTICATE
-// Authenticate user
-_PROTOTYPE _EXPORT _BOOLEAN pups_checkuser(char *, char *);
+// Autheticate user [root thread]
+_PROTOTYPE _EXPORT _BOOLEAN pups_checkuser(const char *, const char *);
 
-// Authenticate secure service password
-_PROTOTYPE _EXPORT _BOOLEAN pups_check_appl_password(char *);
+// Authenticate secure service password [root thread]
+_PROTOTYPE _EXPORT _BOOLEAN pups_check_appl_password(const char *);
 
-// Authenticate a user
-_PROTOTYPE _EXPORT _BOOLEAN pups_getpass(char *);
+// Authenticate a user [root thread]
+_PROTOTYPE _EXPORT _BOOLEAN pups_getpass(const char *);
 
-// Check that application has password set
+// Check that application has password set [root thread]
 _PROTOTYPE _EXPORT _BOOLEAN pups_check_pass_set(void);
 #endif /* PSRP_ATHENTICATE */
 
 
-// Get file type
+// Get file type (wrapper function for the "file" command)
 _PROTOTYPE _EXPORT char *pups_get_file_type(const char *);
 
-/* Convert string to lower case
-_PROTOTYPE _EXPORT int downcase(char *);
+// Convert string to lower case
+_PROTOTYPE _EXPORT int32_t downcase(char *);
 
 // Convert string to upper case
-_PROTOTYPE _EXPORT int upcase(char *);
+_PROTOTYPE _EXPORT int32_t upcase(char *);
 
-// Enigma encrypt a string
-_PROTOTYPE _EXPORT int ecryptstr(const int, const _BOOLEAN, const char *, char *);
+// Get name of host exporting NFS file [root thread]
+_PROTOTYPE _EXPORT int32_t pups_get_nfs_host(const char *pathname, const char *host);
 
-// Get exporting NFS host name (from file path)
-_PROTOTYPE _EXPORT int pups_get_nfs_host(const char *pathname, const char *host);
-
-// Reflect endian ness of float
+// Reflect endianness of float
 _PROTOTYPE _EXPORT float fconv(const FTYPE);
 
-// Reflect endian ness of int
-_PROTOTYPE _EXPORT int iconv(const int);
+// Reflect endianness of int
+_PROTOTYPE _EXPORT int32_t iconv(const int32_t);
 
-// Reflect endian ness of short
-_PROTOTYPE _EXPORT short int sconv(const short int);
+// Reflect endianness of short
+_PROTOTYPE _EXPORT int16_t sconv(const int16_t);
 
-// Reflect endian ness of long
-_PROTOTYPE _EXPORT long int lconv(const long int);
+// Reflect endianness of long
+_PROTOTYPE _EXPORT int64_t lconv(const  int64_t );
 
-// Encrypted formatted print
-_PROTOTYPE _EXPORT int efprintf(FILE *, const char *, ...);
+// Set context of non local goto valid
+_PROTOTYPE _EXPORT int32_t pups_set_jump_vector(void);
 
-// Encrypted formatted scan
-_PROTOTYPE _EXPORT int efscanf(FILE *, const char *, ...);
+// Set context of non local goto invalid
+_PROTOTYPE _EXPORT int32_t pups_reset_jump_vector(void);
 
-// Encrypted formatted string scan
-_PROTOTYPE _EXPORT int esscanf(char *cipher, const char *format, ...);
-
-// Encrypted fputs
-_PROTOTYPE _EXPORT int efputs(const char *, const FILE *);
-
-// Encrypted fgets
-_PROTOTYPE _EXPORT char *efgets(char *, const unsigned long int, const FILE *);
-
-// Mark context of non local goto valid
-_PROTOTYPE _EXPORT int pups_set_jump_vector(void);
-
-// Mark context of non local goto invalid
-_PROTOTYPE _EXPORT int pups_reset_jump_vector(void);
-
-// TRUE if linux version (sub) string matches key
+// TRUE if linux version information matches key
 _PROTOTYPE _EXPORT _BOOLEAN pups_is_linuxversion(const char *);
 
-// How many CPUS's does host have?
-_PROTOTYPE _EXPORT int pups_cpus(FTYPE *, char *);
+// Get current process loading (and memory statistics) for host
+_PROTOTYPE _PUBLIC int32_t pups_get_resource_loading(FTYPE *, uint32_t *);
 
-// Get resource loading
-_PROTOTYPE _PUBLIC int pups_get_resource_loading(const _BOOLEAN, FTYPE *, int *);
+// Do we have resources required?
+_PROTOTYPE _EXPORT _BOOLEAN pups_have_resources(FTYPE,  int32_t);
 
-// Have we got resources required?
-_PROTOTYPE _EXPORT _BOOLEAN pups_have_resources(FTYPE, int);
+// Peer to peer file transfer
+_PROTOTYPE _EXPORT int32_t pups_scp(const char *, const char *, const char *);
 
-// Transfer a file to/from a remote host
-_PROTOTYPE _EXPORT int pups_scp(const char *, const char *, const char *);
+// Is process P3 aware?
+_PROTOTYPE _EXPORT _BOOLEAN pups_aware(const int32_t);
 
-// Is process PUPS/P3 aware?
-_PROTOTYPE _EXPORT _BOOLEAN pups_aware(const int);
+// Open pipe stream eturning child pid
+_PROTOTYPE _EXPORT des_t pups_popen(const char *, const char *,  const int32_t, pid_t *);
 
-// Open extended pipestream
-_PROTOTYPE _EXPORT int pups_popen(const char *, const char *, const int, int *);
+// Open buffered pipe stream retruning child pid 
+_PROTOTYPE _EXPORT FILE *pups_fpopen(const char *, const char *, const char *, pid_t *);
 
-// Open buffered extended pipestream
-_PROTOTYPE _EXPORT FILE *pups_fpopen(const char *, const char *, const char *, int *);
+// Close pipe stream
+_PROTOTYPE _EXPORT int32_t pups_pclose(const des_t, const pid_t);
 
-// Close extended pipestream
-_PROTOTYPE _EXPORT int pups_pclose(const int, const int);
+// Close buffered pipe stream
+_PROTOTYPE _EXPORT int32_t pups_fpclose(const FILE *, const pid_t);
 
-// Close buffered extended pipestream
-_PROTOTYPE _EXPORT int pups_fpclose(const FILE *, const int);
-
-// Test to see if process is foreground
+// Check if process in foreground
 _PROTOTYPE _EXPORT _BOOLEAN pups_is_foreground(void);
 
-// Test to see if process is background
+// Check if process in background
 _PROTOTYPE _EXPORT _BOOLEAN pups_is_background(void);
 
-// Release all link file locks
-_PROTOTYPE _EXPORT int pups_release_all_link_file_locks(void);
-
-// Is command installed on system
+// Is command installed on system?
 _PROTOTYPE _EXPORT _BOOLEAN pups_cmd_installed(const char *);
 
-// Get current CPU utilisation on host
+// Get CPU utilisation on host
 _PROTOTYPE _EXPORT FTYPE pups_cpu_utilisation(void);
 
-// Get prefix from string
-_PROTOTYPE _EXPORT int pups_prefix(const char, const char *, char *);
+// Get prefix
+_PROTOTYPE _EXPORT int32_t pups_prefix(const char, const char *, char *);
 
-// Get suffix from string
-_PROTOTYPE _EXPORT int pups_suffix(const char, const char *, char *);
+// Get suffix
+_PROTOTYPE _EXPORT int32_t pups_suffix(const char, const char *, char *);
 
 // Get file size
-_PROTOTYPE _EXPORT unsigned long int pups_get_fsize(const char *);
+_PROTOTYPE _EXPORT ssize_t pups_get_fsize(const char *);
 
 // Descriptor associated with a pipe
-_PROTOTYPE _EXPORT int isapipe(const int);
+_PROTOTYPE _EXPORT int32_t isapipe(const des_t);
 
 // Descriptor associated with a file
-_PROTOTYPE _EXPORT int isafile(const int);
+_PROTOTYPE _EXPORT int32_t isafile(const des_t);
 
 // Descriptor associated with a socket
-_PROTOTYPE _EXPORT int isasock(const int);
+_PROTOTYPE _EXPORT int32_t isasock(const des_t);
 
 // Descriptor associated with a (data) conduit (pipe, file or socket)
-_PROTOTYPE _EXPORT int isaconduit(const int);
+_PROTOTYPE _EXPORT int32_t isaconduit(const des_t);
 
 // Get system information for current host
-_PROTOTYPE _EXPORT int pups_sysinfo(char *, char *, char *, char *);
+_PROTOTYPE _EXPORT int32_t pups_sysinfo(char *, char *, char *, char *);
 
 // Am I running in virtual enviroment? 
 _PROTOTYPE _EXPORT _BOOLEAN pups_os_is_virtual(char *);
@@ -1673,48 +1663,42 @@ _PROTOTYPE _EXPORT _BOOLEAN pups_bigendian(void);
 
 
 #ifdef CRIU_SUPPORT
-// Enable (Criu) state saving
-_PROTOTYPE _EXPORT int pups_ssave_enable(void);
+// Enable (Criu) state saving [root thread]
+_PROTOTYPE _EXPORT int32_t pups_ssave_enable(void);
 
-// Disable (Criu) state saving
-_PROTOTYPE _EXPORT int pups_ssave_disable(void);
+// Disable (Criu) state saving [root thread]
+_PROTOTYPE _EXPORT int32_t pups_ssave_disable(void);
 #endif /* CRIU_SUPPORT */
 
-// Set (round robin) scheduling priority
-_PROTOTYPE _EXPORT int pups_set_rt_sched(const int);
+// Set (round robin) scheduling priority [root thread]
+_PROTOTYPE _EXPORT int32_t pups_set_rt_sched(const int32_t);
 
-// Switch to standard (time sharing) scheduler
-_PROTOTYPE _EXPORT int pups_set_tslice_sched(void);
+// Switch to standard (time sharing) scheduler [root thread]
+_PROTOTYPE _EXPORT int32_t pups_set_tslice_sched(void);
 
-// Copy file
-_PROTOTYPE _EXPORT int pups_copy_file(const int, const char *, const char *);
+// Copy a file
+_PROTOTYPE _EXPORT  int32_t pups_copy_file(const int32_t, const char *, const char *);
 
-
-#ifdef BSD_FUNCTION_SUPPORT
-// Open BSD strlcat function
-_PROTOTYPE _EXPORT size_t strlcat(char *, const char *, size_t dsize);
-
-// Open BSD strlcpy functiom
-_PROTOTYPE _EXPORT size_t strlcpy(char *, const char *, size_t dsize);
-#endif /* BSD_FUNCTION_SUPPORT */
-
-// Can we run command? */
+// Can we run command? 
 _PROTOTYPE _EXPORT _BOOLEAN pups_can_run_command(const char *);
 
 // Enable (memory) residency
 _PROTOTYPE _EXPORT void pups_enable_resident(void);
 
 // Get size of directory in bytes
-_PROTOTYPE _EXPORT off_t pups_dsize(const char *);
+_PROTOTYPE _EXPORT size_t pups_dsize(const char *);
 
 // Show software watchdog status
-_PROTOTYPE _EXPORT int pups_show_softdogstatus(const FILE *);
+_PROTOTYPE _EXPORT int32_t pups_show_softdogstatus(const FILE *);
 
 // Start software watchdog
-_PROTOTYPE _EXPORT int pups_start_softdog(const unsigned int);
+_PROTOTYPE _EXPORT int32_t pups_start_softdog(const uint32_t);
 
 // Stop software watchdog
-_PROTOTYPE _EXPORT int pups_stop_softdog(void);
+_PROTOTYPE _EXPORT int32_t pups_stop_softdog(void);
+
+// Non-blocking poll of file descriptor 
+_PROTOTYPE _EXPORT _BOOLEAN pups_fd_has_data(const des_t);
 
 
 #ifdef _CPLUSPLUS

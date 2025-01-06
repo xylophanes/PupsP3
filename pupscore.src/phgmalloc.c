@@ -1,6 +1,6 @@
-/*------------------------------------------------------------------------------------
+/*-------------------------------------------------------
     Persistent heap library. A persistent heap is an area
-    of data memory which may be mapped serailly into the
+    of data memory which may be mapped serailly  int32_to the
     address spaces of multiple process.
 
      Author:  M.A. O'Neill
@@ -10,10 +10,10 @@
               NE3 4RT
               United Kingdom
 
-    Version: 2.00 
-    Dated:   4th January 2023
+    Version: 2.03
+    Dated:   11th December 2024 
     Email:   mao@tumblingdice.co.uk
------------------------------------------------------------------------------------*/
+-------------------------------------------------------*/
 
 /*-------------------------------------------------------------*/
 /* If we have OpenMP support then we also have pthread support */
@@ -38,8 +38,8 @@
 #include <unistd.h>
 #include <netlib.h>
 #include <casino.h>
-
 #include <errno.h>
+#include <bsd/bsd.h>
 
 #ifdef PTHREAD_SUPPORT
 #include <tad.h>
@@ -82,13 +82,13 @@
 /*--------------------------------------------------------------------*/
 
 // Is persistent heap initialised
-_PUBLIC int *__phmalloc_initialized                                = (int *)NULL;
+_PUBLIC int32_t *__phmalloc_initialized                            = (int *)NULL;
 
 // Number of objects in heap
-_PUBLIC int *_phobjects                                            = (int *)NULL;
+_PUBLIC int32_t *_phobjects                                        = (int *)NULL;
  
 // Number of objects in heap
-_PUBLIC int *_phobjects_allocated                                  = (int *)NULL;
+_PUBLIC int32_t *_phobjects_allocated                              = (int *)NULL;
 
 // Pointer to table of significant objects on persistent heaps
 _PUBLIC phobmap_type ***_phobjectmap                               = (phobmap_type ***)NULL;
@@ -101,7 +101,7 @@ _PUBLIC phobmap_type ***_phobjectmap                               = (phobmap_ty
 /*-----------------------------------------------------*/
 
 // Pointer to persistent heap parameter table (on persistent heap)
-_PUBLIC unsigned long int **_pheap_parameters                      = (unsigned long int **)NULL;
+_PUBLIC uint64_t          **_pheap_parameters                      = (uint64_t **)NULL;
  
 // Pointer to the base of the first block
 _PUBLIC char **_pheapbase                                          = (char **)NULL;
@@ -146,7 +146,7 @@ _PUBLIC pthread_mutex_t phmalloc_mutex                             = PTHREAD_REC
 #endif /* PTHREAD_SUPPORT */
 
 
-_IMPORT _PROTOTYPE int initialize_heap(int);
+_IMPORT _PROTOTYPE  int32_t initialize_heap(int);
 
 
 /*-----------------------*/ 
@@ -163,7 +163,7 @@ _PUBLIC heap_type    *htable = (heap_type *)NULL;
 /*------------------------------------*/
 
 // Switch off presistent object map updating 
-_PUBLIC int _no_phobject_mapping;
+_PUBLIC int32_t _no_phobject_mapping;
 
 
 
@@ -171,7 +171,6 @@ _PUBLIC int _no_phobject_mapping;
 /*--------------------------------------------*/
 /* Variables which are private to this module */
 /*--------------------------------------------*/
-
 /*-----------------------------------------------------*/
 /* TRUE if persistent heap maps exists (e.g. if we are */
 /* attaching an existing persistent heap)              */
@@ -186,7 +185,7 @@ _PRIVATE _BOOLEAN _phmaps_exist = FALSE;
 /*-------------------------------------------*/
 
 // Relocate heap addresses 
-_PROTOTYPE _PRIVATE int msm_relocate_heap_addresses(int, unsigned long int, int);
+_PROTOTYPE _PRIVATE  int32_t msm_relocate_heap_addresses(int, size_t,  int32_t);
 
 
 
@@ -196,7 +195,7 @@ _PROTOTYPE _PRIVATE int msm_relocate_heap_addresses(int, unsigned long int, int)
 /* cached heap)                                           */
 /*--------------------------------------------------------*/ 
 
-_PROTOTYPE _PRIVATE void local_to_global_blocklist(int, unsigned long int);
+_PROTOTYPE _PRIVATE void local_to_global_blocklist(int32_t, size_t);
 
 
 /*--------------------------------------------------------*/
@@ -204,26 +203,24 @@ _PROTOTYPE _PRIVATE void local_to_global_blocklist(int, unsigned long int);
 /* cached heap)                                           */
 /*--------------------------------------------------------*/
 
-_PROTOTYPE _PRIVATE void global_to_local_blocklist(int, unsigned long int);
+_PROTOTYPE _PRIVATE void global_to_local_blocklist(uint32_t, size_t);
 
 
 
-/*------------------------------------------------------------------------------
-    Slot and usage functions - used by slot manager ...
-------------------------------------------------------------------------------*/
-
-
+/*-------------------------------------------------*/
+/* Slot and usage functions - used by slot manager */
+/*-------------------------------------------------*/
 /*---------------------*/
 /* Slot usage function */
 /*---------------------*/
 
-_PRIVATE void pheap_slot(int level)
+_PRIVATE void pheap_slot(int32_t level)
 {   (void)fprintf(stderr,"lib hseaplib %s: [ANSI C]\n",PHEAP_VERSION);
 
     if(level > 1)
-    {  (void)fprintf(stderr,"(C) 2003-2023 Tumbling Dice\n");
+    {  (void)fprintf(stderr,"(C) 2003-2024 Tumbling Dice\n");
        (void)fprintf(stderr,"Author: M.A. O'Neill\n");
-       (void)fprintf(stderr,"PUPS/P3 persistent heap support library (built %s %s)\n\n",__TIME__,__DATE__);
+       (void)fprintf(stderr,"PUPS/P3 persistent heap support library (gcc %s: built %s %s)\n\n",__VERSION__,__TIME__,__DATE__);
     }
     else
        (void)fprintf(stderr,"\n");
@@ -246,13 +243,13 @@ _EXTERN void (* SLOT )() __attribute__ ((aligned(16))) = pheap_slot;
 
 
 
-/*-----------------------------------------------------------------------------------
-    Initialise (local process) variables associated with persistent heap ...
------------------------------------------------------------------------------------*/
+/*----------------------------------------------------------------------*/
+/* Initialise (local process) variables associated with persistent heap */
+/*----------------------------------------------------------------------*/
 
-_PUBLIC int msm_init(const int max_pheaps)
+_PUBLIC int32_t msm_init(const  int32_t max_pheaps)
 
-{   int i;
+{   uint32_t i;
 
 
     /*----------------------------------*/
@@ -362,10 +359,10 @@ _PUBLIC int msm_init(const int max_pheaps)
     for(i=0; i<max_pheaps; ++i)
         _phobjectmap[i] = (phobmap_type **)NULL;
 
-    _phobjects           = (int *)pups_calloc(max_pheaps,sizeof(int));
-    _phobjects_allocated = (int *)pups_calloc(max_pheaps,sizeof(int));
+    _phobjects           = (int32_t *)pups_calloc(max_pheaps,sizeof(int32_t));
+    _phobjects_allocated = (int32_t *)pups_calloc(max_pheaps,sizeof(int32_t));
 
-    _pheap_parameters    = (unsigned long int **)pups_calloc(max_pheaps,sizeof(unsigned long int *));
+    _pheap_parameters    = (uint64_t          **)pups_calloc(max_pheaps,sizeof(uint64_t *));
     _pheapinfo           = (malloc_info **)      pups_calloc(max_pheaps,sizeof(malloc_info *));
     _pheapbase           = (char **)             pups_calloc(max_pheaps,sizeof(char *));
     pheapsize            = (__malloc_size_t *)   pups_calloc(max_pheaps,sizeof(__malloc_size_t));
@@ -380,7 +377,7 @@ _PUBLIC int msm_init(const int max_pheaps)
     _pheap_bytes_used          = (__malloc_size_t *)pups_calloc(max_pheaps,sizeof(__malloc_size_t));
     _pheap_chunks_free         = (__malloc_size_t *)pups_calloc(max_pheaps,sizeof(__malloc_size_t));
     _pheap_bytes_free          = (__malloc_size_t *)pups_calloc(max_pheaps,sizeof(__malloc_size_t));
-    __phmalloc_initialized     = (int *)            pups_calloc(max_pheaps,sizeof(int));
+    __phmalloc_initialized     = (int32_t *)       pups_calloc(max_pheaps,sizeof(int32_t));
 
 
     #ifdef PTHREAD_SUPPORT
@@ -413,13 +410,13 @@ _PUBLIC int msm_init(const int max_pheaps)
 
 
 
-/*-----------------------------------------------------------------------------------
-    Extend (local process) variables associated with persistent heap ...
------------------------------------------------------------------------------------*/
+/*------------------------------------------------------------------*/
+/* Extend (local process) variables associated with persistent heap */
+/*------------------------------------------------------------------*/
 
-_PUBLIC int msm_extend(const unsigned int from_size, unsigned int to_size) 
+_PUBLIC int32_t msm_extend(const uint32_t from_size, uint32_t to_size) 
 
-{   int i;
+{   uint32_t i;
 
 
     /*--------------*/
@@ -528,10 +525,10 @@ _PUBLIC int msm_extend(const unsigned int from_size, unsigned int to_size)
     for(i=from_size; i<to_size; ++i)
         _phobjectmap[i] = (phobmap_type **)NULL;
 
-    _phobjects                 = (int *)pups_realloc((void *)_phobjects,to_size*sizeof(int));
-    _phobjects_allocated       = (int *)pups_realloc((void *)_phobjects_allocated,to_size*sizeof(int));
+    _phobjects                 = (int32_t *)pups_realloc((void *)_phobjects,to_size*sizeof(int32_t));
+    _phobjects_allocated       = (int32_t *)pups_realloc((void *)_phobjects_allocated,to_size*sizeof(int32_t));
 
-    _pheap_parameters          = (unsigned long int **)pups_realloc((void *)_pheap_parameters,to_size*sizeof(unsigned long int *));
+    _pheap_parameters          = (uint64_t    **)pups_realloc((void *)_pheap_parameters,to_size*sizeof(uint64_t *));
     _pheapinfo                 = (malloc_info **)pups_realloc((void *)_pheapinfo,to_size*sizeof(malloc_info *));
     _pheapbase                 = (char **)pups_realloc((void *)_pheapbase,to_size*sizeof(char *));
     pheapsize                  = (__malloc_size_t *)pups_realloc((void *)pheapsize,to_size*sizeof(__malloc_size_t));
@@ -546,7 +543,7 @@ _PUBLIC int msm_extend(const unsigned int from_size, unsigned int to_size)
     _pheap_bytes_used          = (__malloc_size_t *)pups_realloc((void *)_pheap_bytes_used,to_size*sizeof(__malloc_size_t));
     _pheap_chunks_free         = (__malloc_size_t *)pups_realloc((void *)_pheap_chunks_free,to_size*sizeof(__malloc_size_t));
     _pheap_bytes_free          = (__malloc_size_t *)pups_realloc((void *)_pheap_bytes_free,to_size*sizeof(__malloc_size_t));
-    __phmalloc_initialized     = (int *)            pups_realloc((void *)__phmalloc_initialized,to_size*sizeof(int));
+    __phmalloc_initialized     = (int32_t *)        pups_realloc((void *)__phmalloc_initialized,to_size*sizeof(int32_t));
 
     #ifdef PTHREAD_SUPPORT
     (void)pthread_mutex_unlock(&htab_mutex);
@@ -570,20 +567,19 @@ _PUBLIC int msm_extend(const unsigned int from_size, unsigned int to_size)
 
 
 
-/*-----------------------------------------------------------------------------------
-    Tell heap to destroy itself when we detach it ...
------------------------------------------------------------------------------------*/
+/*-----------------------------------------------*/
+/* Tell heap to destroy itself when we detach it */
+/*-----------------------------------------------*/
 
-_PUBLIC int msm_set_autodestruct_state(const unsigned int hdes, const _BOOLEAN autodestruct)
+_PUBLIC int32_t msm_set_autodestruct_state(const uint32_t hdes, const _BOOLEAN autodestruct)
 
 {   
-
     #ifdef PTHREAD_SUPPORT
     (void)pthread_mutex_lock(&htab_mutex);
     #endif /* PTHREAD_SUPPORT */
 
 
-    /*--------------*
+    /*--------------*/
     /* Sanity check */
     /*--------------*/
 
@@ -622,22 +618,22 @@ _PUBLIC int msm_set_autodestruct_state(const unsigned int hdes, const _BOOLEAN a
 
 
 
+/*---------------------------------------------------------------------------------*/
+/* Return a handle to the persistent heap whose pathname is map_f_path. The flags  */
+/* specifies the (file) I/O mode the persistent heap, and mode specifies the level */
+/* of file protection                                                              */
+/*---------------------------------------------------------------------------------*/
 
-/*-----------------------------------------------------------------------------------
-    Return a handle to the persistent heap whose pathname is map_f_path. The flags
-    specifies the (file) I/O mode the persistent heap, and mode specifies the level
-    of file protection ...
------------------------------------------------------------------------------------*/
+_PUBLIC int32_t msm_heap_attach(const char *map_f_path, const int32_t attach_mode)
 
-_PUBLIC int msm_heap_attach(const char *map_f_path, const int attach_mode)
+{   uint32_t i;
 
-{   int i,
-	flags,
-        ret,
-        start     = 0;
+    int32_t  flags,
+             ret,
+             start      = 0;
 
-    size_t size,
-           offset = 0L;
+    size_t   size,
+             offset     = 0L;
 
     _BOOLEAN map_exists = FALSE;
 
@@ -700,8 +696,8 @@ _PUBLIC int msm_heap_attach(const char *map_f_path, const int attach_mode)
        }
 
        if(htable[i].addr == (void *)NULL)
-       {  int ret,
-              f_index;
+       {   int32_t ret,
+                   f_index;
 
           _BOOLEAN lock_tried = FALSE;
 
@@ -798,15 +794,15 @@ _PUBLIC int msm_heap_attach(const char *map_f_path, const int attach_mode)
           /*-----------------------------------*/
 
           else
-          {  unsigned long int magic,
-                               htag;
+          {  uint64_t magic,
+                      htag;
 
 
              /*---------------------------------*/
              /* Check this is a valid heap file */
              /*---------------------------------*/
 
-             if(pups_lseek(htable[i].fd,MAGIC_OFFSET*sizeof(unsigned long int),SEEK_SET) == (-1))
+             if(pups_lseek(htable[i].fd,MAGIC_OFFSET*sizeof(uint64_t),SEEK_SET) == (-1))
              {  htable[i].fd = pups_close(htable[i].fd);
 
                 #ifdef PTHREAD_SUPPORT
@@ -822,7 +818,7 @@ _PUBLIC int msm_heap_attach(const char *map_f_path, const int attach_mode)
              /* Get heap magic (used to identify persistent heap) */
              /*---------------------------------------------------*/
 
-             (void)pups_pipe_read(htable[i].fd,&magic,sizeof(unsigned long int));
+             (void)pups_pipe_read(htable[i].fd,&magic,sizeof(uint64_t));
 
 
              /*-----------------------------------*/
@@ -870,7 +866,7 @@ _PUBLIC int msm_heap_attach(const char *map_f_path, const int attach_mode)
              /* Check that heap is not stale */
              /*------------------------------*/
 
-             (void)pups_pipe_read(htable[i].fd,&htag,sizeof(unsigned long int));
+             (void)pups_pipe_read(htable[i].fd,&htag,sizeof(uint64_t));
              if(appl_vtag != NO_VERSION_CONTROL && htag != appl_vtag)
              {  htable[i].fd = pups_close(htable[i].fd);
 
@@ -954,8 +950,8 @@ _PUBLIC int msm_heap_attach(const char *map_f_path, const int attach_mode)
           /* are mapping already exists                               */
           /*----------------------------------------------------------*/
 
-          htable[i].sdata = (unsigned long int)htable[i].addr + sizeof(unsigned long int);
-          htable[i].edata = (unsigned long int)htable[i].addr + sizeof(unsigned long int);
+          htable[i].sdata = (uint64_t)htable[i].addr + sizeof(uint64_t);
+          htable[i].edata = (uint64_t)htable[i].addr + sizeof(uint64_t);
 
 
           /*-------------------------------*/
@@ -1008,7 +1004,7 @@ _PUBLIC int msm_heap_attach(const char *map_f_path, const int attach_mode)
                                                                                                                                                   i,
                                                                                                                                          map_f_path,
                                                                                                                   htable[i].edata - htable[i].sdata,
-                                                                                                          (unsigned long int)htable[i].segment_size,
+                                                                                                                   (uint64_t)htable[i].segment_size,
 						                                                                                    htable[i].sdata);
              (void)fflush(stderr);
           }          
@@ -1055,15 +1051,14 @@ _PUBLIC int msm_heap_attach(const char *map_f_path, const int attach_mode)
 
 
 
-/*----------------------------------------------------------------------------------------
-    Detach a persistent heap -- if flags | O_DESTROY the persistent heap is unlinked
-    and destroyed ...
-----------------------------------------------------------------------------------------*/
+/*----------------------------------------------------------------------------------*/
+/* Detach a persistent heap -- if flags | O_DESTROY the persistent heap is unlinked */
+/* and destroyed                                                                    */
+/*----------------------------------------------------------------------------------*/
 
-_PUBLIC int msm_heap_detach(const unsigned int hdes, const int flags)
+_PUBLIC int32_t msm_heap_detach(const uint32_t hdes, const int32_t flags)
 
-{   int  i;
-    char args[SSIZE] = "";
+{   char args[SSIZE] = "";
 
 
     /*--------------*/
@@ -1117,7 +1112,7 @@ _PUBLIC int msm_heap_detach(const unsigned int hdes, const int flags)
                                                                                                                               hdes,
                                                                                                                  htable[hdes].name,
                                                                                            htable[hdes].edata - htable[hdes].sdata,
-                                                                                      (unsigned long int)htable[hdes].segment_size,
+                                                                                               (uint64_t)htable[hdes].segment_size,
                                                                                                                 htable[hdes].sdata);
 
 
@@ -1202,14 +1197,14 @@ _PUBLIC int msm_heap_detach(const unsigned int hdes, const int flags)
 
 
 
-/*------------------------------------------------------------------------------------------
-    sbrk on the persistent heap whose heap descriptor is hdes - size extra bytes will be
-    mapped into the address spaces of the processes attached to the heap ...
-------------------------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------------------------*/
+/* sbrk on the persistent heap whose heap descriptor is hdes - size extra bytes will be */
+/* mapped into the address spaces of the processes attached to the heap                 */
+/*--------------------------------------------------------------------------------------*/
 
-_PUBLIC void *msm_sbrk(const unsigned int hdes, const size_t size)
+_PUBLIC void *msm_sbrk(const uint32_t hdes, const size_t size)
 
-{   void *ptr = (void *)NULL;
+{   void   *ptr = (void *)NULL;
 
     size_t brk_core_size,
            brk_core_needed,
@@ -1246,7 +1241,7 @@ _PUBLIC void *msm_sbrk(const unsigned int hdes, const size_t size)
     /* process?                                                         */
     /*------------------------------------------------------------------*/
 
-    brk_core_size   = htable[hdes].edata - htable[hdes].sdata - sizeof(int) + size;
+    brk_core_size   = htable[hdes].edata - htable[hdes].sdata - sizeof(int32_t) + size;
 
     if(brk_core_size > htable[hdes].segment_size)
        brk_core_needed = brk_core_size -  htable[hdes].segment_size;
@@ -1254,14 +1249,14 @@ _PUBLIC void *msm_sbrk(const unsigned int hdes, const size_t size)
        brk_core_needed = 0;
 
     if(brk_core_needed > 0)
-    {  int n_brk_segments;
+    {   int32_t n_brk_segments;
 
-       unsigned long int seg_used;
-       void              *old_addr = (void *)NULL;
-       long              offset    = 0L;
+       uint64_t seg_used;
+       void     *old_addr = (void *)NULL;
+       uint64_t offset    = 0L;
 
        #ifdef PHEAP_DEBUG
-       print_heaptables(hdes,"BEFORE EXTEND",(unsigned long int)htable[hdes].addr);
+       print_heaptables(hdes,"BEFORE EXTEND",(uint64_t         )htable[hdes].addr);
        #endif /* PHEAP_DEBUG */
 
 
@@ -1269,7 +1264,7 @@ _PUBLIC void *msm_sbrk(const unsigned int hdes, const size_t size)
        /* Get number of SBRK segments currently in use by this persistent heap */
        /*----------------------------------------------------------------------*/
 
-       seg_used = htable[hdes].edata - htable[hdes].sdata   - (unsigned long)sizeof(int); 
+       seg_used = htable[hdes].edata - htable[hdes].sdata   - (uint64_t)sizeof(int32_t); 
 
 
        /*------------------------------------------------------------------*/
@@ -1280,7 +1275,7 @@ _PUBLIC void *msm_sbrk(const unsigned int hdes, const size_t size)
        /*------------------------------------------------------------------*/
 
        old_segment_size          =  htable[hdes].segment_size;
-       n_brk_segments            =  (int)ceil((double)brk_core_needed / (double)PHM_SBRK_SIZE);
+       n_brk_segments            =  (int32_t)ceil((double)brk_core_needed / (double)PHM_SBRK_SIZE);
        htable[hdes].segment_size += PHM_SBRK_SIZE*n_brk_segments;
 
 
@@ -1307,7 +1302,7 @@ _PUBLIC void *msm_sbrk(const unsigned int hdes, const size_t size)
        /* Extend backing store (file) object */
        /*------------------------------------*/
 
-       n_brk_segments            =  (int)ceil((double)brk_core_needed / (double)PHM_SBRK_SIZE);
+       n_brk_segments            =  (int32_t)ceil((double)brk_core_needed / (double)PHM_SBRK_SIZE);
        htable[hdes].segment_size += PHM_SBRK_SIZE*n_brk_segments;
 
        #ifdef PHEAP_DEBUG
@@ -1337,17 +1332,17 @@ _PUBLIC void *msm_sbrk(const unsigned int hdes, const size_t size)
        (void)msm_isync_heaptables(hdes);
 
        #ifdef PHEAP_DEBUG
-      (void)fprint_heaptables(hdes,"AFTER EXTEND",(unsigned long int)htable[hdes].addr);
+      (void)fprint_heaptables(hdes,"AFTER EXTEND",(uint64_t)htable[hdes].addr);
       #endif /* PHEAP_DEBUG */
     } 
 
     if(size > 0)
-    {  ptr                        =  (void *)(htable[hdes].edata);
-       htable[hdes].edata         += size;
+    {  ptr                   =  (void *)(htable[hdes].edata);
+       htable[hdes].edata   += size;
     }
     else
-    {  htable[hdes].edata         -= size;
-       ptr                        =  (void *)(htable[hdes].edata);
+    {  htable[hdes].edata   -= size;
+       ptr                   =  (void *)(htable[hdes].edata);
     }
 
     #ifdef PTHREAD_SUPPORT
@@ -1365,11 +1360,11 @@ _PUBLIC void *msm_sbrk(const unsigned int hdes, const size_t size)
 
 
 
-/*---------------------------------------------------------------------------------------------
-    Routine to stat a heap (in a similar manner to stat on a file) ...
----------------------------------------------------------------------------------------------*/
+/*----------------------------------------------------------------*/
+/* Routine to stat a heap (in a similar manner to stat on a file) */
+/*----------------------------------------------------------------*/
 
-_PUBLIC int msm_hstat(const unsigned int hdes, heap_type *heapinfo)
+_PUBLIC int32_t msm_hstat(const uint32_t hdes, heap_type *heapinfo)
 
 
 {
@@ -1411,14 +1406,14 @@ _PUBLIC int msm_hstat(const unsigned int hdes, heap_type *heapinfo)
 
 
 
-/*-----------------------------------------------------------------------------------------------
-    Find first free named persistent object slot in the map area ...
------------------------------------------------------------------------------------------------*/
+/*--------------------------------------------------------------*/
+/* Find first free named persistent object slot in the map area */
+/*--------------------------------------------------------------*/
 
-_PUBLIC int msm_get_free_mapslot(const unsigned int hdes)
+_PUBLIC int32_t msm_get_free_mapslot(const uint32_t hdes)
 
-{   int i,
-        h_index;
+{   uint32_t i;
+     int32_t h_index;
 
 
     /*--------------*/
@@ -1443,12 +1438,12 @@ _PUBLIC int msm_get_free_mapslot(const unsigned int hdes)
           (void)fflush(stderr);
           #endif /* PHEAP_DEBUG */
 
-         #ifdef PTHREAD_SUPPORT
-         (void)pthread_mutex_unlock(&htab_mutex);
-         #endif /* PTHREAD_SUPPORT */
+          #ifdef PTHREAD_SUPPORT
+          (void)pthread_mutex_unlock(&htab_mutex);
+          #endif /* PTHREAD_SUPPORT */
 
-         pups_set_errno(OK);
-         return(i);
+          pups_set_errno(OK);
+          return(i);
        }
     }
 
@@ -1487,13 +1482,13 @@ _PUBLIC int msm_get_free_mapslot(const unsigned int hdes)
 
 
 
-/*-----------------------------------------------------------------------------------------------
-    Find mapped object (returning its index) ...
------------------------------------------------------------------------------------------------*/
+/*------------------------------------------*/
+/* Find mapped object (returning its index) */
+/*------------------------------------------*/
 
-_PUBLIC int msm_find_mapped_object(const unsigned int hdes, const void *ptr)
+_PUBLIC int32_t msm_find_mapped_object(const uint32_t hdes, const void *ptr)
 
-{   int i;
+{   uint32_t i;
 
 
     /*--------------*/
@@ -1509,8 +1504,8 @@ _PUBLIC int msm_find_mapped_object(const unsigned int hdes, const void *ptr)
     (void)pthread_mutex_lock(&htab_mutex);
     #endif /* PTHREAD_SUPPORT */
 
-   if(_no_phobject_mapping == 1)
-   {  
+    if(_no_phobject_mapping == 1)
+    {  
 
       #ifdef PTHREAD_SUPPORT
       (void)pthread_mutex_unlock(&htab_mutex);
@@ -1518,37 +1513,37 @@ _PUBLIC int msm_find_mapped_object(const unsigned int hdes, const void *ptr)
 
       pups_set_errno(EACCES);
       return(-1);
-   }
+    }
 
-   for(i=0; i<_phobjects_allocated[hdes]; ++i)
-   {  if(_phobjectmap[hdes][i] != (phobmap_type *)NULL &&
-         _phobjectmap[hdes][i]->addr == ptr             )
-      {  
-         #ifdef PTHREAD_SUPPORT
-         (void)pthread_mutex_unlock(&htab_mutex);
-         #endif /* PTHREAD_SUPPORT */
+    for(i=0; i<_phobjects_allocated[hdes]; ++i)
+    {  if(_phobjectmap[hdes][i] != (phobmap_type *)NULL &&
+          _phobjectmap[hdes][i]->addr == ptr             )
+       {  
+          #ifdef PTHREAD_SUPPORT
+          (void)pthread_mutex_unlock(&htab_mutex);
+          #endif /* PTHREAD_SUPPORT */
 
-         pups_set_errno(OK);
-         return(i);
-      }
-   }
+          pups_set_errno(OK);
+          return(i);
+       }
+    }
 
-   #ifdef PTHREAD_SUPPORT
-   (void)pthread_mutex_unlock(&htab_mutex);
-   #endif /* PTHREAD_SUPPORT */
+    #ifdef PTHREAD_SUPPORT
+    (void)pthread_mutex_unlock(&htab_mutex);
+    #endif /* PTHREAD_SUPPORT */
 
-   pups_set_errno(ESRCH);
-   return(-1);
+    pups_set_errno(ESRCH);
+    return(-1);
 } 
 
 
 
 
-/*-----------------------------------------------------------------------------------------------
-    Add object to the persitent heap object map ...
------------------------------------------------------------------------------------------------*/
+/*---------------------------------------------*/
+/* Add object to the persitent heap object map */
+/*---------------------------------------------*/
 
-_PUBLIC int msm_map_object(const unsigned int hdes, const unsigned int h_index, const void *ptr, const char *name)
+_PUBLIC int32_t msm_map_object(const uint32_t hdes, const uint32_t h_index, const void *ptr, const char *name)
 
 {
 
@@ -1621,11 +1616,11 @@ _PUBLIC int msm_map_object(const unsigned int hdes, const unsigned int h_index, 
 
 
 
-/*-----------------------------------------------------------------------------------------------
-    Remove persisent object from object map ...
------------------------------------------------------------------------------------------------*/
+/*-----------------------------------------*/
+/* Remove persisent object from object map */
+/*-----------------------------------------*/
 
-_PUBLIC int msm_unmap_object(const unsigned int hdes, const unsigned int h_index)
+_PUBLIC int32_t msm_unmap_object(const uint32_t hdes, const uint32_t h_index)
 
 {
 
@@ -1687,13 +1682,13 @@ _PUBLIC int msm_unmap_object(const unsigned int hdes, const unsigned int h_index
 
 
 
-/*-----------------------------------------------------------------------------------------------
-    Translate persistent object name to index ...
------------------------------------------------------------------------------------------------*/
+/*-------------------------------------------*/
+/* Translate persistent object name to index */
+/*-------------------------------------------*/
 
-_PUBLIC int msm_map_objectname2index(const unsigned int hdes, const char *name)
+_PUBLIC int32_t msm_map_objectname2index(const uint32_t hdes, const char *name)
 
-{   int i;
+{   uint32_t i;
 
 
     /*--------------*/
@@ -1733,13 +1728,13 @@ _PUBLIC int msm_map_objectname2index(const unsigned int hdes, const char *name)
 
 
 
-/*-----------------------------------------------------------------------------------------------
-    Translate persistent object address to index ...
------------------------------------------------------------------------------------------------*/
+/*----------------------------------------------*/
+/* Translate persistent object address to index */
+/*----------------------------------------------*/
 
-_PUBLIC int msm_map_objectaddr2index(const unsigned int hdes, const void *addr)
+_PUBLIC int32_t msm_map_objectaddr2index(const uint32_t hdes, const void *addr)
 
-{   int i;
+{   uint32_t i;
 
 
     /*--------------*/
@@ -1778,14 +1773,14 @@ _PUBLIC int msm_map_objectaddr2index(const unsigned int hdes, const void *addr)
 
 
 
-/*-----------------------------------------------------------------------------------------------
-    Translate persistent object name to address ...
------------------------------------------------------------------------------------------------*/
+/*---------------------------------------------*/
+/* Translate persistent object name to address */
+/*---------------------------------------------*/
 
-_PUBLIC void *msm_map_objectname2addr(const unsigned int hdes, const char *name)
+_PUBLIC void *msm_map_objectname2addr(const uint32_t hdes, const char *name)
 
-{   int  i;
-    void *addr = (void *)NULL;
+{   uint32_t i;
+    void     *addr = (void *)NULL;
 
 
     /*--------------*/
@@ -1827,11 +1822,11 @@ _PUBLIC void *msm_map_objectname2addr(const unsigned int hdes, const char *name)
 
 
 
-/*-----------------------------------------------------------------------------------------------
-    Translate persistent object index to name ...
------------------------------------------------------------------------------------------------*/
+/*-------------------------------------------*/
+/* Translate persistent object index to name */
+/*-------------------------------------------*/
 
-_PUBLIC char *map_objectindex2name(const unsigned int hdes, const unsigned int h_index)
+_PUBLIC char *map_objectindex2name(const uint32_t  hdes, const uint32_t h_index)
 
 {   char *name = (char *)NULL;
 
@@ -1891,11 +1886,11 @@ _PUBLIC char *map_objectindex2name(const unsigned int hdes, const unsigned int h
 
 
 
-/*-----------------------------------------------------------------------------------------------
-    Translate persistent object index to address ...
------------------------------------------------------------------------------------------------*/
+/*----------------------------------------------*/
+/* Translate persistent object index to address */
+/*----------------------------------------------*/
 
-_PUBLIC char *map_objectindex2addr(const unsigned int hdes, const unsigned int h_index)
+_PUBLIC char *map_objectindex2addr(const uint32_t hdes, const uint32_t h_index)
 
 {   void *addr = (void *)NULL;
 
@@ -1955,11 +1950,11 @@ _PUBLIC char *map_objectindex2addr(const unsigned int hdes, const unsigned int h
 
 
 
-/*------------------------------------------------------------------------------------------------
-    Make sure that a mapname is unique ...
-------------------------------------------------------------------------------------------------*/
+/*------------------------------------*/
+/* Make sure that a mapname is unique */
+/*------------------------------------*/
 
-_PUBLIC int msm_mapname_unique(const unsigned int hdes, const char *name)
+_PUBLIC  int32_t msm_mapname_unique(const uint32_t hdes, const char *name)
 
 {   return(msm_map_objectname2index(hdes,name));
 }
@@ -1967,11 +1962,11 @@ _PUBLIC int msm_mapname_unique(const unsigned int hdes, const char *name)
 
 
 
-/*------------------------------------------------------------------------------------------------
-    Set the info field for a mapped object ...
-------------------------------------------------------------------------------------------------*/
+/*----------------------------------------*/
+/* Set the info field for a mapped object */
+/*----------------------------------------*/
 
-_PUBLIC int msm_map_setinfo(const unsigned int hdes, const unsigned int h_index, const char *info)
+_PUBLIC int32_t msm_map_setinfo(const uint32_t hdes, const uint32_t h_index, const char *info)
 
 {
 
@@ -2018,11 +2013,11 @@ _PUBLIC int msm_map_setinfo(const unsigned int hdes, const unsigned int h_index,
 
 
 
-/*------------------------------------------------------------------------------------------------
-    Set the size field for a mapped object ...
-------------------------------------------------------------------------------------------------*/
+/*----------------------------------------*/
+/* Set the size field for a mapped object */
+/*----------------------------------------*/
 
-_PUBLIC int msm_map_setsize(const unsigned int hdes, const unsigned int h_index, size_t size)
+_PUBLIC int32_t msm_map_setsize(const uint32_t hdes, const uint32_t h_index, size_t size)
 
 {
 
@@ -2067,11 +2062,11 @@ _PUBLIC int msm_map_setsize(const unsigned int hdes, const unsigned int h_index,
 
 
 
-/*------------------------------------------------------------------------------------------------
-    Display statistics of object on persistent heap ...
-------------------------------------------------------------------------------------------------*/
+/*-------------------------------------------------*/
+/* Display statistics of object on persistent heap */
+/*-------------------------------------------------*/
 
-_PUBLIC int msm_show_mapped_object(const unsigned int hdes, const unsigned int h_index, const FILE *stream)
+_PUBLIC int32_t msm_show_mapped_object(const uint32_t hdes, const uint32_t h_index, const FILE *stream)
 
 {   char size_str[SSIZE]   = "",
          endian_str[SSIZE] = "";
@@ -2157,7 +2152,7 @@ _PUBLIC int msm_show_mapped_object(const unsigned int hdes, const unsigned int h
     (void)fprintf(stream,"    object information    :  %s\n",            _phobjectmap[hdes][h_index]->info);
     (void)fprintf(stream,"    pointer size          :  %04d bytes\n",    htable[hdes].ptrsize);
     (void)fprintf(stream,"    pointer configuration :  %s\n",            endian_str);
-    (void)fprintf(stream,"    object location       :  %016lx virtual\n",(unsigned long int)_phobjectmap[hdes][h_index]->addr);
+    (void)fprintf(stream,"    object location       :  %016lx virtual\n",(uint64_t         )_phobjectmap[hdes][h_index]->addr);
     (void)fprintf(stream,"    object size           :  %016lx bytes\n\n",_phobjectmap[hdes][h_index]->size);
      
     (void)fflush(stream);
@@ -2174,14 +2169,14 @@ _PUBLIC int msm_show_mapped_object(const unsigned int hdes, const unsigned int h
 
 
 
-/*------------------------------------------------------------------------------------------------
-    Display objects on persistent heap ...
-------------------------------------------------------------------------------------------------*/
+/*------------------------------------*/
+/* Display objects on persistent heap */
+/*------------------------------------*/
 
-_PUBLIC int msm_show_mapped_objects(const unsigned int hdes, const FILE *stream)
+_PUBLIC int32_t msm_show_mapped_objects(const uint32_t hdes, const FILE *stream)
 
-{   int i,
-        objects = 0;
+{   uint32_t i,
+             objects = 0;
 
 
     /*--------------*/
@@ -2210,7 +2205,7 @@ _PUBLIC int msm_show_mapped_objects(const unsigned int hdes, const FILE *stream)
 
     (void)fprintf(stream,"\n\n    Persistent object map for heap \"%-32s\" (at %016lx virtual)\n\n",
                                                                                 msm_hdes2name(hdes),
-                                                               (unsigned long int)htable[hdes].addr);
+                                                                        (uint64_t)htable[hdes].addr);
     (void)fflush(stream);
 
 
@@ -2231,7 +2226,7 @@ _PUBLIC int msm_show_mapped_objects(const unsigned int hdes, const FILE *stream)
                                                                                                    i,
                                                                          _phobjectmap[hdes][i]->name,
                                                                          _phobjectmap[hdes][i]->info,
-                                                      (unsigned long int)_phobjectmap[hdes][i]->addr,
+                                                               (uint64_t)_phobjectmap[hdes][i]->addr,
                                                                                             size_str);
           (void)fflush(stream);
 
@@ -2267,11 +2262,11 @@ _PUBLIC int msm_show_mapped_objects(const unsigned int hdes, const FILE *stream)
 
 
 
-/*------------------------------------------------------------------------------------------------
-    Translate persistent heap hdes (heap descriptor) to name ...
-------------------------------------------------------------------------------------------------*/
+/*----------------------------------------------------------*/
+/* Translate persistent heap hdes (heap descriptor) to name */
+/*----------------------------------------------------------*/
 
-_PUBLIC char *msm_hdes2name(const unsigned int hdes)
+_PUBLIC char *msm_hdes2name(const uint32_t hdes)
 
 {
 
@@ -2310,13 +2305,13 @@ _PUBLIC char *msm_hdes2name(const unsigned int hdes)
 
 
 
-/*------------------------------------------------------------------------------------------------
-    Translate persistent heap name to hdes (heap descriptor) ...
-------------------------------------------------------------------------------------------------*/
+/*----------------------------------------------------------*/
+/* Translate persistent heap name to hdes (heap descriptor) */
+/*----------------------------------------------------------*/
 
-_PUBLIC int msm_name2hdes(const char *name)
+_PUBLIC int32_t msm_name2hdes(const char *name)
 
-{   int i;
+{   uint32_t i;
 
 
     /*--------------*/
@@ -2356,14 +2351,14 @@ _PUBLIC int msm_name2hdes(const char *name)
 
 
 
-/*-----------------------------------------------------------------------------------------------
-    Make heap table addresses process local ...
------------------------------------------------------------------------------------------------*/
+/*-----------------------------------------*/
+/* Make heap table addresses process local */
+/*-----------------------------------------*/
 
-_PUBLIC int msm_isync_heaptables(const unsigned int hdes)
+_PUBLIC int32_t msm_isync_heaptables(const uint32_t hdes)
 
-{    unsigned long int offset;
-     char          info[SSIZE] = "";
+{    uint64_t offset;
+     char     info[SSIZE] = "";
 
 
      /*--------------*/
@@ -2384,11 +2379,9 @@ _PUBLIC int msm_isync_heaptables(const unsigned int hdes)
      /* Relocation offset (for persistent heap addresses) */
      /*---------------------------------------------------*/
 
-     offset = (unsigned long int)htable[hdes].addr;
+     offset = (uint64_t)htable[hdes].addr;
 
-     _pheap_parameters[hdes]      = (unsigned long int *)((unsigned long int)sizeof(long)              + offset);
-
-
+     _pheap_parameters[hdes]      = (uint64_t *)((uint64_t)sizeof(uint64_t)                  + offset);
      _pheapindex[hdes]            = _pheap_parameters[hdes][0];
      _pheap_bytes_used[hdes]      = _pheap_parameters[hdes][1];
      _pheap_bytes_free[hdes]      = _pheap_parameters[hdes][2];
@@ -2396,20 +2389,20 @@ _PUBLIC int msm_isync_heaptables(const unsigned int hdes)
      _pheap_chunks_free[hdes]     = _pheap_parameters[hdes][4];
      pheapsize[hdes]              = _pheap_parameters[hdes][5];
      _pheaplimit[hdes]            = _pheap_parameters[hdes][6];
-     _pheapinfo[hdes]             = (malloc_info *)((unsigned long int)_pheap_parameters[hdes][7]     + offset);
+     _pheapinfo[hdes]             = (malloc_info *)((uint64_t)_pheap_parameters[hdes][7]     + offset);
      _phobjects[hdes]             = _pheap_parameters[hdes][8];
      _phobjects_allocated[hdes]   = _pheap_parameters[hdes][9];
-     _phobjectmap[hdes]           = (phobmap_type  **)((unsigned long int)_pheap_parameters[hdes][10] + offset);
-     _pheapbase[hdes]             = (char           *)((unsigned long int)_pheap_parameters[hdes][11] + offset);
-     htable[hdes].sdata           = _pheap_parameters[hdes][15]                                       + offset;
-     htable[hdes].edata           = _pheap_parameters[hdes][16]                                       + offset;
+     _phobjectmap[hdes]           = (phobmap_type  **)((uint64_t)_pheap_parameters[hdes][10] + offset);
+     _pheapbase[hdes]             = (char           *)((uint64_t)_pheap_parameters[hdes][11] + offset);
+     htable[hdes].sdata           = _pheap_parameters[hdes][15]                              + offset;
+     htable[hdes].edata           = _pheap_parameters[hdes][16]                              + offset;
      htable[hdes].segment_size    = _pheap_parameters[hdes][17];
      htable[hdes].heapmagic       = _pheap_parameters[hdes][18];
      htable[hdes].ptrsize         = _pheap_parameters[hdes][20];
 
 
      /*--------------------------------------------------------------------------*/
-     /* Map all addresses in persistent memory into the address space of the the */
+     /* Map all addresses in persistent memory  int32_to the address space of the the */
      /* current process                                                          */
      /*--------------------------------------------------------------------------*/
 
@@ -2438,14 +2431,14 @@ _PUBLIC int msm_isync_heaptables(const unsigned int hdes)
  
 
 
-/*-----------------------------------------------------------------------------------------------
-    Make heap table addresses global ...
------------------------------------------------------------------------------------------------*/
+/*----------------------------------*/
+/* Make heap table addresses global */
+/*----------------------------------*/
 
-_PUBLIC int msm_sync_heaptables(const unsigned int hdes)
+_PUBLIC int32_t msm_sync_heaptables(const uint32_t hdes)
 
-{    unsigned long int offset;
-     char              info[SSIZE] = "";
+{    uint64_t offset;
+     char     info[SSIZE] = "";
 
 
      /*--------------*/
@@ -2466,11 +2459,11 @@ _PUBLIC int msm_sync_heaptables(const unsigned int hdes)
      /* Compute offset between global and local process address spaces */
      /*----------------------------------------------------------------*/
 
-     offset = (unsigned long int)htable[hdes].addr;
+     offset = (uint64_t)htable[hdes].addr;
 
 
      /*----------------------------------------------------------------*/
-     /* Map heap parameter table addresses into global address space   */
+     /* Map heap parameter table addresses  int32_to global address space   */
      /* of persistent heap                                             */
      /*----------------------------------------------------------------*/
 
@@ -2481,13 +2474,13 @@ _PUBLIC int msm_sync_heaptables(const unsigned int hdes)
      _pheap_parameters[hdes][4]    = _pheap_chunks_free[hdes];
      _pheap_parameters[hdes][5]    = pheapsize[hdes];
      _pheap_parameters[hdes][6]    = _pheaplimit[hdes];
-     _pheap_parameters[hdes][7]    = (long int)((unsigned long int)_pheapinfo[hdes]     - offset);
+     _pheap_parameters[hdes][7]    = (int64_t)((uint64_t)_pheapinfo[hdes]     - offset);
      _pheap_parameters[hdes][8]    = _phobjects[hdes];
      _pheap_parameters[hdes][9]    = _phobjects_allocated[hdes];
-     _pheap_parameters[hdes][10]   = (long int)((unsigned long int)_phobjectmap[hdes]   - offset);
-     _pheap_parameters[hdes][11]   = (long int)((unsigned long int)_pheapbase[hdes]     - offset);
-     _pheap_parameters[hdes][15]   = htable[hdes].sdata                                 - offset;
-     _pheap_parameters[hdes][16]   = htable[hdes].edata                                 - offset;
+     _pheap_parameters[hdes][10]   = (int64_t)((uint64_t)_phobjectmap[hdes]   - offset);
+     _pheap_parameters[hdes][11]   = (int64_t)((uint64_t)_pheapbase[hdes]     - offset);
+     _pheap_parameters[hdes][15]   = htable[hdes].sdata                       - offset;
+     _pheap_parameters[hdes][16]   = htable[hdes].edata                       - offset;
      _pheap_parameters[hdes][17]   = htable[hdes].segment_size;
      _pheap_parameters[hdes][18]   = htable[hdes].heapmagic;
      _pheap_parameters[hdes][19]   = appl_vtag;
@@ -2514,7 +2507,7 @@ _PUBLIC int msm_sync_heaptables(const unsigned int hdes)
      _pheap_parameters[hdes][14]  = FALSE;
      htable[hdes].addresses_local = FALSE;
 
-     _pheap_parameters[hdes]     = (unsigned long int *)((unsigned long int)sizeof(long) - offset);
+     _pheap_parameters[hdes]      = (uint64_t *)((uint64_t)sizeof(uint64_t) - offset);
 
      #ifdef PTHREAD_SUPPORT
      (void)pthread_mutex_unlock(&htab_mutex);
@@ -2527,11 +2520,11 @@ _PUBLIC int msm_sync_heaptables(const unsigned int hdes)
 
 
 
-/*-----------------------------------------------------------------------------------------------
-    Display heap information ...
------------------------------------------------------------------------------------------------*/
+/*--------------------------*/
+/* Display heap information */
+/*--------------------------*/
 
-_PUBLIC int msm_print_heaptables(const FILE *stream, const unsigned int hdes, const char *info, const size_t offset)
+_PUBLIC int32_t msm_print_heaptables(const FILE *stream, const uint32_t hdes, const char *info, const size_t offset)
 
 {    
 
@@ -2569,20 +2562,20 @@ _PUBLIC int msm_print_heaptables(const FILE *stream, const unsigned int hdes, co
      (void)fprintf(stream,"    chunks free       : %08ld\n",      _pheap_parameters[hdes][4]);
      (void)fprintf(stream,"    heap size         : %08ld\n",      _pheap_parameters[hdes][5]);
      (void)fprintf(stream,"    heap limit        : %08ld\n",      _pheap_parameters[hdes][6]);
-     (void)fprintf(stream,"    heap info         : %010x\n",      (unsigned long int)_pheap_parameters[hdes][7]);
+     (void)fprintf(stream,"    heap info         : %010x\n",      (uint64_t)_pheap_parameters[hdes][7]);
      (void)fprintf(stream,"    heap objects      : %04d\n",       _pheap_parameters[hdes][8]);
      (void)fprintf(stream,"    heap object slots : %04d\n",       _pheap_parameters[hdes][9]);
-     (void)fprintf(stream,"    heap object table : %016lx\n",     (unsigned long int)_pheap_parameters[hdes][10]);
-     (void)fprintf(stream,"    heap base         : %016lx\n\n",   (unsigned long int)_pheap_parameters[hdes][11]);
+     (void)fprintf(stream,"    heap object table : %016lx\n",     (uint64_t)_pheap_parameters[hdes][10]);
+     (void)fprintf(stream,"    heap base         : %016lx\n\n",   (uint64_t)_pheap_parameters[hdes][11]);
      (void)fprintf(stream,"    heap clients      : %04d\n",       _pheap_parameters[hdes][12]);
      (void)fprintf(stream,"    heap client slots : %04d\n",       _pheap_parameters[hdes][13]);
-     (void)fprintf(stream,"    heap client table : %016lx\n",     (unsigned long int)_pheap_parameters[hdes][14]);
-     (void)fprintf(stream,"    heap base         : %016lx\n",     (unsigned long int)_pheap_parameters[hdes][15]);
-     (void)fprintf(stream,"    heap top          : %016lx\n",     (unsigned long int)_pheap_parameters[hdes][16]);
-     (void)fprintf(stream,"    heap segment size : %016lx\n",     (unsigned long int)_pheap_parameters[hdes][17]);
-     (void)fprintf(stream,"    heapmagic         : %016lx\n",     (unsigned long int)_pheap_parameters[hdes][18]);
-     (void)fprintf(stream,"    heap vtag         : %04d\n",       (unsigned long int)_pheap_parameters[hdes][19]);
-     (void)fprintf(stream,"    heap address size : %04d (bits)\n",(unsigned long int)_pheap_parameters[hdes][20]);
+     (void)fprintf(stream,"    heap client table : %016lx\n",     (uint64_t)_pheap_parameters[hdes][14]);
+     (void)fprintf(stream,"    heap base         : %016lx\n",     (uint64_t)_pheap_parameters[hdes][15]);
+     (void)fprintf(stream,"    heap top          : %016lx\n",     (uint64_t)_pheap_parameters[hdes][16]);
+     (void)fprintf(stream,"    heap segment size : %016lx\n",     (uint64_t)_pheap_parameters[hdes][17]);
+     (void)fprintf(stream,"    heapmagic         : %016lx\n",     (uint64_t)_pheap_parameters[hdes][18]);
+     (void)fprintf(stream,"    heap vtag         : %04d\n",       (uint64_t)_pheap_parameters[hdes][19]);
+     (void)fprintf(stream,"    heap address size : %04d (bits)\n",(uint64_t)_pheap_parameters[hdes][20]);
      (void)fflush(stream);
 
      #ifdef PTHREAD_SUPPORT
@@ -2597,14 +2590,14 @@ _PUBLIC int msm_print_heaptables(const FILE *stream, const unsigned int hdes, co
 
 
 
-/*-----------------------------------------------------------------------------------------------
-    Relocate persistent heap (after munmap/mmap extension remapping) ...
------------------------------------------------------------------------------------------------*/
+/*------------------------------------------------------------------*/
+/* Relocate persistent heap (after munmap/mmap extension remapping) */ 
+/*------------------------------------------------------------------*/
 
 
-_PRIVATE int msm_relocate_heap_addresses(int hdes, unsigned long int offset, int offset_op)
+_PRIVATE int32_t msm_relocate_heap_addresses(int hdes, size_t offset,  int32_t offset_op)
 
-{   int  i;
+{   uint32_t i;
  
 
     /*--------------*/
@@ -2625,7 +2618,7 @@ _PRIVATE int msm_relocate_heap_addresses(int hdes, unsigned long int offset, int
 
     #ifdef PHEAP_DEBUG
     if(offset_op == ADD_OFFSET)
-    {  (void)fprintf(stderr,"    heap %04d mapped into process memory map at %016lx virtual\n",hdes,offset);
+    {  (void)fprintf(stderr,"    heap %04d mapped  int32_to process memory map at %016lx virtual\n",hdes,offset);
        (void)fflush(stderr);
     }
     else
@@ -2644,13 +2637,13 @@ _PRIVATE int msm_relocate_heap_addresses(int hdes, unsigned long int offset, int
        {  if(_phobjectmap[hdes][i] != (phobmap_type *)NULL)
           {  if(offset_op == ADD_OFFSET)
              {  if(_phmaps_exist == TRUE)
-                {  _phobjectmap[hdes][i]       = (phobmap_type *)((unsigned long int)_phobjectmap[hdes][i] + offset); 
-                   _phobjectmap[hdes][i]->addr = (void *)((unsigned long int)_phobjectmap[hdes][i]->addr   + offset);
+                {  _phobjectmap[hdes][i]       = (phobmap_type *)((uint64_t)_phobjectmap[hdes][i] + offset); 
+                   _phobjectmap[hdes][i]->addr = (void *)((uint64_t        )_phobjectmap[hdes][i]->addr   + offset);
                 }
              }
              else
-             {  _phobjectmap[hdes][i]->addr = (void *)((unsigned long int)_phobjectmap[hdes][i]->addr   - offset);
-                _phobjectmap[hdes][i]       = (phobmap_type *)((unsigned long int)_phobjectmap[hdes][i] - offset); 
+             {  _phobjectmap[hdes][i]->addr = (void *)((uint64_t        )_phobjectmap[hdes][i]->addr   - offset);
+                _phobjectmap[hdes][i]       = (phobmap_type *)((uint64_t)_phobjectmap[hdes][i] - offset); 
              }
           }
        }
@@ -2680,13 +2673,13 @@ _PRIVATE int msm_relocate_heap_addresses(int hdes, unsigned long int offset, int
 
 
 
-/*-----------------------------------------------------------------------------------------------
-    Convert free block list from global to local addressing  ...
------------------------------------------------------------------------------------------------*/
+/*---------------------------------------------------------*/
+/* Convert free block list from global to local addressing */
+/*---------------------------------------------------------*/
 
-_PRIVATE void global_to_local_blocklist(int hdes, unsigned long int offset)
+_PRIVATE void global_to_local_blocklist(uint32_t hdes, size_t offset)
 
-{   int    i;
+{   uint32_t    i;
     struct list *next = (struct list *)NULL;
 
     _BOOLEAN fraghead_address;
@@ -2705,13 +2698,13 @@ _PRIVATE void global_to_local_blocklist(int hdes, unsigned long int offset)
        fraghead_address = TRUE;
  
        if(next != (struct list *)NULL)
-       {  next = (struct list *)((unsigned long int)next + offset);
+       {  next = (struct list *)((uint64_t)next + offset);
 
           if(fraghead_address == TRUE)
           {  _phfraghead[hdes][i].next = next;
 
              #ifdef PHEAP_DEBUG
-             (void)fprintf(stderr,"log: %04d pointer %016lx\n",i,(unsigned long int)_phfraghead[hdes][i].next);
+             (void)fprintf(stderr,"log: %04d pointer %016lx\n",i,(uint64_t         )_phfraghead[hdes][i].next);
              (void)fflush(stderr);
              #endif /* PHEAP_DEBUG */
           }
@@ -2722,7 +2715,7 @@ _PRIVATE void global_to_local_blocklist(int hdes, unsigned long int offset)
           /*-----------------------------------------------------*/ 
 
           while(next->next != (struct list *)NULL)
-          {  next->next = (struct list *)((unsigned long int)next->next + offset);
+          {  next->next = (struct list *)((uint64_t)next->next + offset);
              
              if(next->prev != (struct list *)NULL)
              {  if(fraghead_address == TRUE)
@@ -2730,7 +2723,7 @@ _PRIVATE void global_to_local_blocklist(int hdes, unsigned long int offset)
                    fraghead_address = FALSE;
                 }
                 else
-                   next->prev = (struct list *)((unsigned long int)next->prev + offset);
+                   next->prev = (struct list *)((uint64_t)next->prev + offset);
              }
 
 
@@ -2747,17 +2740,17 @@ _PRIVATE void global_to_local_blocklist(int hdes, unsigned long int offset)
 
 
 
-/*-----------------------------------------------------------------------------------------------
-    Convert free block list from local to global addressing  ...
------------------------------------------------------------------------------------------------*/
+/*---------------------------------------------------------*/
+/* Convert free block list from local to global addressing */
+/*---------------------------------------------------------*/
 
-_PRIVATE void local_to_global_blocklist(int hdes, unsigned long int offset)
+_PRIVATE void local_to_global_blocklist(int hdes, size_t offset)
 
-{   int    i;
-    struct list *next = (struct list *)NULL,
-                *step = (struct list *)NULL;
+{   uint32_t     i;
+    struct list  *next = (struct list *)NULL,
+                 *step = (struct list *)NULL;
 
-    _BOOLEAN    fraghead_address;
+    _BOOLEAN     fraghead_address;
 
     if(htable[hdes].addresses_local == FALSE)
        return;
@@ -2781,13 +2774,13 @@ _PRIVATE void local_to_global_blocklist(int hdes, unsigned long int offset)
           while(next->next != (struct list *)NULL)
           {  
              step       = next->next;
-             next->next = (struct list *)((unsigned long int)next->next - offset);
+             next->next = (struct list *)((uint64_t)next->next - offset);
  
              if(next->prev != (struct list *)NULL)
              {  if(fraghead_address == TRUE)
                    next->prev->next = next - offset; 
                 else
-                   next->prev = (struct list *)((unsigned long int)next->prev - offset);
+                   next->prev = (struct list *)((uint64_t)next->prev - offset);
              }
 
 
@@ -2802,7 +2795,7 @@ _PRIVATE void local_to_global_blocklist(int hdes, unsigned long int offset)
                 _phfraghead[hdes][i].next = next;
 
                 #ifdef PHEAP_DEBUG 
-                (void)fprintf(stderr,"log: %04d pointer %016lx\n",i,(unsigned long int)_phfraghead[hdes][i].next);
+                (void)fprintf(stderr,"log: %04d pointer %016lx\n",i,(uint64_t)_phfraghead[hdes][i].next);
                 (void)fflush(stderr);
                 #endif /* PHEAP_DEBUG */
              }
@@ -2816,10 +2809,10 @@ _PRIVATE void local_to_global_blocklist(int hdes, unsigned long int offset)
           /*-------------------------------------------------*/
 
           if(fraghead_address == TRUE)
-          {  _phfraghead[hdes][i].next = (struct list *)((unsigned long int)next - offset);
+          {  _phfraghead[hdes][i].next = (struct list *)((uint64_t)next - offset);
  
              #ifdef PHEAP_DEBUG
-             (void)fprintf(stderr,"log: %04d pointer %016lx\n",i,(unsigned long int)_phfraghead[hdes][i].next);
+             (void)fprintf(stderr,"log: %04d pointer %016lx\n",i,(uint64_t)_phfraghead[hdes][i].next);
              (void)fflush(stderr);
              #endif /* PHEAP_DEBUG */
           }
@@ -2830,14 +2823,14 @@ _PRIVATE void local_to_global_blocklist(int hdes, unsigned long int offset)
 
 
 
-/*------------------------------------------------------------------------------------------------
-    Persistent heap exit function (which detaches any persistent heaps) ...
-------------------------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------*/
+/* Persistent heap exit function (which detaches any persistent heaps) */
+/*---------------------------------------------------------------------*/
 
-_PUBLIC void msm_exit(const unsigned int flags)
+_PUBLIC void msm_exit(const uint32_t flags)
 
-{   int i,
-        cnt = 0;
+{   uint32_t i,
+             cnt = 0;
 
 
     /*----------------------------------*/
@@ -2851,7 +2844,7 @@ _PUBLIC void msm_exit(const unsigned int flags)
     if(appl_verbose == TRUE)
     {  (void)strdate(date);
        (void)fprintf(stderr,"%s %s (%d@%s:%s): detaching persistent heaps\n",
-                            date,appl_name,appl_pid,appl_host,appl_owner);
+                                date,appl_name,appl_pid,appl_host,appl_owner);
        (void)fflush(stderr);
     }
 
@@ -2875,13 +2868,13 @@ _PUBLIC void msm_exit(const unsigned int flags)
 
 
 
-/*-------------------------------------------------------------------------------------------------
-    Check to see if an object already exists ...
--------------------------------------------------------------------------------------------------*/
+/*------------------------------------------*/
+/* Check to see if an object already exists */
+/*------------------------------------------*/
 
-_PUBLIC _BOOLEAN msm_phobject_exists(const unsigned int hdes, const char *name)
+_PUBLIC _BOOLEAN msm_phobject_exists(const uint32_t hdes, const char *name)
 
-{   int i;
+{   uint32_t i;
 
     if(hdes <  0                ||
        hdes >= appl_max_pheaps  ||
@@ -2923,11 +2916,11 @@ _PUBLIC _BOOLEAN msm_phobject_exists(const unsigned int hdes, const char *name)
 
 
 
-/*-------------------------------------------------------------------------------------------------
-    Make sure heap addresses are in either absolute (local) or relative ...
--------------------------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------*/
+/* Make sure heap addresses are in either absolute (local) or relative */
+/*---------------------------------------------------------------------*/
 
-_PUBLIC int msm_map_address_mode(const unsigned int hdes, const unsigned int mode)
+_PUBLIC int32_t msm_map_address_mode(const uint32_t  hdes, const uint32_t mode)
 
 {
     
@@ -2972,13 +2965,13 @@ _PUBLIC int msm_map_address_mode(const unsigned int hdes, const unsigned int mod
 
 
 
-/*-------------------------------------------------------------------------------------------------
-    Translate heap name to heap table index ...
--------------------------------------------------------------------------------------------------*/
+/*-----------------------------------------*/
+/* Translate heap name to heap table index */
+/*-----------------------------------------*/
 
-_PUBLIC int msm_name2index(const char *name)
+_PUBLIC int32_t msm_name2index(const char *name)
 
-{   int i;
+{   uint32_t i;
 
 
     /*--------------*/
@@ -3012,13 +3005,13 @@ _PUBLIC int msm_name2index(const char *name)
 
 
 
-/*-------------------------------------------------------------------------------------------------
-    Translate heap fdes to heap table index ...
--------------------------------------------------------------------------------------------------*/
+/*-----------------------------------------*/
+/* Translate heap fdes to heap table index */
+/*-----------------------------------------*/
 
-_PUBLIC int msm_fdes2hdes(const int fdes)
+_PUBLIC int32_t msm_fdes2hdes(const des_t fdes)
 
-{   int i;
+{   uint32_t i;
 
 
     /*--------------*/
@@ -3058,13 +3051,13 @@ _PUBLIC int msm_fdes2hdes(const int fdes)
 
 
 
-/*-------------------------------------------------------------------------------------------------
-    Check to see if an address lies within persistent heap ...
--------------------------------------------------------------------------------------------------*/
+/*--------------------------------------------------------*/
+/* Check to see if an address lies within persistent heap */
+/*--------------------------------------------------------*/
 
-_PUBLIC _BOOLEAN msm_addr_in_heap(const unsigned int hdes, const void *ptr)
+_PUBLIC _BOOLEAN msm_addr_in_heap(const uint32_t hdes, const void *ptr)
 
-{   unsigned long int addr;
+{   uint64_t addr;
 
 
     /*--------------*/
@@ -3081,7 +3074,7 @@ _PUBLIC _BOOLEAN msm_addr_in_heap(const unsigned int hdes, const void *ptr)
     (void)pthread_mutex_lock(&htab_mutex);
     #endif /* PTHREAD_SUPPORT */
 
-    addr = (unsigned long int)ptr;
+    addr = (uint64_t)ptr;
     if(addr < htable[hdes].sdata || addr > htable[hdes].edata)
     {  
 
@@ -3104,13 +3097,13 @@ _PUBLIC _BOOLEAN msm_addr_in_heap(const unsigned int hdes, const void *ptr)
 
 
 
-/*------------------------------------------------------------------------------------------------
-    Resolve address pointer on persistent heap into address space of calling process ...
-------------------------------------------------------------------------------------------------*/
+/*----------------------------------------------------------------------------------*/
+/* Resolve address pointer on persistent heap into address space of calling process */
+/*----------------------------------------------------------------------------------*/
 
-_PUBLIC void *msm_map_haddr_to_paddr(const unsigned int hdes, const void *ptr)
+_PUBLIC void *msm_map_haddr_to_paddr(const uint32_t hdes, const void *ptr)
 
-{   unsigned long int addr;
+{   uint64_t addr;
 
 
     /*--------------*/
@@ -3127,7 +3120,7 @@ _PUBLIC void *msm_map_haddr_to_paddr(const unsigned int hdes, const void *ptr)
     (void)pthread_mutex_lock(&htab_mutex);
     #endif /* PTHREAD_SUPPORT */
 
-    addr = (unsigned long int)ptr;
+    addr = (uint64_t)ptr;
 
 
     /*-----------------------------*/
@@ -3164,13 +3157,13 @@ _PUBLIC void *msm_map_haddr_to_paddr(const unsigned int hdes, const void *ptr)
 
 
  
-/*------------------------------------------------------------------------------------------------
-    Resolve address pointer on persistent heap into address space of calling process ...
-------------------------------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------------------------------*/
+/* Resolve address pointer in address space of calling process to relative address on heap */
+/*-----------------------------------------------------------------------------------------*/
 
-_PUBLIC void *msm_map_paddr_to_haddr(const unsigned int hdes, const void *ptr)
+_PUBLIC void *msm_map_paddr_to_haddr(const uint32_t hdes, const void *ptr)
 
-{   unsigned long int addr;
+{   uint64_t addr;
 
 
     /*--------------*/
@@ -3187,7 +3180,7 @@ _PUBLIC void *msm_map_paddr_to_haddr(const unsigned int hdes, const void *ptr)
     (void)pthread_mutex_lock(&htab_mutex);
     #endif /* PTHREAD_SUPPORT */
 
-    addr = (unsigned long int)ptr;
+    addr = (uint64_t)ptr;
 
 
     /*-----------------------------*/
@@ -3228,9 +3221,9 @@ _PUBLIC void *msm_map_paddr_to_haddr(const unsigned int hdes, const void *ptr)
 /* Save heap state (Criu state save support routine) */
 /*---------------------------------------------------*/
 
-_PUBLIC int msm_save_heapstate(const char *ssave_dir)
+_PUBLIC int32_t msm_save_heapstate(const char *ssave_dir)
 
-{   int i;
+{   uint32_t i;
 
 
     /*--------------*/
@@ -3268,7 +3261,7 @@ _PUBLIC int msm_save_heapstate(const char *ssave_dir)
     pups_set_errno(OK);
     return(0);
 }
-/*---------------------------------------------------------------------------
+/*--------------------------------------------------------------------------
      Allocate memory on a page boundary.
      Copyright (C) 1991, 1992, 1993, 1994 Free Software Foundation, Inc.
 
@@ -3291,38 +3284,30 @@ _PUBLIC int msm_save_heapstate(const char *ssave_dir)
      or (US mail) as Mike Haertel c/o Free Software Foundation.
 
      Shared heap modifications by Mark O'Neill (mao@tumblingdice.co.uk)
-     (C) 1998-2023 M.A. O'Neill, Tumbling Dice
----------------------------------------------------------------------------*/
+     (C) 1998-2024 M.A. O'Neill, Tumbling Dice
+-------------------------------------------------------------------------*/
 
-#ifndef GLIBC
-#if defined (__GNU_LIBRARY__) || defined (_LIBC)
-#include <stddef.h>
-#include <sys/cdefs.h>
-extern size_t __getpagesize __P ((void));
-#else
 #define	 __getpagesize()	getpagesize()
-#endif /* defined (__GNU_LIBRARY__) || defined (_LIBC) */
-#endif /* GLIBC                                        */
-
 
 #ifndef	_PHMALLOC_INTERNAL
 #define	_PHMALLOC_INTERNAL
 #include <phmalloc.h>
 #endif /* _PHMALLOC_INTERNAL */
 #include <xtypes.h>
+#include <stdint.h>
 
 
 _PRIVATE __malloc_size_t pagesize;
 
-_PUBLIC __ptr_t phvalloc (const unsigned int hdes, const __malloc_size_t size, const char *name)
+_PUBLIC __ptr_t phvalloc (const uint32_t hdes, const __malloc_size_t size, const char *name)
 {
 
-  if(pagesize == 0)
-    pagesize = __getpagesize();
+    if(pagesize == 0)
+      pagesize = __getpagesize();
 
-  return phmemalign (hdes, pagesize, size, name);
+    return phmemalign (hdes, pagesize, size, name);
 }
-/*------------------------------------------------------------------------------
+/*----------------------------------------------------------------------------
    Memory allocator `phmalloc'.
    Copyright 1990, 1991, 1992, 1993, 1994, 1995 Free Software Foundation, Inc.
 		  Written May 1989 by Mike Haertel.
@@ -3346,14 +3331,15 @@ _PUBLIC __ptr_t phvalloc (const unsigned int hdes, const __malloc_size_t size, c
    or (US mail) as Mike Haertel c/o Free Software Foundation.
 
    Persistent heap modifications by Mark O'Neill (mao@tumblingdice.co.uk) 
-   (C) 1998-2023 M.A. O'Neill, Tumbling Dice
------------------------------------------------------------------------------*/
+   (C) 1998-2024 M.A. O'Neill, Tumbling Dice
+---------------------------------------------------------------------------*/
 
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 #include <xtypes.h>
 #include <errno.h>
+#include <stdint.h>
 
 #ifndef	_PHMALLOC_INTERNAL
 #define _PHMALLOC_INTERNAL
@@ -3365,30 +3351,30 @@ _PUBLIC __ptr_t phvalloc (const unsigned int hdes, const __malloc_size_t size, c
 /* Signifies whether heap addresses are local or heap global */
 /*-----------------------------------------------------------*/
 
-_IMPORT int addresses_local;
+_IMPORT int32_t addresses_local;
 
 // Heap table (for local process)
 _IMPORT heap_type *htable;
 
 // How to really get more memory
-__ptr_t (*__phmorecore) __P ((int, ptrdiff_t __size)) = __default_phmorecore;
+__ptr_t (*__phmorecore) __P ((int32_t, ptrdiff_t __size)) = __default_phmorecore;
 
 // Debugging hook for `malloc'
-__ptr_t (*__phmalloc_hook) __P ((const unsigned int, __malloc_size_t __size, const char *));
+__ptr_t (*__phmalloc_hook) __P ((const uint32_t   , __malloc_size_t __size, const char *));
 
 //Number of objects in heap
-_IMPORT int *_phobjects;
+_IMPORT int32_t *_phobjects;
 
 // Number of objects slots in heap
-_IMPORT int *_phobjects_allocated;
+_IMPORT int32_t *_phobjects_allocated;
 
 // Pointer to table of significant objects on persistent heaps
 _IMPORT phobmap_type ***_phobjectmap;
 
 // Pointer to persistent heap parameter table (on persistent heap)
-_IMPORT unsigned long int **_pheap_parameters;
+_IMPORT uint64_t     **_pheap_parameters;
 
-// Pointer to the base of the first block.  */
+// Pointer to the base of the first block.
 _IMPORT char **_pheapbase;
 
 // Block information table.  Allocated with align/__free (not malloc/free)
@@ -3412,14 +3398,14 @@ _IMPORT struct list **_phfraghead;
 /* Add persistent object to persistent object map */
 /*------------------------------------------------*/
 
-_PROTOTYPE _EXTERN int msm_map_object(const unsigned int, const unsigned intint, const void *, const char *);
+_PROTOTYPE _EXTERN int32_t msm_map_object(const uint32_t, const uint32_t, const void *, const char *);
 
 
 /*-----------------------------------------------------*/
 /* Remove persistent object from persistent object map */
 /*-----------------------------------------------------*/
 
-_PROTOTYPE _EXTERN int msm_unmap_object(const unsigned int, const unsigned int);
+_PROTOTYPE _EXTERN int32_t msm_unmap_object(const uint32_t, const uint32_t);
 
 
 /*-----------------*/
@@ -3436,17 +3422,17 @@ _IMPORT __malloc_size_t *_pheap_bytes_free;
 /* Are you experienced? */
 /*----------------------*/
 
-_IMPORT int *__phmalloc_initialized;
+_IMPORT  int32_t *__phmalloc_initialized;
 
-void (*__malloc_initialize_hook) __P ((int));
-void (*__after_phmorecore_hook) __P ((void));
+void (*__malloc_initialize_hook) __P ((int32_t));
+void (*__after_phmorecore_hook)  __P ((void));
 
 
 /*---------------------------------------------*/
 /* Set everything up and remember that we have */
 /*---------------------------------------------*/
 
-_PRIVATE int initialize __P ((int));
+_PRIVATE  int32_t initialize __P ((int32_t));
 
 
 /*--------------------*/
@@ -3456,12 +3442,11 @@ _PRIVATE int initialize __P ((int));
 _PRIVATE  __ptr_t align __P ((int, __malloc_size_t));
 _PRIVATE  __ptr_t align (int hdes, __malloc_size_t size)
 {
-  __ptr_t result;
-  unsigned long int adj;
+  __ptr_t  result;
+  uint64_t adj;
 
   result = (*__phmorecore) (hdes, size);
-  adj = (unsigned long int) ((unsigned long int) ((char *) result -
-						  (char *) NULL)) % BLOCKSIZE;
+  adj = (uint64_t) ((uint64_t) ((char *) result - (char *) NULL)) % BLOCKSIZE;
   if (adj != 0)
   {
       adj = BLOCKSIZE - adj;
@@ -3480,8 +3465,8 @@ _PRIVATE  __ptr_t align (int hdes, __malloc_size_t size)
 /* Heap initialisation - called by heap_attach function */
 /*------------------------------------------------------*/
 
-_PUBLIC int initialize_heap __P ((int));
-_PUBLIC int initialize_heap (int hdes)
+_PUBLIC  int32_t initialize_heap __P ((int32_t));
+_PUBLIC  int32_t initialize_heap (int32_t hdes)
 {    
      #ifdef PTHREAD_SUPPORT
      (void)pthread_mutex_lock(&htab_mutex);
@@ -3507,7 +3492,7 @@ _PUBLIC int initialize_heap (int hdes)
      /*-------------------------*/
 
      else if(htable[hdes].exists == FALSE)
-     {  int i;
+     {  uint32_t i;
 
 
         /*----------------------------*/
@@ -3557,7 +3542,7 @@ _PUBLIC int initialize_heap (int hdes)
 /* Set everything up and remember that we have. */
 /*----------------------------------------------*/
 
-_PRIVATE int initialize (int hdes)
+_PRIVATE int32_t initialize (int32_t hdes)
 {
 
   #ifdef PTHREAD_SUPPORT
@@ -3606,7 +3591,7 @@ _PRIVATE int initialize (int hdes)
      /* Account for the _pheapinfo block itself in the statistics */
      /*-----------------------------------------------------------*/
 
-     _pheap_bytes_used[hdes]  = pheapsize[hdes] * sizeof (malloc_info) + 8*sizeof(int);
+     _pheap_bytes_used[hdes]  = pheapsize[hdes] * sizeof (malloc_info) + 8*sizeof(int32_t);
      _pheap_chunks_used[hdes] = 1;
 
      _phobjects[hdes]           = 0;
@@ -3663,8 +3648,8 @@ _PRIVATE int initialize (int hdes)
             (void)msm_isync_heaptables(hdes);
 
 #ifdef PHMALLOC_DEBUG
-         (void)fprintf(stderr,"initialize: persistent heap %d dynamically remapped\n",hdes);
-         (void)fflush(stderr);
+(void)fprintf(stderr,"initialize: persistent heap %d dynamically remapped\n",hdes);
+(void)fflush(stderr);
 #endif /* PHMALLOC_DEBUG */
 
       }
@@ -3695,8 +3680,8 @@ _PRIVATE int initialize (int hdes)
 /* growing the heap info table as necessary.  */
 /*--------------------------------------------*/
 
-_PRIVATE __ptr_t phmorecore __P ((int, __malloc_size_t));
-_PRIVATE __ptr_t phmorecore (int hdes, __malloc_size_t size)
+_PRIVATE __ptr_t phmorecore __P ((int32_t, __malloc_size_t));
+_PRIVATE __ptr_t phmorecore (int32_t hdes, __malloc_size_t size)
 {
   __ptr_t result;
 
@@ -3730,8 +3715,8 @@ _PRIVATE __ptr_t phmorecore (int hdes, __malloc_size_t size)
       { 
 
 #ifdef PHMALLOC_DEBUG
-        (void)fprintf(stderr,"BLOCK: %0x%010x\n",(__malloc_size_t)BLOCK (hdes, (char *) result + size));
-        (void)fflush(stderr);
+(void)fprintf(stderr,"BLOCK: %0x%010x\n",(__malloc_size_t)BLOCK (hdes, (char *) result + size));
+(void)fflush(stderr);
 #endif /* PHMALLOC_DEBUG */
 
 	newsize *= 2;
@@ -3766,14 +3751,14 @@ _PRIVATE __ptr_t phmorecore (int hdes, __malloc_size_t size)
       ++_pheap_chunks_used[hdes];
       _phfree_internal (hdes, oldinfo);
       pheapsize[hdes] = newsize;
-    }
+  }
 
 
   _pheaplimit[hdes] = BLOCK (hdes, (char *) result + size);
 
 #ifdef PHMALLOC_DEBUG
-  (void)fprintf(stderr,"MORECORE BLOCK: %d (%d)\n",_pheaplimit[hdes],BLOCK (hdes, (char *)result)); 
-  (void)fflush(stderr); 
+(void)fprintf(stderr,"MORECORE BLOCK: %d (%d)\n",_pheaplimit[hdes],BLOCK (hdes, (char *)result)); 
+(void)fflush(stderr); 
 #endif /* PHMALLOC_DEBUG */
  
   #ifdef PTHREAD_SUPPORT
@@ -3788,101 +3773,101 @@ _PRIVATE __ptr_t phmorecore (int hdes, __malloc_size_t size)
 /* Allocate memory from (persistent) heap. */
 /*-----------------------------------------*/
 
-_PUBLIC __ptr_t phmalloc (const unsigned int hdes, __malloc_size_t  size, const char *name)
-{ int             h_index;
-  __ptr_t         result;
-  __malloc_size_t block, blocks, lastblocks, start, req_size, i;
-  struct list     *next = (struct list *)NULL;
+_PUBLIC __ptr_t phmalloc (const uint32_t hdes, __malloc_size_t  size, const char *name)
+{   int32_t        h_index;
+   __ptr_t         result;
+   __malloc_size_t block, blocks, lastblocks, start, req_size, i;
+   struct list     *next = (struct list *)NULL;
 
-  #ifdef PTHREAD_SUPPORT
-  (void)pthread_mutex_lock(&htab_mutex);
-  #endif /* PTHREAD_SUPPORT */
-
-
-  /*--------------------------------------------------------------------------------------*/
-  /* Before we do anything else, check whether we have a valid persistent heap descriptor */
-  /*--------------------------------------------------------------------------------------*/
-
-  if(hdes > appl_max_pheaps || htable[hdes].addr == (void *)NULL)
-  {  errno = EACCES;
-
-     #ifdef PTHREAD_SUPPORT
-     (void)pthread_mutex_unlock(&htab_mutex);
-     #endif /* PTHREAD_SUPPORT */
-
-     return (__ptr_t*)NULL;
-  }
+   #ifdef PTHREAD_SUPPORT
+   (void)pthread_mutex_lock(&htab_mutex);
+   #endif /* PTHREAD_SUPPORT */
 
 
-  /*--------------------------------------------------------------------------*/
-  /* Does this persistent object already exits? If so, we cannot allocate it! */
-  /*--------------------------------------------------------------------------*/
+   /*--------------------------------------------------------------------------------------*/
+   /* Before we do anything else, check whether we have a valid persistent heap descriptor */
+   /*--------------------------------------------------------------------------------------*/
 
-  if(name != (const char *)NULL && msm_phobject_exists(hdes,name))
-  {  errno = EEXIST;
+   if(hdes > appl_max_pheaps || htable[hdes].addr == (void *)NULL)
+   {  errno = EACCES;
 
-     #ifdef PTHREAD_SUPPORT
-     (void)pthread_mutex_unlock(&htab_mutex);
-     #endif /* PTHREAD_SUPPORT */
+      #ifdef PTHREAD_SUPPORT
+      (void)pthread_mutex_unlock(&htab_mutex);
+      #endif /* PTHREAD_SUPPORT */
 
-     return((__ptr_t *)NULL);
-  }
+      return (__ptr_t*)NULL;
+   }
 
 
-  /*------------------------------------------------------------------*/
-  /* ANSI C allows `malloc (0)' to either return NULL, or to return a */
-  /* valid address you can realloc and free (though not dereference). */
-  /*------------------------------------------------------------------*/
+   /*--------------------------------------------------------------------------*/
+   /* Does this persistent object already exits? If so, we cannot allocate it! */
+   /*--------------------------------------------------------------------------*/
 
-#if	0
-  if (size == 0)
-  {
-     #ifdef PTHREAD_SUPPORT
-     (void)pthread_mutex_unlock(&htab_mutex);
-     #endif /* PTHREAD_SUPPORT */
+   if(name != (const char *)NULL && msm_phobject_exists(hdes,name))
+   {  errno = EEXIST;
 
-     return (__ptr_t*)NULL;
-  }
+      #ifdef PTHREAD_SUPPORT
+      (void)pthread_mutex_unlock(&htab_mutex);
+      #endif /* PTHREAD_SUPPORT */
+
+      return((__ptr_t *)NULL);
+   }
+
+
+   /*------------------------------------------------------------------*/
+   /* ANSI C allows `malloc (0)' to either return NULL, or to return a */
+   /* valid address you can realloc and free (though not dereference). */
+   /*------------------------------------------------------------------*/
+
+#if 0
+   if (size == 0)
+   {
+      #ifdef PTHREAD_SUPPORT
+      (void)pthread_mutex_unlock(&htab_mutex);
+      #endif /* PTHREAD_SUPPORT */
+
+      return (__ptr_t*)NULL;
+   }
 #endif /* 0 */
 
 
-  if (__phmalloc_hook != NULL)
-  {  result = (*__phmalloc_hook) (hdes, size, name);
+   if (__phmalloc_hook != NULL)
+   {  result = (*__phmalloc_hook) (hdes, size, name);
 
-     #ifdef PTHREAD_SUPPORT
-     (void)pthread_mutex_unlock(&htab_mutex);
-     #endif /* PTHREAD_SUPPORT */
+      #ifdef PTHREAD_SUPPORT
+      (void)pthread_mutex_unlock(&htab_mutex);
+      #endif /* PTHREAD_SUPPORT */
 
-     return result;
-  }
+      return result;
+   }
 
-  req_size = size;
+   req_size = size;
 
 
-  /*--------------------------------------------------------------------------*/
-  /* Does this persistent object already exits? If so, we cannot allocate it! */
-  /*--------------------------------------------------------------------------*/
+   /*--------------------------------------------------------------------------*/
+   /* Does this persistent object already exits? If so, we cannot allocate it! */
+   /*--------------------------------------------------------------------------*/
 
-  if(name != (const char *)NULL && msm_phobject_exists(hdes,name))
-  {  errno = EEXIST;
+   if(name != (const char *)NULL && msm_phobject_exists(hdes,name))
+   {  errno = EEXIST;
 
-     #ifdef PTHREAD_SUPPORT
-     (void)pthread_mutex_unlock(&htab_mutex);
-     #endif /* PTHREAD_SUPPORT */
+      #ifdef PTHREAD_SUPPORT
+      (void)pthread_mutex_unlock(&htab_mutex);
+      #endif /* PTHREAD_SUPPORT */
 
-     return((__ptr_t *)NULL);
-  }
+      return((__ptr_t *)NULL);
+   }
 
    if (size < sizeof (struct list))
-      size = sizeof (struct list);
+       size = sizeof (struct list);
 
 
-  /*-----------------------------------------------------------*/
-  /* Determine the allocation policy based on the request size */
-  /*-----------------------------------------------------------*/
+   /*-----------------------------------------------------------*/
+   /* Determine the allocation policy based on the request size */
+   /*-----------------------------------------------------------*/
 
-  if (size <= BLOCKSIZE / 2)
-  {
+   if (size <= BLOCKSIZE / 2)
+   {
 
       /*-----------------------------------------------------------*/
       /* Small allocation to receive a fragment of a block.        */
@@ -3919,9 +3904,7 @@ _PUBLIC __ptr_t phmalloc (const unsigned int hdes, __malloc_size_t  size, const 
 
 	  block = BLOCK (hdes, result);
 	  if (--_pheapinfo[hdes][block].busy.info.frag.nfree != 0)
-	    _pheapinfo[hdes][block].busy.info.frag.first = (unsigned long int)
-	                                                   ((unsigned long int) ((char *) next->next - (char *) NULL)
-	                                                                                          % BLOCKSIZE) >> log;
+	    _pheapinfo[hdes][block].busy.info.frag.first = (uint64_t) ((uint64_t) ((char *) next->next - (char *) NULL) % BLOCKSIZE) >> log;
 
 
           /*-----------------------*/
@@ -3966,9 +3949,10 @@ _PUBLIC __ptr_t phmalloc (const unsigned int hdes, __malloc_size_t  size, const 
 	  for (i = 1; i < (__malloc_size_t) (BLOCKSIZE >> log); ++i)
 	  {
 	      next = (struct list *) ((char *) result + (i << log));
-	      next->next = _phfraghead[hdes][log].next;
-	      next->prev = &_phfraghead[hdes][log];
+	      next->next       = _phfraghead[hdes][log].next;
+	      next->prev       = &_phfraghead[hdes][log];
 	      next->prev->next = next;
+
 	      if (next->next != NULL)
 		next->next->prev = next;
 	  }
@@ -3987,9 +3971,10 @@ _PUBLIC __ptr_t phmalloc (const unsigned int hdes, __malloc_size_t  size, const 
 	  _pheap_bytes_free[hdes]  += BLOCKSIZE - (1 << log);
 	  _pheap_bytes_used[hdes]  -= BLOCKSIZE - (1 << log);
 	}
-  }
-  else
-  {
+   }
+
+   else
+   {
 
       /*----------------------------------------------------------------------*/
       /* Large allocation to receive one or more blocks.                      */
@@ -4076,15 +4061,16 @@ _PUBLIC __ptr_t phmalloc (const unsigned int hdes, __malloc_size_t  size, const 
 
           /*-------------------------------------------------*/
 	  /* The block we found has a bit left over,         */
-	  /* so relink the tail end back into the free list. */
+	  /* so relink the tail end back  int32_to the free list. */
           /*-------------------------------------------------*/
 
-	  _pheapinfo[hdes][block + blocks].free.size                     = _pheapinfo[hdes][block].free.size - blocks;
-	  _pheapinfo[hdes][block + blocks].free.next                     = _pheapinfo[hdes][block].free.next;
-	  _pheapinfo[hdes][block + blocks].free.prev                     = _pheapinfo[hdes][block].free.prev;
+	  _pheapinfo[hdes][block + blocks].free.size                    = _pheapinfo[hdes][block].free.size - blocks;
+	  _pheapinfo[hdes][block + blocks].free.next                    = _pheapinfo[hdes][block].free.next;
+	  _pheapinfo[hdes][block + blocks].free.prev                    = _pheapinfo[hdes][block].free.prev;
 	  _pheapinfo[hdes][_pheapinfo[hdes][block].free.prev].free.next = _pheapindex[hdes] = block + blocks;
           _pheapinfo[hdes][_pheapinfo[hdes][block].free.next].free.prev = _pheapindex[hdes] = block + blocks;
       }
+
       else
       {
 
@@ -4096,7 +4082,7 @@ _PUBLIC __ptr_t phmalloc (const unsigned int hdes, __malloc_size_t  size, const 
 	  _pheapinfo[hdes][_pheapinfo[hdes][block].free.next].free.prev = _pheapinfo[hdes][block].free.prev;
 	  _pheapinfo[hdes][_pheapinfo[hdes][block].free.prev].free.next = _pheapindex[hdes] = _pheapinfo[hdes][block].free.next;
 	  --_pheap_chunks_free[hdes];
-	}
+      }
 
       _pheapinfo[hdes][block].busy.type = 0;
       _pheapinfo[hdes][block].busy.info.size = blocks;
@@ -4115,25 +4101,25 @@ _PUBLIC __ptr_t phmalloc (const unsigned int hdes, __malloc_size_t  size, const 
 
       while(--blocks > 0)
 	_pheapinfo[hdes][block + blocks].busy.info.size = -blocks;
-  }
+   }
 
-  if(_no_phobject_mapping == 0 && name != (char *)NULL)
-  {  h_index         = msm_get_free_mapslot(hdes);
+   if(_no_phobject_mapping == 0 && name != (char *)NULL)
+   {  h_index         = msm_get_free_mapslot(hdes);
 
-     (void)msm_map_object (hdes,h_index,result,name);
-     (void)msm_map_setinfo(hdes,h_index,"persistent GMAP object");
-     (void)msm_map_setsize(hdes,h_index,req_size);
+      (void)msm_map_object (hdes,h_index,result,name);
+      (void)msm_map_setinfo(hdes,h_index,"persistent GMAP object");
+      (void)msm_map_setsize(hdes,h_index,req_size);
 
-     _pheap_parameters[hdes][8] = _phobjects[hdes];
-  }
+      _pheap_parameters[hdes][8] = _phobjects[hdes];
+   }
 
-  #ifdef PTHREAD_SUPPORT
-  (void)pthread_mutex_unlock(&htab_mutex);
-  #endif /* PTHREAD_SUPPORT */
+   #ifdef PTHREAD_SUPPORT
+   (void)pthread_mutex_unlock(&htab_mutex);
+   #endif /* PTHREAD_SUPPORT */
 
-  return result;
+   return result;
 }
-/*--------------------------------------------------------------------------------------------------------
+/*-------------------------------------------------------------------------
     Free a block of memory allocated by `malloc'.
     Copyright 1990, 1991, 1992, 1994 Free Software Foundation, Inc.
 		  Written May 1989 by Mike Haertel.
@@ -4157,13 +4143,14 @@ _PUBLIC __ptr_t phmalloc (const unsigned int hdes, __malloc_size_t  size, const 
     or (US mail) as Mike Haertel c/o Free Software Foundation.
 
     Persistent heap modifications by Mark O'Neill (mao@tumblingdice.co.uk)
-    (C) 1998-2023 M.A. O'Neill, Tumbling Dice
--------------------------------------------------------------------------------------------------------*/
+    (C) 1998-2024 M.A. O'Neill, Tumbling Dice
+-------------------------------------------------------------------------*/
 
 #include <stdio.h>
 #include <unistd.h>
 #include <errno.h>
 #include <xtypes.h>
+#include <stdint.h>
 
 #ifndef	_PHMALLOC_INTERNAL
 #define _PHMALLOC_INTERNAL
@@ -4179,21 +4166,21 @@ _IMPORT __malloc_size_t   *pheapsize;
 /* Add a persistent object to persistent object map */
 /*--------------------------------------------------*/
 
-_PROTOTYPE _EXTERN int msm_map_object(const unsigned int, const unsigned int, const void *, const char *);
+_PROTOTYPE _EXTERN int32_t msm_map_object(const uint32_t, const uint32_t, const void *, const char *);
 
 
 /*-----------------------------------------------------------------------------------*/
 /* Remove a persistent object persistent object map within persistent memory segment */
 /*-----------------------------------------------------------------------------------*/
 
-_PROTOTYPE _EXTERN int msm_unmap_object(const unsigned int, const unsigned int);
+_PROTOTYPE _EXTERN int32_t msm_unmap_object(const uint32_t, const uint32_t);
 
 
 /*-------------------------*/
 /* Debugging hook for free */
 /*-------------------------*/
 
-_PUBLIC void (*__phfree_hook) __P ((const unsigned int, const __ptr_t __ptr));
+_PUBLIC void (*__phfree_hook) __P ((const uint32_t, const __ptr_t __ptr));
 
 
 /*---------------------------------------*/
@@ -4207,14 +4194,14 @@ _PUBLIC struct alignlist *_aligned_blocks = NULL;
 /* Object mapping switch */
 /*-----------------------*/
 
-_PUBLIC int _no_phobject_mapping;
+_PUBLIC int32_t _no_phobject_mapping;
 
 
 /*---------------------------*/
 /* Number of objects in heap */
 /*---------------------------*/
 
-_IMPORT int *_phobjects;
+_IMPORT int32_t *_phobjects;
 
 
 /*------------------------------------------------------------*/
@@ -4222,10 +4209,10 @@ _IMPORT int *_phobjects;
 /* Like `free' but don't call a __free_hook if there is one.  */
 /*------------------------------------------------------------*/
 
-_PUBLIC void _phfree_internal (const unsigned int hdes, const __ptr_t ptr)
+_PUBLIC void _phfree_internal (const uint32_t hdes, const __ptr_t ptr)
 {
-  int type,
-      h_index;
+   int32_t type,
+           h_index;
 
   __malloc_size_t block,
                   blocks,
@@ -4282,7 +4269,7 @@ _PUBLIC void _phfree_internal (const unsigned int hdes, const __ptr_t ptr)
 
 
       /*-------------------------------------------------------*/
-      /* Determine how to link this block into the free list.  */
+      /* Determine how to link this block  int32_to the free list.  */
       /*-------------------------------------------------------*/
 
       if (block == i + _pheapinfo[hdes][i].free.size)
@@ -4299,7 +4286,7 @@ _PUBLIC void _phfree_internal (const unsigned int hdes, const __ptr_t ptr)
       {
 
           /*--------------------------------------------------*/
-	  /* Really link this block back into the free list.  */
+	  /* Really link this block back  int32_to the free list.  */
           /*--------------------------------------------------*/
 
 	  _pheapinfo[hdes][block].free.size = _pheapinfo[hdes][block].busy.info.size;
@@ -4444,8 +4431,8 @@ _PUBLIC void _phfree_internal (const unsigned int hdes, const __ptr_t ptr)
 
 	  prev = (struct list *) ptr;
 	  _pheapinfo[hdes][block].busy.info.frag.nfree = 1;
-	  _pheapinfo[hdes][block].busy.info.frag.first = (unsigned long int)
-	  ((unsigned long int) ((char *) ptr - (char *) NULL) % BLOCKSIZE >> type);
+	  _pheapinfo[hdes][block].busy.info.frag.first = (uint64_t)
+	  ((uint64_t)((char *) ptr - (char *) NULL) % BLOCKSIZE >> type);
 
 	  prev->next       = _phfraghead[hdes][type].next;
 	  prev->prev       = &_phfraghead[hdes][type];
@@ -4466,8 +4453,8 @@ _PUBLIC void _phfree_internal (const unsigned int hdes, const __ptr_t ptr)
     (void)msm_unmap_object(hdes,h_index);
 
 #ifdef DEBUG
-    (void)fprintf(stderr,"PHFREE EXIT\n");
-    (void)fflush(stderr);
+(void)fprintf(stderr,"PHFREE EXIT\n");
+(void)fflush(stderr);
 #endif /* DEBUG */
 
 }
@@ -4478,33 +4465,34 @@ _PUBLIC void _phfree_internal (const unsigned int hdes, const __ptr_t ptr)
 /* Return memory to the heap. */
 /*----------------------------*/
 
-void *phfree (const unsigned int hdes, const __ptr_t ptr)
+void *phfree (const uint32_t hdes, const __ptr_t ptr)
 
 { struct alignlist *l;
 
   if (ptr == NULL)
-    return;
+    return((void *)NULL);
 
   #ifdef PTHREAD_SUPPORT
   (void)pthread_mutex_lock(&htab_mutex);
   #endif /* PTHREAD_SUPPORT */
 
   for (l = _aligned_blocks; l != NULL; l = l->next)
-    if (l->aligned == ptr)
+  {   if (l->aligned == ptr)
       {
 
                                 /*-----------------------------------*/
-	l->aligned = NULL;	/* Mark the slot in the list as free */
+ 	 l->aligned = NULL;	/* Mark the slot in the list as free */
                                 /*-----------------------------------*/
 
-	ptr = l->exact;
-	break;
+	 ptr = l->exact;
+	 break;
       }
+  }
 
   if (__phfree_hook != NULL)
-    (*__phfree_hook) (hdes, ptr);
+     (*__phfree_hook) (hdes, ptr);
   else
-    _phfree_internal (hdes, ptr);
+     _phfree_internal (hdes, ptr);
 
   #ifdef PTHREAD_SUPPORT
   (void)pthread_mutex_unlock(&htab_mutex);
@@ -4512,7 +4500,7 @@ void *phfree (const unsigned int hdes, const __ptr_t ptr)
 
   return((void *)NULL);
 }
-/*---------------------------------------------------------------------------
+/*------------------------------------------------------------------------
     Copyright (C) 1991, 1993, 1994 Free Software Foundation, Inc.
     This file is part of the GNU C Library.
 
@@ -4532,8 +4520,8 @@ void *phfree (const unsigned int hdes, const __ptr_t ptr)
     Cambridge, MA 02139, USA.
 
     Shared heap code by Mark O'Neill (mao@tumblingdice.co.uk)
-    (C) 1998-2023 M.A. O'Neill, Tumbling Dice
---------------------------------------------------------------------------*/
+    (C) 1998-2024 M.A. O'Neill, Tumbling Dice
+-----------------------------------------------------------------------*/
 
 #ifndef	_PHMALLOC_INTERNAL
 #define _PHMALLOC_INTERNAL
@@ -4541,6 +4529,7 @@ void *phfree (const unsigned int hdes, const __ptr_t ptr)
 #endif /* _PHMALLOC_INTERNAL */
 
 #include <xtypes.h>
+#include <stdint.h>
 
 #ifdef _LIBC
 #include <ansidecl.h>
@@ -4551,12 +4540,12 @@ function_alias(cfree, free, void, (ptr), DEFUN(cfree, (ptr), PTR ptr))
 
 #else
 
-_PUBLIC void phcfree (int hdes,  __ptr_t ptr)
+_PUBLIC void phcfree (int32_t hdes,  __ptr_t ptr)
 {   phfree (hdes, ptr);
 }
 
-#endif /* LIBC */
-/*--------------------------------------------------------------------------
+#endif /* PHMALLOC_INTERNAL */
+/*------------------------------------------------------------------------
     Change the size of a block allocated by `malloc'.
     Copyright 1990, 1991, 1992, 1993, 1994 Free Software Foundation, Inc.
     		     Written May 1989 by Mike Haertel.
@@ -4580,8 +4569,8 @@ _PUBLIC void phcfree (int hdes,  __ptr_t ptr)
     or (US mail) as Mike Haertel c/o Free Software Foundation.
 
     Persistent heap modifications by Mark O'Neill (mao@tumblingdice.co.uk)
-    (C) 1998-2023 M.A. O'Neill, Tumbling Dice
--------------------------------------------------------------------------*/
+    (C) 1998-2024 M.A. O'Neill, Tumbling Dice
+------------------------------------------------------------------------*/
 
 #ifndef	_PHMALLOC_INTERNAL
 #define _PHMALLOC_INTERNAL
@@ -4591,6 +4580,7 @@ _PUBLIC void phcfree (int hdes,  __ptr_t ptr)
 #include <xtypes.h>
 #include <unistd.h>
 #include <errno.h>
+#include <stdint.h>
 
 
 #if (defined (MEMMOVE_MISSING) || !defined(_LIBC) && !defined(STDC_HEADERS) && !defined(USG))
@@ -4609,7 +4599,7 @@ _PUBLIC void phcfree (int hdes,  __ptr_t ptr)
 /* not use object or heap locking)                         */
 /*---------------------------------------------------------*/
 
-_IMPORT int _pheap_internal;
+_IMPORT int32_t _pheap_internal;
 
 
 /*-------------------------------------------------------------*/
@@ -4617,31 +4607,31 @@ _IMPORT int _pheap_internal;
 /* table (as this is an internal operation)                    */
 /*-------------------------------------------------------------*/
 
-_IMPORT int _no_phobject_mapping;
+_IMPORT int32_t _no_phobject_mapping;
 
 
 /*--------------------------------------------------*/
 /* Add a persistent object to persistent object map */
 /*--------------------------------------------------*/
 
-_PROTOTYPE _EXTERN int msm_map_object(const unsigned int, const unsigned int, const void *, const char *);
+_PROTOTYPE _EXTERN int32_t msm_map_object(const uint32_t, const uint32_t, const void *, const char *);
 
 
 /*-----------------------------------------------------*/
 /* Remove persistent object from persistent object map */
 /*-----------------------------------------------------*/
 
-_PROTOTYPE _EXTERN int msm_unmap_object(const unsigned int, const unsigned int);
+_PROTOTYPE _EXTERN int32_t msm_unmap_object(const uint32_t, const uint32_t);
 
 
 /*--------------------------------------------------*/
 /* Like bcopy except never gets confused by overlap */
 /*--------------------------------------------------*/
 
-_PRIVATE void safe_bcopy (char *from, char *to, int size)
+_PRIVATE void safe_bcopy (char *from, char *to,  int32_t size)
 {
-  if (size <= 0 || from == to)
-    return;
+    if (size <= 0 || from == to)
+       return;
 
 
     /*------------------------------------------------------------------*/
@@ -4650,36 +4640,37 @@ _PRIVATE void safe_bcopy (char *from, char *to, int size)
     /* memory than the source, we'll assume bcopy can handle that.      */
     /*------------------------------------------------------------------*/
 
-  if(to < from || from + size <= to)
-     (void)bcopy (from, to, size);
-  else
-  {
+    if(to < from || from + size <= to)
+       (void)bcopy (from, to, size);
+    else
+    {
 
-      /*------------------------------------*/
-      /* Otherwise, we'll copy from the end */
-      /*------------------------------------*/
+       /*------------------------------------*/
+       /* Otherwise, we'll copy from the end */
+       /*------------------------------------*/
 
-      register char *endf = from + size;
-      register char *endt = to + size;
+       char *endf = from + size;
+       char *endt = to + size;
 
 
-      /*--------------------------------------------------------------*/
-      /* If TO - FROM is large, then we should break the copy into    */
-      /* nonoverlapping chunks of TO - FROM bytes each.  However, if  */
-      /* TO - FROM is small, then the bcopy function call overhead    */
-      /* makes this not worth it.  The crossover point could be about */
-      /* anywhere.  Since I don't think the obvious copy loop is too  */
-      /* bad, I'm trying to err in its favor.                         */
-      /*--------------------------------------------------------------*/
+       /*--------------------------------------------------------------*/
+       /* If TO - FROM is large, then we should break the copy  int32_to    */
+       /* nonoverlapping chunks of TO - FROM bytes each.  However, if  */
+       /* TO - FROM is small, then the bcopy function call overhead    */
+       /* makes this not worth it.  The crossover point could be about */
+       /* anywhere.  Since I don't think the obvious copy loop is too  */
+       /* bad, I'm trying to err in its favor.                         */
+       /*--------------------------------------------------------------*/
 
-      if (to - from < 64)
-      {
+       if (to - from < 64)
+       {
 	  do {    *--endt = *--endf;
 	     } while (endf != from);
-      }
-      else
-      {  for (;;)
-	 {
+       }
+
+       else
+       {  for (;;)
+          {
 	      endt -= (to - from);
 	      endf -= (to - from);
 
@@ -4697,8 +4688,8 @@ _PRIVATE void safe_bcopy (char *from, char *to, int size)
           /*---------------------------------------------------------*/
 
 	  (void)bcopy (from, to, endt - from);
-	}
-    }
+      }
+   }
 }
 
         /*-----------*/
@@ -4716,7 +4707,7 @@ _PRIVATE void safe_bcopy (char *from, char *to, int size)
 /* Debugging hook for realloc */
 /*----------------------------*/
 
-_PUBLIC __ptr_t (*__phrealloc_hook) __P ((const unsigned int, const __ptr_t __ptr, __malloc_size_t const __size, const char *));
+_PUBLIC __ptr_t (*__phrealloc_hook) __P ((const uint32_t, const __ptr_t __ptr, __malloc_size_t const __size, const char *));
 
 
 /*---------------------------------------------------------------*/
@@ -4728,260 +4719,262 @@ _PUBLIC __ptr_t (*__phrealloc_hook) __P ((const unsigned int, const __ptr_t __pt
 /* internals of both free and malloc.                            */
 /*---------------------------------------------------------------*/
 
-_PUBLIC __ptr_t phrealloc (const unsigned int hdes, const __ptr_t ptr, __malloc_size_t size, const char *name)
+_PUBLIC __ptr_t phrealloc (const uint32_t hdes, const __ptr_t ptr, __malloc_size_t size, const char *name)
 {
-  __ptr_t result;
+    __ptr_t result;
 
-  int type,
-      mapped,
-      h_index;
+    int32_t type,
+            mapped,
+            h_index;
 
-  __malloc_size_t block,
-                  blocks,
-                  oldlimit,
-                  req_size;
+    __malloc_size_t block,
+                    blocks,
+                    oldlimit,
+                    req_size;
 
 
-  #ifdef PTHREAD_SUPPORT
-  (void)pthread_mutex_lock(&htab_mutex);
-  #endif /* PTHREAD_SUPPORT */
+    #ifdef PTHREAD_SUPPORT
+    (void)pthread_mutex_lock(&htab_mutex);
+    #endif /* PTHREAD_SUPPORT */
 
-  /*--------------------------------------------------------------------------*/
-  /* Does this persistent object already exits? If so, we cannot allocate it! */
-  /*--------------------------------------------------------------------------*/
+    /*--------------------------------------------------------------------------*/
+    /* Does this persistent object already exits? If so, we cannot allocate it! */
+    /*--------------------------------------------------------------------------*/
 
-  if(name != (const char *)NULL && msm_phobject_exists(hdes,name))
-  {  errno = EEXIST;
+    if(name != (const char *)NULL && msm_phobject_exists(hdes,name))
+    {  errno = EEXIST;
 
-     #ifdef PTHREAD_SUPPORT
-     (void)pthread_mutex_unlock(&htab_mutex);
-     #endif /* PTHREAD_SUPPORT */
+       #ifdef PTHREAD_SUPPORT
+       (void)pthread_mutex_unlock(&htab_mutex);
+       #endif /* PTHREAD_SUPPORT */
 
-     return((__ptr_t *)NULL);
-  }
-
-  if(size == 0)
-  {  (void)phfree (hdes, ptr);
-
-     result = phmalloc (hdes, 0, name);
-
-     #ifdef PTHREAD_SUPPORT
-     (void)pthread_mutex_unlock(&htab_mutex);
-     #endif /* PTHREAD_SUPPORT */
-
-     return result;
-  }
-  else if (ptr == NULL)
-  {  result = phmalloc(hdes, size, name);
-
-     #ifdef PTHREAD_SUPPORT
-     (void)pthread_mutex_unlock(&htab_mutex);
-     #endif /* PTHREAD_SUPPORT */
-
-     return result;
-  }
-
-  if(__phrealloc_hook != NULL)
-  {
-     result = (*__phrealloc_hook) (hdes, ptr, size, name);
-
-     #ifdef PTHREAD_SUPPORT
-     (void)pthread_mutex_unlock(&htab_mutex);
-     #endif /* PTHREAD_SUPPORT */
-
-     return result;
-  }
-
-  if((h_index = msm_map_objectaddr2index(hdes,ptr)) == (-1))
-  {  errno = EACCES;
-
-     #ifdef PTHREAD_SUPPORT
-     (void)pthread_mutex_unlock(&htab_mutex);
-     #endif /* PTHREAD_SUPPORT */
-
-     return NULL;
-  }
-
-  block = BLOCK (hdes, ptr);
-
-  req_size = size;
-  type     = _pheapinfo[hdes][block].busy.type;
-  switch (type)
-  {
-    case 0:
-
-      /*----------------------------------------------------*/
-      /* Maybe reallocate a large block to a small fragment */
-      /*----------------------------------------------------*/
-
-      if (size <= BLOCKSIZE / 2)
-      {
-	  result = phmalloc (hdes, size, (char *)NULL);
-	  if(result != NULL)
-          {
-	      (void)memcpy (result, ptr, size);
-
-              _no_phobject_mapping = 1;
-	      _phfree_internal (hdes, ptr);
-              _no_phobject_mapping = 1;
-
-              h_index = msm_map_objectname2index(hdes,name);
-
-              (void)msm_map_setsize(hdes,h_index,req_size);
-
-              #ifdef PTHREAD_SUPPORT
-              (void)pthread_mutex_unlock(&htab_mutex);
-              #endif /* PTHREAD_SUPPORT */
-
-	      return result;
-          }
-      }
-
-
-      /*---------------------------------------------*/
-      /* The new size is a large allocation as well; */
-      /* see if we can hold it in place.             */
-      /*---------------------------------------------*/
-
-      blocks = BLOCKIFY (size);
-      if (blocks < _pheapinfo[hdes][block].busy.info.size)
-      {
-
-          /*---------------------------------*/
-	  /* The new size is smaller; return */
-	  /* excess memory to the free list. */
-          /*---------------------------------*/
-
-	  _pheapinfo[hdes][block + blocks].busy.type      = 0;
-	  _pheapinfo[hdes][block + blocks].busy.info.size = _pheapinfo[hdes][block].busy.info.size - blocks;
-	  _pheapinfo[hdes][block].busy.info.size          = blocks;
-
-
-          /*---------------------------------------------------------------------*/
-          /* We have just created a new chunk by splitting a chunk in two.       */
-          /* Now we will free this chunk; increment the statistics counter       */
-          /* so it doesn't become wrong when _free_pheap_internal decrements it. */
-          /*---------------------------------------------------------------------*/
-
-	  ++_pheap_chunks_used[hdes];
-
-          _no_phobject_mapping = 1;
-	  _phfree_internal (hdes, ADDRESS (hdes, block + blocks));
-          _no_phobject_mapping = 0;
-
-          h_index         = msm_map_objectname2index(hdes,name); 
-
-          _phobjectmap[hdes][h_index]->addr = result; 
-	  result = ptr;
-      }
-      else if (blocks == _pheapinfo[hdes][block].busy.info.size)
-
-
-         /*--------------------------*/
-         /* No size change necessary */
-         /*--------------------------*/
-
-         result = ptr;
-      else
-      {
-
-         /*------------------------------------------------------------*/
-         /* Won't fit, so allocate a new region that will.             */
-         /* Free the old region first in case there is sufficient      */
-         /* adjacent free space to grow without moving.                */
-         /* blocks = _pheapinfo[hdes][block].busy.info.size;           */
-         /* Prevent free from actually returning memory to the system. */
-         /*------------------------------------------------------------*/
-
-	  oldlimit           = _pheaplimit[hdes];
-	  _pheaplimit[hdes] = 0;
-
-          _no_phobject_mapping = 1;
-	  _phfree_internal (hdes, ptr);
-          _no_phobject_mapping = 0;
-
-	  _pheaplimit[hdes] = oldlimit;
-	  result = phmalloc (hdes, size, (char *)NULL);
-	  if (result == NULL)
-          {
-
-             /*--------------------------------------------------*/
-             /* Now we're really in trouble.  We have to unfree  */
-             /* the thing we just freed.  Unfortunately it might */
-             /* have been coalesced with its neighbours.         */
-             /*--------------------------------------------------*/
-
-	      if(_pheapindex[hdes] == block)
-	        (void) phmalloc (hdes, blocks * BLOCKSIZE, (char *)NULL);
-	      else
-              {
-		  __ptr_t previous = phmalloc (hdes, (block - _pheapindex[hdes]) * BLOCKSIZE, (char *)NULL);
-		  (void) phmalloc (hdes, blocks * BLOCKSIZE, (char *)NULL);
-
-                  _no_phobject_mapping = 1;
-		  _phfree_internal (hdes, previous);
-                  _no_phobject_mapping = 1;
-              }
-
-              h_index = msm_map_objectname2index(hdes,name); 
-
-              msm_unmap_object(hdes,h_index); 
- 
-              #ifdef PTHREAD_SUPPORT
-              (void)pthread_mutex_unlock(&htab_mutex);
-              #endif /* PTHREAD_SUPPORT */
-
-	      return NULL;
-	  }
-
-	  if(ptr != result)
-	     memmove (result, ptr, blocks * BLOCKSIZE);
-	}
-        break;
-
-    default:
-
-
-         /*-------------------------------------------*/
-         /* Old size is a fragment; type is logarithm */
-	 /* to base two of the fragment size.         */
-         /*-------------------------------------------*/
-
-         if (size > (__malloc_size_t) (1 << (type - 1)) && size <= (__malloc_size_t) (1 << type))
-
-
-             /*-------------------------------------------*/
-	     /* The new size is the same kind of fragment */
-             /*-------------------------------------------*/
-
-	     result = ptr;
-         else
-	 {  
-
-            /*--------------------------------------------------*/
-            /* The new size is different; allocate a new space, */
-	    /* and copy the lesser of the new size and the old. */
-            /*--------------------------------------------------*/
-
-	    result = phmalloc (hdes, size, (char *)NULL);
-
-            if(result == NULL)  
-            {  h_index = msm_map_objectname2index(hdes,name);  
-
-               msm_unmap_object(hdes,h_index);  
-
-               #ifdef PTHREAD_SUPPORT
-               (void)pthread_mutex_unlock(&htab_mutex);
-               #endif /* PTHREAD_SUPPORT */
-
-	       return NULL;
-            }
-
-	    (void)memcpy (result, ptr, min (size, (__malloc_size_t) 1 << type));
-	    (void)phfree (hdes, ptr);
-	}
-        break;
+       return((__ptr_t *)NULL);
     }
+
+    if(size == 0)
+    {  (void)phfree (hdes, ptr);
+
+       result = phmalloc (hdes, 0, name);
+
+       #ifdef PTHREAD_SUPPORT
+       (void)pthread_mutex_unlock(&htab_mutex);
+       #endif /* PTHREAD_SUPPORT */
+
+       return result;
+    }
+    else if (ptr == NULL)
+    {  result = phmalloc(hdes, size, name);
+
+       #ifdef PTHREAD_SUPPORT
+       (void)pthread_mutex_unlock(&htab_mutex);
+       #endif /* PTHREAD_SUPPORT */
+
+       return result;
+    }
+
+    if(__phrealloc_hook != NULL)
+    {
+       result = (*__phrealloc_hook) (hdes, ptr, size, name);
+
+       #ifdef PTHREAD_SUPPORT
+       (void)pthread_mutex_unlock(&htab_mutex);
+       #endif /* PTHREAD_SUPPORT */
+
+       return result;
+    }
+
+    if((h_index = msm_map_objectaddr2index(hdes,ptr)) == (-1))
+    {  errno = EACCES;
+
+       #ifdef PTHREAD_SUPPORT
+       (void)pthread_mutex_unlock(&htab_mutex);
+       #endif /* PTHREAD_SUPPORT */
+
+       return NULL;
+    }
+
+    block = BLOCK (hdes, ptr);
+
+    req_size = size;
+    type     = _pheapinfo[hdes][block].busy.type;
+    switch (type)
+    {
+           case 0:
+
+                      /*----------------------------------------------------*/
+                      /* Maybe reallocate a large block to a small fragment */
+                      /*----------------------------------------------------*/
+
+                      if (size <= BLOCKSIZE / 2)
+                      {
+	                 result = phmalloc (hdes, size, (char *)NULL);
+
+                         if(result != NULL)
+                         {
+                            (void)memcpy (result, ptr, size);
+
+                            _no_phobject_mapping = 1;
+	                    _phfree_internal (hdes, ptr);
+                            _no_phobject_mapping = 1;
+
+                            h_index              = msm_map_objectname2index(hdes,name);
+
+                            (void)msm_map_setsize(hdes,h_index,req_size);
+
+                            #ifdef PTHREAD_SUPPORT
+                            (void)pthread_mutex_unlock(&htab_mutex);
+                            #endif /* PTHREAD_SUPPORT */
+
+	                    return result;
+                         }
+                     }
+
+
+                     /*---------------------------------------------*/
+                     /* The new size is a large allocation as well; */
+                     /* see if we can hold it in place.             */
+                     /*---------------------------------------------*/
+
+                     blocks = BLOCKIFY (size);
+                     if (blocks < _pheapinfo[hdes][block].busy.info.size)
+                     {
+
+                        /*---------------------------------*/
+                        /* The new size is smaller; return */
+                        /* excess memory to the free list. */
+                        /*---------------------------------*/
+
+	                _pheapinfo[hdes][block + blocks].busy.type      = 0;
+	                _pheapinfo[hdes][block + blocks].busy.info.size = _pheapinfo[hdes][block].busy.info.size - blocks;
+	                _pheapinfo[hdes][block].busy.info.size          = blocks;
+
+
+                        /*---------------------------------------------------------------------*/
+                        /* We have just created a new chunk by splitting a chunk in two.       */
+                        /* Now we will free this chunk; increment the statistics counter       */
+                        /* so it doesn't become wrong when _free_pheap_internal decrements it. */
+                        /*---------------------------------------------------------------------*/
+
+                        ++_pheap_chunks_used[hdes];
+
+                        _no_phobject_mapping = 1;
+                        _phfree_internal (hdes, ADDRESS (hdes, block + blocks));
+                        _no_phobject_mapping = 0;
+
+                        h_index         = msm_map_objectname2index(hdes,name); 
+
+                        _phobjectmap[hdes][h_index]->addr = result; 
+                        result = ptr;
+                    }
+                    else if (blocks == _pheapinfo[hdes][block].busy.info.size)
+
+
+                       /*--------------------------*/
+                       /* No size change necessary */
+                       /*--------------------------*/
+
+                       result = ptr;
+                    else
+                    {
+
+                       /*------------------------------------------------------------*/
+                       /* Won't fit, so allocate a new region that will.             */
+                       /* Free the old region first in case there is sufficient      */
+                       /* adjacent free space to grow without moving.                */
+                       /* blocks = _pheapinfo[hdes][block].busy.info.size;           */
+                       /* Prevent free from actually returning memory to the system. */
+                       /*------------------------------------------------------------*/
+
+                      oldlimit          = _pheaplimit[hdes];
+                      _pheaplimit[hdes] = 0;
+
+                      _no_phobject_mapping = 1;
+	             _phfree_internal (hdes, ptr);
+                     _no_phobject_mapping = 0;
+
+	             _pheaplimit[hdes] = oldlimit;
+	             result = phmalloc (hdes, size, (char *)NULL);
+
+	             if (result == NULL)
+                     {
+
+                        /*--------------------------------------------------*/
+                        /* Now we're really in trouble.  We have to unfree  */
+                        /* the thing we just freed.  Unfortunately it might */
+                        /* have been coalesced with its neighbours.         */
+                        /*--------------------------------------------------*/
+
+	                 if(_pheapindex[hdes] == block)
+	                    (void) phmalloc (hdes, blocks * BLOCKSIZE, (char *)NULL);
+	                 else
+                         {
+		             __ptr_t previous = phmalloc (hdes, (block - _pheapindex[hdes]) * BLOCKSIZE, (char *)NULL);
+		             (void) phmalloc (hdes, blocks * BLOCKSIZE, (char *)NULL);
+
+                             _no_phobject_mapping = 1;
+		             _phfree_internal (hdes, previous);
+                             _no_phobject_mapping = 1;
+                         }
+
+                         h_index = msm_map_objectname2index(hdes,name); 
+
+                         msm_unmap_object(hdes,h_index); 
+ 
+                         #ifdef PTHREAD_SUPPORT
+                         (void)pthread_mutex_unlock(&htab_mutex);
+                         #endif /* PTHREAD_SUPPORT */
+
+	                 return NULL;
+	             }
+
+	             if(ptr != result)
+	                memmove (result, ptr, blocks * BLOCKSIZE);
+	           }
+                   break;
+
+           default:
+
+
+                  /*-------------------------------------------*/
+                  /* Old size is a fragment; type is logarithm */
+	          /* to base two of the fragment size.         */
+                  /*-------------------------------------------*/
+
+                  if (size > (__malloc_size_t) (1 << (type - 1)) && size <= (__malloc_size_t) (1 << type))
+
+
+                     /*-------------------------------------------*/
+	             /* The new size is the same kind of fragment */
+                     /*-------------------------------------------*/
+
+	             result = ptr;
+                 else
+	         {  
+
+                    /*--------------------------------------------------*/
+                    /* The new size is different; allocate a new space, */
+	            /* and copy the lesser of the new size and the old. */
+                    /*--------------------------------------------------*/
+
+        	    result = phmalloc (hdes, size, (char *)NULL);
+
+                    if(result == NULL)  
+                    {  h_index = msm_map_objectname2index(hdes,name);  
+
+                       msm_unmap_object(hdes,h_index);  
+
+                       #ifdef PTHREAD_SUPPORT
+                       (void)pthread_mutex_unlock(&htab_mutex);
+                       #endif /* PTHREAD_SUPPORT */
+
+	               return NULL;
+                    }
+
+	            (void)memcpy (result, ptr, min (size, (__malloc_size_t) 1 << type));
+	            (void)phfree (hdes, ptr);
+	        }
+                break;
+  }
 
   h_index                           = msm_map_objectname2index(hdes,name);
   _phobjectmap[hdes][h_index]->addr = result; 
@@ -4994,7 +4987,7 @@ _PUBLIC __ptr_t phrealloc (const unsigned int hdes, const __ptr_t ptr, __malloc_
 
   return result;
 }
-/*---------------------------------------------------------------------------
+/*------------------------------------------------------------------------
     Copyright (C) 1991, 1992, 1994 Free Software Foundation, Inc.
 
     This library is free software; you can redistribute it and/or
@@ -5016,10 +5009,11 @@ _PUBLIC __ptr_t phrealloc (const unsigned int hdes, const __ptr_t ptr, __malloc_
    or (US mail) as Mike Haertel c/o Free Software Foundation.
 
    Shared heap modifications by Mark O'Neill (mao@tumblingdice.co.uk)
-   (C) 1998-2023 M.A. O'Neill, Tumbling Dice
---------------------------------------------------------------------------*/
+   (C) 1998-2024 M.A. O'Neill, Tumbling Dice
+-----------------------------------------------------------------------*/
 
 #include <errno.h>
+#include <stdint.h>
 
 #ifndef	_PHMALLOC_INTERNAL
 #define	_PHMALLOC_INTERNAL
@@ -5034,7 +5028,7 @@ _PUBLIC __ptr_t phrealloc (const unsigned int hdes, const __ptr_t ptr, __malloc_
 /* The entire array is initialized to zeros.                 */
 /*-----------------------------------------------------------*/
 
-_PUBLIC __ptr_t phcalloc (const unsigned int hdes, const __malloc_size_t nmemb, const __malloc_size_t size, const char *name)
+_PUBLIC __ptr_t phcalloc (const uint32_t hdes, const __malloc_size_t nmemb, const __malloc_size_t size, const char *name)
 {
   register __ptr_t result;
 
@@ -5069,7 +5063,7 @@ _PUBLIC __ptr_t phcalloc (const unsigned int hdes, const __malloc_size_t nmemb, 
 
   return result;
 }
-/*-----------------------------------------------------------------------------
+/*----------------------------------------------------------------------------
     Copyright (C) 1991, 1992, 1993, 1994 Free Software Foundation, Inc.
     This file is part of the GNU C Library.
 
@@ -5088,8 +5082,8 @@ _PUBLIC __ptr_t phcalloc (const unsigned int hdes, const __malloc_size_t nmemb, 
     the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
 
     Persistent heap modifications by Mark O'Neill (mao@tumblingdice.co.uk)
-    (C) 1998-2023 M.A. O'Neill, Tumbling Dice
-----------------------------------------------------------------------------*/
+    (C) 1998-2024 M.A. O'Neill, Tumbling Dice
+---------------------------------------------------------------------------*/
 
 #include <pheap.h>
 
@@ -5106,7 +5100,7 @@ _PUBLIC __ptr_t phcalloc (const unsigned int hdes, const __malloc_size_t nmemb, 
 /* systems with potentially hostile include files.                         */
 /*-------------------------------------------------------------------------*/
 
-extern void *msm_sbrk __P ((const unsigned int hdes, size_t increment));
+extern void *msm_sbrk __P ((const uint32_t hdes, size_t increment));
 #endif /* __GNU_LIBRARY__ */
 
 #ifndef NULL
@@ -5123,17 +5117,17 @@ extern void *msm_sbrk __P ((const unsigned int hdes, size_t increment));
 #ifdef __STDC__
 _PUBLIC __ptr_t __default_phmorecore (int hdes,  ptrdiff_t increment)
 #else
-_PUBLIC __ptr_t __default_phmorecore (int hdes,  int increment)
+_PUBLIC __ptr_t __default_phmorecore (int hdes,  int32_t   increment)
 #endif /* __STDC__ */
 {
-  __ptr_t result = (__ptr_t)msm_sbrk(hdes, increment);
+    __ptr_t result = (__ptr_t)msm_sbrk(hdes, increment);
 
-  if(result == (__ptr_t) -1)
-    return NULL;
+    if(result == (__ptr_t) -1)
+      return NULL;
 
-  return result;
+    return result;
 }
-/*----------------------------------------------------------------------------
+/*---------------------------------------------------------------------------
     Copyright (C) 1991, 1992, 1993, 1994, 1995 Free Software Foundation, Inc.
 
     This library is free software; you can redistribute it and/or
@@ -5152,8 +5146,8 @@ _PUBLIC __ptr_t __default_phmorecore (int hdes,  int increment)
     Cambridge, MA 02139, USA.  
 
     Persistent heap modification by Mark O'Neill (mao@tumblingdice.co.uk)
-    (C) 1998-2023 M.A. O'Neill, Tumbling Dice
-----------------------------------------------------------------------------*/
+    (C) 1998-2024 M.A. O'Neill, Tumbling Dice
+---------------------------------------------------------------------------*/
 
 #ifndef	_PHMALLOC_INTERNAL
 #define _PHMALLOC_INTERNAL
@@ -5166,97 +5160,99 @@ _PUBLIC __ptr_t __default_phmorecore (int hdes,  int increment)
 /* Add a persistent object to persistent object map */
 /*--------------------------------------------------*/
 
-_PROTOTYPE _EXTERN int msm_map_object(const unsigned int, const unsigned int, const void *, const char *);
+_PROTOTYPE _EXTERN int32_t msm_map_object(const uint32_t, const uint32_t, const void *, const char *);
 
 
 /*-------------------------------------------------------*/
 /* Remove a persistent object from persistent object map */
 /*-------------------------------------------------------*/
 
-_PROTOTYPE _EXTERN int msm_unmap_object(const unsigned int, const unsigned int);
+_PROTOTYPE _EXTERN int32_t msm_unmap_object(const uint32_t, const uint32_t);
 
 
 /*-------------------------*/
 /* Get free object mapslot */
 /*-------------------------*/
 
-_PROTOTYPE _EXTERN int msm_get_free_mapslot(const unsigned int);
+_PROTOTYPE _EXTERN int32_t msm_get_free_mapslot(const uint32_t);
 
 
-_PUBLIC __ptr_t (*__phmemalign_hook) __P ((const unsigned int, const __malloc_size_t __alignment, size_t __size, const char *));
-_PUBLIC __ptr_t phmemalign (const unsigned int hdes, const __malloc_size_t alignment, __malloc_size_t size, const char *name)
+_PUBLIC __ptr_t (*__phmemalign_hook) __P ((const uint32_t   , const __malloc_size_t __alignment, size_t __size, const char *));
+_PUBLIC __ptr_t phmemalign (const uint32_t    hdes, const __malloc_size_t alignment, __malloc_size_t size, const char *name)
 {
-  int               h_index;
-  __ptr_t           result;
-  unsigned long int adj;
-
-  #ifdef PTHREAD_SUPPORT
-  (void)pthread_mutex_lock(&htab_mutex);
-  #endif /* PTHREAD_SUPPORT */
-
-  if(__phmemalign_hook)
-  {
-     result = (*__phmemalign_hook) (hdes, alignment, size, name);
+     int32_t  h_index;
+     __ptr_t  result;
+     uint64_t adj;
 
      #ifdef PTHREAD_SUPPORT
-     (void)pthread_mutex_unlock(&htab_mutex);
+     (void)pthread_mutex_lock(&htab_mutex);
      #endif /* PTHREAD_SUPPORT */
 
-     return result;
-  }
+     if(__phmemalign_hook)
+     {
+        result = (*__phmemalign_hook) (hdes, alignment, size, name);
 
-  size = ((size + alignment - 1) / alignment) * alignment;
+        #ifdef PTHREAD_SUPPORT
+        (void)pthread_mutex_unlock(&htab_mutex);
+        #endif /* PTHREAD_SUPPORT */
 
-  result = phmalloc (hdes, size, (char *)NULL);
-  if(result == NULL)
-  {
+        return result;
+     }
 
-     #ifdef PTHREAD_SUPPORT
-     (void)pthread_mutex_unlock(&htab_mutex);
-     #endif /* PTHREAD_SUPPORT */
+     size = ((size + alignment - 1) / alignment) * alignment;
 
-     return NULL;
-  }
+     result = phmalloc (hdes, size, (char *)NULL);
+     if(result == NULL)
+     {
 
-  adj = (unsigned long int) ((unsigned long int) ((char *) result - (char *) NULL)) % alignment;
+        #ifdef PTHREAD_SUPPORT
+        (void)pthread_mutex_unlock(&htab_mutex);
+        #endif /* PTHREAD_SUPPORT */
 
-  if (adj != 0)
-  {
-      struct alignlist *l = (struct alignlist *)NULL;
-      for(l = _aligned_blocks; l != NULL; l = l->next)
-      {  if(l->aligned == NULL)
+        return NULL;
+     }
+
+     adj = (uint64_t) ((uint64_t) ((char *) result - (char *) NULL)) % alignment;
+
+     if (adj != 0)
+     {
+         struct alignlist *l = (struct alignlist *)NULL;
+         for(l = _aligned_blocks; l != NULL; l = l->next)
+         {  if(l->aligned == NULL)
 
 
-            /*-----------------------------*/
-	    /* This slot is free.  Use it. */
-            /*-----------------------------*/
+               /*-----------------------------*/
+	       /* This slot is free.  Use it. */
+               /*-----------------------------*/
 
-	    break;
-      }
+	       break;
+         }
 
-      if (l == NULL)
-      {
-	  l = (struct alignlist *) phmalloc (hdes, sizeof (struct alignlist), (char *)NULL);
-	  if (l == NULL)
-          {
-	      phfree (hdes, result);
-	      return NULL;
-	  }
-	  l->next         = _aligned_blocks;
-	  _aligned_blocks = l;
-      }
-      l->exact = result;
-      result   = l->aligned = (char *) result + alignment - adj;
-  }
+         if (l == NULL)
+         {
+             l = (struct alignlist *) phmalloc (hdes, sizeof (struct alignlist), (char *)NULL);
+	     if (l == NULL)
+             {
+                phfree (hdes, result);
+                return NULL;
+	     }
 
-  if(name != (char *)NULL)
-  {  h_index = msm_get_free_mapslot(hdes);
-     msm_map_object(hdes,h_index,result,name);
-  }
+	     l->next         = _aligned_blocks;
+	     _aligned_blocks = l;
+         }
 
-  #ifdef PTHREAD_SUPPORT
-  (void)pthread_mutex_unlock(&htab_mutex);
-  #endif /* PTHREAD_SUPPORT */
+         l->exact = result;
+         result   = l->aligned = (char *) result + alignment - adj;
+    }
+
+    if(name != (char *)NULL)
+    {  h_index = msm_get_free_mapslot(hdes);
+       msm_map_object(hdes,h_index,result,name);
+    }
+
+    #ifdef PTHREAD_SUPPORT
+    (void)pthread_mutex_unlock(&htab_mutex);
+    #endif /* PTHREAD_SUPPORT */
  
-  return result;
+    return result;
 }
